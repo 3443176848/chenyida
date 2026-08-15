@@ -77,7 +77,7 @@ test("versioned test inventory accounts for every top-level test and only exclud
   assert.equal(inventory.total_tests, RELEASE_TEST_INVENTORY_TOTAL);
   assert.equal(inventory.required_tests, RELEASE_TEST_INVENTORY_REQUIRED);
   assert.equal(inventory.not_applicable_tests, RELEASE_TEST_INVENTORY_NOT_APPLICABLE);
-  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 84, POSTGRES_ALIAS: 2, PURE_NODE: 130, RELEASE_CONTRACT: 9, SPECIAL_HARNESS: 7 });
+  assert.deepEqual(inventory.category_counts, { BROWSER: 6, HISTORICAL_D1_SITES: 22, POSTGRES: 84, POSTGRES_ALIAS: 2, PURE_NODE: 130, RELEASE_CONTRACT: 10, SPECIAL_HARNESS: 7 });
   assert.deepEqual(inventory.tests.filter((entry) => entry.category === "RELEASE_CONTRACT").map((entry) => entry.path), [
     "tests/selfhost-file-storage.test.mjs",
     "tests/selfhost-release-gate-contract.test.mjs",
@@ -88,6 +88,7 @@ test("versioned test inventory accounts for every top-level test and only exclud
     "tests/selfhost-uat-promotion-cross-role-evidence-contract.test.mjs",
     "tests/selfhost-uat-promotion-migration-execution-contract.test.mjs",
     "tests/selfhost-uat-promotion-rollback-contract.test.mjs",
+    "tests/selfhost-uat-promotion-rollback-runtime-contract.test.mjs",
   ]);
   assert.ok(inventory.tests.filter((entry) => entry.applicability === "NOT_APPLICABLE").every((entry) => entry.reason && entry.canonical_path !== entry.path));
   assert.ok(inventory.tests.filter((entry) => entry.applicability === "REQUIRED").every((entry) => entry.reason === null && entry.canonical_path === null));

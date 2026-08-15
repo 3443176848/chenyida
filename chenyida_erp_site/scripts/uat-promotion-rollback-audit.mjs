@@ -157,6 +157,8 @@ function inspectRepository(policy, sourceBodies, errors) {
   const deploymentControl = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs") ?? "";
   const rollbackContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs") ?? "";
   const rollbackControl = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs") ?? "";
+  const rollbackRuntimeContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs") ?? "";
+  const rollbackRuntimeAdapter = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py") ?? "";
   const promotionJournal = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs") ?? "";
   const promotionPolicy = sourceBodies.get("chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json") ?? "";
   const crossRoleResultContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-cross-role-evidence-contract.mjs") ?? "";
@@ -248,8 +250,29 @@ function inspectRepository(policy, sourceBodies, errors) {
       && installer.includes("SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_POSTVERIFY_REQUIRED")
       ? "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE" : "UNKNOWN",
     rollback_runtime_adapter: rollbackControl.includes('path.join(SITE_ROOT, "scripts/uat-promotion-rollback-runtime-adapter.py")')
-      && !launcher.includes('"chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py"')
-      ? "MISSING_BUNDLED_RUNTIME_ADAPTER_FAIL_CLOSED" : "UNKNOWN",
+      && launcher.includes('"chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py"')
+      && launcher.includes('"chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs"')
+      && rollbackRuntimeContract.includes("UAT_PROMOTION_ROLLBACK_RUNTIME_ACTION_MATRIX")
+      && rollbackRuntimeContract.includes('RECOVERY: Object.freeze(["PREFLIGHT", "RECHECK", "PROBE", "CONTAIN"])')
+      && rollbackRuntimeAdapter.includes("EXECUTOR_FILE = Path(\"/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1\")")
+      && rollbackRuntimeContract.includes("COMPOSE_PROJECT_COMPLETE_WRITER_SET")
+      && rollbackRuntimeContract.includes("retained_candidate_volumes")
+      && rollbackRuntimeContract.includes("STALE_INTENT")
+      && rollbackRuntimeContract.includes("knownServiceContainerIds")
+      && rollbackControl.includes("stopped_writers")
+      && rollbackControl.includes("candidate_volume_present")
+      && rollbackControl.includes("containment_attempt_receipt_sha256")
+      && rollbackControl.includes("REFRESH_REJECTED")
+      && rollbackControl.includes("retained_candidate_volumes_sha256")
+      && rollbackRuntimeAdapter.includes("CHENYIDA_ERP_ROLLBACK_TRUSTED_FD_MANIFEST")
+      && rollbackRuntimeAdapter.includes("trusted_parent_chain")
+      && rollbackRuntimeAdapter.includes("/proc/self/fd/")
+      && rollbackRuntimeAdapter.includes("start_new_session=True")
+      && rollbackRuntimeAdapter.includes("os.killpg")
+      && rollbackRuntimeAdapter.includes("STALE_INTENT")
+      && rollbackRuntimeAdapter.includes("known_service_container_ids")
+      && rollbackRuntimeAdapter.includes("contain database, volume, or Compose mutation logic itself")
+      ? "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED" : "UNKNOWN",
     rollback_rehearsal_evidence: "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT",
     cross_role_uat_readiness: crossRole?.readiness?.status ?? "UNKNOWN",
   };
@@ -262,7 +285,7 @@ function inspectRepository(policy, sourceBodies, errors) {
   if (observations.cross_role_uat_transaction_binding !== "SUPERVISOR_CHECKPOINT_12_CONTENT_ADDRESSED_AND_RECOVERABLE") error(errors, "AUDIT_CROSS_ROLE_UAT_TRANSACTION_BINDING_DRIFT");
   if (observations.finalization_transaction_binding !== "SUPERVISOR_CHECKPOINT_13_AGGREGATED_AND_RECOVERABLE") error(errors, "AUDIT_FINALIZATION_TRANSACTION_BINDING_DRIFT");
   if (observations.rollback_transaction_binding !== "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE") error(errors, "AUDIT_ROLLBACK_TRANSACTION_BINDING_DRIFT");
-  if (observations.rollback_runtime_adapter !== "MISSING_BUNDLED_RUNTIME_ADAPTER_FAIL_CLOSED") error(errors, "AUDIT_ROLLBACK_RUNTIME_BOUNDARY_DRIFT");
+  if (observations.rollback_runtime_adapter !== "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED") error(errors, "AUDIT_ROLLBACK_RUNTIME_BOUNDARY_DRIFT");
   if (observations.rollback_rehearsal_evidence !== "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT") error(errors, "AUDIT_ROLLBACK_REHEARSAL_BOUNDARY_DRIFT");
   if (observations.cross_role_uat_readiness !== "BLOCKED") error(errors, "AUDIT_CROSS_ROLE_UAT_BOUNDARY_DRIFT");
   return observations;
@@ -289,9 +312,9 @@ export function buildUatPromotionRollbackAudit(inputs) {
   const observations = inspectRepository(policy, sourceBodies, errors);
   const incomplete = capabilities.filter((entry) => entry.status !== "SUPPORTED");
   const executionBlockers = [
-    ...(observations.rollback_runtime_adapter === "MISSING_BUNDLED_RUNTIME_ADAPTER_FAIL_CLOSED" ? [{
-      id: "ROLLBACK_RUNTIME_ADAPTER_NOT_BUNDLED", severity: "P0",
-      finding: "checkpoint 14/15控制链已闭合，但真实数据库、卷与Web/Worker物化适配器未进入受信Supervisor bundle；预检必须在授权消耗前失败。",
+    ...(observations.rollback_runtime_adapter === "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED" ? [{
+      id: "ROLLBACK_RUNTIME_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED", severity: "P0",
+      finding: "checkpoint 14/15控制链与受信网关已进入Supervisor bundle，但固定数据库、卷与Web/Worker物化执行器尚未实现或激活；预检必须在授权消耗前失败。",
     }] : []),
     ...(observations.rollback_rehearsal_evidence === "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT" ? [{
       id: "UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED", severity: "P0",
@@ -332,7 +355,7 @@ export function buildUatPromotionRollbackAudit(inputs) {
       code: blocked ? "UAT_PROMOTION_EXECUTOR_NOT_READY" : "UAT_PROMOTION_EXECUTOR_READY",
       statement: !blocked
         ? "全部逐检查点执行、恢复与回退能力已由同一内容寻址控制链证明。"
-        : "仓库检查点控制链已闭合，但真实运行时适配器、隔离回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
+        : "仓库检查点控制链与受信回退网关已闭合，但真实运行时执行器/激活、隔离回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
     },
     audit_validation: { result: errors.length ? "FAIL" : "PASS", errors: [...errors] },
   };
@@ -362,7 +385,7 @@ export function renderMarkdown(artifact) {
   const lines = [
     "# 晨亿达 ERP UAT 晋升与快照回滚执行器审计 v1",
     "",
-    "> 当前结论：`BLOCKED / CONTROL PLANE COMPLETE / RUNTIME ADAPTER AND REAL EVIDENCE MISSING`。本报告是源码摘要绑定的机器审计，不是UAT、Migration、部署、恢复或回滚授权。",
+    "> 当前结论：`BLOCKED / CONTROL PLANE AND TRUSTED GATEWAY COMPLETE / EXECUTOR ACTIVATION AND REAL EVIDENCE MISSING`。本报告是源码摘要绑定的机器审计，不是UAT、Migration、部署、恢复或回滚授权。",
     "",
     "## 1. 审计结论",
     "",
@@ -372,7 +395,7 @@ export function renderMarkdown(artifact) {
     `- 执行判定：\`${artifact.execution_readiness.code}\`；检查点缺口=${artifact.execution_readiness.blocking_checkpoint_count}，全部阻塞=${artifact.execution_readiness.blocking_condition_count}，P0=${artifact.execution_readiness.p0_blocker_count}，P1=${artifact.execution_readiness.p1_blocker_count}，may_start=\`${artifact.execution_readiness.may_start}\`。`,
     `- ${artifact.execution_readiness.statement}`,
     "",
-    "仓库已有checkpoint 4—15的内容寻址意图、结果、恢复与隔离控制链，其中checkpoint 14/15绑定精确前代、四数据域、独立授权和ROLLED_BACK终态；但真实数据库/卷/容器物化适配器未进入bundle，隔离UAT回退演练与人工UAT也尚未执行。",
+    "仓库已有checkpoint 4—15的内容寻址意图、结果、恢复与隔离控制链，其中checkpoint 14/15绑定精确前代、四数据域、独立授权和ROLLED_BACK终态；受信无shell网关已进入bundle，但固定数据库/卷/容器物化执行器及其激活仍不存在，隔离UAT回退演练与人工UAT也尚未执行。",
     "",
     "## 2. Supervisor操作面",
     "",
@@ -398,7 +421,7 @@ export function renderMarkdown(artifact) {
     `- 跨岗位UAT事务：\`${artifact.observations.cross_role_uat_transaction_binding}\`；checkpoint 12只摄取已由事前人工授权、精确账号/人员映射、结构化步骤与控制、共同证据主题及三方签字闭合的结果；人工执行授权与后续Supervisor摄取授权必须不同，恢复只续写journal且不重跑人工步骤。`,
     `- 晋升终态事务：\`${artifact.observations.finalization_transaction_binding}\`；checkpoint 13以独立一次性授权聚合checkpoint 4—12 receipt、evidence、intent和authorization链，最终证据绑定checkpoint 12完整result摘要；不释放数据库或备份保护，也不声明checkpoint 14/15回退就绪。`,
     `- 回退事务：\`${artifact.observations.rollback_transaction_binding}\`；checkpoint 14逐阶段先写intent再调用适配器并绑定精确前代，checkpoint 15用独立授权逐项核验后只允许写入ROLLED_BACK；partial/unknown只能隔离，恢复不得重跑阶段。`,
-    `- 回退运行时：\`${artifact.observations.rollback_runtime_adapter}\`；生产适配器缺失会在授权消耗前预检失败，当前没有真实数据库、四数据域、Web/Worker切换权限。`,
+    `- 回退运行时：\`${artifact.observations.rollback_runtime_adapter}\`；受信网关会核对固定activation、plan、工具身份、process-group与响应，但固定执行器或激活缺失仍会在授权消耗前失败，当前没有真实数据库、四数据域、Web/Worker切换权限。`,
     `- 回退演练：\`${artifact.observations.rollback_rehearsal_evidence}\`；fake-root自动测试不是UAT恢复或回退证据。`,
     "- Writer静默回执只覆盖精确Compose项目与working directory；checkpoint 8在SQL前重验静默并以数据库级围栏拒绝未标记或外部业务客户端，围栏保持至后续部署或保全恢复接管。",
     `- TASK67人工UAT状态：\`${artifact.observations.cross_role_uat_readiness}\`。`,
@@ -407,7 +430,7 @@ export function renderMarkdown(artifact) {
     "",
     "任何工具、手册或operator在本artifact仍为BLOCKED时调用晋升断言，必须得到`UAT_PROMOTION_EXECUTOR_NOT_READY`。不得用root手工Compose、可重复环境变量、TEST恢复回执、旧postdeploy receipt或最终health页面绕过缺失检查点。",
     "",
-    "下一实现必须补齐受信、最小权限且可隔离测试的rollback runtime adapter，再形成真实UAT回退演练回执；实际人工UAT仍需独立事前授权、UAT资源、人员映射和签字，不能由仓库测试替代。",
+    "下一实现必须补齐受信、最小权限且可隔离测试的固定rollback executor及独立激活，再形成真实UAT回退演练回执；实际人工UAT仍需独立事前授权、UAT资源、人员映射和签字，不能由仓库测试替代。",
     "",
     "## 6. 源码manifest",
     "",

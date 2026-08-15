@@ -4811,6 +4811,7 @@ function rollbackPostverifyPlanBinding(parameters, rollbackResult) {
     predecessor: rollbackResult.predecessor,
     database: rollbackResult.database,
     restored_database: rollbackResult.restored_database,
+    candidate_database_quarantine: rollbackResult.candidate_database_quarantine,
     boundary: rollbackResult.boundary,
   });
 }

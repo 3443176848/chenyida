@@ -2248,7 +2248,7 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
 
         def control(_node, _bundle, _context, phase, _intent, _lock, *extra):
             events.append(f"control:{phase}")
-            self.assertEqual(extra, ())
+            self.assertEqual(extra, (authorization["expires_at"],))
             if phase == "preflight":
                 self.assertNotIn("consume", events)
                 return {
@@ -2268,12 +2268,16 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             ),
             patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner),
             patch.object(supervisor, "run_uat_promotion_rollback_control", side_effect=control),
+            patch.object(
+                supervisor, "load_authorization",
+                return_value=(authorization, "1" * 64, supervisor.canonical_json(authorization)),
+            ),
             patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")),
             patch.object(
                 supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup"),
             ),
         ]
-        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6]:
             result = supervisor.run_uat_promotion_authorization(
                 Path("/trusted/bundle"), Path("/trusted/pending/rollback.json"),
                 authorization, "1" * 64, lock_descriptor=51,
@@ -2313,6 +2317,49 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
                 )
         self.assertEqual(events, ["preflight-failed"])
 
+    def test_rollback_authorization_is_reloaded_after_preflight_before_consumption(self):
+        authorization = self.rollback_authorization("f" * 64)
+
+        def run_case(reload_effect, expected_error):
+            events = []
+
+            def runner(_node, _bundle, _context, phase, _lock, **_keywords):
+                events.append(f"journal:{phase}")
+                return {"intent_sha256": "2" * 64, "rollback_plan_sha256": "3" * 64}
+
+            def control(_node, _bundle, _context, phase, _intent, _lock, *_extra):
+                events.append(f"control:{phase}")
+                return {"result": "ROLLBACK_CONTROL_PREFLIGHT_PASSED"}
+
+            with patch.object(supervisor, "verify_uat_promotion_rollback_sources", return_value={}), \
+                    patch.object(
+                        supervisor, "prepare_runtime_privilege_node",
+                        return_value=(Path("/tmp/runtime"), Path("/tmp/node")),
+                    ), \
+                    patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner), \
+                    patch.object(supervisor, "run_uat_promotion_rollback_control", side_effect=control), \
+                    patch.object(supervisor, "load_authorization", side_effect=reload_effect), \
+                    patch.object(
+                        supervisor, "consume_authorization",
+                        side_effect=lambda *_: events.append("consume"),
+                    ), \
+                    patch.object(supervisor, "cleanup_runtime_privilege_node", return_value=None):
+                with self.assertRaisesRegex(supervisor.SupervisorError, expected_error):
+                    supervisor.run_uat_promotion_authorization(
+                        Path("/trusted/bundle"), Path("/trusted/pending/rollback.json"),
+                        authorization, "1" * 64, lock_descriptor=51,
+                    )
+            self.assertEqual(events, ["journal:prepare", "control:preflight"])
+
+        run_case(
+            supervisor.SupervisorError("SUPERVISOR_AUTHORIZATION_TIME_INVALID"),
+            "SUPERVISOR_AUTHORIZATION_TIME_INVALID",
+        )
+        run_case(
+            lambda *_: (authorization, "9" * 64, supervisor.canonical_json(authorization)),
+            "SUPERVISOR_AUTHORIZATION_CHANGED_BEFORE_CONSUMPTION",
+        )
+
     def test_rollback_control_wrapper_marks_preflight_unconsumed_and_binds_recovery_decision(self):
         bundle = "f" * 64
         original = self.rollback_authorization(bundle)
@@ -2323,17 +2370,28 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             "intent_sha256": "2" * 64,
             "execution_package_sha256": "a" * 64,
             "source_set_sha256": "3" * 64,
+            "runtime_plan_sha256": "4" * 64,
+            "runtime_activation_source_sha256": "5" * 64,
+            "executor_sha256": "6" * 64,
+            "deployment_identity_sha256": "7" * 64,
+            "protected_resources_sha256": "8" * 64,
         }
 
         class ProcessResult:
+            pid = 12345
             returncode = 0
             stderr = b""
             stdout = supervisor.canonical_json(preflight)
 
-        with patch.object(supervisor.subprocess, "run", return_value=ProcessResult()) as command:
+            def communicate(self, input=None, timeout=None):
+                del input, timeout
+                return self.stdout, self.stderr
+
+        with patch.object(supervisor.subprocess, "Popen", return_value=ProcessResult()) as command:
+            expires = utc(datetime.now(timezone.utc) + timedelta(minutes=5))
             result = supervisor.run_uat_promotion_rollback_control(
                 Path("/tmp/node"), Path("/trusted/bundle"), original_context,
-                "preflight", "2" * 64, 51,
+                "preflight", "2" * 64, 51, expires,
             )
         self.assertEqual(result, preflight)
         arguments = command.call_args.args[0]
@@ -2349,10 +2407,11 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             "containment_sha256": "5" * 64,
         }
         ProcessResult.stdout = supervisor.canonical_json(contained)
-        with patch.object(supervisor.subprocess, "run", return_value=ProcessResult()) as command:
+        expires = utc(datetime.now(timezone.utc) + timedelta(minutes=5))
+        with patch.object(supervisor.subprocess, "Popen", return_value=ProcessResult()) as command:
             result = supervisor.run_uat_promotion_rollback_control(
                 Path("/tmp/node"), Path("/trusted/bundle"), recovery_context,
-                "recover", "c" * 64, 51, "QUARANTINE",
+                "recover", "c" * 64, 51, expires, "QUARANTINE",
             )
         self.assertEqual(result, contained)
         arguments = command.call_args.args[0]
@@ -2375,7 +2434,7 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             events.append(f"control:{phase}")
             if phase == "preflight":
                 return {"result": "ROLLBACK_CONTROL_PREFLIGHT_PASSED"}
-            self.assertEqual(extra, ("QUARANTINE",))
+            self.assertEqual(extra, (authorization["expires_at"], "QUARANTINE"))
             return {"result": "CONTAINED_FOR_JOURNAL_QUARANTINE"}
 
         patches = [
@@ -2393,12 +2452,16 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             ),
             patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner),
             patch.object(supervisor, "run_uat_promotion_rollback_control", side_effect=control),
+            patch.object(
+                supervisor, "load_authorization",
+                return_value=(authorization, "1" * 64, supervisor.canonical_json(authorization)),
+            ),
             patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")),
             patch.object(
                 supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup"),
             ),
         ]
-        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6]:
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6], patches[7]:
             result = supervisor.run_uat_promotion_authorization(
                 Path("/trusted/bundle"), Path("/trusted/pending/recovery.json"),
                 authorization, "1" * 64, lock_descriptor=51,

@@ -42,7 +42,7 @@ test("current repository audit is valid but UAT promotion remains blocked", () =
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "ROLLBACK_TO_UAT_EXECUTOR").status, "SUPPORTED");
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT").status, "SUPPORTED");
   assert.deepEqual(result.artifact.execution_blockers.map((entry) => entry.id), [
-    "ROLLBACK_RUNTIME_ADAPTER_NOT_BUNDLED",
+    "ROLLBACK_RUNTIME_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED",
     "UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED",
     "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED",
   ]);
@@ -62,7 +62,7 @@ test("audit observes the complete repository control plane and the fail-closed r
   assert.equal(artifact.observations.cross_role_uat_transaction_binding, "SUPERVISOR_CHECKPOINT_12_CONTENT_ADDRESSED_AND_RECOVERABLE");
   assert.equal(artifact.observations.finalization_transaction_binding, "SUPERVISOR_CHECKPOINT_13_AGGREGATED_AND_RECOVERABLE");
   assert.equal(artifact.observations.rollback_transaction_binding, "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE");
-  assert.equal(artifact.observations.rollback_runtime_adapter, "MISSING_BUNDLED_RUNTIME_ADAPTER_FAIL_CLOSED");
+  assert.equal(artifact.observations.rollback_runtime_adapter, "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED");
   assert.equal(artifact.observations.rollback_rehearsal_evidence, "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT");
   assert.equal(artifact.observations.cross_role_uat_readiness, "BLOCKED");
 });

@@ -210,6 +210,8 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs": "0444",
     "chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs": "0444",
     "chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs": "0444",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py": "0444",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/backup-projection.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/collector.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/components-projection.mjs": "0444",
@@ -233,6 +235,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-postdeploy-runtime-configuration-probe.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-uat-promotion-transaction-journal.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-contract.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-runtime-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-uat-promotion-cross-role-evidence-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-backup-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-cluster-recovery-postgres.sh": "0555",
@@ -254,6 +257,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/test_release_supervisor_cluster_policy_activation.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_runtime_secret_file.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_uat_promotion.py": "0444",
+    "chenyida_erp_site/tests/test_uat_promotion_rollback_runtime_adapter.py": "0444",
 }
 
 ENTRYPOINTS = {
@@ -4854,6 +4858,7 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
 def run_uat_promotion_rollback_control(
         node_path: Path, bundle_root: Path, context: dict[str, Any], phase: str,
         expected_intent_sha256: str, lock_descriptor: int,
+        authorization_expires_at: str,
         recovery_decision: str | None = None) -> dict[str, Any]:
     if context.get("operation") not in {"ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"} \
             or phase not in {"preflight", "execute", "recover"} \
@@ -4863,6 +4868,11 @@ def run_uat_promotion_rollback_control(
             or not SHA256.fullmatch(expected_intent_sha256) \
             or expected_intent_sha256 == "0" * 64:
         reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_INVALID")
+    authorization_expiry = parse_time(
+        authorization_expires_at, "SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_TIME_INVALID",
+    )
+    if authorization_expiry <= datetime.now(timezone.utc):
+        reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_TIME_INVALID")
     decisions = {"RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"}
     if phase == "recover":
         if recovery_decision not in decisions:
@@ -4878,6 +4888,7 @@ def run_uat_promotion_rollback_control(
         "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
         "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": context["supervisor_bundle_sha256"],
         "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": context["execution_authorization_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_EXPIRES_AT": authorization_expires_at,
         "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES" if consumed else "NO",
         "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED":
             "YES" if context["execution_mode"] == "RECOVERY" else "NO",
@@ -4889,11 +4900,29 @@ def run_uat_promotion_rollback_control(
     if recovery_decision is not None:
         arguments.append(recovery_decision)
     try:
-        result = subprocess.run(
-            arguments, env=environment, input=canonical_json(context), stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, check=False, timeout=120 if phase == "preflight" else 7500,
-            pass_fds=(lock_descriptor,),
+        process = subprocess.Popen(
+            arguments, env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, pass_fds=(lock_descriptor,), start_new_session=True,
         )
+        try:
+            stdout, stderr = process.communicate(
+                input=canonical_json(context), timeout=150 if phase == "preflight" else 7500,
+            )
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                process.communicate(timeout=30)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.communicate()
+            reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_FAILED")
+        result = subprocess.CompletedProcess(arguments, process.returncode, stdout, stderr)
     except (OSError, subprocess.SubprocessError):
         reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_FAILED")
     if result.returncode != 0 or result.stderr != b"" or not 2 <= len(result.stdout) <= 64 * 1024:
@@ -4905,10 +4934,14 @@ def run_uat_promotion_rollback_control(
     if phase == "preflight":
         expected_fields = {
             "result", "promotion_id", "intent_sha256", "execution_package_sha256", "source_set_sha256",
+            "runtime_plan_sha256", "runtime_activation_source_sha256", "executor_sha256",
+            "deployment_identity_sha256", "protected_resources_sha256",
         }
         expected_result = "ROLLBACK_CONTROL_PREFLIGHT_PASSED"
         digest_fields = {
             "intent_sha256", "execution_package_sha256", "source_set_sha256",
+            "runtime_plan_sha256", "runtime_activation_source_sha256", "executor_sha256",
+            "deployment_identity_sha256", "protected_resources_sha256",
         }
         if value.get("intent_sha256") != expected_intent_sha256:
             reject("SUPERVISOR_UAT_PROMOTION_ROLLBACK_CONTROL_RESPONSE_INVALID")
@@ -5313,11 +5346,19 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
         if rollback or rollback_postverify:
             rollback_preflight = run_uat_promotion_rollback_control(
                 node_path, bundle_root, context, "preflight", prepared["intent_sha256"], lock_descriptor,
+                authorization["expires_at"],
             )
             verify_uat_promotion_rollback_sources(
                 authorization["parameters"],
                 "ROLLBACK_UAT_RELEASE" if rollback else "VERIFY_AND_FINALIZE_UAT_ROLLBACK",
             )
+        if rollback or rollback_postverify:
+            reloaded_authorization, reloaded_digest, _ = load_authorization(
+                authorization_path, authorization["supervisor_bundle_sha256"],
+            )
+            if reloaded_digest != authorization_digest \
+                    or canonical_json(reloaded_authorization) != canonical_json(authorization):
+                reject("SUPERVISOR_AUTHORIZATION_CHANGED_BEFORE_CONSUMPTION")
         consume_authorization(authorization_path, authorization, authorization_digest)
         if snapshot:
             verify_uat_promotion_snapshot_sources(authorization["parameters"])
@@ -5357,7 +5398,7 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             if recovery:
                 control = run_uat_promotion_rollback_control(
                     node_path, bundle_root, context, "recover", prepared["intent_sha256"],
-                    lock_descriptor, prepared["decision"],
+                    lock_descriptor, authorization["expires_at"], prepared["decision"],
                 )
                 committed = run_uat_promotion_runner(
                     node_path, bundle_root, context, "recover-execute", lock_descriptor,
@@ -5379,6 +5420,7 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
                 return committed
             control = run_uat_promotion_rollback_control(
                 node_path, bundle_root, context, "execute", prepared["intent_sha256"], lock_descriptor,
+                authorization["expires_at"],
             )
             committed = run_uat_promotion_runner(
                 node_path, bundle_root, context, "execute", lock_descriptor,

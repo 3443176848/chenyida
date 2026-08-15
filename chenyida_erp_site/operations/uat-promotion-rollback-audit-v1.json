@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "cc12d6135cb8b45816aa9e36123f396a34512d330df637ab02b6f0d6fac56187",
+  "artifact_sha256": "ee87cbf9512017062d563e1712817df7091d0b3183e7f4ea4d87b3c56c75cc94",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -199,8 +199,8 @@
   "deployment_class": "UAT",
   "execution_blockers": [
     {
-      "finding": "checkpoint 14/15控制链已闭合，但真实数据库、卷与Web/Worker物化适配器未进入受信Supervisor bundle；预检必须在授权消耗前失败。",
-      "id": "ROLLBACK_RUNTIME_ADAPTER_NOT_BUNDLED",
+      "finding": "checkpoint 14/15控制链与受信网关已进入Supervisor bundle，但固定数据库、卷与Web/Worker物化执行器尚未实现或激活；预检必须在授权消耗前失败。",
+      "id": "ROLLBACK_RUNTIME_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED",
       "severity": "P0"
     },
     {
@@ -222,25 +222,25 @@
     "may_start": false,
     "p0_blocker_count": 2,
     "p1_blocker_count": 1,
-    "statement": "仓库检查点控制链已闭合，但真实运行时适配器、隔离回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
+    "statement": "仓库检查点控制链与受信回退网关已闭合，但真实运行时执行器/激活、隔离回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
     "status": "BLOCKED"
   },
   "findings": [],
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "7599284665c27a7d3982ac1afe3aca20f6eb9bfe1d7cb5adc617f4777c17aaba"
+      "sha256": "829b534d38b3ac2917e59becce487fe914cd4a009f85d64e02cf61505512b6d8"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
-      "sha256": "b8ac1489b5636c4d26fa29f2d7b489915d9f517bf5acb09aa275681e8da82d69"
+      "sha256": "2eb86830362ead5f3c7c2cd200dc0d192300a2ca900755d4b4c04d060e064a4c"
     },
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-      "required_tests": 236,
-      "sha256": "d5be6d6d082812ac0077ca0b1f5563ee372cdd133aa2f98e0b2bb303da8b8af4",
-      "total_tests": 260
+      "required_tests": 237,
+      "sha256": "502e36cb0b2eba814d3b690f1c64b88bc44b63cea2b9146689898395b172f35a",
+      "total_tests": 261
     },
     "source_manifest": {
       "files": [
@@ -284,7 +284,7 @@
             "\"status\": \"BLOCKED\""
           ],
           "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
-          "sha256": "66e3996cdc6d41f48288089eb47dd44e713ccc11688dd111be20a16eea4d7a2e"
+          "sha256": "d26372abb586da46e4d7fb8affa36e737d49cd92e33d85ffe310139ff09e780b"
         },
         {
           "markers": [
@@ -325,7 +325,7 @@
             "SUPERVISOR_INSTALL_UAT_PROMOTION_ROLLBACK_POSTVERIFY_REQUIRED"
           ],
           "path": "chenyida_erp_site/scripts/install-release-supervisor.py",
-          "sha256": "fc15cc4fdd0671c643cdf95174cc268e009a6263fa9af4b1f48a4f237f887e19"
+          "sha256": "2d1bbea3a99e17dc8cb416b2305e441174e8c8616b284c1247e0af1f3b0ddca4"
         },
         {
           "markers": [
@@ -391,7 +391,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "52994e70af023cce7b38d777f42f8d11b0fb99fa6f3fbce7726d667b9846c6bc"
+          "sha256": "7899672d4b0e07e44f6f6d1a713a4f00ed88d7f5e65d9e4d2e676cec050fde15"
         },
         {
           "markers": [
@@ -424,7 +424,7 @@
             "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
           ],
           "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
-          "sha256": "37cd44a975bfcb0ad09e8c3d69637dd1d429dcca0d43b73c15afaa63dfc474fe"
+          "sha256": "15e75b55dae989628d7ec829ff665e51811e6f28b2d9a5108d209fde681c2585"
         },
         {
           "markers": [
@@ -488,7 +488,7 @@
             "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_CONTRACT"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs",
-          "sha256": "0c42f9d36cc56eb921e1141948d895203e381d3fc37b5aaa947106de365c8705"
+          "sha256": "adf0853174bb5047f34ebaad5416844d25266a57fe4850906ab2d796905e06e2"
         },
         {
           "markers": [
@@ -496,10 +496,46 @@
             "runUatPromotionRollbackControl",
             "ROLLBACK_CONTROL_PREFLIGHT_PASSED",
             "CONTAINED_FOR_JOURNAL_QUARANTINE",
+            "stopped_writers",
+            "candidate_volume_present",
+            "restart_count !== 0",
+            "containment_attempt_receipt_sha256",
+            "REFRESH_REJECTED",
+            "retained_candidate_volumes_sha256",
             "uat-promotion-rollback-runtime-adapter.py"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs",
-          "sha256": "882db264dc73a48a4bc94074f3f5e6cf3c64da19eae051fe4eea95ea5cd90110"
+          "sha256": "ba6635a61e40e16772a4d0aec129e9c9afde35e3fb99840b5c7000588d2b8ee9"
+        },
+        {
+          "markers": [
+            "EXECUTOR_FILE = Path",
+            "ROLLBACK_RUNTIME_ACTIVATION_SOURCE_INVALID",
+            "CHENYIDA_ERP_ROLLBACK_TRUSTED_FD_MANIFEST",
+            "trusted_parent_chain",
+            "/proc/self/fd/",
+            "start_new_session=True",
+            "os.killpg",
+            "STALE_INTENT",
+            "known_service_container_ids",
+            "contain database, volume, or Compose mutation logic itself"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py",
+          "sha256": "6ff55a12e8cb1ac00e9df97e613d446243123ca8498d5e6a75f22805c7ad4edb"
+        },
+        {
+          "markers": [
+            "UAT_PROMOTION_ROLLBACK_RUNTIME_ACTION_MATRIX",
+            "RECOVERY: Object.freeze",
+            "UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_FILE",
+            "UAT_PROMOTION_ROLLBACK_RUNTIME_EXECUTOR",
+            "COMPOSE_PROJECT_COMPLETE_WRITER_SET",
+            "retained_candidate_volumes",
+            "STALE_INTENT",
+            "knownServiceContainerIds"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs",
+          "sha256": "029218aac986e968cbb8aaad3ed69ab526bf0ada91bb3a303bc672d37e2df2e0"
         },
         {
           "markers": [
@@ -536,10 +572,10 @@
             "runUatPromotionTransactionPhase"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs",
-          "sha256": "c9b2e2b152fa856f31470cb5611b3b7fa55764225011d566748eb44cc2378494"
+          "sha256": "bf192c88b674cebaa780c96883948d1e8616e443a732a2d4e8ee05176bb78766"
         }
       ],
-      "sha256": "74893a7616343434f71fcecd94cf0d97a8f4d3a96aa568c1d97225c8bfc39605"
+      "sha256": "cca6644c56592e34fc43a231e3c47c44c080f342edf2c4b7ad803a25610f9843"
     }
   },
   "observations": {
@@ -568,7 +604,7 @@
     "required_promotion_operation_count": 13,
     "restore_target_policy": "TEST_ONLY",
     "rollback_rehearsal_evidence": "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT",
-    "rollback_runtime_adapter": "MISSING_BUNDLED_RUNTIME_ADAPTER_FAIL_CLOSED",
+    "rollback_runtime_adapter": "BUNDLED_TRUSTED_GATEWAY_EXECUTOR_NOT_IMPLEMENTED_OR_ACTIVATED_FAIL_CLOSED",
     "rollback_transaction_binding": "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE",
     "supervisor_operation_count": 32,
     "supervisor_operations": [

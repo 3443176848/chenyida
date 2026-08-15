@@ -9,6 +9,7 @@ import {
   assertUatPromotionRollbackResultMatchesIntent,
   createUatPromotionRollbackCheckIntent,
   createUatPromotionRollbackCheckResult,
+  createUatPromotionRollbackContentReconciliation,
   createUatPromotionRollbackExecutionPackage,
   createUatPromotionRollbackPostverifyResult,
   createUatPromotionRollbackResult,
@@ -17,6 +18,10 @@ import {
   validateUatPromotionRollbackPostverifyResult,
   validateUatPromotionRollbackResult,
 } from "../scripts/uat-promotion-rollback-contract.mjs";
+import {
+  createUatPromotionRollbackRuntimePlan,
+  deriveUatPromotionRollbackRuntimeTargets,
+} from "../scripts/uat-promotion-rollback-runtime-contract.mjs";
 import {
   createNextUatPromotionCheckpointReceipt,
   validateUatPromotionCheckpointReceipt,
@@ -112,7 +117,64 @@ function executionPackage() {
     compose_release_file: source("compose.release.yaml"),
     deployment_environment: source("deployment.env"),
     runtime_policy: source("runtime-policy.json"),
+    runtime_adapter_activation: source("runtime-adapter-activation.json", {
+      path: "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/activation-v1.json",
+    }),
   };
+  const contentReconciliation = createUatPromotionRollbackContentReconciliation({
+    source_reconciliation_sha256: sources.snapshot_reconciliation.sha256,
+    database: { report_sha256: hash("postgresql-logical-content") },
+    files: {
+      uploads: { tree_sha256: hash("uploads-logical-content"), entries: snapshotObjects.uploads.entries },
+      attachments: { tree_sha256: hash("attachments-logical-content"), entries: snapshotObjects.attachments.entries },
+      backup_status: { tree_sha256: hash("backup-status-logical-content"), entries: snapshotObjects.backup_status.entries },
+    },
+  });
+  const candidateServices = Object.fromEntries(["caddy", "postgres", "web", "worker"].map((name) => [name, {
+    service: name,
+    container_id: hash(`candidate-container:${name}`),
+    image_reference: image(`candidate-${name}`),
+    image_digest: `sha256:${hash(`candidate-image:${name}`)}`,
+  }]));
+  const candidateVolumes = Object.fromEntries(["uploads", "attachments", "backup_status"].map((domain) => [domain, {
+    domain, name: `chenyida-erp_erp_${domain}`, identity_sha256: hash(`candidate-volume:${domain}`),
+  }]));
+  const runtimePlan = createUatPromotionRollbackRuntimePlan({
+    promotion_id: "promotion-001",
+    promotion_generation: 1,
+    rollback_operation_id: "rollback-uat-release-001",
+    deployment: {
+      class: "UAT", id: "chenyida-erp", compose_project: "chenyida-erp",
+      compose_project_root: "/opt/erp/chenyida_erp_site", database,
+    },
+    candidate: {
+      services: candidateServices, volumes: candidateVolumes,
+      protected_resources_sha256: hash("protected-resources"),
+    },
+    predecessor: {
+      release_manifest_sha256: predecessor.release_manifest_sha256,
+      postdeploy_receipt_sha256: sources.predecessor_postdeploy_receipt.sha256,
+      runtime_configuration_sha256: predecessor.runtime_configuration_sha256,
+      web_image: predecessor.web_image, worker_image: predecessor.worker_image,
+    },
+    toolchain: {
+      executor: {
+        path: "/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1",
+        sha256: hash("rollback-executor"), uid: 0, gid: 0, mode: "0555",
+      },
+      docker: {
+        path: "/usr/bin/docker", sha256: hash("docker"), uid: 0, gid: 0, mode: "0555",
+      },
+    },
+    source_bindings: {
+      snapshot_objects_sha256: clusterSha256(snapshotObjects),
+      snapshot_reconciliation_sha256: sources.snapshot_reconciliation.sha256,
+      deployment_environment_sha256: sources.deployment_environment.sha256,
+      compose_file_sha256: sources.compose_file.sha256,
+      compose_release_file_sha256: sources.compose_release_file.sha256,
+      runtime_policy_sha256: sources.runtime_policy.sha256,
+    },
+  });
   return createUatPromotionRollbackExecutionPackage({
     promotion_id: "promotion-001",
     promotion_generation: 1,
@@ -120,10 +182,16 @@ function executionPackage() {
     created_at: "2026-08-15T02:00:00.000Z",
     execution_deadline: "2026-08-15T03:00:00.000Z",
     snapshot_readiness_sha256: hash("snapshot-readiness"),
+    snapshot_objects: snapshotObjects,
     snapshot_objects_sha256: clusterSha256(snapshotObjects),
+    predecessor,
     predecessor_sha256: clusterSha256(predecessor),
+    database,
     database_snapshot_sha256: clusterSha256(database),
+    boundary,
+    content_reconciliation: contentReconciliation,
     protected_resources_sha256: hash("protected-resources"),
+    runtime_plan_sha256: runtimePlan.runtime_plan_sha256,
     compose_project: "chenyida-erp",
     compose_project_root: "/opt/erp/chenyida_erp_site",
     restore_strategies: {
@@ -179,14 +247,19 @@ function service(name, imageField, imageValue) {
 }
 
 function stageEvidence(stage, intent, packageValue) {
+  const targets = deriveUatPromotionRollbackRuntimeTargets(intent.rollback_operation_id);
   const commonVolume = (domain) => ({
     strategy: packageValue.restore_strategies.file_domains,
-    source_sha256: packageValue.sources[`snapshot_${domain}`].sha256,
-    source_bytes: intent.parameters.snapshot_objects[domain].bytes,
+    source_artifact_sha256: packageValue.sources[`snapshot_${domain}`].sha256,
+    source_artifact_bytes: intent.parameters.snapshot_objects[domain].bytes,
     source_entries: intent.parameters.snapshot_objects[domain].entries,
-    target_volume: `rollback_${domain}_001`,
+    source_reconciliation_sha256: packageValue.content_reconciliation.source_reconciliation_sha256,
+    target_content_sha256: packageValue.content_reconciliation.files[domain].tree_sha256,
+    target_volume: targets.volumes[domain].target,
+    target_volume_identity_sha256: hash(`rollback-volume:${domain}`),
     retained_candidate_volume: `candidate_${domain}_001`,
-    content_sha256: intent.parameters.snapshot_objects[domain].sha256,
+    retained_candidate_volume_identity_sha256: hash(`candidate-volume:${domain}`),
+    runtime_plan_sha256: packageValue.runtime_plan_sha256,
   });
   const values = {
     PRECONDITION_RECHECK: {
@@ -195,25 +268,39 @@ function stageEvidence(stage, intent, packageValue) {
       checkpoint_receipt_sha256: intent.parameters.previous_checkpoint_receipt_sha256,
       snapshot_intent_sha256: hash("snapshot-intent"),
       finalization_intent_sha256: hash("finalization-intent"),
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
+      runtime_activation_sha256: packageValue.sources.runtime_adapter_activation.sha256,
     },
     WRITER_CONTAINMENT: {
       database_fence_sha256: hash("database-fence"),
-      candidate_service_set_sha256: hash("candidate-service-set"),
+      candidate_service_set_sha256: clusterSha256({
+        deployment_result_sha256: packageValue.sources.candidate_deployment_result.sha256,
+        postdeploy_identity_sha256: packageValue.sources.candidate_postdeploy_identity.sha256,
+      }),
       web_container_id: hash("candidate-web"),
       worker_container_id: hash("candidate-worker"),
+      database_oid: database.oid,
+      system_identifier: database.system_identifier,
       stopped: true,
+      sealed: true,
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
     },
     POSTGRESQL_RESTORE: {
       strategy: packageValue.restore_strategies.database,
-      source_sha256: packageValue.sources.snapshot_postgresql.sha256,
-      source_bytes: snapshotObjects.postgresql.bytes,
+      source_artifact_sha256: packageValue.sources.snapshot_postgresql.sha256,
+      source_artifact_bytes: snapshotObjects.postgresql.bytes,
+      source_reconciliation_sha256: packageValue.content_reconciliation.source_reconciliation_sha256,
+      target_content_sha256: packageValue.content_reconciliation.database.report_sha256,
       snapshot_database_oid: database.oid,
       restored_database_oid: "17384",
       restored_database_name: database.name,
       system_identifier: database.system_identifier,
       migration_head: predecessor.migration_head,
-      content_sha256: snapshotObjects.postgresql.sha256,
-      candidate_database_quarantine_name: "chenyida_erp_candidate_001",
+      restored_database_marker: database.marker,
+      staging_database_name: targets.database.staging,
+      candidate_database_quarantine_name: targets.database.candidate_quarantine,
+      candidate_database_quarantine_oid: database.oid,
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
     },
     UPLOADS_RESTORE: commonVolume("uploads"),
     ATTACHMENTS_RESTORE: commonVolume("attachments"),
@@ -224,6 +311,7 @@ function stageEvidence(stage, intent, packageValue) {
       deployment_environment_sha256: packageValue.sources.deployment_environment.sha256,
       runtime_policy_sha256: packageValue.sources.runtime_policy.sha256,
       runtime_configuration_sha256: predecessor.runtime_configuration_sha256,
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
     },
     WEB_WORKER_PREDECESSOR_ACTIVATION: {
       strategy: packageValue.restore_strategies.runtime,
@@ -231,17 +319,24 @@ function stageEvidence(stage, intent, packageValue) {
       worker: service("worker", "image_reference", predecessor.worker_image),
       caddy: service("caddy", "image_digest", `sha256:${hash("caddy")}`),
       postgres: service("postgres", "image_digest", `sha256:${hash("postgres")}`),
+      rollback_postdeploy_receipt_sha256: hash("rollback-postdeploy-receipt"),
+      rollback_postdeploy_receipt_json: "{}\n",
       release_identity_sha256: hash("restored-release-identity"),
+      release_identity_json: "{}\n",
+      runtime_configuration_sha256: predecessor.runtime_configuration_sha256,
+      protected_resources_sha256: packageValue.protected_resources_sha256,
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
     },
     PROTECTED_RESOURCE_RECHECK: {
       before_sha256: packageValue.protected_resources_sha256,
       after_sha256: packageValue.protected_resources_sha256,
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
     },
   };
   return values[stage];
 }
 
-function rollbackResult(intent = rollbackIntent(), packageValue = executionPackage()) {
+function rollbackResult(intent = rollbackIntent(), packageValue = executionPackage(), mutateEvidence = null) {
   const base = Date.parse(intent.created_at);
   const stages = [];
   let previous = "0".repeat(64);
@@ -253,6 +348,7 @@ function rollbackResult(intent = rollbackIntent(), packageValue = executionPacka
       execution_authorization_sha256: intent.execution_authorization_sha256,
       rollback_plan_sha256: intent.rollback_plan_sha256,
       execution_package_sha256: packageValue.package_sha256,
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
       ordinal: index + 1,
       stage,
       previous_result_sha256: previous,
@@ -260,6 +356,8 @@ function rollbackResult(intent = rollbackIntent(), packageValue = executionPacka
       prepared_at: new Date(base + index * 2_000).toISOString(),
     };
     const stageIntent = createUatPromotionRollbackStageIntent(common);
+    const evidence = stageEvidence(stage, intent, packageValue);
+    mutateEvidence?.(stage, evidence);
     const result = createUatPromotionRollbackStageResult({
       promotion_id: common.promotion_id,
       promotion_generation: common.promotion_generation,
@@ -267,11 +365,12 @@ function rollbackResult(intent = rollbackIntent(), packageValue = executionPacka
       execution_authorization_sha256: common.execution_authorization_sha256,
       rollback_plan_sha256: common.rollback_plan_sha256,
       execution_package_sha256: common.execution_package_sha256,
+      runtime_plan_sha256: common.runtime_plan_sha256,
       ordinal: common.ordinal,
       stage,
       previous_result_sha256: previous,
       stage_intent_sha256: stageIntent.stage_intent_sha256,
-      evidence: stageEvidence(stage, intent, packageValue),
+      evidence,
       started_at: common.prepared_at,
       completed_at: new Date(base + index * 2_000 + 1_000).toISOString(),
     });
@@ -288,6 +387,7 @@ function rollbackResult(intent = rollbackIntent(), packageValue = executionPacka
     rollback_intent_sha256: intent.rollback_intent_sha256,
     rollback_plan_sha256: intent.rollback_plan_sha256,
     execution_package_sha256: packageValue.package_sha256,
+    runtime_plan_sha256: packageValue.runtime_plan_sha256,
     source_set_sha256: packageValue.source_set_sha256,
     promotion_snapshot_binding_sha256: intent.parameters.promotion_snapshot_binding_sha256,
     snapshot_readiness_sha256: intent.parameters.snapshot_readiness_sha256,
@@ -297,6 +397,10 @@ function rollbackResult(intent = rollbackIntent(), packageValue = executionPacka
     predecessor: intent.parameters.predecessor,
     database: intent.parameters.database,
     restored_database: { ...intent.parameters.database, oid: "17384" },
+    candidate_database_quarantine: {
+      name: stages[2].evidence.candidate_database_quarantine_name,
+      oid: stages[2].evidence.candidate_database_quarantine_oid,
+    },
     compose_project: intent.parameters.compose_project,
     compose_project_root: intent.parameters.compose_project_root,
     boundary: intent.parameters.boundary,
@@ -330,7 +434,7 @@ function postverifyIntent(rollback) {
   return intent;
 }
 
-function checkEvidence(check, rollback, packageValue) {
+function checkEvidence(check, rollback, packageValue, checkedAt) {
   const domainByCheck = {
     POSTGRESQL_CONTENT: "postgresql",
     UPLOADS_CONTENT: "uploads",
@@ -339,11 +443,29 @@ function checkEvidence(check, rollback, packageValue) {
   };
   if (Object.hasOwn(domainByCheck, check)) {
     const domain = domainByCheck[check];
+    const stageIndex = { postgresql: 2, uploads: 3, attachments: 4, backup_status: 5 }[domain];
+    const stage = rollback.stages[stageIndex];
     return {
-      content_sha256: rollback.snapshot_objects[domain].sha256,
-      source_sha256: packageValue.sources[`snapshot_${domain}`].sha256,
-      bytes: rollback.snapshot_objects[domain].bytes,
+      source_artifact_sha256: packageValue.sources[`snapshot_${domain}`].sha256,
+      source_artifact_bytes: rollback.snapshot_objects[domain].bytes,
+      source_reconciliation_sha256: packageValue.content_reconciliation.source_reconciliation_sha256,
+      target_content_sha256: domain === "postgresql"
+        ? packageValue.content_reconciliation.database.report_sha256
+        : packageValue.content_reconciliation.files[domain].tree_sha256,
+      target_identity_sha256: domain === "postgresql"
+        ? clusterSha256(rollback.restored_database)
+        : stage.evidence.target_volume_identity_sha256,
+      stage_result_sha256: stage.stage_result_sha256,
       entries: rollback.snapshot_objects[domain].entries,
+      ...(domain === "postgresql" ? {
+        candidate_database_quarantine_name: stage.evidence.candidate_database_quarantine_name,
+        candidate_database_quarantine_oid: stage.evidence.candidate_database_quarantine_oid,
+        candidate_database_quarantine_present: true,
+      } : {
+        candidate_volume_name: stage.evidence.retained_candidate_volume,
+        candidate_volume_identity_sha256: stage.evidence.retained_candidate_volume_identity_sha256,
+        candidate_volume_present: true,
+      }),
     };
   }
   const activation = rollback.stages[7].evidence;
@@ -351,6 +473,8 @@ function checkEvidence(check, rollback, packageValue) {
     MIGRATION_HEAD: {
       migration_head: rollback.predecessor.migration_head,
       migration_manifest_sha256: rollback.predecessor.migration_manifest_sha256,
+      database_identity_sha256: clusterSha256(rollback.restored_database),
+      postgresql_stage_result_sha256: rollback.stages[2].stage_result_sha256,
     },
     CADDY_IDENTITY: activation.caddy,
     POSTGRES_IDENTITY: activation.postgres,
@@ -367,16 +491,39 @@ function checkEvidence(check, rollback, packageValue) {
     RUNTIME_CONFIGURATION: {
       runtime_configuration_sha256: rollback.predecessor.runtime_configuration_sha256,
       deployment_environment_sha256: packageValue.sources.deployment_environment.sha256,
+      activation_stage_result_sha256: rollback.stages[7].stage_result_sha256,
+      runtime_plan_sha256: rollback.runtime_plan_sha256,
     },
     STRICT_RELEASE_IDENTITY: {
       release_identity_sha256: activation.release_identity_sha256,
       release_manifest_sha256: rollback.predecessor.release_manifest_sha256,
-      postdeploy_receipt_sha256: packageValue.sources.predecessor_postdeploy_receipt.sha256,
+      rollback_postdeploy_receipt_sha256: activation.rollback_postdeploy_receipt_sha256,
+      activation_stage_result_sha256: rollback.stages[7].stage_result_sha256,
     },
-    HEALTH: { status: "HEALTHY", health_sha256: hash("rollback-health") },
+    HEALTH: (() => {
+      const receipt = JSON.parse(activation.rollback_postdeploy_receipt_json);
+      const readiness = { ...receipt.readiness, database_time: checkedAt };
+      const services = {
+        caddy: activation.caddy, postgres: activation.postgres,
+        web: activation.web, worker: activation.worker,
+      };
+      const body = {
+        status: "HEALTHY",
+        checked_at: checkedAt,
+        readiness_sha256: clusterSha256(readiness),
+        readiness,
+        services,
+        service_set_sha256: clusterSha256(services),
+        release_identity_sha256: activation.release_identity_sha256,
+        runtime_configuration_sha256: activation.runtime_configuration_sha256,
+      };
+      return { ...body, health_sha256: clusterSha256(body) };
+    })(),
     PROTECTED_RESOURCES: {
       before_sha256: packageValue.protected_resources_sha256,
       after_sha256: packageValue.protected_resources_sha256,
+      protected_recheck_stage_result_sha256: rollback.stages[8].stage_result_sha256,
+      runtime_plan_sha256: rollback.runtime_plan_sha256,
     },
   };
   return values[check];
@@ -394,6 +541,7 @@ function postverifyResult(rollback, intent = postverifyIntent(rollback), package
       execution_authorization_sha256: intent.execution_authorization_sha256,
       rollback_plan_sha256: rollback.rollback_plan_sha256,
       execution_package_sha256: rollback.execution_package_sha256,
+      runtime_plan_sha256: rollback.runtime_plan_sha256,
       ordinal: index + 1,
       check,
       previous_result_sha256: previous,
@@ -408,11 +556,14 @@ function postverifyResult(rollback, intent = postverifyIntent(rollback), package
       execution_authorization_sha256: common.execution_authorization_sha256,
       rollback_plan_sha256: common.rollback_plan_sha256,
       execution_package_sha256: common.execution_package_sha256,
+      runtime_plan_sha256: common.runtime_plan_sha256,
       ordinal: common.ordinal,
       check,
       previous_result_sha256: previous,
       check_intent_sha256: checkIntent.check_intent_sha256,
-      evidence: checkEvidence(check, rollback, packageValue),
+      evidence: checkEvidence(
+        check, rollback, packageValue, new Date(base + index * 1_000 + 250).toISOString(),
+      ),
       started_at: common.prepared_at,
       completed_at: new Date(base + index * 1_000 + 500).toISOString(),
     });
@@ -431,12 +582,14 @@ function postverifyResult(rollback, intent = postverifyIntent(rollback), package
     rollback_result_sha256: rollback.result_sha256,
     rollback_plan_sha256: rollback.rollback_plan_sha256,
     execution_package_sha256: rollback.execution_package_sha256,
+    runtime_plan_sha256: rollback.runtime_plan_sha256,
     postverify_intent_sha256: intent.postverify_intent_sha256,
     postverify_plan_sha256: intent.postverify_plan_sha256,
     snapshot_objects: rollback.snapshot_objects,
     predecessor: rollback.predecessor,
     database: rollback.database,
     restored_database: rollback.restored_database,
+    candidate_database_quarantine: rollback.candidate_database_quarantine,
     boundary: rollback.boundary,
     check_result_sha256_chain: previous,
     checks,
@@ -471,6 +624,31 @@ test("checkpoint 14 rejects partial stages, target drift, and protected-resource
   assert.throws(
     () => validateUatPromotionRollbackResult({
       ...result, protected_resources_after_sha256: hash("replaced-protected-resources"),
+    }),
+    /UAT_PROMOTION_ROLLBACK_RESULT_INVALID/,
+  );
+});
+
+test("checkpoint 14 requires the candidate database quarantine OID and disjoint restored volumes", () => {
+  assert.throws(
+    () => rollbackResult(rollbackIntent(), executionPackage(), (stage, evidence) => {
+      if (stage === "POSTGRESQL_RESTORE") evidence.candidate_database_quarantine_oid = "18384";
+    }),
+    /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID|UAT_PROMOTION_ROLLBACK_RESULT_INVALID/,
+  );
+  assert.throws(
+    () => rollbackResult(rollbackIntent(), executionPackage(), (stage, evidence) => {
+      if (stage === "ATTACHMENTS_RESTORE") {
+        evidence.target_volume_identity_sha256 = hash("rollback-volume:uploads");
+      }
+    }),
+    /UAT_PROMOTION_ROLLBACK_RESULT_INVALID/,
+  );
+  assert.throws(
+    () => rollbackResult(rollbackIntent(), executionPackage(), (stage, evidence) => {
+      if (stage === "BACKUP_STATUS_RESTORE") {
+        evidence.target_volume_identity_sha256 = hash("candidate-volume:uploads");
+      }
     }),
     /UAT_PROMOTION_ROLLBACK_RESULT_INVALID/,
   );

@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { constants, fstatSync, lstatSync, readFileSync } from "node:fs";
 import { chmod, chown, lstat, mkdir, open, readdir } from "node:fs/promises";
@@ -6,7 +6,18 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { canonicalClusterJson, clusterSha256 } from "./postgresql-cluster-recovery-contract.mjs";
-import { parseStrictJson } from "./release-identity-contract.mjs";
+import { validateReconciliation } from "./backup-recovery-contract.mjs";
+import { validateUatPromotionComposeDeploymentResult } from "./uat-promotion-compose-deployment-contract.mjs";
+import { parseStrictJson, validateReleaseIdentity } from "./release-identity-contract.mjs";
+import {
+  buildReleaseIdentityFromPostDeployReceipt,
+  validatePostDeployReceipt,
+  validatePostDeployReadiness,
+} from "./postdeploy-release-contract.mjs";
+import {
+  canonicalJson as releaseCanonicalJson,
+  validateReleaseManifest,
+} from "./release-manifest-contract.mjs";
 import {
   UAT_PROMOTION_ROLLBACK_PACKAGE_SOURCE_ROLES,
   UAT_PROMOTION_ROLLBACK_POSTVERIFY_CHECKS,
@@ -30,6 +41,19 @@ import {
   validateUatPromotionRollbackStageResult,
 } from "./uat-promotion-rollback-contract.mjs";
 import {
+  UAT_PROMOTION_ROLLBACK_RUNTIME_CHECK_SOURCE_ROLES,
+  UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_FILE,
+  UAT_PROMOTION_ROLLBACK_RUNTIME_STAGE_SOURCE_ROLES,
+  UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS,
+  createUatPromotionRollbackRuntimeOriginalObservation,
+  createUatPromotionRollbackRuntimeRequest,
+  deriveUatPromotionRollbackRuntimeSourceRoles,
+  deriveUatPromotionRollbackRuntimeTargets,
+  validateUatPromotionRollbackRuntimeActivation,
+  validateUatPromotionRollbackRuntimeObservation,
+  validateUatPromotionRollbackRuntimeResponse,
+} from "./uat-promotion-rollback-runtime-contract.mjs";
+import {
   UAT_PROMOTION_STATE_ROOT,
   validateUatPromotionContext,
   validateUatPromotionRollbackIntent,
@@ -44,42 +68,10 @@ const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const HASH_BUFFER_BYTES = 1024 * 1024;
 const HELPER = path.join(SITE_ROOT, "scripts/uat-promotion-rollback-runtime-adapter.py");
 const ZERO_SHA256 = "0".repeat(64);
+const MAX_CONTAINMENT_ATTEMPTS = 3;
 
-const STAGE_SOURCE_ROLES = Object.freeze({
-  PRECONDITION_RECHECK: UAT_PROMOTION_ROLLBACK_PACKAGE_SOURCE_ROLES,
-  WRITER_CONTAINMENT: ["candidate_deployment_result", "candidate_postdeploy_identity"],
-  POSTGRESQL_RESTORE: [
-    "snapshot_readiness", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
-    "snapshot_postgresql", "snapshot_policy", "snapshot_policy_activation",
-  ],
-  UPLOADS_RESTORE: ["snapshot_manifest", "snapshot_uploads"],
-  ATTACHMENTS_RESTORE: ["snapshot_manifest", "snapshot_attachments"],
-  BACKUP_STATUS_RESTORE: ["snapshot_manifest", "snapshot_backup_status"],
-  RUNTIME_CONFIGURATION_RESTORE: [
-    "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
-  ],
-  WEB_WORKER_PREDECESSOR_ACTIVATION: [
-    "predecessor_postdeploy_receipt", "predecessor_release_manifest", "compose_file",
-    "compose_release_file", "deployment_environment", "runtime_policy",
-  ],
-  PROTECTED_RESOURCE_RECHECK: ["candidate_deployment_result", "candidate_postdeploy_identity"],
-});
-
-const CHECK_SOURCE_ROLES = Object.freeze({
-  POSTGRESQL_CONTENT: ["snapshot_postgresql", "snapshot_manifest", "snapshot_migrations"],
-  UPLOADS_CONTENT: ["snapshot_uploads", "snapshot_manifest"],
-  ATTACHMENTS_CONTENT: ["snapshot_attachments", "snapshot_manifest"],
-  BACKUP_STATUS_CONTENT: ["snapshot_backup_status", "snapshot_manifest"],
-  MIGRATION_HEAD: ["snapshot_migrations", "predecessor_release_manifest"],
-  CADDY_IDENTITY: ["candidate_deployment_result"],
-  POSTGRES_IDENTITY: ["candidate_deployment_result"],
-  WEB_IDENTITY: ["predecessor_postdeploy_receipt", "predecessor_release_manifest"],
-  WORKER_IDENTITY: ["predecessor_postdeploy_receipt", "predecessor_release_manifest"],
-  RUNTIME_CONFIGURATION: ["deployment_environment", "runtime_policy"],
-  STRICT_RELEASE_IDENTITY: ["predecessor_postdeploy_receipt", "predecessor_release_manifest"],
-  HEALTH: ["predecessor_postdeploy_receipt"],
-  PROTECTED_RESOURCES: ["candidate_deployment_result", "candidate_postdeploy_identity"],
-});
+const STAGE_SOURCE_ROLES = UAT_PROMOTION_ROLLBACK_RUNTIME_STAGE_SOURCE_ROLES;
+const CHECK_SOURCE_ROLES = UAT_PROMOTION_ROLLBACK_RUNTIME_CHECK_SOURCE_ROLES;
 
 export class UatPromotionRollbackControlError extends Error {
   constructor(code) {
@@ -97,6 +89,22 @@ function operationArtifactMatches(name, operationId) {
   return match !== null && match[1] === operationId;
 }
 function same(left, right) { return canonicalClusterJson(left) === canonicalClusterJson(right); }
+function runtimeExchangeSha256(responses) {
+  return clusterSha256(responses.map((response) => ({
+    action: response.action,
+    request_sha256: response.request_sha256,
+    response_sha256: response.response_sha256,
+    status: response.status,
+  })));
+}
+function containmentDrift(outcome, observed, responses) {
+  return Object.freeze({
+    status: "CONTAINMENT_OBSERVATION_DRIFT",
+    outcome,
+    observed,
+    runtime_exchange_sha256: runtimeExchangeSha256(responses),
+  });
+}
 function nowIso(clock = () => new Date()) {
   const observed = clock();
   const value = observed instanceof Date ? observed : new Date(observed);
@@ -240,6 +248,50 @@ async function trustedSourceJson(spec, filesystemRoot, validator, code) {
   return stored.value;
 }
 
+async function trustedSourceDocument(specInput, filesystemRoot, validator, code) {
+  const spec = validateUatPromotionRollbackSourceSpec(specInput, code);
+  const file = physicalPath(spec.path, filesystemRoot);
+  const before = await lstat(file, { bigint: true }).catch(() => reject(code));
+  if (!before.isFile() || before.isSymbolicLink() || before.uid !== BigInt(spec.uid)
+    || before.gid !== BigInt(spec.gid) || before.nlink !== BigInt(spec.nlink)
+    || before.dev.toString() !== spec.device || before.ino.toString() !== spec.inode
+    || before.size !== BigInt(spec.bytes) || before.size > BigInt(MAX_JSON_BYTES)
+    || modeText(before) !== spec.mode) reject(code);
+  const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW).catch(() => reject(code));
+  try {
+    const opened = await handle.stat({ bigint: true });
+    const raw = await handle.readFile();
+    const after = await handle.stat({ bigint: true });
+    const named = await lstat(file, { bigint: true }).catch(() => reject(`${code}_CHANGED`));
+    if (opened.dev !== before.dev || opened.ino !== before.ino || opened.size !== before.size
+      || after.dev !== opened.dev || after.ino !== opened.ino || after.size !== opened.size
+      || after.mtimeNs !== opened.mtimeNs || after.ctimeNs !== opened.ctimeNs
+      || named.dev !== opened.dev || named.ino !== opened.ino || named.size !== opened.size
+      || createHash("sha256").update(raw).digest("hex") !== spec.sha256) reject(`${code}_CHANGED`);
+    let value;
+    try { value = validator(parseStrictJson(raw.toString("utf8"), MAX_JSON_BYTES)); }
+    catch { reject(code); }
+    const text = raw.toString("utf8");
+    if (text !== canonicalClusterJson(value) && text !== releaseCanonicalJson(value)) reject(code);
+    return value;
+  } finally { await handle.close(); }
+}
+
+async function verifyTrustedParentChain(file, filesystemRoot, code) {
+  const boundary = path.resolve(filesystemRoot);
+  let current = path.dirname(path.resolve(file));
+  while (true) {
+    const metadata = await lstat(current, { bigint: true }).catch(() => reject(code));
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()
+      || metadata.uid !== 0n || metadata.gid !== 0n || (modeOf(metadata) & 0o022) !== 0) reject(code);
+    if (current === boundary) return;
+    const parent = path.dirname(current);
+    if (parent === current || boundary !== "/" && !parent.startsWith(`${boundary}${path.sep}`)
+      && parent !== boundary) reject(code);
+    current = parent;
+  }
+}
+
 async function loadRollbackResultForPostverify(context, filesystemRoot) {
   return trustedSourceJson(
     context.parameters.rollback_result_source, filesystemRoot,
@@ -270,15 +322,288 @@ async function loadExecutionPackage(context, intent, filesystemRoot, rollbackRes
   return Object.freeze({ packageValue, rollbackIntent });
 }
 
-function invokeHelper(context, intent, consumed, phase, label = null) {
+function reconciliationProjection(source, sourceSha256) {
+  const body = {
+    source_reconciliation_sha256: sourceSha256,
+    database: { report_sha256: source.database.report_sha256 },
+    files: Object.fromEntries(["uploads", "attachments", "backup_status"].map((domain) => [domain, {
+      tree_sha256: source.files[domain].tree_sha256,
+      entries: source.files[domain].entries,
+    }])),
+  };
+  return Object.freeze({ ...body, binding_sha256: clusterSha256(body) });
+}
+
+function candidateServiceProjection(result) {
+  return Object.fromEntries([...result.unchanged_services, ...result.services].map((service) => [
+    service.service,
+    {
+      service: service.service,
+      container_id: service.container_id,
+      image_reference: service.image_reference,
+      image_digest: service.image_id,
+    },
+  ]));
+}
+
+async function loadRuntimeTrustSources(context, packageValue, filesystemRoot, clock, { full = true } = {}) {
+  const sources = packageValue.sources;
+  if (sources.runtime_adapter_activation.path !== UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_FILE
+    || sources.runtime_adapter_activation.uid !== 0 || sources.runtime_adapter_activation.gid !== 0
+    || sources.runtime_adapter_activation.mode !== "0400") reject("ROLLBACK_CONTROL_RUNTIME_ACTIVATION_INVALID");
+  await verifyTrustedParentChain(
+    physicalPath(sources.runtime_adapter_activation.path, filesystemRoot),
+    filesystemRoot, "ROLLBACK_CONTROL_RUNTIME_ACTIVATION_INVALID",
+  );
+  const activation = await trustedSourceDocument(
+    sources.runtime_adapter_activation, filesystemRoot,
+    (value) => validateUatPromotionRollbackRuntimeActivation(value, {
+      now: clock(), allowExpired: context.execution_mode === "RECOVERY",
+      executionDeadline: packageValue.execution_deadline,
+    }),
+    "ROLLBACK_CONTROL_RUNTIME_ACTIVATION_INVALID",
+  );
+  if (activation.plan.runtime_plan_sha256 !== packageValue.runtime_plan_sha256) {
+    reject("ROLLBACK_CONTROL_RUNTIME_ACTIVATION_BINDING_INVALID");
+  }
+  const candidateDeployment = await trustedSourceDocument(
+    sources.candidate_deployment_result, filesystemRoot, validateUatPromotionComposeDeploymentResult,
+    "ROLLBACK_CONTROL_CANDIDATE_DEPLOYMENT_INVALID",
+  );
+  const candidateIdentity = await trustedSourceDocument(
+    sources.candidate_postdeploy_identity, filesystemRoot, validateReleaseIdentity,
+    "ROLLBACK_CONTROL_CANDIDATE_IDENTITY_INVALID",
+  );
+  const plan = activation.plan;
+  const candidateServices = candidateServiceProjection(candidateDeployment);
+  const handoff = candidateDeployment.database_handoff;
+  if (!same(plan.candidate.services, candidateServices)
+    || plan.candidate.protected_resources_sha256 !== candidateDeployment.protected_resources_after_sha256
+    || candidateDeployment.protected_resources_before_sha256 !== packageValue.protected_resources_sha256
+    || candidateDeployment.protected_resources_after_sha256 !== packageValue.protected_resources_sha256
+    || candidateDeployment.compose_project !== packageValue.compose_project
+    || candidateDeployment.compose_project_root !== packageValue.compose_project_root
+    || !same(plan.deployment.database, {
+      name: handoff.database_name, system_identifier: handoff.database_system_identifier,
+      oid: handoff.database_oid, marker: handoff.database_marker,
+    })
+    || candidateIdentity.release_manifest_sha256 !== candidateDeployment.release_manifest_sha256
+    || candidateIdentity.deployment_class !== "UAT"
+    || candidateIdentity.deployment_id !== packageValue.compose_project
+    || ["caddy", "postgres", "web", "worker"].some((service) => (
+      candidateIdentity[`${service}_container_id`] !== candidateServices[service].container_id
+      || candidateIdentity[`${service}_image_digest`] !== candidateServices[service].image_digest
+    ))) reject("ROLLBACK_CONTROL_CANDIDATE_PLAN_BINDING_INVALID");
+  if (!full) return Object.freeze({ runtimePlan: plan, candidateDeployment, candidateIdentity });
+  const reconciliation = await trustedSourceDocument(
+    sources.snapshot_reconciliation, filesystemRoot, validateReconciliation,
+    "ROLLBACK_CONTROL_SNAPSHOT_RECONCILIATION_INVALID",
+  );
+  if (!same(
+    packageValue.content_reconciliation,
+    reconciliationProjection(reconciliation, sources.snapshot_reconciliation.sha256),
+  )) reject("ROLLBACK_CONTROL_SNAPSHOT_RECONCILIATION_BINDING_INVALID");
+  const predecessorReceipt = await trustedSourceDocument(
+    sources.predecessor_postdeploy_receipt, filesystemRoot, validatePostDeployReceipt,
+    "ROLLBACK_CONTROL_PREDECESSOR_RECEIPT_INVALID",
+  );
+  const predecessorManifest = await trustedSourceDocument(
+    sources.predecessor_release_manifest, filesystemRoot,
+    (value) => validateReleaseManifest(value, { requireEligible: false }),
+    "ROLLBACK_CONTROL_PREDECESSOR_MANIFEST_INVALID",
+  );
+  const predecessorIdentity = buildReleaseIdentityFromPostDeployReceipt({
+    receipt: predecessorReceipt, receiptSha256: sources.predecessor_postdeploy_receipt.sha256,
+  });
+  const predecessorServices = Object.fromEntries(predecessorReceipt.services.map((service) => [service.service, service]));
+  const predecessor = packageValue.predecessor;
+  if (sources.predecessor_release_manifest.sha256 !== predecessor.release_manifest_sha256
+    || predecessorReceipt.release.manifest_sha256 !== predecessor.release_manifest_sha256
+    || predecessorManifest.source.git_commit !== predecessor.git_commit
+    || predecessorManifest.source.git_tree !== predecessor.git_tree
+    || predecessorManifest.source.package_version !== predecessor.application_version
+    || predecessorManifest.migrations.head !== predecessor.migration_head
+    || predecessorManifest.migrations.allowlist_sha256 !== predecessor.migration_manifest_sha256
+    || predecessorManifest.images.web.image_reference !== predecessor.web_image
+    || predecessorManifest.images.worker.image_reference !== predecessor.worker_image
+    || predecessorReceipt.runtime_configuration_sha256 !== predecessor.runtime_configuration_sha256
+    || predecessorServices.web.image_reference !== predecessor.web_image
+    || predecessorServices.worker.image_reference !== predecessor.worker_image
+    || predecessorIdentity.release_manifest_sha256 !== predecessor.release_manifest_sha256
+    || predecessorIdentity.application_version !== predecessor.application_version
+    || predecessorIdentity.git_commit !== predecessor.git_commit
+    || predecessorIdentity.git_tree !== predecessor.git_tree
+    || predecessorIdentity.migration_head !== predecessor.migration_head
+    || predecessorIdentity.migration_manifest_sha256 !== predecessor.migration_manifest_sha256) {
+    reject("ROLLBACK_CONTROL_PREDECESSOR_BINDING_INVALID");
+  }
+  return Object.freeze({
+    runtimePlan: plan, reconciliation, candidateDeployment, candidateIdentity,
+    predecessorReceipt, predecessorManifest, predecessorIdentity,
+  });
+}
+
+function terminateProcessGroup(child, signal) {
+  if (!Number.isSafeInteger(child.pid) || child.pid < 1) return;
+  try { process.kill(-child.pid, signal); } catch (error) {
+    if (error?.code !== "ESRCH") throw error;
+  }
+}
+
+function processGroupExists(child) {
+  if (!Number.isSafeInteger(child.pid) || child.pid < 1) return false;
+  try { process.kill(-child.pid, 0); return true; } catch (error) {
+    if (error?.code === "ESRCH") return false;
+    return true;
+  }
+}
+
+async function killAndConfirmProcessGroup(child, timeoutMs = 2_000) {
+  try { terminateProcessGroup(child, "SIGKILL"); } catch { return false; }
+  const deadline = Date.now() + timeoutMs;
+  while (processGroupExists(child) && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  return !processGroupExists(child);
+}
+
+function boundedProcess(binary, argumentsList, options) {
+  return new Promise((resolve, fail) => {
+    const child = spawn(binary, argumentsList, {
+      cwd: "/", env: options.env, detached: true, stdio: options.stdio,
+    });
+    const stdout = [];
+    const stderr = [];
+    let stdoutBytes = 0;
+    let stderrBytes = 0;
+    let failureCode = null;
+    let killTimer = null;
+    let settled = false;
+    const watchedSignals = ["SIGTERM", "SIGINT", "SIGHUP"];
+    const removeHandlers = () => {
+      for (const watched of watchedSignals) process.removeListener(watched, signalHandlers[watched]);
+      process.removeListener("exit", exitHandler);
+    };
+    const requestTermination = (code) => {
+      if (failureCode === null) failureCode = code;
+      try { terminateProcessGroup(child, "SIGTERM"); } catch { failureCode = code; }
+      if (killTimer === null) {
+        killTimer = setTimeout(() => {
+          try { terminateProcessGroup(child, "SIGKILL"); } catch { /* close handler rejects */ }
+        }, options.killGraceMs ?? 7_000);
+        killTimer.unref?.();
+      }
+    };
+    const signalHandlers = Object.fromEntries(watchedSignals.map((watched) => [watched, () => {
+      requestTermination(options.failureCode);
+    }]));
+    const exitHandler = () => {
+      try { terminateProcessGroup(child, "SIGKILL"); } catch { /* best effort during exit */ }
+    };
+    for (const watched of watchedSignals) process.once(watched, signalHandlers[watched]);
+    process.once("exit", exitHandler);
+    const timeout = setTimeout(() => requestTermination(options.failureCode), options.timeoutMs);
+    timeout.unref?.();
+    child.stdout.on("data", (chunk) => {
+      stdoutBytes += chunk.length;
+      if (stdoutBytes > MAX_JSON_BYTES) requestTermination(options.failureCode);
+      else stdout.push(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderrBytes += chunk.length;
+      if (stderrBytes > MAX_JSON_BYTES) requestTermination(options.failureCode);
+      else stderr.push(chunk);
+    });
+    child.once("error", () => requestTermination(options.failureCode));
+    child.once("close", async (status, signal) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (killTimer !== null) clearTimeout(killTimer);
+      removeHandlers();
+      if (processGroupExists(child)) {
+        if (!await killAndConfirmProcessGroup(child)) failureCode = options.failureCode;
+        failureCode = options.failureCode;
+      }
+      if (failureCode !== null || status !== 0 || signal !== null || stderrBytes !== 0
+        || stdoutBytes < 2 || stdoutBytes > MAX_JSON_BYTES) {
+        fail(new UatPromotionRollbackControlError(options.failureCode));
+        return;
+      }
+      resolve(Buffer.concat(stdout));
+    });
+    child.stdin.once("error", () => requestTermination(options.failureCode));
+    child.stdin.end(options.input);
+  });
+}
+
+function transactionIntentSha256(context, intent) {
+  return context.operation === "ROLLBACK_POSTVERIFY"
+    ? intent.postverify_intent_sha256 : intent.rollback_intent_sha256;
+}
+
+function recordIntentSha256(recordIntent) {
+  if (recordIntent?.stage_intent_sha256) return recordIntent.stage_intent_sha256;
+  if (recordIntent?.check_intent_sha256) return recordIntent.check_intent_sha256;
+  if (recordIntent?.containment_intent_sha256) return recordIntent.containment_intent_sha256;
+  return ZERO_SHA256;
+}
+
+async function invokeHelper({
+  context, intent, packageValue, rollbackResult = null, consumed, action, label = null,
+  recordIntent = null, previousResultSha256 = ZERO_SHA256, requestedAt = nowIso(), extra = {},
+}) {
   const descriptor = Number(process.env.ERP_RELEASE_GATE_LOCK_FD);
   const stdio = ["pipe", "pipe", "pipe"];
   for (let index = 3; index <= descriptor; index += 1) stdio[index] = "ignore";
   stdio[descriptor] = descriptor;
-  const argumentsList = [HELPER, phase, context.operation_id];
+  const argumentsList = [HELPER, action.toLowerCase(), context.operation_id];
   if (label !== null) argumentsList.push(label);
-  const result = spawnSync("/usr/bin/python3", argumentsList, {
-    cwd: "/", env: {
+  const payload = {
+    context, transaction_intent: intent, execution_package: packageValue,
+    ...(rollbackResult === null ? {} : { rollback_result: rollbackResult }),
+    ...(recordIntent === null ? {} : { record_intent: recordIntent }),
+    ...extra,
+  };
+  const policyTimeout = UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS[action] * 1_000;
+  const requestedMs = Date.parse(requestedAt);
+  const authorizationExpiresAt = process.env.ERP_RELEASE_SUPERVISOR_AUTHORIZATION_EXPIRES_AT;
+  const authorizationExpiresMs = Date.parse(authorizationExpiresAt || "");
+  const packageDeadlineMs = Date.parse(packageValue.execution_deadline);
+  if (![requestedMs, authorizationExpiresMs, packageDeadlineMs].every(Number.isFinite)) {
+    reject("ROLLBACK_CONTROL_EXECUTION_DEADLINE_INVALID");
+  }
+  const actionDeadlineMs = Math.min(
+    requestedMs + policyTimeout,
+    authorizationExpiresMs,
+    context.execution_mode === "ORIGINAL" ? packageDeadlineMs : Number.POSITIVE_INFINITY,
+  );
+  if (actionDeadlineMs <= requestedMs) reject("ROLLBACK_CONTROL_EXECUTION_DEADLINE_EXPIRED");
+  const actionDeadline = new Date(actionDeadlineMs).toISOString();
+  const sourceRoles = deriveUatPromotionRollbackRuntimeSourceRoles({ action, operation: context.operation, label });
+  const request = createUatPromotionRollbackRuntimeRequest({
+    action, operation: context.operation, operation_id: context.operation_id,
+    execution_mode: context.execution_mode, label,
+    execution_package_sha256: packageValue.package_sha256,
+    source_set_sha256: packageValue.source_set_sha256,
+    transaction_intent_sha256: transactionIntentSha256(context, intent),
+    record_intent_sha256: recordIntentSha256(recordIntent),
+    runtime_plan_sha256: packageValue.runtime_plan_sha256,
+    previous_result_sha256: previousResultSha256,
+    source_roles: sourceRoles,
+    payload, requested_at: requestedAt, execution_deadline: packageValue.execution_deadline,
+    authorization_expires_at: authorizationExpiresAt, action_deadline: actionDeadline,
+  });
+  const remaining = actionDeadlineMs - Date.now();
+  if (!Number.isFinite(remaining) || remaining <= 0) reject("ROLLBACK_CONTROL_EXECUTION_DEADLINE_EXPIRED");
+  const failureCode = action === "CONTAIN"
+    ? "ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED"
+    : action === "PREFLIGHT" ? "ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_FAILED"
+      : "ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED";
+  let stdout;
+  try {
+    stdout = await boundedProcess("/usr/bin/python3", argumentsList, {
+      env: {
       PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
       LC_ALL: "C", LANG: "C", TZ: "UTC", HOME: "/nonexistent", PYTHONDONTWRITEBYTECODE: "1",
       PYTHONHASHSEED: "0", ERP_RELEASE_SUPERVISOR_LAUNCHED: "YES",
@@ -286,46 +611,319 @@ function invokeHelper(context, intent, consumed, phase, label = null) {
       ERP_RELEASE_SUPERVISOR_SITE_ROOT: SITE_ROOT,
       ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256: context.supervisor_bundle_sha256,
       ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256: context.execution_authorization_sha256,
+      ERP_RELEASE_SUPERVISOR_AUTHORIZATION_EXPIRES_AT: authorizationExpiresAt,
       ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED: consumed ? "YES" : "NO",
       ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED:
         context.execution_mode === "RECOVERY" ? "YES" : "NO",
-    },
-    input: Buffer.from(canonicalClusterJson({ context, intent })), encoding: "buffer",
-    maxBuffer: MAX_JSON_BYTES, timeout: phase === "preflight" ? 120_000 : 30 * 60 * 1000, stdio,
-  });
-  if (result.status !== 0 || result.signal !== null || result.stderr?.length !== 0
-    || !result.stdout || result.stdout.length < 2 || result.stdout.length > MAX_JSON_BYTES) {
-    reject(phase === "contain"
-      ? "ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED"
-      : phase === "preflight" ? "ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_FAILED"
-        : "ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
-  }
-  try { return parseStrictJson(result.stdout.toString("utf8"), MAX_JSON_BYTES); }
-  catch { reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_RESPONSE_INVALID"); }
+      },
+      input: Buffer.from(canonicalClusterJson(request)), stdio,
+      timeoutMs: Math.max(1, remaining + 7_000), killGraceMs: 7_000, failureCode,
+    });
+  } catch (error) { reject(error?.code || failureCode); }
+  try {
+    const response = validateUatPromotionRollbackRuntimeResponse(
+      parseStrictJson(stdout.toString("utf8"), MAX_JSON_BYTES), request,
+    );
+    if (stdout.toString("utf8") !== canonicalClusterJson(response)) {
+      reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_RESPONSE_INVALID");
+    }
+    return response;
+  } catch (error) { reject(error?.code || "ROLLBACK_CONTROL_RUNTIME_ADAPTER_RESPONSE_INVALID"); }
 }
 
 function productionAdapter(context, intent) {
   return Object.freeze({
-    async preflight() { return invokeHelper(context, intent, false, "preflight"); },
-    async executeStage({ stage, stageIntent }) {
-      return invokeHelper(context, { intent, record_intent: stageIntent }, true, "stage", stage);
+    async preflight({ packageValue, rollbackResult }) {
+      const response = await invokeHelper({
+        context, intent, packageValue, rollbackResult,
+        consumed: false,
+        action: "PREFLIGHT",
+      });
+      const allowed = context.execution_mode === "ORIGINAL"
+        ? new Set([context.operation === "ROLLBACK_POSTVERIFY"
+          ? "EXACT_RESULT_ALREADY_DURABLE" : "SAFE_TO_EXECUTE"])
+        : new Set([
+          "EXACT_RESULT_ALREADY_DURABLE", "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT",
+          "BLOCKED_TARGET_IDENTITY_MISMATCH",
+        ]);
+      if (!allowed.has(response.status)) reject("ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_INVALID");
+      return response.output;
     },
-    async verifyCheck({ check, checkIntent, rollbackResult }) {
-      return invokeHelper(context, { intent, record_intent: checkIntent, rollback_result: rollbackResult }, true, "check", check);
+    async recheck({ packageValue, rollbackResult, containment = false }) {
+      const response = await invokeHelper({
+        context, intent, packageValue, rollbackResult, consumed: true, action: "RECHECK",
+      });
+      const allowed = containment
+        ? new Set([
+          "SAFE_TO_EXECUTE", "EXACT_RESULT_ALREADY_DURABLE",
+          "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT", "BLOCKED_TARGET_IDENTITY_MISMATCH",
+        ])
+        : context.execution_mode === "ORIGINAL"
+        ? new Set([context.operation === "ROLLBACK_POSTVERIFY"
+          ? "EXACT_RESULT_ALREADY_DURABLE" : "SAFE_TO_EXECUTE"])
+        : new Set([
+          "EXACT_RESULT_ALREADY_DURABLE", "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT",
+          "BLOCKED_TARGET_IDENTITY_MISMATCH",
+        ]);
+      if (!allowed.has(response.status)) reject("ROLLBACK_CONTROL_RUNTIME_RECHECK_INVALID");
+      return response.output;
     },
-    async contain({ containmentIntent }) {
-      return invokeHelper(context, { intent, containment_intent: containmentIntent }, true, "contain");
+    async executeStage({ packageValue, rollbackResult, stage, stageIntent }) {
+      const common = {
+        context, intent, packageValue, rollbackResult, consumed: true, label: stage,
+        recordIntent: stageIntent, previousResultSha256: stageIntent.previous_result_sha256,
+      };
+      const prepared = await invokeHelper({ ...common, action: "PREPARE" });
+      if (prepared.status !== "PREPARED") reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
+      const executed = await invokeHelper({ ...common, action: "EXECUTE" });
+      if (!new Set(["COMMITTED", "ALREADY_COMMITTED"]).has(executed.status)) {
+        reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
+      }
+      const probed = await invokeHelper({ ...common, action: "PROBE" });
+      if (probed.status !== "COMMITTED") reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
+      return probed.output.record;
+    },
+    async verifyCheck({ packageValue, rollbackResult, check, checkIntent }) {
+      const common = {
+        context, intent, packageValue, rollbackResult, consumed: true, label: check,
+        recordIntent: checkIntent, previousResultSha256: checkIntent.previous_result_sha256,
+      };
+      const prepared = await invokeHelper({ ...common, action: "PREPARE" });
+      if (prepared.status !== "PREPARED") reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
+      const probed = await invokeHelper({ ...common, action: "PROBE" });
+      if (probed.status !== "VERIFIED") reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
+      return probed.output.record;
+    },
+    async contain({ packageValue, containmentIntent, runtimeObservation }) {
+      const common = {
+        context, intent, packageValue, consumed: true,
+        recordIntent: containmentIntent,
+        previousResultSha256: containmentIntent.last_committed_record_sha256,
+        extra: { containment_intent: containmentIntent },
+      };
+      const before = await invokeHelper({ ...common, action: "PROBE" });
+      if (!new Set(["PARTIAL_OR_UNKNOWN", "COMMITTED", "VERIFIED", "CONTAINED"]).has(before.status)) {
+        reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+      }
+      if (!before.output || !same(Object.keys(before.output).sort(), ["containment", "observed"])) {
+        reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+      }
+      let beforeObserved;
+      try { beforeObserved = validateUatPromotionRollbackRuntimeObservation(before.output.observed); }
+      catch { reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED"); }
+      if (!same(beforeObserved, runtimeObservation)) {
+        return containmentDrift("DRIFT_BEFORE_CONTAIN", beforeObserved, [before]);
+      }
+      const contained = await invokeHelper({ ...common, action: "CONTAIN" });
+      if (contained.status === "STALE_INTENT") {
+        if (!contained.output || !same(Object.keys(contained.output).sort(), ["observed"])) {
+          reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+        }
+        let drifted;
+        try { drifted = validateUatPromotionRollbackRuntimeObservation(contained.output.observed); }
+        catch { reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED"); }
+        return containmentDrift("STALE_INTENT_BEFORE_CONTAIN", drifted, [before, contained]);
+      }
+      if (contained.status !== "CONTAINED" || !contained.output
+        || !same(Object.keys(contained.output).sort(), ["containment", "observed"])) {
+        reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+      }
+      const after = await invokeHelper({ ...common, action: "PROBE" });
+      if (after.status !== "CONTAINED" || !after.output
+        || !same(Object.keys(after.output).sort(), ["containment", "observed"])) {
+        reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+      }
+      if (!same(contained.output, after.output)) {
+        let drifted;
+        try { drifted = validateUatPromotionRollbackRuntimeObservation(after.output.observed); }
+        catch { reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED"); }
+        return containmentDrift("DRIFT_AFTER_CONTAIN", drifted, [before, contained, after]);
+      }
+      return {
+        before_observed: before.output.observed,
+        after_observed: after.output.observed,
+        containment: after.output.containment,
+        runtime_exchange_sha256: runtimeExchangeSha256([before, contained, after]),
+      };
     },
   });
 }
 
-function validatePreflightResponse(value, packageValue) {
+function validateContainmentRefreshObservation(value, previous, packageValue, runtimeTrust) {
+  const observed = value;
+  const stableDatabaseFields = ["name", "system_identifier", "oid", "marker"];
+  const plan = runtimeTrust.runtimePlan;
+  if (same(observed, previous)
+    || stableDatabaseFields.some((field) => observed.database[field] !== previous.database[field])
+    || ["caddy", "postgres"].some((service) => !same(
+      observed.services[service], previous.services[service],
+    ))
+    || !same(observed.volumes, previous.volumes)
+    || !same(observed.retained_candidate_volumes, previous.retained_candidate_volumes)
+    || !same(observed.derived_targets, previous.derived_targets)
+    || observed.protected_resources_sha256 !== packageValue.protected_resources_sha256
+    || observed.protected_resources_sha256 !== previous.protected_resources_sha256
+    || ["uploads", "attachments", "backup_status"].some((domain) => !same(
+      observed.retained_candidate_volumes[domain],
+      { ...plan.candidate.volumes[domain], present: true },
+    ))) reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+  return observed;
+}
+
+function validateRuntimeGateResponse(
+  value, packageValue, executionMode, operation, action, runtimeTrust, allowedTargetStates = null,
+) {
+  const targetStates = allowedTargetStates ?? (executionMode === "ORIGINAL"
+    ? new Set([operation === "ROLLBACK_POSTVERIFY"
+      ? "EXACT_RESULT_ALREADY_DURABLE" : "SAFE_TO_EXECUTE"])
+    : new Set([
+      "EXACT_RESULT_ALREADY_DURABLE", "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT",
+      "BLOCKED_TARGET_IDENTITY_MISMATCH",
+    ]));
   if (!value || typeof value !== "object" || Array.isArray(value)
-    || !same(Object.keys(value).sort(), ["execution_package_sha256", "result", "source_set_sha256"].sort())
-    || value.result !== "ROLLBACK_RUNTIME_PREFLIGHT_PASSED"
+    || !same(Object.keys(value).sort(), [
+      "deployment_identity_sha256", "execution_package_sha256", "executor_sha256",
+      "protected_resources_sha256", "result", "runtime_activation_source_sha256",
+      "runtime_plan_sha256", "source_set_sha256", "target_state", "observed",
+    ].sort())
+    || value.result !== (action === "PREFLIGHT"
+      ? "ROLLBACK_RUNTIME_PREFLIGHT_PASSED" : "ROLLBACK_RUNTIME_RECHECK_PASSED")
     || value.execution_package_sha256 !== packageValue.package_sha256
-    || value.source_set_sha256 !== packageValue.source_set_sha256) reject("ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_INVALID");
+    || value.source_set_sha256 !== packageValue.source_set_sha256
+    || value.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
+    || value.runtime_activation_source_sha256
+      !== packageValue.sources.runtime_adapter_activation.sha256
+    || value.protected_resources_sha256 !== packageValue.protected_resources_sha256
+    || !targetStates.has(value.target_state)
+    || !SHA256.test(value.executor_sha256 || "")
+    || value.deployment_identity_sha256 !== clusterSha256(runtimeTrust.runtimePlan.deployment)) {
+    reject(action === "PREFLIGHT"
+      ? "ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_INVALID" : "ROLLBACK_CONTROL_RUNTIME_RECHECK_INVALID");
+  }
+  let observed;
+  try { observed = validateUatPromotionRollbackRuntimeObservation(value.observed); }
+  catch { reject(action === "PREFLIGHT"
+    ? "ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_INVALID" : "ROLLBACK_CONTROL_RUNTIME_RECHECK_INVALID"); }
+  if (value.target_state === "SAFE_TO_EXECUTE"
+    && !same(observed, createUatPromotionRollbackRuntimeOriginalObservation(runtimeTrust.runtimePlan))) {
+    reject(action === "PREFLIGHT"
+      ? "ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_INVALID" : "ROLLBACK_CONTROL_RUNTIME_RECHECK_INVALID");
+  }
+  const plan = runtimeTrust.runtimePlan;
+  const targets = plan.targets;
+  if (observed.derived_targets.database.staging.name !== targets.database.staging
+    || observed.derived_targets.database.candidate_quarantine.name
+      !== targets.database.candidate_quarantine
+    || ["uploads", "attachments", "backup_status"].some((domain) => (
+      observed.derived_targets.volumes[domain].target.name !== targets.volumes[domain].target
+      || observed.derived_targets.volumes[domain].utility_container.name
+        !== targets.volumes[domain].utility_container
+      || observed.retained_candidate_volumes[domain].name
+        !== plan.candidate.volumes[domain].name
+    ))) reject(action === "PREFLIGHT"
+    ? "ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_INVALID" : "ROLLBACK_CONTROL_RUNTIME_RECHECK_INVALID");
+  if (value.target_state === "EXACT_RESULT_ALREADY_DURABLE") {
+    const expectedDigest = (reference) => {
+      const matched = /@sha256:([0-9a-f]{64})$/u.exec(reference);
+      if (matched === null) return null;
+      return `sha256:${matched[1]}`;
+    };
+    if (observed.active_generation !== "PREDECESSOR"
+      || observed.database.name !== plan.deployment.database.name
+      || observed.database.system_identifier !== plan.deployment.database.system_identifier
+      || observed.database.marker !== plan.deployment.database.marker
+      || observed.database.oid === plan.deployment.database.oid
+      || observed.database.allow_connections !== true
+      || observed.database.writer_sessions !== 0
+      || observed.database.sealed !== false
+      || ["caddy", "postgres"].some((service) => !same(
+        {
+          service: observed.services[service].service,
+          container_id: observed.services[service].container_id,
+          image_reference: observed.services[service].image_reference,
+          image_digest: observed.services[service].image_digest,
+        },
+        plan.candidate.services[service],
+      ))
+      || ["web", "worker"].some((service) => (
+        observed.services[service].image_reference !== plan.predecessor[`${service}_image`]
+        || observed.services[service].image_digest
+          !== expectedDigest(plan.predecessor[`${service}_image`])
+        || observed.services[service].container_id === plan.candidate.services[service].container_id
+      ))
+      || Object.values(observed.services).some((service) => !service.running
+        || service.oom_killed || service.restart_count !== 0
+        || service.health !== (service.service === "caddy" ? "none" : "healthy"))
+      || observed.writer_inventory.active_writer_count !== 2
+      || observed.writer_inventory.unexpected_writer_count !== 0
+      || observed.writer_inventory.members.length !== 2
+      || observed.derived_targets.database.staging.present
+      || !observed.derived_targets.database.candidate_quarantine.present
+      || observed.derived_targets.database.candidate_quarantine.oid !== plan.deployment.database.oid
+      || ["uploads", "attachments", "backup_status"].some((domain) => (
+        observed.volumes[domain].name !== targets.volumes[domain].target
+        || observed.volumes[domain].identity_sha256 === plan.candidate.volumes[domain].identity_sha256
+        || !observed.derived_targets.volumes[domain].target.present
+        || observed.derived_targets.volumes[domain].target.identity_sha256
+          !== observed.volumes[domain].identity_sha256
+        || observed.derived_targets.volumes[domain].utility_container.present
+        || observed.retained_candidate_volumes[domain].present !== true
+        || observed.retained_candidate_volumes[domain].identity_sha256
+          !== plan.candidate.volumes[domain].identity_sha256
+      ))) reject(action === "PREFLIGHT"
+      ? "ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_INVALID" : "ROLLBACK_CONTROL_RUNTIME_RECHECK_INVALID");
+  }
   return value;
+}
+
+function exactRuntimeMatchesRollbackStages(runtimeRecheck, stages) {
+  if (runtimeRecheck.target_state !== "EXACT_RESULT_ALREADY_DURABLE") return false;
+  if (!Array.isArray(stages) || stages.length !== UAT_PROMOTION_ROLLBACK_STAGES.length) return false;
+  const database = stages[2]?.evidence;
+  const activation = stages[7]?.evidence;
+  const observed = runtimeRecheck.observed;
+  if (!database || !activation || !observed) return false;
+  if (!same(observed.database, {
+    name: database.restored_database_name,
+    system_identifier: database.system_identifier,
+    oid: database.restored_database_oid,
+    marker: database.restored_database_marker,
+    allow_connections: true,
+    writer_sessions: 0,
+    sealed: false,
+  })) return false;
+  const volumeStage = { uploads: 3, attachments: 4, backup_status: 5 };
+  if (Object.entries(volumeStage).some(([domain, index]) => (
+    observed.volumes[domain].name !== stages[index].evidence.target_volume
+    || observed.volumes[domain].identity_sha256
+      !== stages[index].evidence.target_volume_identity_sha256
+    || observed.retained_candidate_volumes[domain].present !== true
+    || observed.retained_candidate_volumes[domain].name
+      !== stages[index].evidence.retained_candidate_volume
+    || observed.retained_candidate_volumes[domain].identity_sha256
+      !== stages[index].evidence.retained_candidate_volume_identity_sha256
+  ))) return false;
+  if (observed.writer_inventory.active_writer_count !== 2
+    || observed.writer_inventory.unexpected_writer_count !== 0
+    || observed.writer_inventory.members.length !== 2) return false;
+  return ["caddy", "postgres", "web", "worker"].every((service) => {
+    const actual = observed.services[service];
+    const expected = activation[service];
+    return actual.container_id === expected.container_id
+      && actual.running === expected.running
+      && actual.restart_count === expected.restart_count
+      && actual.oom_killed === expected.oom_killed
+      && actual.health === (service === "caddy" ? "none" : "healthy")
+      && (service === "web" || service === "worker"
+        ? actual.image_reference === expected.image_reference
+        : actual.image_digest === expected.image_digest);
+  });
+}
+
+function exactRuntimeMatchesDurableRollback(context, runtimeRecheck, ledger, rollbackResult) {
+  if (!ledger.complete) return false;
+  const stages = context.operation === "ROLLBACK_EXECUTION" ? ledger.records : rollbackResult?.stages;
+  return exactRuntimeMatchesRollbackStages(runtimeRecheck, stages);
 }
 
 function controlOptions(context, phase, options) {
@@ -363,14 +961,23 @@ export async function preflightUatPromotionRollbackControl(contextInput, options
     context, intent, resolved.filesystemRoot, rollbackResult,
   );
   await verifyPackageSources(packageValue, resolved.filesystemRoot, UAT_PROMOTION_ROLLBACK_PACKAGE_SOURCE_ROLES);
-  if (Date.parse(nowIso(resolved.clock)) > Date.parse(packageValue.execution_deadline)) {
+  if (context.execution_mode === "ORIGINAL"
+    && Date.parse(nowIso(resolved.clock)) > Date.parse(packageValue.execution_deadline)) {
     reject("ROLLBACK_CONTROL_EXECUTION_DEADLINE_EXPIRED");
   }
+  const runtimeTrust = await loadRuntimeTrustSources(
+    context, packageValue, resolved.filesystemRoot, resolved.clock,
+  );
   const adapter = options.adapter ?? productionAdapter(context, intent);
   if (!adapter || typeof adapter.preflight !== "function") reject("ROLLBACK_CONTROL_ADAPTER_INVALID");
-  const response = validatePreflightResponse(
-    await adapter.preflight({ context, intent, packageValue, rollbackResult }), packageValue,
+  const response = validateRuntimeGateResponse(
+    await adapter.preflight({ context, intent, packageValue, rollbackResult, runtimeTrust }), packageValue,
+    context.execution_mode, context.operation, "PREFLIGHT", runtimeTrust,
   );
+  if (context.operation === "ROLLBACK_POSTVERIFY" && context.execution_mode === "ORIGINAL"
+    && !exactRuntimeMatchesRollbackStages(response, rollbackResult.stages)) {
+    reject("ROLLBACK_CONTROL_RUNTIME_PREFLIGHT_INVALID");
+  }
   const reloaded = await loadExecutionPackage(
     context, intent, resolved.filesystemRoot, rollbackResult,
   );
@@ -378,11 +985,17 @@ export async function preflightUatPromotionRollbackControl(contextInput, options
   await verifyPackageSources(
     reloaded.packageValue, resolved.filesystemRoot, UAT_PROMOTION_ROLLBACK_PACKAGE_SOURCE_ROLES,
   );
+  await loadRuntimeTrustSources(context, reloaded.packageValue, resolved.filesystemRoot, resolved.clock);
   return Object.freeze({
     result: "ROLLBACK_CONTROL_PREFLIGHT_PASSED", promotion_id: context.parameters.promotion_id,
     intent_sha256: options.expectedIntentSha256,
     execution_package_sha256: response.execution_package_sha256,
     source_set_sha256: response.source_set_sha256,
+    runtime_plan_sha256: response.runtime_plan_sha256,
+    runtime_activation_source_sha256: response.runtime_activation_source_sha256,
+    executor_sha256: response.executor_sha256,
+    deployment_identity_sha256: response.deployment_identity_sha256,
+    protected_resources_sha256: response.protected_resources_sha256,
   });
 }
 
@@ -420,29 +1033,155 @@ async function completeLedger(root, result, postverify) {
   return true;
 }
 
-async function lastCommittedRecord(root, postverify) {
+async function auditCommittedRecords(root, context, intent, packageValue, rollbackResult, runtimeTrust) {
+  const postverify = context.operation === "ROLLBACK_POSTVERIFY";
   const labels = postverify ? UAT_PROMOTION_ROLLBACK_POSTVERIFY_CHECKS : UAT_PROMOTION_ROLLBACK_STAGES;
   const names = (await readdir(root)).sort();
+  const recordFiles = new Set();
+  const records = [];
   let previous = ZERO_SHA256;
+  let prefixExact = true;
+  let diagnostic = null;
   for (const [index, label] of labels.entries()) {
-    const prefix = recordNames(index, label).resultPrefix;
-    const matches = names.filter((name) => name.startsWith(prefix) && name.endsWith(".json"));
-    if (matches.length === 0) break;
-    if (matches.length !== 1) return ZERO_SHA256;
-    let stored;
+    const prefixes = recordNames(index, label);
+    const intentMatches = names.filter((name) => name.startsWith(prefixes.intentPrefix) && name.endsWith(".json"));
+    const resultMatches = names.filter((name) => name.startsWith(prefixes.resultPrefix) && name.endsWith(".json"));
+    for (const name of [...intentMatches, ...resultMatches]) recordFiles.add(name);
+    if (intentMatches.length === 0 && resultMatches.length === 0) {
+      if (names.some((name) => labels.slice(index + 1).some((later, offset) => {
+        const laterNames = recordNames(index + offset + 1, later);
+        return name.startsWith(laterNames.intentPrefix) || name.startsWith(laterNames.resultPrefix);
+      }))) {
+        prefixExact = false;
+        diagnostic = `LATER_RECORD_AFTER_GAP:${label}`;
+      }
+      break;
+    }
+    if (intentMatches.length !== 1 || resultMatches.length > 1) {
+      prefixExact = false;
+      diagnostic = `RECORD_CARDINALITY:${label}`;
+      break;
+    }
+    let storedIntent;
     try {
-      stored = await trustedJson(
-        path.join(root, matches[0]),
+      storedIntent = (await trustedJson(
+        path.join(root, intentMatches[0]),
+        postverify ? validateUatPromotionRollbackCheckIntent : validateUatPromotionRollbackStageIntent,
+        "ROLLBACK_CONTROL_RECORD_INTENT_INVALID",
+      )).value;
+    } catch (error) {
+      prefixExact = false;
+      diagnostic = `INTENT_INVALID:${label}:${error?.code || "UNKNOWN"}`;
+      break;
+    }
+    const intentField = postverify ? "check_intent_sha256" : "stage_intent_sha256";
+    const resultField = postverify ? "check_result_sha256" : "stage_result_sha256";
+    const planSha256 = postverify ? rollbackResult.rollback_plan_sha256 : intent.rollback_plan_sha256;
+    const common = {
+      promotion_id: context.parameters.promotion_id,
+      promotion_generation: context.parameters.promotion_generation,
+      operation_id: context.operation_id,
+      execution_authorization_sha256: context.original_authorization_sha256,
+      rollback_plan_sha256: planSha256,
+      execution_package_sha256: packageValue.package_sha256,
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
+      ordinal: index + 1,
+      previous_result_sha256: previous,
+      input_sha256: clusterSha256({
+        operation_id: context.operation_id, label, ordinal: index + 1,
+        rollback_plan_sha256: planSha256,
+        execution_package_sha256: packageValue.package_sha256,
+        runtime_plan_sha256: packageValue.runtime_plan_sha256,
+        previous_result_sha256: previous,
+      }),
+      prepared_at: storedIntent.prepared_at,
+    };
+    const expectedIntent = postverify
+      ? createUatPromotionRollbackCheckIntent({ ...common, check: label })
+      : createUatPromotionRollbackStageIntent({ ...common, stage: label });
+    if (!same(storedIntent, expectedIntent)
+      || intentMatches[0] !== `${prefixes.intentPrefix}${storedIntent[intentField]}.json`) {
+      prefixExact = false;
+      diagnostic = `INTENT_BINDING:${label}`;
+      break;
+    }
+    if (resultMatches.length === 0) {
+      prefixExact = false;
+      diagnostic = `DANGLING_INTENT:${label}`;
+      break;
+    }
+    let storedResult;
+    try {
+      storedResult = (await trustedJson(
+        path.join(root, resultMatches[0]),
         postverify ? validateUatPromotionRollbackCheckResult : validateUatPromotionRollbackStageResult,
         "ROLLBACK_CONTROL_RECORD_RESULT_INVALID",
+      )).value;
+      if (postverify) assertCheckEvidenceBindings(
+        label, storedResult.evidence, rollbackResult, packageValue,
+        { startedAt: storedResult.started_at, completedAt: storedResult.completed_at },
       );
-    } catch { return ZERO_SHA256; }
-    const digestField = postverify ? "check_result_sha256" : "stage_result_sha256";
-    if (stored.value.previous_result_sha256 !== previous
-      || matches[0] !== `${prefix}${stored.value[digestField]}.json`) return ZERO_SHA256;
-    previous = stored.value[digestField];
+      else assertStageEvidenceBindings(
+        label, storedResult.evidence, intent, packageValue, runtimeTrust,
+      );
+    } catch (error) {
+      prefixExact = false;
+      diagnostic = `RESULT_INVALID:${label}:${error?.code || "UNKNOWN"}`;
+      break;
+    }
+    const expectedResult = postverify
+      ? createUatPromotionRollbackCheckResult({
+        promotion_id: common.promotion_id,
+        promotion_generation: common.promotion_generation,
+        operation_id: common.operation_id,
+        execution_authorization_sha256: common.execution_authorization_sha256,
+        rollback_plan_sha256: common.rollback_plan_sha256,
+        execution_package_sha256: common.execution_package_sha256,
+        runtime_plan_sha256: common.runtime_plan_sha256,
+        ordinal: common.ordinal,
+        check: label,
+        previous_result_sha256: previous,
+        check_intent_sha256: storedIntent.check_intent_sha256,
+        evidence: storedResult.evidence,
+        started_at: storedResult.started_at,
+        completed_at: storedResult.completed_at,
+      })
+      : createUatPromotionRollbackStageResult({
+        promotion_id: common.promotion_id,
+        promotion_generation: common.promotion_generation,
+        operation_id: common.operation_id,
+        execution_authorization_sha256: common.execution_authorization_sha256,
+        rollback_plan_sha256: common.rollback_plan_sha256,
+        execution_package_sha256: common.execution_package_sha256,
+        runtime_plan_sha256: common.runtime_plan_sha256,
+        ordinal: common.ordinal,
+        stage: label,
+        previous_result_sha256: previous,
+        stage_intent_sha256: storedIntent.stage_intent_sha256,
+        evidence: storedResult.evidence,
+        started_at: storedResult.started_at,
+        completed_at: storedResult.completed_at,
+      });
+    if (!same(storedResult, expectedResult)
+      || resultMatches[0] !== `${prefixes.resultPrefix}${storedResult[resultField]}.json`
+      || Date.parse(storedResult.started_at) < Date.parse(storedIntent.prepared_at)
+      || Date.parse(storedResult.completed_at) > Date.parse(packageValue.execution_deadline)) {
+      prefixExact = false;
+      diagnostic = `RESULT_BINDING:${label}`;
+      break;
+    }
+    records.push(storedResult);
+    previous = storedResult[resultField];
   }
-  return previous;
+  const unexpected = names.filter((name) => !recordFiles.has(name));
+  if (unexpected.length > 0 && diagnostic === null) diagnostic = "UNEXPECTED_FILES";
+  const complete = prefixExact && unexpected.length === 0 && records.length === labels.length;
+  const state = prefixExact && unexpected.length === 0
+    ? (records.length === 0 ? "EMPTY" : "EXACT_PREFIX") : "UNKNOWN";
+  return Object.freeze({
+    state, complete, ordinal: records.length,
+    records: Object.freeze(records), lastResultSha256: previous, diagnostic,
+  });
 }
 
 async function completion(context, intent, filesystemRoot, root) {
@@ -466,8 +1205,12 @@ async function completion(context, intent, filesystemRoot, root) {
   return Object.freeze({ partial: false, result: stored.value });
 }
 
-function assertStageEvidenceBindings(stage, evidence, intent, packageValue) {
+function assertStageEvidenceBindings(stage, evidence, intent, packageValue, runtimeTrust) {
   const parameters = intent.parameters;
+  const plan = runtimeTrust?.runtimePlan;
+  if (!plan || plan.runtime_plan_sha256 !== packageValue.runtime_plan_sha256) {
+    reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
+  }
   const sourceByStage = {
     POSTGRESQL_RESTORE: ["snapshot_postgresql", "postgresql"],
     UPLOADS_RESTORE: ["snapshot_uploads", "uploads"],
@@ -478,19 +1221,59 @@ function assertStageEvidenceBindings(stage, evidence, intent, packageValue) {
     || evidence.source_set_sha256 !== packageValue.source_set_sha256
     || evidence.checkpoint_receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
     || evidence.snapshot_intent_sha256 !== parameters.snapshot_intent_sha256
-    || evidence.finalization_intent_sha256 !== parameters.finalization_intent_sha256)) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
+    || evidence.finalization_intent_sha256 !== parameters.finalization_intent_sha256
+    || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
+    || evidence.runtime_activation_sha256
+      !== packageValue.sources.runtime_adapter_activation.sha256)) {
+    reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
+  }
+  if (stage === "WRITER_CONTAINMENT" && (
+    evidence.database_oid !== parameters.database.oid
+    || evidence.system_identifier !== parameters.database.system_identifier
+    || evidence.web_container_id !== plan.candidate.services.web.container_id
+    || evidence.worker_container_id !== plan.candidate.services.worker.container_id
+    || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
+    || evidence.candidate_service_set_sha256 !== clusterSha256({
+      deployment_result_sha256: packageValue.sources.candidate_deployment_result.sha256,
+      postdeploy_identity_sha256: packageValue.sources.candidate_postdeploy_identity.sha256,
+    })
+  )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
   if (Object.hasOwn(sourceByStage, stage)) {
     const [role, domain] = sourceByStage[stage];
     const object = parameters.snapshot_objects[domain];
-    if (evidence.source_sha256 !== packageValue.sources[role].sha256
-      || evidence.source_sha256 !== object.sha256 || evidence.source_bytes !== object.bytes
-      || evidence.content_sha256 !== object.sha256
+    const expectedContentSha256 = domain === "postgresql"
+      ? packageValue.content_reconciliation.database.report_sha256
+      : packageValue.content_reconciliation.files[domain].tree_sha256;
+    if (evidence.source_artifact_sha256 !== packageValue.sources[role].sha256
+      || evidence.source_artifact_sha256 !== object.sha256
+      || evidence.source_artifact_bytes !== object.bytes
+      || evidence.source_reconciliation_sha256
+        !== packageValue.content_reconciliation.source_reconciliation_sha256
+      || evidence.target_content_sha256 !== expectedContentSha256
+      || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
       || domain !== "postgresql" && evidence.source_entries !== object.entries
       || domain === "postgresql" && (evidence.snapshot_database_oid !== parameters.database.oid
+        || evidence.restored_database_oid === plan.deployment.database.oid
         || evidence.system_identifier !== parameters.database.system_identifier
+        || evidence.restored_database_marker !== parameters.database.marker
         || evidence.migration_head !== parameters.predecessor.migration_head)) {
       reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
     }
+    const targets = deriveUatPromotionRollbackRuntimeTargets(intent.rollback_operation_id);
+    if (domain === "postgresql" && (
+      evidence.staging_database_name !== targets.database.staging
+      || evidence.candidate_database_quarantine_name !== targets.database.candidate_quarantine
+      || evidence.candidate_database_quarantine_oid !== plan.deployment.database.oid
+    )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
+    if (domain !== "postgresql" && evidence.target_volume !== targets.volumes[domain].target) {
+      reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
+    }
+    if (domain !== "postgresql" && (
+      evidence.retained_candidate_volume !== plan.candidate.volumes[domain].name
+      || evidence.retained_candidate_volume_identity_sha256
+        !== plan.candidate.volumes[domain].identity_sha256
+      || evidence.target_volume_identity_sha256 === plan.candidate.volumes[domain].identity_sha256
+    )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
   }
   if (stage === "RUNTIME_CONFIGURATION_RESTORE" && (
     evidence.compose_file_sha256 !== packageValue.sources.compose_file.sha256
@@ -498,18 +1281,82 @@ function assertStageEvidenceBindings(stage, evidence, intent, packageValue) {
     || evidence.deployment_environment_sha256 !== packageValue.sources.deployment_environment.sha256
     || evidence.runtime_policy_sha256 !== packageValue.sources.runtime_policy.sha256
     || evidence.runtime_configuration_sha256 !== parameters.predecessor.runtime_configuration_sha256
+    || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
   )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
-  if (stage === "WEB_WORKER_PREDECESSOR_ACTIVATION" && (
-    evidence.web.image_reference !== parameters.predecessor.web_image
-    || evidence.worker.image_reference !== parameters.predecessor.worker_image
-  )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
+  if (stage === "WEB_WORKER_PREDECESSOR_ACTIVATION") {
+    let receipt, identity, derivedIdentity;
+    try {
+      receipt = validatePostDeployReceipt(parseStrictJson(
+        evidence.rollback_postdeploy_receipt_json, 1024 * 1024,
+      ));
+      identity = validateReleaseIdentity(parseStrictJson(
+        evidence.release_identity_json, 1024 * 1024,
+      ));
+      derivedIdentity = buildReleaseIdentityFromPostDeployReceipt({
+        receipt, receiptSha256: evidence.rollback_postdeploy_receipt_sha256,
+      });
+    } catch { reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID"); }
+    const receiptSha256 = createHash("sha256")
+      .update(evidence.rollback_postdeploy_receipt_json).digest("hex");
+    const identitySha256 = createHash("sha256")
+      .update(evidence.release_identity_json).digest("hex");
+    const receiptServices = Object.fromEntries(receipt.services.map((service) => [service.service, service]));
+    const pinnedDigest = (reference) => {
+      const match = /@sha256:([0-9a-f]{64})$/u.exec(reference);
+      return match === null ? null : `sha256:${match[1]}`;
+    };
+    if (evidence.web.image_reference !== parameters.predecessor.web_image
+      || evidence.worker.image_reference !== parameters.predecessor.worker_image
+      || evidence.web.container_id === plan.candidate.services.web.container_id
+      || evidence.worker.container_id === plan.candidate.services.worker.container_id
+      || evidence.caddy.container_id !== plan.candidate.services.caddy.container_id
+      || evidence.caddy.image_digest !== plan.candidate.services.caddy.image_digest
+      || evidence.postgres.container_id !== plan.candidate.services.postgres.container_id
+      || evidence.postgres.image_digest !== plan.candidate.services.postgres.image_digest
+      || receiptSha256 !== evidence.rollback_postdeploy_receipt_sha256
+      || evidence.rollback_postdeploy_receipt_json !== releaseCanonicalJson(receipt)
+      || receiptSha256 === packageValue.sources.predecessor_postdeploy_receipt.sha256
+      || identitySha256 !== evidence.release_identity_sha256
+      || evidence.release_identity_json !== releaseCanonicalJson(identity)
+      || !same(identity, derivedIdentity)
+      || receipt.run_id !== plan.targets.rollback_postdeploy_run_id
+      || receipt.deployment.class !== "UAT"
+      || receipt.deployment.id !== plan.deployment.id
+      || receipt.deployment.compose_project !== plan.deployment.compose_project
+      || receipt.release.manifest_sha256 !== parameters.predecessor.release_manifest_sha256
+      || receipt.source.application_version !== parameters.predecessor.application_version
+      || receipt.source.git_commit !== parameters.predecessor.git_commit
+      || receipt.source.git_tree !== parameters.predecessor.git_tree
+      || receipt.migrations.head !== parameters.predecessor.migration_head
+      || receipt.migrations.manifest_sha256 !== parameters.predecessor.migration_manifest_sha256
+      || receipt.runtime_configuration_sha256 !== parameters.predecessor.runtime_configuration_sha256
+      || receipt.control.supervisor_bundle_sha256 !== intent.supervisor_bundle_sha256
+      || receipt.control.authorization_sha256 !== intent.execution_authorization_sha256
+      || ["caddy", "postgres"].some((service) => (
+        receiptServices[service].container_id !== plan.candidate.services[service].container_id
+        || receiptServices[service].image_id !== plan.candidate.services[service].image_digest
+        || receiptServices[service].image_reference !== plan.candidate.services[service].image_reference
+      ))
+      || ["web", "worker"].some((service) => (
+        receiptServices[service].container_id !== evidence[service].container_id
+        || receiptServices[service].image_reference !== parameters.predecessor[`${service}_image`]
+        || receiptServices[service].image_id
+          !== pinnedDigest(parameters.predecessor[`${service}_image`])
+      ))
+      || evidence.runtime_configuration_sha256 !== parameters.predecessor.runtime_configuration_sha256
+      || evidence.protected_resources_sha256 !== packageValue.protected_resources_sha256
+      || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256) {
+      reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
+    }
+  }
   if (stage === "PROTECTED_RESOURCE_RECHECK" && (
     evidence.before_sha256 !== packageValue.protected_resources_sha256
     || evidence.after_sha256 !== packageValue.protected_resources_sha256
+    || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
   )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
 }
 
-function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageValue) {
+function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageValue, timing) {
   const sourceByCheck = {
     POSTGRESQL_CONTENT: ["snapshot_postgresql", "postgresql"],
     UPLOADS_CONTENT: ["snapshot_uploads", "uploads"],
@@ -519,15 +1366,46 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
   if (Object.hasOwn(sourceByCheck, check)) {
     const [role, domain] = sourceByCheck[check];
     const object = rollbackResult.snapshot_objects[domain];
-    if (evidence.source_sha256 !== packageValue.sources[role].sha256
-      || evidence.source_sha256 !== object.sha256 || evidence.content_sha256 !== object.sha256
-      || evidence.bytes !== object.bytes || evidence.entries !== object.entries) {
+    const stageIndex = { postgresql: 2, uploads: 3, attachments: 4, backup_status: 5 }[domain];
+    const stage = rollbackResult.stages[stageIndex];
+    const expectedContentSha256 = domain === "postgresql"
+      ? packageValue.content_reconciliation.database.report_sha256
+      : packageValue.content_reconciliation.files[domain].tree_sha256;
+    const expectedTargetIdentitySha256 = domain === "postgresql"
+      ? clusterSha256(rollbackResult.restored_database)
+      : stage.evidence.target_volume_identity_sha256;
+    if (evidence.source_artifact_sha256 !== packageValue.sources[role].sha256
+      || evidence.source_artifact_sha256 !== object.sha256
+      || evidence.source_artifact_bytes !== object.bytes
+      || evidence.source_reconciliation_sha256
+        !== packageValue.content_reconciliation.source_reconciliation_sha256
+      || evidence.target_content_sha256 !== expectedContentSha256
+      || evidence.target_identity_sha256 !== expectedTargetIdentitySha256
+      || evidence.stage_result_sha256 !== stage.stage_result_sha256
+      || evidence.entries !== object.entries
+      || check === "POSTGRESQL_CONTENT" && (
+        evidence.candidate_database_quarantine_present !== true
+        || evidence.candidate_database_quarantine_name
+          !== stage.evidence.candidate_database_quarantine_name
+        || evidence.candidate_database_quarantine_oid
+          !== stage.evidence.candidate_database_quarantine_oid
+        || evidence.candidate_database_quarantine_oid !== packageValue.database.oid
+      )
+      || check !== "POSTGRESQL_CONTENT" && (
+        evidence.candidate_volume_present !== true
+        || evidence.candidate_volume_name !== stage.evidence.retained_candidate_volume
+        || evidence.candidate_volume_identity_sha256
+          !== stage.evidence.retained_candidate_volume_identity_sha256
+      )) {
       reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
     }
   }
   const activation = rollbackResult.stages[7].evidence;
+  const activationStageSha256 = rollbackResult.stages[7].stage_result_sha256;
   if (check === "MIGRATION_HEAD" && (evidence.migration_head !== rollbackResult.predecessor.migration_head
-    || evidence.migration_manifest_sha256 !== rollbackResult.predecessor.migration_manifest_sha256)) {
+    || evidence.migration_manifest_sha256 !== rollbackResult.predecessor.migration_manifest_sha256
+    || evidence.database_identity_sha256 !== clusterSha256(rollbackResult.restored_database)
+    || evidence.postgresql_stage_result_sha256 !== rollbackResult.stages[2].stage_result_sha256)) {
     reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
   }
   if (check === "CADDY_IDENTITY" && !same(evidence, activation.caddy)) reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
@@ -536,22 +1414,60 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
     if (check === label && (evidence.container_id !== activation[service].container_id
       || evidence.image_reference !== activation[service].image_reference
       || evidence.application_version !== rollbackResult.predecessor.application_version
-      || evidence.git_commit !== rollbackResult.predecessor.git_commit)) {
+      || evidence.git_commit !== rollbackResult.predecessor.git_commit
+      || evidence.running !== activation[service].running
+      || evidence.healthy !== activation[service].healthy
+      || evidence.restart_count !== activation[service].restart_count
+      || evidence.oom_killed !== activation[service].oom_killed)) {
       reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
     }
   }
   if (check === "RUNTIME_CONFIGURATION" && (
     evidence.runtime_configuration_sha256 !== rollbackResult.predecessor.runtime_configuration_sha256
     || evidence.deployment_environment_sha256 !== packageValue.sources.deployment_environment.sha256
+    || evidence.activation_stage_result_sha256 !== activationStageSha256
+    || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
   )) reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
   if (check === "STRICT_RELEASE_IDENTITY" && (
     evidence.release_identity_sha256 !== activation.release_identity_sha256
     || evidence.release_manifest_sha256 !== rollbackResult.predecessor.release_manifest_sha256
-    || evidence.postdeploy_receipt_sha256 !== packageValue.sources.predecessor_postdeploy_receipt.sha256
+    || evidence.rollback_postdeploy_receipt_sha256 !== activation.rollback_postdeploy_receipt_sha256
+    || evidence.activation_stage_result_sha256 !== activationStageSha256
   )) reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
+  if (check === "HEALTH") {
+    let readiness;
+    try { readiness = validatePostDeployReadiness(evidence.readiness); }
+    catch { reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID"); }
+    const expectedServices = {
+      caddy: activation.caddy, postgres: activation.postgres,
+      web: activation.web, worker: activation.worker,
+    };
+    if (!timing || Date.parse(evidence.checked_at) < Date.parse(timing.startedAt)
+      || Date.parse(evidence.checked_at) > Date.parse(timing.completedAt)
+      || evidence.checked_at !== readiness.database_time
+      || readiness.deployment_class !== "UAT"
+      || readiness.deployment_id !== packageValue.compose_project
+      || readiness.version !== rollbackResult.predecessor.application_version
+      || readiness.revision !== rollbackResult.predecessor.git_commit.slice(0, 12)
+      || readiness.migration_head !== rollbackResult.predecessor.migration_head
+      || readiness.migration_manifest_sha256
+        !== rollbackResult.predecessor.migration_manifest_sha256
+      || evidence.readiness_sha256 !== clusterSha256(readiness)
+      || !same(evidence.services, expectedServices)
+      || evidence.service_set_sha256 !== clusterSha256(expectedServices)
+      || evidence.release_identity_sha256 !== activation.release_identity_sha256
+      || evidence.runtime_configuration_sha256 !== activation.runtime_configuration_sha256
+      || evidence.health_sha256 !== clusterSha256(
+        Object.fromEntries(Object.entries(evidence).filter(([field]) => field !== "health_sha256")),
+      )) {
+      reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
+    }
+  }
   if (check === "PROTECTED_RESOURCES" && (
     evidence.before_sha256 !== packageValue.protected_resources_sha256
     || evidence.after_sha256 !== packageValue.protected_resources_sha256
+    || evidence.protected_recheck_stage_result_sha256 !== rollbackResult.stages[8].stage_result_sha256
+    || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
   )) reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
 }
 
@@ -579,62 +1495,401 @@ async function persistRecord(root, record, postverify, intentRecord) {
   );
 }
 
-function validateContainmentObservation(value, packageValue, previousResultSha256) {
+function validateContainmentObservation(value, packageValue, runtimeTrust, ledger, containmentIntent) {
+  const preparedMs = Date.parse(containmentIntent.prepared_at);
+  const deadlineCandidates = [preparedMs + UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS.CONTAIN * 1_000];
+  const authorizationDeadline = Date.parse(
+    process.env.ERP_RELEASE_SUPERVISOR_AUTHORIZATION_EXPIRES_AT || "",
+  );
+  if (Number.isFinite(authorizationDeadline)) deadlineCandidates.push(authorizationDeadline);
   if (!value || typeof value !== "object" || Array.isArray(value)
     || !same(Object.keys(value).sort(), [
-      "contained_at", "database", "last_committed_record_sha256", "protected_resources_sha256",
-      "stopped_services",
-    ].sort()) || !value.database || value.database.name !== "chenyida_erp"
-    || !/^[1-9][0-9]{0,9}$/u.test(value.database.oid || "") || value.database.sealed !== true
-    || value.last_committed_record_sha256 !== previousResultSha256
-    || value.protected_resources_sha256 !== packageValue.protected_resources_sha256
-    || !Array.isArray(value.stopped_services) || value.stopped_services.length !== 2
-    || !same(value.stopped_services.map((item) => item.service).sort(), ["web", "worker"])
-    || value.stopped_services.some((item) => !item || typeof item !== "object"
-      || !same(Object.keys(item).sort(), ["container_id", "service"].sort())
-      || !/^[0-9a-f]{64}$/u.test(item.container_id || ""))
-    || nowIso(() => new Date(value.contained_at)) !== value.contained_at) {
+      "after_observed", "before_observed", "containment", "runtime_exchange_sha256",
+    ])
+    || !SHA256.test(value.runtime_exchange_sha256 || "")) {
     reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_INVALID");
   }
-  return value;
+  let before;
+  let after;
+  try {
+    before = validateUatPromotionRollbackRuntimeObservation(value.before_observed);
+    after = validateUatPromotionRollbackRuntimeObservation(value.after_observed);
+  } catch { reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_INVALID"); }
+  const containment = value.containment;
+  if (!containment || typeof containment !== "object" || Array.isArray(containment)
+    || !same(Object.keys(containment).sort(), [
+      "active_generation", "after_observation_sha256", "after_writer_inventory_sha256",
+      "before_observation_sha256", "before_writer_inventory_sha256",
+      "contained_at", "containment_probe_sha256", "database", "last_committed_record_sha256",
+      "protected_resources_sha256", "retained_candidate_volumes",
+      "retained_candidate_volumes_sha256", "runtime_plan_sha256", "stopped_writers",
+      "writer_set_sha256",
+    ].sort()) || !containment.database
+    || !same(Object.keys(containment.database).sort(), [
+      "allow_connections", "marker", "name", "oid", "sealed", "system_identifier",
+      "writer_sessions",
+    ].sort())
+    || containment.database.name !== "chenyida_erp"
+    || !/^[1-9][0-9]{0,9}$/u.test(containment.database.oid || "")
+    || containment.database.sealed !== true
+    || containment.database.system_identifier !== packageValue.database.system_identifier
+    || containment.database.marker !== packageValue.database.marker
+    || !new Set(["CANDIDATE", "PREDECESSOR", "PARTIAL_OR_UNKNOWN"])
+      .has(containment.active_generation)
+    || containment.last_committed_record_sha256 !== ledger.lastResultSha256
+    || containment.protected_resources_sha256 !== packageValue.protected_resources_sha256
+    || containment.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
+    || !SHA256.test(containment.containment_probe_sha256 || "")
+    || !SHA256.test(containment.retained_candidate_volumes_sha256 || "")
+    || !SHA256.test(containment.before_writer_inventory_sha256 || "")
+    || !SHA256.test(containment.after_writer_inventory_sha256 || "")
+    || !SHA256.test(containment.writer_set_sha256 || "")
+    || !Array.isArray(containment.stopped_writers)
+    || containment.stopped_writers.some((item) => !item || typeof item !== "object"
+      || !same(Object.keys(item).sort(), ["container_id", "service", "writer_key"].sort())
+      || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/u.test(item.writer_key || "")
+      || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/u.test(item.service || "")
+      || !/^[0-9a-f]{64}$/u.test(item.container_id || ""))
+    || new Set(containment.stopped_writers.map((item) => item.writer_key)).size
+      !== containment.stopped_writers.length
+    || new Set(containment.stopped_writers.map((item) => item.container_id)).size
+      !== containment.stopped_writers.length
+    || nowIso(() => new Date(containment.contained_at)) !== containment.contained_at
+    || Date.parse(containment.contained_at) < preparedMs
+    || Date.parse(containment.contained_at) > Math.min(...deadlineCandidates)) {
+    reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_INVALID");
+  }
+  const expectedServices = {
+    web: containmentIntent.expected_web_container_id,
+    worker: containmentIntent.expected_worker_container_id,
+  };
+  const plan = runtimeTrust.runtimePlan;
+  const stopped = Object.fromEntries(containment.stopped_writers.map((item) => [item.writer_key, item]));
+  const beforeWriters = before.writer_inventory.members;
+  const afterWriters = after.writer_inventory.members;
+  const writerIdentitySet = (members) => members.map((item) => ({
+    writer_key: item.writer_key,
+    service: item.service,
+    container_id: item.container_id,
+    unexpected: item.unexpected,
+  }));
+  const expectedStopped = beforeWriters.map((item) => ({
+    writer_key: item.writer_key, service: item.service, container_id: item.container_id,
+  }));
+  const sameServiceIdentity = (service) => [
+    "service", "container_id", "image_reference", "image_digest", "restart_count", "oom_killed",
+  ].every((field) => before.services[service][field] === after.services[service][field]);
+  if (before.observation_sha256 !== containmentIntent.runtime_observation_sha256
+    || clusterSha256(before.writer_inventory) !== containmentIntent.expected_writer_inventory_sha256
+    || before.writer_inventory.writer_set_sha256 !== containmentIntent.expected_writer_set_sha256
+    || before.active_generation !== containmentIntent.expected_active_generation
+    || before.database.oid !== containmentIntent.expected_database_oid
+    || before.services.web.container_id !== expectedServices.web
+    || before.services.worker.container_id !== expectedServices.worker
+    || containment.before_observation_sha256 !== before.observation_sha256
+    || containment.after_observation_sha256 !== after.observation_sha256
+    || containment.before_writer_inventory_sha256 !== clusterSha256(before.writer_inventory)
+    || containment.after_writer_inventory_sha256 !== clusterSha256(after.writer_inventory)
+    || containment.writer_set_sha256 !== before.writer_inventory.writer_set_sha256
+    || containment.active_generation !== before.active_generation
+    || !same(containment.database, after.database)
+    || !same(after.database, {
+      ...before.database, allow_connections: false, writer_sessions: 0, sealed: true,
+    })
+    || after.active_generation !== before.active_generation
+    || !same(after.volumes, before.volumes)
+    || !same(after.retained_candidate_volumes, before.retained_candidate_volumes)
+    || !same(containment.retained_candidate_volumes, after.retained_candidate_volumes)
+    || containment.retained_candidate_volumes_sha256
+      !== clusterSha256(containment.retained_candidate_volumes)
+    || ["uploads", "attachments", "backup_status"].some((domain) => {
+      const expected = { ...plan.candidate.volumes[domain], present: true };
+      return !same(before.retained_candidate_volumes[domain], expected)
+        || !same(after.retained_candidate_volumes[domain], expected);
+    })
+    || !same(after.derived_targets, before.derived_targets)
+    || after.protected_resources_sha256 !== before.protected_resources_sha256
+    || !same(after.services.caddy, before.services.caddy)
+    || !same(after.services.postgres, before.services.postgres)
+    || before.writer_inventory.discovery_complete !== true
+    || after.writer_inventory.discovery_complete !== true
+    || before.writer_inventory.discovery_scope !== after.writer_inventory.discovery_scope
+    || before.writer_inventory.writer_set_sha256 !== after.writer_inventory.writer_set_sha256
+    || !same(writerIdentitySet(beforeWriters), writerIdentitySet(afterWriters))
+    || after.writer_inventory.active_writer_count !== 0
+    || after.writer_inventory.unexpected_writer_count !== before.writer_inventory.unexpected_writer_count
+    || afterWriters.some((item) => item.running)
+    || !same(containment.stopped_writers, expectedStopped)
+    || ["web", "worker"].some((service) => (
+      stopped[service].container_id !== expectedServices[service]
+      || !sameServiceIdentity(service)
+      || before.services[service].running !== (before.services[service].health !== "stopped")
+      || after.services[service].running !== false
+      || after.services[service].health !== "stopped"
+    ))) reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_INVALID");
+  const probeBody = {
+    before_observation_sha256: containment.before_observation_sha256,
+    after_observation_sha256: containment.after_observation_sha256,
+    before_writer_inventory_sha256: containment.before_writer_inventory_sha256,
+    after_writer_inventory_sha256: containment.after_writer_inventory_sha256,
+    writer_set_sha256: containment.writer_set_sha256,
+    database: containment.database,
+    stopped_writers: containment.stopped_writers,
+    retained_candidate_volumes: containment.retained_candidate_volumes,
+    retained_candidate_volumes_sha256: containment.retained_candidate_volumes_sha256,
+    protected_resources_sha256: containment.protected_resources_sha256,
+    runtime_plan_sha256: containment.runtime_plan_sha256,
+    last_committed_record_sha256: containment.last_committed_record_sha256,
+    contained_at: containment.contained_at,
+  };
+  if (containment.containment_probe_sha256 !== clusterSha256(probeBody)) {
+    reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_INVALID");
+  }
+  const exact = ledger.state !== "UNKNOWN" && containmentIntent.containment_attempt === 1;
+  const predecessorActive = exact && ledger.ordinal >= 8;
+  const databaseRestored = exact && ledger.ordinal >= 3;
+  const expectedGeneration = exact ? (predecessorActive ? "PREDECESSOR" : "CANDIDATE") : "PARTIAL_OR_UNKNOWN";
+  const expectedDatabaseOid = databaseRestored
+    ? ledger.records[2].evidence.restored_database_oid : plan.deployment.database.oid;
+  if (exact && (containment.active_generation !== expectedGeneration
+    || containment.database.name !== plan.deployment.database.name
+    || containment.database.system_identifier !== plan.deployment.database.system_identifier
+    || containment.database.marker !== plan.deployment.database.marker
+    || containment.database.oid !== expectedDatabaseOid)) {
+    reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_INVALID");
+  }
+  if (exact) {
+    const ledgerServices = predecessorActive
+      ? {
+        web: ledger.records[7].evidence.web.container_id,
+        worker: ledger.records[7].evidence.worker.container_id,
+      }
+      : {
+        web: plan.candidate.services.web.container_id,
+        worker: plan.candidate.services.worker.container_id,
+      };
+    if (["web", "worker"].some((service) => stopped[service].container_id !== ledgerServices[service])) {
+      reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_INVALID");
+    }
+  }
+  return Object.freeze({
+    ...containment,
+    runtime_exchange_sha256: value.runtime_exchange_sha256,
+  });
 }
 
-async function containAndRecord(context, intent, packageValue, root, adapter, failureCode, options, previousResultSha256) {
+async function containAndRecord(
+  context, intent, packageValue, runtimeTrust, root, adapter, failureCode, options, ledger,
+  runtimeRecheck,
+) {
   if (!adapter || typeof adapter.contain !== "function") reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
-  const preparedAt = nowIso(options.clock);
-  const intentBody = {
-    schema_version: 1, contract: "chenyida-erp-uat-promotion-rollback-containment-intent/v1",
-    status: "PREPARED", operation: context.operation, operation_id: context.operation_id,
-    promotion_id: context.parameters.promotion_id, intent_sha256: options.expectedIntentSha256,
-    execution_package_sha256: packageValue.package_sha256, failure_code: failureCode,
-    last_committed_record_sha256: previousResultSha256, prepared_at: preparedAt,
-  };
-  const containmentIntent = Object.freeze({
-    ...intentBody, containment_intent_sha256: clusterSha256(intentBody),
-  });
-  await immutableJson(
-    path.join(root, `containment.intent.${containmentIntent.containment_intent_sha256}.json`),
-    containmentIntent,
-    (value) => { if (!same(value, containmentIntent)) reject("ROLLBACK_CONTROL_CONTAINMENT_INTENT_INVALID"); return value; },
-    "ROLLBACK_CONTROL_CONTAINMENT_INTENT_INVALID",
-  );
+  let runtimeObservation = runtimeRecheck.observed;
+  let runtimeTargetState = runtimeRecheck.target_state;
   let observed;
-  try {
-    observed = validateContainmentObservation(
-      await adapter.contain({ context, intent, packageValue, containmentIntent }),
-      packageValue, previousResultSha256,
+  let containmentIntent;
+  let containmentAttemptReceipt;
+  let previousContainmentIntentSha256 = null;
+  let previousContainmentAttemptReceiptSha256 = null;
+  const persistAttemptReceipt = async ({
+    outcome, observation, runtimeExchangeSha256: exchangeSha256,
+    containmentProbeSha256 = null, nextRuntimeTargetState,
+  }) => {
+    if (!new Set([
+      "DRIFT_BEFORE_CONTAIN", "STALE_INTENT_BEFORE_CONTAIN", "DRIFT_AFTER_CONTAIN",
+      "CONTAINED", "REFRESH_REJECTED", "CONTAINMENT_RESPONSE_REJECTED",
+    ]).has(outcome) || !SHA256.test(exchangeSha256 || "")
+      || containmentProbeSha256 !== null && !SHA256.test(containmentProbeSha256)
+      || new Set(["REFRESH_REJECTED", "CONTAINMENT_RESPONSE_REJECTED"]).has(outcome)
+        !== (nextRuntimeTargetState === null)) {
+      reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+    }
+    const receiptBody = {
+      schema_version: 1,
+      contract: "chenyida-erp-uat-promotion-rollback-containment-attempt/v1",
+      status: "RECORDED",
+      operation: context.operation,
+      operation_id: context.operation_id,
+      promotion_id: context.parameters.promotion_id,
+      containment_attempt: containmentIntent.containment_attempt,
+      containment_intent_sha256: containmentIntent.containment_intent_sha256,
+      previous_attempt_receipt_sha256: previousContainmentAttemptReceiptSha256,
+      outcome,
+      runtime_target_state: containmentIntent.runtime_target_state,
+      next_runtime_target_state: nextRuntimeTargetState,
+      runtime_observation_sha256: observation.observation_sha256,
+      writer_inventory_sha256: clusterSha256(observation.writer_inventory),
+      writer_set_sha256: observation.writer_inventory.writer_set_sha256,
+      runtime_exchange_sha256: exchangeSha256,
+      containment_probe_sha256: containmentProbeSha256,
+      recorded_at: nowIso(options.clock),
+    };
+    const receipt = Object.freeze({
+      ...receiptBody, containment_attempt_receipt_sha256: clusterSha256(receiptBody),
+    });
+    await immutableJson(
+      path.join(
+        root,
+        `containment.attempt.${receipt.containment_attempt}.${receipt.containment_attempt_receipt_sha256}.json`,
+      ),
+      receipt,
+      (value) => {
+        if (!same(value, receipt)) reject("ROLLBACK_CONTROL_CONTAINMENT_ATTEMPT_INVALID");
+        return value;
+      },
+      "ROLLBACK_CONTROL_CONTAINMENT_ATTEMPT_INVALID",
     );
-  } catch { reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED"); }
+    previousContainmentAttemptReceiptSha256 = receipt.containment_attempt_receipt_sha256;
+    return receipt;
+  };
+  for (let attempt = 1; attempt <= MAX_CONTAINMENT_ATTEMPTS; attempt += 1) {
+    const preparedAt = nowIso(options.clock);
+    const intentBody = {
+      schema_version: 1, contract: "chenyida-erp-uat-promotion-rollback-containment-intent/v1",
+      status: "PREPARED", operation: context.operation, operation_id: context.operation_id,
+      promotion_id: context.parameters.promotion_id, intent_sha256: options.expectedIntentSha256,
+      execution_package_sha256: packageValue.package_sha256, failure_code: failureCode,
+      ledger_state: ledger.state,
+      last_committed_ordinal: ledger.ordinal,
+      last_committed_label: ledger.ordinal === 0 ? null
+        : (context.operation === "ROLLBACK_POSTVERIFY"
+          ? UAT_PROMOTION_ROLLBACK_POSTVERIFY_CHECKS : UAT_PROMOTION_ROLLBACK_STAGES)[ledger.ordinal - 1],
+      last_committed_record_sha256: ledger.lastResultSha256,
+      containment_attempt: attempt,
+      previous_containment_intent_sha256: previousContainmentIntentSha256,
+      previous_containment_attempt_receipt_sha256: previousContainmentAttemptReceiptSha256,
+      runtime_target_state: runtimeTargetState,
+      runtime_observation_sha256: runtimeObservation.observation_sha256,
+      expected_writer_inventory_sha256: clusterSha256(runtimeObservation.writer_inventory),
+      expected_writer_set_sha256: runtimeObservation.writer_inventory.writer_set_sha256,
+      expected_active_generation: runtimeObservation.active_generation,
+      expected_database_oid: runtimeObservation.database.oid,
+      expected_web_container_id: runtimeObservation.services.web.container_id,
+      expected_worker_container_id: runtimeObservation.services.worker.container_id,
+      prepared_at: preparedAt,
+    };
+    containmentIntent = Object.freeze({
+      ...intentBody, containment_intent_sha256: clusterSha256(intentBody),
+    });
+    await immutableJson(
+      path.join(root, `containment.intent.${containmentIntent.containment_intent_sha256}.json`),
+      containmentIntent,
+      (value) => {
+        if (!same(value, containmentIntent)) reject("ROLLBACK_CONTROL_CONTAINMENT_INTENT_INVALID");
+        return value;
+      },
+      "ROLLBACK_CONTROL_CONTAINMENT_INTENT_INVALID",
+    );
+    let containmentResult;
+    try {
+      containmentResult = await adapter.contain({
+        context, intent, packageValue, runtimeTrust, containmentIntent,
+        runtimeObservation,
+      });
+    } catch { reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED"); }
+    if (containmentResult?.status === "CONTAINMENT_OBSERVATION_DRIFT") {
+      if (!same(Object.keys(containmentResult).sort(), [
+        "observed", "outcome", "runtime_exchange_sha256", "status",
+      ]) || !new Set([
+        "DRIFT_BEFORE_CONTAIN", "STALE_INTENT_BEFORE_CONTAIN", "DRIFT_AFTER_CONTAIN",
+      ]).has(containmentResult.outcome)) {
+        reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+      }
+      let refreshedObservation;
+      try {
+        refreshedObservation = validateUatPromotionRollbackRuntimeObservation(
+          containmentResult.observed,
+        );
+      } catch { reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED"); }
+      let acceptedObservation;
+      try {
+        acceptedObservation = validateContainmentRefreshObservation(
+          refreshedObservation, runtimeObservation, packageValue, runtimeTrust,
+        );
+      } catch {
+        await persistAttemptReceipt({
+          outcome: "REFRESH_REJECTED",
+          observation: refreshedObservation,
+          runtimeExchangeSha256: containmentResult.runtime_exchange_sha256,
+          nextRuntimeTargetState: null,
+        });
+        reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+      }
+      containmentAttemptReceipt = await persistAttemptReceipt({
+        outcome: containmentResult.outcome,
+        observation: acceptedObservation,
+        runtimeExchangeSha256: containmentResult.runtime_exchange_sha256,
+        nextRuntimeTargetState: "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT",
+      });
+      runtimeObservation = acceptedObservation;
+      if (attempt === MAX_CONTAINMENT_ATTEMPTS) {
+        reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+      }
+      runtimeTargetState = "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT";
+      previousContainmentIntentSha256 = containmentIntent.containment_intent_sha256;
+      continue;
+    }
+    try {
+      observed = validateContainmentObservation(
+        containmentResult, packageValue, runtimeTrust, ledger, containmentIntent,
+      );
+    } catch {
+      let rejectedObservation;
+      try {
+        rejectedObservation = validateUatPromotionRollbackRuntimeObservation(
+          containmentResult?.after_observed,
+        );
+      } catch { reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED"); }
+      await persistAttemptReceipt({
+        outcome: "CONTAINMENT_RESPONSE_REJECTED",
+        observation: rejectedObservation,
+        runtimeExchangeSha256: containmentResult.runtime_exchange_sha256,
+        containmentProbeSha256: SHA256.test(
+          containmentResult?.containment?.containment_probe_sha256 || "",
+        ) ? containmentResult.containment.containment_probe_sha256 : null,
+        nextRuntimeTargetState: null,
+      });
+      reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+    }
+    containmentAttemptReceipt = await persistAttemptReceipt({
+      outcome: "CONTAINED",
+      observation: validateUatPromotionRollbackRuntimeObservation(containmentResult.after_observed),
+      runtimeExchangeSha256: observed.runtime_exchange_sha256,
+      containmentProbeSha256: observed.containment_probe_sha256,
+      nextRuntimeTargetState: containmentIntent.runtime_target_state,
+    });
+    break;
+  }
+  if (!observed || !containmentIntent || !containmentAttemptReceipt) {
+    reject("ROLLBACK_CONTROL_RUNTIME_CONTAINMENT_FAILED");
+  }
   const body = {
     schema_version: 1, contract: "chenyida-erp-uat-promotion-rollback-containment/v1",
     status: "CONTAINED_FOR_JOURNAL_QUARANTINE", operation: context.operation,
     operation_id: context.operation_id, promotion_id: context.parameters.promotion_id,
     intent_sha256: options.expectedIntentSha256,
     containment_intent_sha256: containmentIntent.containment_intent_sha256,
+    containment_attempt: containmentIntent.containment_attempt,
+    previous_containment_intent_sha256: containmentIntent.previous_containment_intent_sha256,
+    previous_containment_attempt_receipt_sha256:
+      containmentIntent.previous_containment_attempt_receipt_sha256,
+    containment_attempt_receipt_sha256:
+      containmentAttemptReceipt.containment_attempt_receipt_sha256,
     execution_package_sha256: packageValue.package_sha256, failure_code: failureCode,
-    database: observed.database, stopped_services: observed.stopped_services,
+    database: observed.database, stopped_writers: observed.stopped_writers,
+    active_generation: observed.active_generation,
+    before_observation_sha256: observed.before_observation_sha256,
+    after_observation_sha256: observed.after_observation_sha256,
+    before_writer_inventory_sha256: observed.before_writer_inventory_sha256,
+    after_writer_inventory_sha256: observed.after_writer_inventory_sha256,
+    writer_set_sha256: observed.writer_set_sha256,
+    containment_probe_sha256: observed.containment_probe_sha256,
+    runtime_exchange_sha256: observed.runtime_exchange_sha256,
+    retained_candidate_volumes: observed.retained_candidate_volumes,
+    retained_candidate_volumes_sha256: observed.retained_candidate_volumes_sha256,
     protected_resources_sha256: observed.protected_resources_sha256,
+    runtime_plan_sha256: observed.runtime_plan_sha256,
     last_committed_record_sha256: observed.last_committed_record_sha256,
+    runtime_target_state: containmentIntent.runtime_target_state,
     contained_at: observed.contained_at,
     preservation: "EXACT_RECORD_INTENTS_RESULTS_AND_CANDIDATE_RESOURCES_LEFT_UNCHANGED_NO_RERUN_NO_DELETE",
     recovery_authorization_sha256: context.execution_authorization_sha256,
@@ -654,7 +1909,10 @@ async function executeRecords(context, intent, packageValue, rollbackResult, roo
   const records = [];
   let previousResultSha256 = ZERO_SHA256;
   for (const [index, label] of labels.entries()) {
-    const roles = postverify ? CHECK_SOURCE_ROLES[label] : STAGE_SOURCE_ROLES[label];
+    const roles = [...new Set([
+      ...(postverify ? CHECK_SOURCE_ROLES[label] : STAGE_SOURCE_ROLES[label]),
+      "runtime_adapter_activation",
+    ])];
     await verifyPackageSources(packageValue, options.filesystemRoot, roles);
     const preparedAt = nowIso(options.clock);
     const common = {
@@ -664,12 +1922,15 @@ async function executeRecords(context, intent, packageValue, rollbackResult, roo
       execution_authorization_sha256: context.original_authorization_sha256,
       rollback_plan_sha256: postverify ? rollbackResult.rollback_plan_sha256 : intent.rollback_plan_sha256,
       execution_package_sha256: packageValue.package_sha256,
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
       ordinal: index + 1,
       previous_result_sha256: previousResultSha256,
       input_sha256: clusterSha256({
         operation_id: context.operation_id, label, ordinal: index + 1,
         rollback_plan_sha256: postverify ? rollbackResult.rollback_plan_sha256 : intent.rollback_plan_sha256,
-        execution_package_sha256: packageValue.package_sha256, previous_result_sha256: previousResultSha256,
+        execution_package_sha256: packageValue.package_sha256,
+        runtime_plan_sha256: packageValue.runtime_plan_sha256,
+        previous_result_sha256: previousResultSha256,
       }),
       prepared_at: preparedAt,
     };
@@ -685,16 +1946,27 @@ async function executeRecords(context, intent, packageValue, rollbackResult, roo
     );
     await verifyPackageSources(packageValue, options.filesystemRoot, roles);
     const observed = adapterRecord(postverify
-      ? await adapter.verifyCheck({ context, intent, packageValue, rollbackResult, check: label, checkIntent: recordIntent })
-      : await adapter.executeStage({ context, intent, packageValue, stage: label, stageIntent: recordIntent }),
+      ? await adapter.verifyCheck({
+        context, intent, packageValue, rollbackResult, runtimeTrust: options.runtimeTrust,
+        check: label, checkIntent: recordIntent,
+      })
+      : await adapter.executeStage({
+        context, intent, packageValue, rollbackResult, runtimeTrust: options.runtimeTrust,
+        stage: label, stageIntent: recordIntent,
+      }),
     postverify ? "ROLLBACK_CONTROL_CHECK_ADAPTER_RESULT_INVALID" : "ROLLBACK_CONTROL_STAGE_ADAPTER_RESULT_INVALID");
     await verifyPackageSources(packageValue, options.filesystemRoot, roles);
     if (Date.parse(observed.started_at) < Date.parse(preparedAt)
       || Date.parse(observed.completed_at) > Date.parse(packageValue.execution_deadline)) {
       reject("ROLLBACK_CONTROL_RECORD_TIME_INVALID");
     }
-    if (postverify) assertCheckEvidenceBindings(label, observed.evidence, rollbackResult, packageValue);
-    else assertStageEvidenceBindings(label, observed.evidence, intent, packageValue);
+    if (postverify) assertCheckEvidenceBindings(
+      label, observed.evidence, rollbackResult, packageValue,
+      { startedAt: observed.started_at, completedAt: observed.completed_at },
+    );
+    else assertStageEvidenceBindings(
+      label, observed.evidence, intent, packageValue, options.runtimeTrust,
+    );
     const resultCommon = {
       promotion_id: common.promotion_id,
       promotion_generation: common.promotion_generation,
@@ -702,6 +1974,7 @@ async function executeRecords(context, intent, packageValue, rollbackResult, roo
       execution_authorization_sha256: common.execution_authorization_sha256,
       rollback_plan_sha256: common.rollback_plan_sha256,
       execution_package_sha256: common.execution_package_sha256,
+      runtime_plan_sha256: common.runtime_plan_sha256,
       ordinal: common.ordinal,
       previous_result_sha256: common.previous_result_sha256,
     };
@@ -732,7 +2005,9 @@ function finalResult(context, intent, packageValue, rollbackResult, execution) {
       supervisor_bundle_sha256: intent.supervisor_bundle_sha256,
       checkpoint_13_receipt_sha256: intent.checkpoint_13_receipt_sha256,
       rollback_intent_sha256: intent.rollback_intent_sha256, rollback_plan_sha256: intent.rollback_plan_sha256,
-      execution_package_sha256: packageValue.package_sha256, source_set_sha256: packageValue.source_set_sha256,
+      execution_package_sha256: packageValue.package_sha256,
+      runtime_plan_sha256: packageValue.runtime_plan_sha256,
+      source_set_sha256: packageValue.source_set_sha256,
       promotion_snapshot_binding_sha256: intent.promotion_snapshot_binding_sha256,
       snapshot_readiness_sha256: intent.snapshot_readiness_sha256,
       snapshot_backup_id: intent.parameters.snapshot_backup_id,
@@ -742,6 +2017,10 @@ function finalResult(context, intent, packageValue, rollbackResult, execution) {
       restored_database: {
         name: postgres.restored_database_name, system_identifier: postgres.system_identifier,
         oid: postgres.restored_database_oid, marker: intent.parameters.database.marker,
+      },
+      candidate_database_quarantine: {
+        name: postgres.candidate_database_quarantine_name,
+        oid: postgres.candidate_database_quarantine_oid,
       },
       compose_project: intent.parameters.compose_project,
       compose_project_root: intent.parameters.compose_project_root, boundary: intent.parameters.boundary,
@@ -760,10 +2039,13 @@ function finalResult(context, intent, packageValue, rollbackResult, execution) {
     rollback_operation_id: intent.rollback_operation_id, rollback_intent_sha256: intent.rollback_intent_sha256,
     rollback_result_sha256: rollbackResult.result_sha256, rollback_plan_sha256: rollbackResult.rollback_plan_sha256,
     execution_package_sha256: packageValue.package_sha256,
+    runtime_plan_sha256: packageValue.runtime_plan_sha256,
     postverify_intent_sha256: intent.postverify_intent_sha256,
     postverify_plan_sha256: intent.postverify_plan_sha256, snapshot_objects: rollbackResult.snapshot_objects,
     predecessor: rollbackResult.predecessor, database: rollbackResult.database,
-    restored_database: rollbackResult.restored_database, boundary: rollbackResult.boundary,
+    restored_database: rollbackResult.restored_database,
+    candidate_database_quarantine: rollbackResult.candidate_database_quarantine,
+    boundary: rollbackResult.boundary,
     check_result_sha256_chain: execution.previousResultSha256, checks: execution.records,
     verified_at: execution.records.at(-1).completed_at,
   });
@@ -776,10 +2058,32 @@ export async function runUatPromotionRollbackControl(contextInput, phase, option
   const rollbackResult = context.operation === "ROLLBACK_POSTVERIFY"
     ? await loadRollbackResultForPostverify(context, resolved.filesystemRoot) : null;
   const { packageValue } = await loadExecutionPackage(context, intent, resolved.filesystemRoot, rollbackResult);
-  await verifyPackageSources(packageValue, resolved.filesystemRoot, UAT_PROMOTION_ROLLBACK_PACKAGE_SOURCE_ROLES);
   const adapter = options.adapter ?? productionAdapter(context, intent);
   if (phase === "preflight") return preflightUatPromotionRollbackControl(context, options);
+  const runtimeTrust = await loadRuntimeTrustSources(
+    context, packageValue, resolved.filesystemRoot, resolved.clock, { full: false },
+  );
+  if (!adapter || typeof adapter.recheck !== "function") reject("ROLLBACK_CONTROL_ADAPTER_INVALID");
+  const runtimeRecheck = validateRuntimeGateResponse(
+    await adapter.recheck({ context, intent, packageValue, rollbackResult, runtimeTrust }),
+    packageValue, context.execution_mode, context.operation, "RECHECK", runtimeTrust,
+  );
+  if (context.operation === "ROLLBACK_POSTVERIFY" && context.execution_mode === "ORIGINAL"
+    && !exactRuntimeMatchesRollbackStages(runtimeRecheck, rollbackResult.stages)) {
+    reject("ROLLBACK_CONTROL_RUNTIME_RECHECK_INVALID");
+  }
   const root = await executionRoot(context, options.expectedIntentSha256, resolved.filesystemRoot, phase === "recover");
+  let ledger;
+  try {
+    ledger = await auditCommittedRecords(
+      root, context, intent, packageValue, rollbackResult, runtimeTrust,
+    );
+  } catch {
+    ledger = Object.freeze({
+      state: "UNKNOWN", complete: false, ordinal: 0,
+      records: Object.freeze([]), lastResultSha256: ZERO_SHA256,
+    });
+  }
   let existing;
   try { existing = await completion(context, intent, resolved.filesystemRoot, root); }
   catch (cause) {
@@ -787,21 +2091,59 @@ export async function runUatPromotionRollbackControl(contextInput, phase, option
     existing = Object.freeze({ partial: true });
   }
   if (phase === "recover") {
-    if (existing && !existing.partial && resolved.recoveryDecision !== "QUARANTINE") {
+    const runtimeClaimsExact = runtimeRecheck.target_state === "EXACT_RESULT_ALREADY_DURABLE";
+    const runtimeExact = exactRuntimeMatchesDurableRollback(
+      context, runtimeRecheck, ledger, rollbackResult,
+    );
+    if (runtimeExact && ledger.complete && existing && !existing.partial
+      && resolved.recoveryDecision === "ALREADY_COMMITTED") {
       return Object.freeze({
         result: context.operation === "ROLLBACK_POSTVERIFY"
           ? "ROLLBACK_POSTVERIFY_ALREADY_COMPLETED" : "ROLLBACK_EXECUTION_ALREADY_COMPLETED",
         promotion_id: context.parameters.promotion_id, result_sha256: existing.result.result_sha256,
       });
     }
+    if (runtimeExact && ledger.complete && existing === null
+      && resolved.recoveryDecision === "RESUME_PUBLICATION") {
+      const rebuilt = finalResult(context, intent, packageValue, rollbackResult, {
+        records: ledger.records, previousResultSha256: ledger.lastResultSha256,
+      });
+      if (context.operation === "ROLLBACK_POSTVERIFY") {
+        assertUatPromotionRollbackPostverifyResultMatchesIntent(rebuilt, intent, rollbackResult);
+      } else assertUatPromotionRollbackResultMatchesIntent(rebuilt, intent);
+      const resultRoot = physicalPath(`${UAT_PROMOTION_STATE_ROOT}/results`, resolved.filesystemRoot);
+      await immutableJson(
+        path.join(resultRoot, `${context.operation_id}.${rebuilt.result_sha256}.json`), rebuilt,
+        context.operation === "ROLLBACK_POSTVERIFY"
+          ? validateUatPromotionRollbackPostverifyResult : validateUatPromotionRollbackResult,
+        "ROLLBACK_CONTROL_RESULT_PUBLICATION_INVALID",
+      );
+      const published = await completion(context, intent, resolved.filesystemRoot, root);
+      if (!published || published.partial || published.result.result_sha256 !== rebuilt.result_sha256) {
+        reject("ROLLBACK_CONTROL_RESULT_PUBLICATION_INVALID");
+      }
+      return Object.freeze({
+        result: context.operation === "ROLLBACK_POSTVERIFY"
+          ? "ROLLBACK_POSTVERIFY_ALREADY_COMPLETED" : "ROLLBACK_EXECUTION_ALREADY_COMPLETED",
+        promotion_id: context.parameters.promotion_id, result_sha256: rebuilt.result_sha256,
+      });
+    }
+    const containmentLedger = runtimeExact ? ledger : Object.freeze({ ...ledger, state: "UNKNOWN" });
     const containment = await containAndRecord(
-      context, intent, packageValue, root, adapter,
-      resolved.recoveryDecision === "QUARANTINE" && existing && !existing.partial
+      context, intent, packageValue, runtimeTrust, root, adapter,
+      runtimeRecheck.target_state === "BLOCKED_TARGET_IDENTITY_MISMATCH"
+        ? "ROLLBACK_CONTROL_RUNTIME_TARGET_IDENTITY_MISMATCH"
+        : runtimeClaimsExact && !runtimeExact
+          ? "ROLLBACK_CONTROL_RUNTIME_LEDGER_MISMATCH"
+        : runtimeRecheck.target_state === "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT"
+          ? "ROLLBACK_CONTROL_RUNTIME_PARTIAL_OR_UNKNOWN"
+          : resolved.recoveryDecision === "QUARANTINE" && existing && !existing.partial
         ? "ROLLBACK_JOURNAL_REQUIRES_RUNTIME_QUARANTINE"
-        : existing === null ? "ROLLBACK_CONTROL_RESULT_ABSENT"
-          : "ROLLBACK_CONTROL_RESULT_UNTRUSTED_OR_PARTIAL",
-      { ...options, ...resolved },
-      await lastCommittedRecord(root, context.operation === "ROLLBACK_POSTVERIFY"),
+          : existing === null ? "ROLLBACK_CONTROL_RESULT_ABSENT_OR_UNPUBLISHABLE"
+            : "ROLLBACK_CONTROL_RESULT_UNTRUSTED_OR_PARTIAL",
+      { ...options, ...resolved, runtimeTrust },
+      containmentLedger,
+      runtimeRecheck,
     );
     return Object.freeze({
       result: "CONTAINED_FOR_JOURNAL_QUARANTINE", promotion_id: context.parameters.promotion_id,
@@ -813,13 +2155,11 @@ export async function runUatPromotionRollbackControl(contextInput, phase, option
   if (!adapter || typeof adapter[requiredMethod] !== "function" || typeof adapter.contain !== "function") {
     reject("ROLLBACK_CONTROL_ADAPTER_INVALID");
   }
-  let lastCommitted = ZERO_SHA256;
   try {
     const execution = await executeRecords(
       context, intent, packageValue, rollbackResult, root, adapter,
-      { ...options, ...resolved, onCommit: (value) => { lastCommitted = value; } },
+      { ...options, ...resolved, runtimeTrust },
     );
-    lastCommitted = execution.previousResultSha256;
     const result = finalResult(context, intent, packageValue, rollbackResult, execution);
     if (context.operation === "ROLLBACK_POSTVERIFY") {
       assertUatPromotionRollbackPostverifyResultMatchesIntent(result, intent, rollbackResult);
@@ -837,10 +2177,33 @@ export async function runUatPromotionRollbackControl(contextInput, phase, option
       promotion_id: context.parameters.promotion_id, result_sha256: result.result_sha256,
     });
   } catch (cause) {
+    let failureLedger;
+    try {
+      failureLedger = await auditCommittedRecords(
+        root, context, intent, packageValue, rollbackResult, runtimeTrust,
+      );
+    } catch {
+      failureLedger = Object.freeze({
+        state: "UNKNOWN", complete: false, ordinal: 0,
+        records: Object.freeze([]), lastResultSha256: ZERO_SHA256,
+      });
+    }
+    const containmentStates = new Set([
+      "SAFE_TO_EXECUTE", "EXACT_RESULT_ALREADY_DURABLE",
+      "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT", "BLOCKED_TARGET_IDENTITY_MISMATCH",
+    ]);
+    const failureRuntimeRecheck = validateRuntimeGateResponse(
+      await adapter.recheck({
+        context, intent, packageValue, rollbackResult, runtimeTrust, containment: true,
+      }),
+      packageValue, context.execution_mode, context.operation, "RECHECK", runtimeTrust,
+      containmentStates,
+    );
     await containAndRecord(
-      context, intent, packageValue, root, adapter,
+      context, intent, packageValue, runtimeTrust, root, adapter,
       cause?.code || "ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED",
-      { ...options, ...resolved }, lastCommitted,
+      { ...options, ...resolved }, Object.freeze({ ...failureLedger, state: "UNKNOWN" }),
+      failureRuntimeRecheck,
     );
     throw cause;
   }
