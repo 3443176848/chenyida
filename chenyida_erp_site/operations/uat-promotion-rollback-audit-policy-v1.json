@@ -15,6 +15,7 @@
   ],
   "expected_implemented_supervisor_operations": [
     "BEGIN_UAT_PROMOTION",
+    "CAPTURE_UAT_PROMOTION_SNAPSHOT",
     "RECOVER_UAT_PROMOTION"
   ],
   "required_checkpoint_order": [
@@ -65,10 +66,10 @@
     },
     {
       "id": "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
-      "status": "PARTIAL",
+      "status": "SUPPORTED",
       "severity_if_incomplete": "P0",
-      "evidence": ["backup-selfhost.sh:UAT_BACKUP_V2_AUTHORIZED", "restore-selfhost.sh:target-deployment-class TEST"],
-      "finding": "备份可生成UAT来源回执，但现有恢复只允许不同集群的可丢弃TEST目标；没有绑定本次晋升并可恢复到UAT的执行合同。"
+      "evidence": ["uat-promotion-transaction-journal.mjs:UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "uat-promotion-transaction-journal.mjs:validateBackupRecoveryReadinessV4", "release-supervisor-launcher.py:CAPTURE_UAT_PROMOTION_SNAPSHOT"],
+      "finding": null
     },
     {
       "id": "WRITER_QUIESCE_RECEIPT",
@@ -142,7 +143,7 @@
     }
   ],
   "source_files": [
-    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
+    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
     {"path": "chenyida_erp_site/scripts/release-candidate-snapshot.py", "markers": ["VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT", "receipt_sha256"]},
     {"path": "chenyida_erp_site/scripts/release-manifest-contract.mjs", "markers": ["promotion_status", "RELEASE_NOT_ELIGIBLE"]},
     {"path": "chenyida_erp_site/scripts/release-lifecycle-contract.mjs", "markers": ["PRE_DEPLOY_EXISTING_RUNTIME_STABILITY", "POST_DEPLOY_CURRENT_RUNTIME_STRICT"]},
@@ -152,12 +153,13 @@
     {"path": "chenyida_erp_site/compose.yml", "markers": ["  migrate:", "service_completed_successfully"]},
     {"path": "chenyida_erp_site/compose.release.yml", "markers": ["ERP_WEB_IMAGE", "ERP_WORKER_IMAGE"]},
     {"path": "chenyida_erp_site/scripts/backup-selfhost.sh", "markers": ["UAT_BACKUP_V2_AUTHORIZED", "acquire_chenyida_release_gate_lock"]},
+    {"path": "chenyida_erp_site/scripts/backup-recovery-readiness-v4.mjs", "markers": ["validateBackupRecoveryReadinessV4", "ACTUAL_OFFHOST", "policy_activation"]},
     {"path": "chenyida_erp_site/scripts/restore-selfhost.sh", "markers": ["--target-deployment-class TEST", "RESTORE_SIGNED_ENCRYPTED_OFFHOST_TO_MARKED_DISPOSABLE_TEST_TARGET"]},
     {"path": "chenyida_erp_site/scripts/postdeploy-runtime-configuration-probe.mjs", "markers": ["POSTDEPLOY_RUNTIME_CONFIGURATION_PROBE_CONTRACT", "runtime_configuration_sha256"]},
     {"path": "chenyida_erp_site/scripts/postdeploy-release-contract.mjs", "markers": ["POSTDEPLOY_RECEIPT_CONTRACT", "buildReleaseIdentityFromPostDeployReceipt"]},
     {"path": "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs", "markers": ["buildReleaseIdentityFromPostDeployReceipt", "assertPostDeployReadinessStable"]},
     {"path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json", "markers": ["HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED", "\"status\": \"BLOCKED\""]},
     {"path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json", "markers": ["chenyida-erp-uat-promotion-transaction-policy/v1", "\"status\": \"NOT_IMPLEMENTED\""]},
-    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "runUatPromotionTransactionPhase"]}
+    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "validateBackupRecoveryReadinessV4", "AFTER_SNAPSHOT_CURRENT", "runUatPromotionTransactionPhase"]}
   ]
 }
