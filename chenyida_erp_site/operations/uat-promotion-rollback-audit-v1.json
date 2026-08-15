@@ -1,0 +1,439 @@
+{
+  "artifact_sha256": "c0a5a5619835bf82d478494ed63d2e2d68c54542634495aae93986090ad6f24d",
+  "audit_validation": {
+    "errors": [],
+    "result": "PASS"
+  },
+  "authority": "SELFHOSTED_NODE_POSTGRESQL_REPOSITORY_SOURCE",
+  "capabilities": [
+    {
+      "evidence": [
+        "release-candidate-snapshot.py:verify",
+        "release-candidate-snapshot.py:receipt-sha256"
+      ],
+      "finding": null,
+      "id": "CANDIDATE_SOURCE_SNAPSHOT",
+      "ordinal": 1,
+      "severity_if_incomplete": "P0",
+      "status": "SUPPORTED"
+    },
+    {
+      "evidence": [
+        "release-manifest-contract.mjs:promotion_status",
+        "release-manifest-contract.mjs:ELIGIBLE"
+      ],
+      "finding": null,
+      "id": "ELIGIBLE_RELEASE_MANIFEST",
+      "ordinal": 2,
+      "severity_if_incomplete": "P0",
+      "status": "SUPPORTED"
+    },
+    {
+      "evidence": [
+        "release-lifecycle-contract.mjs:PRE_DEPLOY_EXISTING_RUNTIME_STABILITY",
+        "release-gate-runner.mjs:assertPreDeployRuntimeStable"
+      ],
+      "finding": null,
+      "id": "PRE_DEPLOY_RUNTIME_STABILITY",
+      "ordinal": 3,
+      "severity_if_incomplete": "P0",
+      "status": "SUPPORTED"
+    },
+    {
+      "evidence": [],
+      "finding": "没有把同一候选、授权、当前运行面、数据库、快照和逐检查点状态绑定的durable promotion intent/journal。",
+      "id": "PROMOTION_INTENT_AND_DURABLE_JOURNAL",
+      "ordinal": 4,
+      "severity_if_incomplete": "P0",
+      "status": "MISSING"
+    },
+    {
+      "evidence": [
+        "backup-selfhost.sh:UAT_BACKUP_V2_AUTHORIZED",
+        "restore-selfhost.sh:target-deployment-class TEST"
+      ],
+      "finding": "备份可生成UAT来源回执，但现有恢复只允许不同集群的可丢弃TEST目标；没有绑定本次晋升并可恢复到UAT的执行合同。",
+      "id": "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
+      "ordinal": 5,
+      "severity_if_incomplete": "P0",
+      "status": "PARTIAL"
+    },
+    {
+      "evidence": [
+        "backup-selfhost.sh:web-container",
+        "backup-selfhost.sh:worker-container"
+      ],
+      "finding": "备份入口要求Web/Worker已经停止并检查writer，但没有由晋升控制面停止精确容器并发布不可变quiesce receipt。",
+      "id": "WRITER_QUIESCE_RECEIPT",
+      "ordinal": 6,
+      "severity_if_incomplete": "P0",
+      "status": "PARTIAL"
+    },
+    {
+      "evidence": [
+        "release-migration-authorization.ts:ERP_MIGRATION_CONFIRM",
+        "release-migration-authorization.ts:MIGRATE_EXACT_RELEASE_MANIFEST"
+      ],
+      "finding": "Migration绑定ELIGIBLE manifest和目标身份，但授权来自可重复环境变量；Supervisor没有一次性迁移操作或消费回执。",
+      "id": "ONE_TIME_MIGRATION_AUTHORIZATION",
+      "ordinal": 7,
+      "severity_if_incomplete": "P0",
+      "status": "PARTIAL"
+    },
+    {
+      "evidence": [
+        "migrate-postgres.ts:schema_migrations"
+      ],
+      "finding": "Migration逐文件事务和最终数据库核对存在，但没有promotion-bound、不可覆盖的提交回执和partial/recover状态。",
+      "id": "MIGRATION_COMMIT_RECEIPT",
+      "ordinal": 8,
+      "severity_if_incomplete": "P0",
+      "status": "MISSING"
+    },
+    {
+      "evidence": [
+        "compose.release.yml:ERP_WEB_IMAGE",
+        "compose.release.yml:ERP_WORKER_IMAGE"
+      ],
+      "finding": "镜像digest override存在，但没有一次性授权的Compose部署执行器、前后容器身份回执或未知partial恢复。",
+      "id": "COMPOSE_DEPLOYMENT_RECEIPT",
+      "ordinal": 9,
+      "severity_if_incomplete": "P0",
+      "status": "MISSING"
+    },
+    {
+      "evidence": [
+        "postdeploy-runtime-configuration-probe.mjs:POSTDEPLOY_RUNTIME_CONFIGURATION_PROBE_CONTRACT",
+        "postdeploy-runtime-configuration-probe.mjs:runtime_configuration_sha256"
+      ],
+      "finding": null,
+      "id": "POST_DEPLOY_RUNTIME_CONFIGURATION",
+      "ordinal": 10,
+      "severity_if_incomplete": "P0",
+      "status": "SUPPORTED"
+    },
+    {
+      "evidence": [
+        "postdeploy-release-contract.mjs:POSTDEPLOY_RECEIPT_CONTRACT",
+        "postdeploy-release-verifier.mjs:buildReleaseIdentityFromPostDeployReceipt"
+      ],
+      "finding": null,
+      "id": "POST_DEPLOY_IDENTITY",
+      "ordinal": 11,
+      "severity_if_incomplete": "P0",
+      "status": "SUPPORTED"
+    },
+    {
+      "evidence": [
+        "cross-role-uat-evidence-contract-v1.json:HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED"
+      ],
+      "finding": "TASK67只提供BLOCKED合成合同；没有事前批准、账号映射、真实执行回执或三方签字。",
+      "id": "CROSS_ROLE_UAT_EXECUTION",
+      "ordinal": 12,
+      "severity_if_incomplete": "P1",
+      "status": "CONTRACT_ONLY"
+    },
+    {
+      "evidence": [],
+      "finding": "没有聚合Migration、部署、postdeploy、恢复能力和UAT结果的单调promotion COMMITTED receipt。",
+      "id": "PROMOTION_FINAL_RECEIPT",
+      "ordinal": 13,
+      "severity_if_incomplete": "P0",
+      "status": "MISSING"
+    },
+    {
+      "evidence": [
+        "restore-selfhost.sh:RESTORE_SIGNED_ENCRYPTED_OFFHOST_TO_MARKED_DISPOSABLE_TEST_TARGET"
+      ],
+      "finding": "当前恢复器显式拒绝UAT目标；没有恢复精确数据库/三文件域、前代镜像和运行配置的UAT回退执行器。",
+      "id": "ROLLBACK_TO_UAT_EXECUTOR",
+      "ordinal": 14,
+      "severity_if_incomplete": "P0",
+      "status": "MISSING"
+    },
+    {
+      "evidence": [
+        "postdeploy-release-verifier.mjs:assertPostDeployReadinessStable"
+      ],
+      "finding": "严格postdeploy验证可复用设计，但当前没有绑定rollback intent/target generation的回退后核验及终态回执。",
+      "id": "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT",
+      "ordinal": 15,
+      "severity_if_incomplete": "P0",
+      "status": "MISSING"
+    }
+  ],
+  "contract": "chenyida-erp-uat-promotion-rollback-audit/v1",
+  "deployment_class": "UAT",
+  "execution_class": "AUDIT_ONLY_NOT_AUTHORIZED",
+  "execution_readiness": {
+    "blocking_checkpoint_count": 10,
+    "code": "UAT_PROMOTION_EXECUTOR_NOT_READY",
+    "may_start": false,
+    "p0_blocker_count": 9,
+    "p1_blocker_count": 1,
+    "statement": "当前只允许继续仓库实施和隔离验证；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
+    "status": "BLOCKED"
+  },
+  "findings": [
+    {
+      "finding": "没有把同一候选、授权、当前运行面、数据库、快照和逐检查点状态绑定的durable promotion intent/journal。",
+      "id": "PROMOTION_INTENT_AND_DURABLE_JOURNAL",
+      "severity": "P0",
+      "status": "MISSING"
+    },
+    {
+      "finding": "备份可生成UAT来源回执，但现有恢复只允许不同集群的可丢弃TEST目标；没有绑定本次晋升并可恢复到UAT的执行合同。",
+      "id": "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
+      "severity": "P0",
+      "status": "PARTIAL"
+    },
+    {
+      "finding": "备份入口要求Web/Worker已经停止并检查writer，但没有由晋升控制面停止精确容器并发布不可变quiesce receipt。",
+      "id": "WRITER_QUIESCE_RECEIPT",
+      "severity": "P0",
+      "status": "PARTIAL"
+    },
+    {
+      "finding": "Migration绑定ELIGIBLE manifest和目标身份，但授权来自可重复环境变量；Supervisor没有一次性迁移操作或消费回执。",
+      "id": "ONE_TIME_MIGRATION_AUTHORIZATION",
+      "severity": "P0",
+      "status": "PARTIAL"
+    },
+    {
+      "finding": "Migration逐文件事务和最终数据库核对存在，但没有promotion-bound、不可覆盖的提交回执和partial/recover状态。",
+      "id": "MIGRATION_COMMIT_RECEIPT",
+      "severity": "P0",
+      "status": "MISSING"
+    },
+    {
+      "finding": "镜像digest override存在，但没有一次性授权的Compose部署执行器、前后容器身份回执或未知partial恢复。",
+      "id": "COMPOSE_DEPLOYMENT_RECEIPT",
+      "severity": "P0",
+      "status": "MISSING"
+    },
+    {
+      "finding": "TASK67只提供BLOCKED合成合同；没有事前批准、账号映射、真实执行回执或三方签字。",
+      "id": "CROSS_ROLE_UAT_EXECUTION",
+      "severity": "P1",
+      "status": "CONTRACT_ONLY"
+    },
+    {
+      "finding": "没有聚合Migration、部署、postdeploy、恢复能力和UAT结果的单调promotion COMMITTED receipt。",
+      "id": "PROMOTION_FINAL_RECEIPT",
+      "severity": "P0",
+      "status": "MISSING"
+    },
+    {
+      "finding": "当前恢复器显式拒绝UAT目标；没有恢复精确数据库/三文件域、前代镜像和运行配置的UAT回退执行器。",
+      "id": "ROLLBACK_TO_UAT_EXECUTOR",
+      "severity": "P0",
+      "status": "MISSING"
+    },
+    {
+      "finding": "严格postdeploy验证可复用设计，但当前没有绑定rollback intent/target generation的回退后核验及终态回执。",
+      "id": "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT",
+      "severity": "P0",
+      "status": "MISSING"
+    }
+  ],
+  "generated_from": {
+    "generator": {
+      "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
+      "sha256": "7773150b236325bf8c5ecb0503eaa835a844b8941e11787d0b488b8a0517e84a"
+    },
+    "policy": {
+      "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
+      "sha256": "02e59718b1158df6028888e19c11cd499c50469f4582dbbacbd4df20d0344f7e"
+    },
+    "release_test_inventory": {
+      "not_applicable_tests": 24,
+      "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
+      "required_tests": 232,
+      "sha256": "da85d92555b957c6b9a2d4697f88e96156230b8d37e6951e839c67189dfe187b",
+      "total_tests": 256
+    },
+    "source_manifest": {
+      "files": [
+        {
+          "markers": [
+            "ERP_WEB_IMAGE",
+            "ERP_WORKER_IMAGE"
+          ],
+          "path": "chenyida_erp_site/compose.release.yml",
+          "sha256": "1f921685f73efd592700a2ad3db1ee0abe709a1564c96f576a24d19fea25ff57"
+        },
+        {
+          "markers": [
+            "  migrate:",
+            "service_completed_successfully"
+          ],
+          "path": "chenyida_erp_site/compose.yml",
+          "sha256": "2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa"
+        },
+        {
+          "markers": [
+            "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED",
+            "\"status\": \"BLOCKED\""
+          ],
+          "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
+          "sha256": "b5799f986211d3589cf0f68bcde7b35252f49489deb08ba111d7017821a0fba5"
+        },
+        {
+          "markers": [
+            "UAT_BACKUP_V2_AUTHORIZED",
+            "acquire_chenyida_release_gate_lock"
+          ],
+          "path": "chenyida_erp_site/scripts/backup-selfhost.sh",
+          "sha256": "adb7047631660c20a01c56d6c0393c08e67db5502a3eeeb64f2eaf392daf902a"
+        },
+        {
+          "markers": [
+            "runMigrationTransaction",
+            "schema_migrations"
+          ],
+          "path": "chenyida_erp_site/scripts/migrate-postgres.ts",
+          "sha256": "bb2ede0cb967a736dda09d9a0deaa7e4c68af3ed2be27671b78ea08f19b124e1"
+        },
+        {
+          "markers": [
+            "POSTDEPLOY_RECEIPT_CONTRACT",
+            "buildReleaseIdentityFromPostDeployReceipt"
+          ],
+          "path": "chenyida_erp_site/scripts/postdeploy-release-contract.mjs",
+          "sha256": "5f8c2e7e97707161cc6e473a9437fd1c7a6273a2d58f411c26fa95cbe1b221a7"
+        },
+        {
+          "markers": [
+            "buildReleaseIdentityFromPostDeployReceipt",
+            "assertPostDeployReadinessStable"
+          ],
+          "path": "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs",
+          "sha256": "4de8085198e3e500a109a5092ea0309ba77f8dbf9ebbdeab1990b2d815c15d32"
+        },
+        {
+          "markers": [
+            "POSTDEPLOY_RUNTIME_CONFIGURATION_PROBE_CONTRACT",
+            "runtime_configuration_sha256"
+          ],
+          "path": "chenyida_erp_site/scripts/postdeploy-runtime-configuration-probe.mjs",
+          "sha256": "5de62cc7de848a2c3c4f3373b3dac71b42872abd56ed382992653d3c848867da"
+        },
+        {
+          "markers": [
+            "VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT",
+            "receipt_sha256"
+          ],
+          "path": "chenyida_erp_site/scripts/release-candidate-snapshot.py",
+          "sha256": "296f61efb552a5fdd327e7b60b567a4dc2a569f9ec1c93bd57ef4dfe0f4fe98d"
+        },
+        {
+          "markers": [
+            "assertPreDeployRuntimeStable",
+            "GATE_MIGRATION_ALLOWLIST_MISMATCH"
+          ],
+          "path": "chenyida_erp_site/scripts/release-gate-runner.mjs",
+          "sha256": "172c99a33bac72f78b58453e11cca1632e2ad4f461b42f40ff264e11dc92077d"
+        },
+        {
+          "markers": [
+            "PRE_DEPLOY_EXISTING_RUNTIME_STABILITY",
+            "POST_DEPLOY_CURRENT_RUNTIME_STRICT"
+          ],
+          "path": "chenyida_erp_site/scripts/release-lifecycle-contract.mjs",
+          "sha256": "3b6945a9b7374abf3f892492bf3811b7b105e435ca4ab43020d53bba0d0e8f1e"
+        },
+        {
+          "markers": [
+            "promotion_status",
+            "RELEASE_NOT_ELIGIBLE"
+          ],
+          "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
+          "sha256": "ec707ccdf1d59ef32495fe8af0776850281e0e43877f125a3a7a1e04a1223986"
+        },
+        {
+          "markers": [
+            "ERP_ALLOW_PRODUCTION_MIGRATION",
+            "MIGRATE_EXACT_RELEASE_MANIFEST"
+          ],
+          "path": "chenyida_erp_site/scripts/release-migration-authorization.ts",
+          "sha256": "bf99fa5ce5a793b0212a806066b9f68a5494d2968110a6d9d34ceab699bfa878"
+        },
+        {
+          "markers": [
+            "ENTRYPOINTS = {",
+            "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION",
+            "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
+          ],
+          "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
+          "sha256": "75d474fcabcd806d61079b22b0b6339ff9c066d643d676bdf37d9c6d56c66df5"
+        },
+        {
+          "markers": [
+            "--target-deployment-class TEST",
+            "RESTORE_SIGNED_ENCRYPTED_OFFHOST_TO_MARKED_DISPOSABLE_TEST_TARGET"
+          ],
+          "path": "chenyida_erp_site/scripts/restore-selfhost.sh",
+          "sha256": "c648db054afdcec661ffc293eec71f3087315412aa222078aabea3a4de102b22"
+        }
+      ],
+      "sha256": "eab97c64078d00ff75e0da55710e3c9b9b2b7780d996c35e5e6a7a093f9de093"
+    }
+  },
+  "observations": {
+    "compose_release_image_binding": "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT",
+    "cross_role_uat_readiness": "BLOCKED",
+    "implemented_required_promotion_operations": [],
+    "migration_authorization": "REPEATABLE_ENVIRONMENT_CONFIRMATION",
+    "missing_required_promotion_operations": [
+      "BEGIN_UAT_PROMOTION",
+      "CAPTURE_UAT_PROMOTION_SNAPSHOT",
+      "QUIESCE_UAT_WRITERS",
+      "RUN_UAT_PROMOTION_MIGRATION",
+      "DEPLOY_UAT_RELEASE",
+      "ROLLBACK_UAT_RELEASE",
+      "RECOVER_UAT_PROMOTION"
+    ],
+    "required_promotion_operation_count": 7,
+    "restore_target_policy": "TEST_ONLY",
+    "supervisor_operation_count": 19,
+    "supervisor_operations": [
+      "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1",
+      "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
+      "BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES",
+      "CREATE_IMAGE_EVIDENCE",
+      "CREATE_RELEASE_MANIFEST",
+      "DISABLE_MONITORING_HOST_DELIVERY",
+      "INSTALL_MONITORING_HOST_DELIVERY",
+      "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION",
+      "PUBLISH_MONITORING_BACKUP_PROJECTION",
+      "PUBLISH_MONITORING_COMPONENTS_PROJECTION",
+      "RECONCILE_POSTGRESQL_RUNTIME_PRIVILEGES",
+      "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION",
+      "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION",
+      "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT",
+      "ROLLBACK_MONITORING_HOST_DELIVERY",
+      "ROLLBACK_MONITORING_NOTIFIER_EGRESS_V1",
+      "ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
+      "RUN_RELEASE_GATE",
+      "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
+    ]
+  },
+  "required_checkpoint_order": [
+    "CANDIDATE_SOURCE_SNAPSHOT",
+    "ELIGIBLE_RELEASE_MANIFEST",
+    "PRE_DEPLOY_RUNTIME_STABILITY",
+    "PROMOTION_INTENT_AND_DURABLE_JOURNAL",
+    "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
+    "WRITER_QUIESCE_RECEIPT",
+    "ONE_TIME_MIGRATION_AUTHORIZATION",
+    "MIGRATION_COMMIT_RECEIPT",
+    "COMPOSE_DEPLOYMENT_RECEIPT",
+    "POST_DEPLOY_RUNTIME_CONFIGURATION",
+    "POST_DEPLOY_IDENTITY",
+    "CROSS_ROLE_UAT_EXECUTION",
+    "PROMOTION_FINAL_RECEIPT",
+    "ROLLBACK_TO_UAT_EXECUTOR",
+    "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT"
+  ],
+  "schema_version": 1
+}
