@@ -23,7 +23,7 @@ const REQUIRED_STATUS = Object.freeze({
   PROMOTION_INTENT_AND_DURABLE_JOURNAL: "SUPPORTED",
   PROMOTION_BOUND_RECOVERABLE_SNAPSHOT: "SUPPORTED",
   WRITER_QUIESCE_RECEIPT: "SUPPORTED",
-  ONE_TIME_MIGRATION_AUTHORIZATION: "PARTIAL",
+  ONE_TIME_MIGRATION_AUTHORIZATION: "SUPPORTED",
   MIGRATION_COMMIT_RECEIPT: "MISSING",
   COMPOSE_DEPLOYMENT_RECEIPT: "MISSING",
   POST_DEPLOY_RUNTIME_CONFIGURATION: "SUPPORTED",
@@ -150,6 +150,8 @@ function inspectRepository(policy, sourceBodies, errors) {
 
   const restore = sourceBodies.get("chenyida_erp_site/scripts/restore-selfhost.sh") ?? "";
   const migration = sourceBodies.get("chenyida_erp_site/scripts/release-migration-authorization.ts") ?? "";
+  const migrationRunner = sourceBodies.get("chenyida_erp_site/scripts/migrate-postgres.ts") ?? "";
+  const promotionJournal = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs") ?? "";
   const compose = sourceBodies.get("chenyida_erp_site/compose.release.yml") ?? "";
   const crossRole = JSON.parse(sourceBodies.get("chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json") ?? "null");
   const observations = {
@@ -159,14 +161,18 @@ function inspectRepository(policy, sourceBodies, errors) {
     implemented_required_promotion_operations: implementedRequired,
     missing_required_promotion_operations: missingRequired,
     restore_target_policy: restore.includes('[ "$TARGET_CLASS" = TEST ]') && !restore.includes('[ "$TARGET_CLASS" = UAT ]') ? "TEST_ONLY" : "AMBIGUOUS",
-    migration_authorization: migration.includes("ERP_ALLOW_PRODUCTION_MIGRATION") && migration.includes("ERP_MIGRATION_CONFIRM") ? "REPEATABLE_ENVIRONMENT_CONFIRMATION" : "UNKNOWN",
+    migration_authorization: launcher.includes("AUTHORIZE_UAT_PROMOTION_MIGRATION")
+      && promotionJournal.includes("UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT")
+      && migration.includes("Legacy variables may select and validate evidence, but never authorize SQL")
+      && migrationRunner.includes("MIGRATION_SUPERVISOR_EXECUTION_ADAPTER_NOT_IMPLEMENTED")
+      ? "SUPERVISOR_ONE_TIME_APPROVAL_SQL_BLOCKED" : "UNKNOWN",
     compose_release_image_binding: compose.includes("ERP_WEB_IMAGE") && compose.includes("ERP_WORKER_IMAGE") ? "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT" : "UNKNOWN",
     cross_role_uat_readiness: crossRole?.readiness?.status ?? "UNKNOWN",
   };
   if (!Array.isArray(expectedImplemented) || expectedImplemented.some((item) => !IDENTIFIER.test(item))
     || !exactSet(implementedRequired, expectedImplemented)) error(errors, "AUDIT_IMPLEMENTED_OPERATION_DRIFT", implementedRequired.join(","));
   if (observations.restore_target_policy !== "TEST_ONLY") error(errors, "AUDIT_RESTORE_BOUNDARY_DRIFT");
-  if (observations.migration_authorization !== "REPEATABLE_ENVIRONMENT_CONFIRMATION") error(errors, "AUDIT_MIGRATION_AUTHORIZATION_DRIFT");
+  if (observations.migration_authorization !== "SUPERVISOR_ONE_TIME_APPROVAL_SQL_BLOCKED") error(errors, "AUDIT_MIGRATION_AUTHORIZATION_DRIFT");
   if (observations.compose_release_image_binding !== "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT") error(errors, "AUDIT_COMPOSE_BINDING_DRIFT");
   if (observations.cross_role_uat_readiness !== "BLOCKED") error(errors, "AUDIT_CROSS_ROLE_UAT_BOUNDARY_DRIFT");
   return observations;
@@ -261,7 +267,7 @@ export function renderMarkdown(artifact) {
     "",
     "## 2. Supervisor操作面",
     "",
-    `当前识别${artifact.observations.supervisor_operation_count}个Supervisor操作；所需7个UAT晋升/回退操作中实现${artifact.observations.implemented_required_promotion_operations.length}个、缺失${artifact.observations.missing_required_promotion_operations.length}个。`,
+    `当前识别${artifact.observations.supervisor_operation_count}个Supervisor操作；所需${artifact.observations.required_promotion_operation_count}个UAT晋升/回退操作中实现${artifact.observations.implemented_required_promotion_operations.length}个、缺失${artifact.observations.missing_required_promotion_operations.length}个。`,
     "",
     "缺失操作：",
     "",
@@ -276,7 +282,7 @@ export function renderMarkdown(artifact) {
     "## 4. 关键边界事实",
     "",
     `- UAT恢复目标：\`${artifact.observations.restore_target_policy}\`；当前恢复器只能写不同cluster上的可丢弃TEST目标。`,
-    `- Migration授权：\`${artifact.observations.migration_authorization}\`；尚无Supervisor一次性消费与promotion journal。`,
+    `- Migration授权：\`${artifact.observations.migration_authorization}\`；checkpoint 7只形成一次性批准证明，受控SQL在checkpoint 8适配器完成前明确失败关闭。`,
     `- Compose发布：\`${artifact.observations.compose_release_image_binding}\`；digest override不等于受控部署回执。`,
     "- Writer静默回执只覆盖精确Compose项目与working directory；未标记或外部数据库客户端必须由下一步一次性Migration数据库围栏拒绝。",
     `- TASK67人工UAT状态：\`${artifact.observations.cross_role_uat_readiness}\`。`,
@@ -285,7 +291,7 @@ export function renderMarkdown(artifact) {
     "",
     "任何工具、手册或operator在本artifact仍为BLOCKED时调用晋升断言，必须得到`UAT_PROMOTION_EXECUTOR_NOT_READY`。不得用root手工Compose、可重复环境变量、TEST恢复回执、旧postdeploy receipt或最终health页面绕过缺失检查点。",
     "",
-    "下一实现必须接入一次性Migration授权、数据库级writer围栏和提交回执，并继续沿用内容寻址history/receipts/current、每步一次性授权、精确前代回退及unknown/partial保全；执行器完整后才可在合成Compose和隔离PostgreSQL做动态验证。",
+    "下一实现必须接入独立的一次性Migration执行授权、数据库级writer围栏和提交回执，并继续沿用内容寻址history/receipts/current、每步一次性授权、精确前代回退及unknown/partial保全；执行器完整后才可在合成Compose和隔离PostgreSQL做动态验证。",
     "",
     "## 6. 源码manifest",
     "",

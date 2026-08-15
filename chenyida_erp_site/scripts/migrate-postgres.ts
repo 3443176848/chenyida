@@ -44,6 +44,12 @@ function reject(code: string): never {
   throw new MigrationGuardError(code);
 }
 
+export function assertControlledMigrationExecutionAdapterReady(
+  releaseAuthorization: ReleaseAuthorization | null,
+): void {
+  if (releaseAuthorization) reject("MIGRATION_SUPERVISOR_EXECUTION_ADAPTER_NOT_IMPLEMENTED");
+}
+
 async function migrationFiles(directory: string): Promise<string[]> {
   const allSql = (await readdir(directory)).filter((name) => name.endsWith(".sql")).sort();
   if (allSql.length < 1 || allSql.some((name) => !MIGRATION_FILE.test(name))) reject("MIGRATION_DIRECTORY_CONTENT_INVALID");
@@ -81,10 +87,10 @@ export async function runMigrationWorkflow(input: MigrationWorkflowInput): Promi
   const { config } = input;
   assertControlledSecretsAbsent(config.deploymentClass);
   assertControlledRuntimeServiceKind(config.deploymentClass, "MIGRATION");
-  if (config.environment === "production" && process.env.ERP_ALLOW_PRODUCTION_MIGRATION !== "YES") reject("MIGRATION_EXPLICIT_PRODUCTION_PERMISSION_REQUIRED");
   const directory = resolve(process.cwd(), "drizzle-postgres");
   const files = await migrationFiles(directory);
   const releaseAuthorization = await loadReleaseAuthorization(config, directory);
+  assertControlledMigrationExecutionAdapterReady(releaseAuthorization);
   const authorization: { kind: "RELEASE"; value: ReleaseAuthorization } | { kind: "ISOLATED"; value: IsolatedAuthorization } = releaseAuthorization
     ? { kind: "RELEASE", value: releaseAuthorization }
     : { kind: "ISOLATED", value: loadIsolatedAuthorization(config, input.isolatedDatabaseUrl) };

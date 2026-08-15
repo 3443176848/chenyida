@@ -15,6 +15,7 @@ import { InMemoryIdMap } from "../tools/selfhost-migration/id-map.mjs";
 import { executeDryRun, executionInputDigest } from "../tools/selfhost-migration/executor.mjs";
 import { buildSafeReport } from "../tools/selfhost-migration/report.mjs";
 import {
+  assertControlledMigrationExecutionAdapterReady,
   closeMigrationRuntime,
   runMigrationWorkflow,
   runMigrationTransaction,
@@ -177,4 +178,12 @@ test("controlled migration workflow rejects environment secrets before opening a
     if (previous === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previous;
   }
+});
+
+test("controlled release evidence cannot become SQL execution before the Supervisor fence adapter exists", () => {
+  assert.doesNotThrow(() => assertControlledMigrationExecutionAdapterReady(null));
+  assert.throws(
+    () => assertControlledMigrationExecutionAdapterReady({}),
+    { code: "MIGRATION_SUPERVISOR_EXECUTION_ADAPTER_NOT_IMPLEMENTED" },
+  );
 });

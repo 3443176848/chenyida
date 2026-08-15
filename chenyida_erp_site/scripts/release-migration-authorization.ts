@@ -78,6 +78,8 @@ export async function loadReleaseAuthorization(config: MigrationRuntimeConfig, d
   if (config.environment === "production" && !controlled) reject("MIGRATION_CONTROLLED_DEPLOYMENT_CLASS_REQUIRED");
   if (!controlled) return null;
   if (config.environment !== "production") reject("MIGRATION_CONTROLLED_ENVIRONMENT_REQUIRED");
+  // Legacy variables may select and validate evidence, but never authorize SQL; runMigrationWorkflow
+  // remains fail-closed until the checkpoint-8 Supervisor execution adapter consumes a fenced grant.
   if (process.env.ERP_ALLOW_PRODUCTION_MIGRATION !== "YES") reject("MIGRATION_EXPLICIT_PRODUCTION_PERMISSION_REQUIRED");
   if (process.env.ERP_MIGRATION_CONFIRM !== "MIGRATE_EXACT_RELEASE_MANIFEST") reject("MIGRATION_EXACT_CONFIRMATION_REQUIRED");
   const manifestFile = process.env.ERP_RELEASE_MANIFEST_FILE || "";

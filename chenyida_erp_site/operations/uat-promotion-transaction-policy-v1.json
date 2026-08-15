@@ -28,6 +28,7 @@
     "begin_operation": "BEGIN_UAT_PROMOTION",
     "snapshot_operation": "CAPTURE_UAT_PROMOTION_SNAPSHOT",
     "quiesce_operation": "QUIESCE_UAT_WRITERS",
+    "migration_authorization_operation": "AUTHORIZE_UAT_PROMOTION_MIGRATION",
     "recovery_operation": "RECOVER_UAT_PROMOTION"
   },
   "required_intent_bindings": [
@@ -79,7 +80,8 @@
     {"operation": "BEGIN_UAT_PROMOTION", "status": "IMPLEMENTED", "checkpoints": ["CANDIDATE_SOURCE_SNAPSHOT", "ELIGIBLE_RELEASE_MANIFEST", "PRE_DEPLOY_RUNTIME_STABILITY", "PROMOTION_INTENT_AND_DURABLE_JOURNAL"]},
     {"operation": "CAPTURE_UAT_PROMOTION_SNAPSHOT", "status": "IMPLEMENTED", "checkpoints": ["PROMOTION_BOUND_RECOVERABLE_SNAPSHOT"]},
     {"operation": "QUIESCE_UAT_WRITERS", "status": "IMPLEMENTED", "checkpoints": ["WRITER_QUIESCE_RECEIPT"]},
-    {"operation": "RUN_UAT_PROMOTION_MIGRATION", "status": "NOT_IMPLEMENTED", "checkpoints": ["ONE_TIME_MIGRATION_AUTHORIZATION", "MIGRATION_COMMIT_RECEIPT"]},
+    {"operation": "AUTHORIZE_UAT_PROMOTION_MIGRATION", "status": "IMPLEMENTED", "checkpoints": ["ONE_TIME_MIGRATION_AUTHORIZATION"]},
+    {"operation": "RUN_UAT_PROMOTION_MIGRATION", "status": "NOT_IMPLEMENTED", "checkpoints": ["MIGRATION_COMMIT_RECEIPT"]},
     {"operation": "DEPLOY_UAT_RELEASE", "status": "NOT_IMPLEMENTED", "checkpoints": ["COMPOSE_DEPLOYMENT_RECEIPT", "POST_DEPLOY_RUNTIME_CONFIGURATION", "POST_DEPLOY_IDENTITY", "CROSS_ROLE_UAT_EXECUTION", "PROMOTION_FINAL_RECEIPT"]},
     {"operation": "ROLLBACK_UAT_RELEASE", "status": "NOT_IMPLEMENTED", "checkpoints": ["ROLLBACK_TO_UAT_EXECUTOR", "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT"]},
     {"operation": "RECOVER_UAT_PROMOTION", "status": "IMPLEMENTED", "checkpoints": []}

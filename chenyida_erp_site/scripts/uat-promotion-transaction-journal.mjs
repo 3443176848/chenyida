@@ -30,6 +30,7 @@ export const UAT_PROMOTION_CONTEXT_CONTRACT = "chenyida-erp-uat-promotion-transa
 export const UAT_PROMOTION_INTENT_CONTRACT = "chenyida-erp-uat-promotion-intent/v1";
 export const UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT = "chenyida-erp-uat-promotion-snapshot-intent/v1";
 export const UAT_PROMOTION_QUIESCE_INTENT_CONTRACT = "chenyida-erp-uat-promotion-quiesce-intent/v1";
+export const UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT = "chenyida-erp-uat-promotion-migration-authorization-intent/v1";
 export const UAT_PROMOTION_RECEIPT_CONTRACT = "chenyida-erp-uat-promotion-checkpoint-receipt/v1";
 export const UAT_PROMOTION_RECOVERY_CONTRACT = "chenyida-erp-uat-promotion-recovery/v3";
 export const UAT_PROMOTION_QUARANTINE_CONTRACT = "chenyida-erp-uat-promotion-quarantine/v3";
@@ -38,8 +39,8 @@ export const UAT_PROMOTION_CURRENT_FILE = `${UAT_PROMOTION_STATE_ROOT}/current.j
 export const UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1";
 export const UAT_PROMOTION_STATE_MARKER_VALUE = "chenyida-erp-uat-promotion-transactions/v1\n";
 export const UAT_PROMOTION_POLICY_RELATIVE = "operations/uat-promotion-transaction-policy-v1.json";
-export const UAT_PROMOTION_POLICY_FILE_SHA256 = "162d86b3833f26005e34ac48f46d5b72e49edbfa4067896e6ed68f87a86cc00f";
-export const UAT_PROMOTION_POLICY_SHA256 = "f89b377c196c921bb5bea337084a9802c90d1edcb8507374911d2c30f3adf280";
+export const UAT_PROMOTION_POLICY_FILE_SHA256 = "deb332eef0e4e4018de076ed27cee37b06adf8f82ff9f7a15c229b885c4d3705";
+export const UAT_PROMOTION_POLICY_SHA256 = "c0408305e61465c21068ccfd68f4919bd4feff67e5a55f43d604b60bc5dea08a";
 export const ZERO_SHA256 = "0".repeat(64);
 
 const SITE_ROOT = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
@@ -63,6 +64,7 @@ const VERSION = /^0\.1\.0-alpha\.\d+$/u;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/u;
 const IMAGE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)+@sha256:[0-9a-f]{64}$/u;
 const MIGRATION = /^\d{4}_[a-z0-9_]+\.sql$/u;
+const ROLE = /^[a-z_][a-z0-9_$-]{0,62}$/u;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
 const BACKUP_ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u;
 const CONTAINER_ID = /^[0-9a-f]{64}$/u;
@@ -127,6 +129,18 @@ const QUIESCE_PARAMETER_FIELDS = Object.freeze([
   "quiesce_created_at", "quiesce_expires_at", "requester_identity_sha256", "approver_identity_sha256",
   "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
 ]);
+const MIGRATION_AUTHORIZATION_PARAMETER_FIELDS = Object.freeze([
+  "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+  "promotion_intent_sha256", "promotion_original_authorization_sha256", "quiesce_operation_id",
+  "quiesce_intent_sha256", "quiesce_intent_source", "candidate_binding_sha256", "database_binding_sha256",
+  "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+  "writer_quiesce_binding_sha256", "current_checkpoint_source", "runtime_identity_source", "release_manifest",
+  "release_manifest_sha256", "release_manifest_source", "deployment_class", "deployment_id", "database_name",
+  "database_oid", "database_system_identifier", "database_marker", "expected_current_migration_head",
+  "target_migration_head", "migration_manifest_sha256", "migration_role", "authorization_created_at",
+  "authorization_expires_at", "requester_identity_sha256", "approver_identity_sha256",
+  "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+]);
 const WRITER_CAPTURE_FIELDS = Object.freeze([
   "deployment_class", "deployment_id", "compose_project", "snapshot_recovery_point_at", "snapshot_writer_verified_at",
   "application_version", "git_commit", "migration_head", "migration_manifest_sha256", "web", "worker",
@@ -184,11 +198,12 @@ function validatePolicy(value) {
   if (!same(value.deployment, { class: "UAT", id: "chenyida-erp", database: "chenyida_erp", database_marker: "chenyida-erp-deployment/v2:UAT:chenyida-erp" })) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.state, ["root", "marker", "marker_value", "directory_mode", "file_mode", "owner_uid", "owner_gid"], "UAT_PROMOTION_POLICY_INVALID");
   if (!same(value.state, { root: UAT_PROMOTION_STATE_ROOT, marker: UAT_PROMOTION_STATE_MARKER, marker_value: UAT_PROMOTION_STATE_MARKER_VALUE, directory_mode: "0700", file_mode: "0400", owner_uid: 0, owner_gid: 0 })) reject("UAT_PROMOTION_POLICY_INVALID");
-  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
+  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "migration_authorization_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
   if (value.authorization.contract !== "chenyida-erp-release-supervisor-authorization/v6"
     || value.authorization.maximum_window_minutes !== 60 || value.authorization.begin_operation !== "BEGIN_UAT_PROMOTION"
     || value.authorization.snapshot_operation !== "CAPTURE_UAT_PROMOTION_SNAPSHOT"
     || value.authorization.quiesce_operation !== "QUIESCE_UAT_WRITERS"
+    || value.authorization.migration_authorization_operation !== "AUTHORIZE_UAT_PROMOTION_MIGRATION"
     || value.authorization.recovery_operation !== "RECOVER_UAT_PROMOTION"
     || !same(value.authorization.required_distinct_actors, ["requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256"])) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.snapshot_writer_dependency, [
@@ -207,10 +222,11 @@ function validatePolicy(value) {
   if (!same(value.checkpoint_order, CHECKPOINT_ORDER) || value.initial_checkpoint !== CHECKPOINT_ORDER[3]) reject("UAT_PROMOTION_POLICY_INVALID");
   if (!Array.isArray(value.required_intent_bindings) || value.required_intent_bindings.length !== 16
     || new Set(value.required_intent_bindings).size !== value.required_intent_bindings.length) reject("UAT_PROMOTION_POLICY_INVALID");
-  if (!Array.isArray(value.adapters) || value.adapters.length !== 7) reject("UAT_PROMOTION_POLICY_INVALID");
+  if (!Array.isArray(value.adapters) || value.adapters.length !== 8) reject("UAT_PROMOTION_POLICY_INVALID");
   const expectedAdapters = new Map([
     ["BEGIN_UAT_PROMOTION", "IMPLEMENTED"], ["CAPTURE_UAT_PROMOTION_SNAPSHOT", "IMPLEMENTED"],
     ["QUIESCE_UAT_WRITERS", "IMPLEMENTED"], ["RUN_UAT_PROMOTION_MIGRATION", "NOT_IMPLEMENTED"],
+    ["AUTHORIZE_UAT_PROMOTION_MIGRATION", "IMPLEMENTED"],
     ["DEPLOY_UAT_RELEASE", "NOT_IMPLEMENTED"], ["ROLLBACK_UAT_RELEASE", "NOT_IMPLEMENTED"],
     ["RECOVER_UAT_PROMOTION", "IMPLEMENTED"],
   ]);
@@ -430,9 +446,58 @@ export function validateUatPromotionQuiesceParameters(value) {
   return value;
 }
 
+export function validateUatPromotionMigrationAuthorizationParameters(value) {
+  exactKeys(value, MIGRATION_AUTHORIZATION_PARAMETER_FIELDS, "UAT_PROMOTION_MIGRATION_AUTHORIZATION_PARAMETERS_INVALID");
+  if (value.promotion_state_root !== UAT_PROMOTION_STATE_ROOT) reject("UAT_PROMOTION_STATE_PATH_INVALID");
+  for (const field of ["promotion_id", "quiesce_operation_id"]) {
+    identifier(value[field], "UAT_PROMOTION_MIGRATION_AUTHORIZATION_IDENTIFIER_INVALID");
+  }
+  if (value.promotion_id === value.quiesce_operation_id) reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_IDENTIFIER_INVALID");
+  integer(value.promotion_generation, 1, 1_000_000, "UAT_PROMOTION_GENERATION_INVALID");
+  for (const field of [
+    "previous_checkpoint_receipt_sha256", "promotion_intent_sha256", "promotion_original_authorization_sha256",
+    "quiesce_intent_sha256", "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+    "release_manifest_sha256", "migration_manifest_sha256", "requester_identity_sha256",
+    "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+  ]) digest(value[field], "UAT_PROMOTION_MIGRATION_AUTHORIZATION_DIGEST_INVALID");
+  if (value.policy_file_sha256 !== UAT_PROMOTION_POLICY_FILE_SHA256 || value.policy_sha256 !== UAT_PROMOTION_POLICY_SHA256) {
+    reject("UAT_PROMOTION_POLICY_BINDING_INVALID");
+  }
+  const actors = new Set([value.requester_identity_sha256, value.approver_identity_sha256, value.executor_identity_sha256]);
+  if (actors.size !== 3 || actors.has(ZERO_SHA256)) reject("UAT_PROMOTION_ACTORS_INVALID");
+  if (value.deployment_class !== "UAT" || value.deployment_id !== "chenyida-erp"
+    || value.database_name !== "chenyida_erp" || !/^[1-9][0-9]{0,9}$/u.test(value.database_oid)
+    || !/^[1-9][0-9]{9,29}$/u.test(value.database_system_identifier)
+    || value.database_marker !== "chenyida-erp-deployment/v2:UAT:chenyida-erp") {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_DATABASE_INVALID");
+  }
+  if (!MIGRATION.test(value.expected_current_migration_head) || !MIGRATION.test(value.target_migration_head)
+    || typeof value.migration_role !== "string" || !ROLE.test(value.migration_role)) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_TARGET_INVALID");
+  }
+  if (typeof value.release_manifest !== "string" || !path.isAbsolute(value.release_manifest)
+    || path.normalize(value.release_manifest) !== value.release_manifest || value.release_manifest === "/") {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_PATH_INVALID");
+  }
+  const created = Date.parse(iso(value.authorization_created_at, "UAT_PROMOTION_MIGRATION_AUTHORIZATION_TIME_INVALID"));
+  const expires = Date.parse(iso(value.authorization_expires_at, "UAT_PROMOTION_MIGRATION_AUTHORIZATION_TIME_INVALID"));
+  if (expires <= created || expires - created > 60 * 60 * 1000) reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_TIME_INVALID");
+  const quiesceIntentPath = `${UAT_PROMOTION_STATE_ROOT}/intents/${value.quiesce_operation_id}.${value.quiesce_intent_sha256}.json`;
+  validateSourceSpec(value.current_checkpoint_source, UAT_PROMOTION_CURRENT_FILE, new Set(["0400"]), "UAT_PROMOTION_MIGRATION_AUTHORIZATION_CURRENT_SOURCE_INVALID", 0);
+  validateSourceSpec(value.quiesce_intent_source, quiesceIntentPath, new Set(["0400"]), "UAT_PROMOTION_MIGRATION_AUTHORIZATION_QUIESCE_SOURCE_INVALID", 0);
+  validateSourceSpec(value.runtime_identity_source, RELEASE_IDENTITY_FILE, new Set(["0440"]), "UAT_PROMOTION_MIGRATION_AUTHORIZATION_RUNTIME_SOURCE_INVALID");
+  validateSourceSpec(value.release_manifest_source, value.release_manifest, new Set(["0440"]), "UAT_PROMOTION_MIGRATION_AUTHORIZATION_MANIFEST_SOURCE_INVALID", 0);
+  if (value.runtime_identity_source.sha256 !== value.runtime_binding_sha256
+    || value.release_manifest_source.sha256 !== value.release_manifest_sha256) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_SOURCE_BINDING_INVALID");
+  }
+  return value;
+}
+
 export function validateUatPromotionContext(value) {
   exactKeys(value, CONTEXT_FIELDS, "UAT_PROMOTION_CONTEXT_INVALID");
-  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS"]).has(value.operation)
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION"]).has(value.operation)
     || !new Set(["ORIGINAL", "RECOVERY"]).has(value.execution_mode)) reject("UAT_PROMOTION_CONTEXT_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
@@ -440,14 +505,19 @@ export function validateUatPromotionContext(value) {
   for (const field of ["execution_authorization_sha256", "original_authorization_sha256", "supervisor_bundle_sha256"]) digest(value[field], "UAT_PROMOTION_CONTEXT_DIGEST_INVALID");
   if (value.operation === "BEGIN") validateUatPromotionParameters(value.parameters);
   else if (value.operation === "CAPTURE_SNAPSHOT") validateUatPromotionSnapshotParameters(value.parameters);
-  else validateUatPromotionQuiesceParameters(value.parameters);
+  else if (value.operation === "QUIESCE_WRITERS") validateUatPromotionQuiesceParameters(value.parameters);
+  else validateUatPromotionMigrationAuthorizationParameters(value.parameters);
   const operationCreatedAt = value.operation === "BEGIN" ? value.parameters.promotion_created_at
-    : value.operation === "CAPTURE_SNAPSHOT" ? value.parameters.snapshot_created_at : value.parameters.quiesce_created_at;
+    : value.operation === "CAPTURE_SNAPSHOT" ? value.parameters.snapshot_created_at
+      : value.operation === "QUIESCE_WRITERS" ? value.parameters.quiesce_created_at : value.parameters.authorization_created_at;
   if (value.execution_mode === "ORIGINAL") {
     if (value.execution_authorization_id !== value.operation_id || value.execution_authorization_sha256 !== value.original_authorization_sha256
       || value.expected_intent_sha256 !== null || Math.abs(Date.parse(value.execution_created_at) - Date.parse(operationCreatedAt)) > 5 * 60 * 1000
       || value.operation === "BEGIN" && value.operation_id !== value.parameters.promotion_id
-      || value.operation !== "BEGIN" && value.operation_id === value.parameters.promotion_id) reject("UAT_PROMOTION_CONTEXT_BINDING_INVALID");
+      || value.operation !== "BEGIN" && value.operation_id === value.parameters.promotion_id
+      || value.operation === "MIGRATION_AUTHORIZATION" && value.operation_id === value.parameters.quiesce_operation_id) {
+      reject("UAT_PROMOTION_CONTEXT_BINDING_INVALID");
+    }
   } else {
     if (value.execution_authorization_id === value.operation_id || value.execution_authorization_sha256 === value.original_authorization_sha256
       || Date.parse(value.execution_created_at) < Date.parse(operationCreatedAt)) reject("UAT_PROMOTION_CONTEXT_BINDING_INVALID");
@@ -1233,6 +1303,182 @@ async function verifyQuiesceAuthorizedSources(context, filesystemRoot, options) 
   return Object.freeze({ previous, snapshotIntent: snapshotIntent.value, promotionIntent: promotionIntent.value, identity: identity.value, evidence, binding });
 }
 
+function migrationAuthorizationBinding(context, parameters, previous, quiesceIntent, promotionIntent, identity, manifest) {
+  return clusterSha256({
+    contract: "chenyida-erp-uat-promotion-migration-authorization-binding/v1",
+    execution_scope: "APPROVAL_ONLY_NO_SQL_NO_DATABASE_FENCE",
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    authorization_operation_id: context.operation_id,
+    execution_authorization_sha256: context.original_authorization_sha256,
+    previous_checkpoint_receipt_sha256: previous.receipt_sha256,
+    promotion_intent_sha256: parameters.promotion_intent_sha256,
+    quiesce_operation_id: parameters.quiesce_operation_id,
+    quiesce_intent_sha256: parameters.quiesce_intent_sha256,
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    release_manifest_sha256: parameters.release_manifest_sha256,
+    release_id: manifest.release_id,
+    candidate: {
+      git_commit: promotionIntent.parameters.git_commit,
+      git_tree: promotionIntent.parameters.git_tree,
+      application_version: promotionIntent.parameters.application_version,
+      web_image: promotionIntent.parameters.web_image,
+      worker_image: promotionIntent.parameters.worker_image,
+    },
+    runtime: {
+      application_version: identity.application_version,
+      git_commit: identity.git_commit,
+      migration_head: identity.migration_head,
+      migration_manifest_sha256: identity.migration_manifest_sha256,
+      web_container_id: identity.web_container_id,
+      worker_container_id: identity.worker_container_id,
+    },
+    database: {
+      deployment_class: parameters.deployment_class,
+      deployment_id: parameters.deployment_id,
+      database_name: parameters.database_name,
+      database_oid: parameters.database_oid,
+      database_system_identifier: parameters.database_system_identifier,
+      database_marker: parameters.database_marker,
+      migration_role: parameters.migration_role,
+    },
+    migration: {
+      expected_current_head: parameters.expected_current_migration_head,
+      target_head: parameters.target_migration_head,
+      manifest_sha256: parameters.migration_manifest_sha256,
+    },
+    actors: {
+      requester_identity_sha256: parameters.requester_identity_sha256,
+      approver_identity_sha256: parameters.approver_identity_sha256,
+      executor_identity_sha256: parameters.executor_identity_sha256,
+    },
+    authorization_window: {
+      created_at: parameters.authorization_created_at,
+      expires_at: parameters.authorization_expires_at,
+    },
+    quiesce_evidence_sha256: quiesceIntent.writer_quiesce_binding_sha256,
+  });
+}
+
+async function verifyMigrationAuthorizationSources(context, filesystemRoot) {
+  const parameters = context.parameters;
+  const current = await readAuthorizedSource(
+    parameters.current_checkpoint_source, filesystemRoot, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_MIGRATION_AUTHORIZATION_CURRENT_SOURCE_INVALID",
+  );
+  const quiesce = await readAuthorizedSource(
+    parameters.quiesce_intent_source, filesystemRoot, validateUatPromotionQuiesceIntent,
+    "UAT_PROMOTION_MIGRATION_AUTHORIZATION_QUIESCE_SOURCE_INVALID",
+  );
+  const promotionIntentPath = path.join(
+    physicalPath(`${UAT_PROMOTION_STATE_ROOT}/intents`, filesystemRoot),
+    `${parameters.promotion_id}.${parameters.promotion_intent_sha256}.json`,
+  );
+  const promotion = await trustedJsonFile(
+    promotionIntentPath, 0o400, validateUatPromotionIntent,
+    "UAT_PROMOTION_MIGRATION_AUTHORIZATION_PROMOTION_INTENT_INVALID",
+  );
+  if (!promotion || promotion.value.intent_sha256 !== parameters.promotion_intent_sha256) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_PROMOTION_INTENT_INVALID");
+  }
+  const identity = await readAuthorizedRootSource(
+    parameters.runtime_identity_source, path.dirname(RELEASE_IDENTITY_FILE), new Set([0o750]),
+    RELEASE_IDENTITY_ROOT_MARKER, RELEASE_IDENTITY_ROOT_MARKER_VALUE, 0o440, validateReleaseIdentity,
+    filesystemRoot, "UAT_PROMOTION_MIGRATION_AUTHORIZATION_RUNTIME_SOURCE_INVALID",
+  );
+  const releaseRoot = physicalPath(path.dirname(parameters.release_manifest), filesystemRoot);
+  await trustedMarker(
+    path.join(releaseRoot, RELEASE_ARTIFACT_MARKER), Buffer.from(RELEASE_ARTIFACT_MARKER_VALUE),
+    0o440, 0, "UAT_PROMOTION_MIGRATION_AUTHORIZATION_MANIFEST_ROOT_INVALID",
+  );
+  const release = await readAuthorizedSource(
+    parameters.release_manifest_source, filesystemRoot,
+    (value) => validateReleaseManifest(value, { now: new Date(parameters.authorization_created_at), requireEligible: true }),
+    "UAT_PROMOTION_MIGRATION_AUTHORIZATION_MANIFEST_SOURCE_INVALID",
+  );
+  const previous = current.value;
+  const quiesceIntent = quiesce.value;
+  const promotionIntent = promotion.value;
+  const runtimeIdentity = identity.value;
+  const manifest = release.value;
+  if (previous.promotion_id !== parameters.promotion_id || previous.promotion_generation !== parameters.promotion_generation
+    || previous.checkpoint_id !== "WRITER_QUIESCE_RECEIPT" || previous.checkpoint_ordinal !== 6
+    || previous.checkpoint_status !== "COMMITTED" || previous.journal_status !== "IN_PROGRESS"
+    || previous.receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || previous.intent_sha256 !== parameters.promotion_intent_sha256
+    || previous.original_authorization_sha256 !== parameters.promotion_original_authorization_sha256
+    || previous.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || previous.database_binding_sha256 !== parameters.database_binding_sha256
+    || previous.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || previous.recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || previous.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || previous.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || previous.checkpoint_evidence_sha256 !== parameters.quiesce_intent_sha256
+    || previous.migration_authorization_binding_sha256 !== ZERO_SHA256) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_CURRENT_MISMATCH");
+  }
+  if (quiesceIntent.quiesce_operation_id !== parameters.quiesce_operation_id
+    || quiesceIntent.quiesce_intent_sha256 !== parameters.quiesce_intent_sha256
+    || quiesceIntent.promotion_id !== parameters.promotion_id
+    || quiesceIntent.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || quiesceIntent.previous_checkpoint_receipt_sha256 !== previous.previous_checkpoint_receipt_sha256
+    || quiesceIntent.execution_authorization_sha256 !== previous.checkpoint_authorization_sha256
+    || quiesceIntent.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || quiesceIntent.database_binding_sha256 !== parameters.database_binding_sha256
+    || quiesceIntent.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || quiesceIntent.preupgrade_recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || quiesceIntent.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || quiesceIntent.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_QUIESCE_MISMATCH");
+  }
+  if (promotionIntent.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || promotionIntent.database_binding_sha256 !== parameters.database_binding_sha256
+    || promotionIntent.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || promotionIntent.recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || promotionIntent.parameters.release_manifest_sha256 !== parameters.release_manifest_sha256
+    || promotionIntent.parameters.migration_manifest_sha256 !== parameters.migration_manifest_sha256
+    || promotionIntent.parameters.migration_head !== parameters.target_migration_head
+    || promotionIntent.parameters.database_name !== parameters.database_name
+    || promotionIntent.parameters.database_oid !== parameters.database_oid
+    || promotionIntent.parameters.database_system_identifier !== parameters.database_system_identifier
+    || promotionIntent.parameters.database_marker !== parameters.database_marker) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_PROMOTION_MISMATCH");
+  }
+  if (runtimeIdentity.deployment_class !== parameters.deployment_class
+    || runtimeIdentity.deployment_id !== parameters.deployment_id
+    || runtimeIdentity.migration_head !== parameters.expected_current_migration_head
+    || runtimeIdentity.web_container_id !== quiesceIntent.snapshot_writer_capture.web.container_id
+    || runtimeIdentity.worker_container_id !== quiesceIntent.snapshot_writer_capture.worker.container_id) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_RUNTIME_MISMATCH");
+  }
+  if (manifest.allowed_deployment_classes.length !== 1 || manifest.allowed_deployment_classes[0] !== "UAT"
+    || manifest.control.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || manifest.source.git_commit !== promotionIntent.parameters.git_commit
+    || manifest.source.git_tree !== promotionIntent.parameters.git_tree
+    || manifest.source.package_version !== promotionIntent.parameters.application_version
+    || manifest.images.web.image_reference !== promotionIntent.parameters.web_image
+    || manifest.images.worker.image_reference !== promotionIntent.parameters.worker_image
+    || manifest.migrations.head !== parameters.target_migration_head
+    || manifest.migrations.allowlist_sha256 !== parameters.migration_manifest_sha256) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_MANIFEST_MISMATCH");
+  }
+  const created = Date.parse(parameters.authorization_created_at);
+  if (created < Date.parse(previous.recorded_at)
+    || Date.parse(parameters.authorization_expires_at) > Date.parse(previous.promotion_expires_at)) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_TIME_INVALID");
+  }
+  const binding = migrationAuthorizationBinding(
+    context, parameters, previous, quiesceIntent, promotionIntent, runtimeIdentity, manifest,
+  );
+  digest(binding, "UAT_PROMOTION_MIGRATION_AUTHORIZATION_BINDING_INVALID");
+  return Object.freeze({ previous, quiesceIntent, promotionIntent, identity: runtimeIdentity, manifest, binding });
+}
+
 async function ensureDirectory(directory, parent, mode, code) {
   await trustedDirectory(parent, new Set([0o700, 0o750, 0o755]), code);
   let created = false;
@@ -1339,7 +1585,7 @@ export function validateUatPromotionCheckpointReceipt(value) {
     "checkpoint_ordinal", "completed_checkpoints", "checkpoint_status", "journal_status", "recorded_at",
     "promotion_expires_at", "intent_sha256", "candidate_binding_sha256", "database_binding_sha256",
     "runtime_binding_sha256", "recovery_binding_sha256", "promotion_snapshot_binding_sha256",
-    "writer_quiesce_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
     "previous_promotion_receipt_sha256", "previous_checkpoint_receipt_sha256", "original_authorization_sha256",
     "checkpoint_authorization_sha256", "authorization_sha256_chain", "authorization_chain_sha256",
     "checkpoint_evidence_sha256", "receipt_sha256",
@@ -1373,7 +1619,7 @@ export function validateUatPromotionCheckpointReceipt(value) {
     || value.authorization_sha256_chain[0] !== value.original_authorization_sha256
     || value.authorization_sha256_chain.at(-1) !== value.checkpoint_authorization_sha256
     || clusterSha256(value.authorization_sha256_chain) !== value.authorization_chain_sha256) reject("UAT_PROMOTION_RECEIPT_AUTHORIZATION_CHAIN_INVALID");
-  for (const field of ["promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256", "previous_promotion_receipt_sha256", "previous_checkpoint_receipt_sha256"]) {
+  for (const field of ["promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256", "previous_promotion_receipt_sha256", "previous_checkpoint_receipt_sha256"]) {
     digest(value[field], "UAT_PROMOTION_RECEIPT_DIGEST_INVALID", true);
   }
   if (value.checkpoint_ordinal === 4 && value.previous_checkpoint_receipt_sha256 !== ZERO_SHA256
@@ -1382,6 +1628,8 @@ export function validateUatPromotionCheckpointReceipt(value) {
     || value.checkpoint_ordinal >= 5 && value.promotion_snapshot_binding_sha256 === ZERO_SHA256
     || value.checkpoint_ordinal < 6 && value.writer_quiesce_binding_sha256 !== ZERO_SHA256
     || value.checkpoint_ordinal >= 6 && value.writer_quiesce_binding_sha256 === ZERO_SHA256
+    || value.checkpoint_ordinal < 7 && value.migration_authorization_binding_sha256 !== ZERO_SHA256
+    || value.checkpoint_ordinal >= 7 && value.migration_authorization_binding_sha256 === ZERO_SHA256
     || clusterSha256(bodyWithout(value, "receipt_sha256")) !== value.receipt_sha256) reject("UAT_PROMOTION_RECEIPT_BINDING_INVALID");
   return value;
 }
@@ -1408,6 +1656,7 @@ function createInitialReceipt(context, intent) {
     recovery_binding_sha256: intent.recovery_binding_sha256,
     promotion_snapshot_binding_sha256: ZERO_SHA256,
     writer_quiesce_binding_sha256: ZERO_SHA256,
+    migration_authorization_binding_sha256: ZERO_SHA256,
     previous_promotion_receipt_sha256: parameters.previous_promotion_receipt_sha256,
     previous_checkpoint_receipt_sha256: ZERO_SHA256,
     original_authorization_sha256: context.original_authorization_sha256,
@@ -1425,7 +1674,7 @@ export function createNextUatPromotionCheckpointReceipt(previousInput, input) {
     "checkpoint_id", "checkpoint_status", "journal_status", "recorded_at", "checkpoint_evidence_sha256",
     "checkpoint_authorization_sha256", "intent_sha256", "candidate_binding_sha256", "database_binding_sha256",
     "runtime_binding_sha256", "recovery_binding_sha256", "promotion_snapshot_binding_sha256",
-    "writer_quiesce_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
   ], "UAT_PROMOTION_CHECKPOINT_INPUT_INVALID");
   const nextOrdinal = previous.checkpoint_ordinal + 1;
   if (nextOrdinal > CHECKPOINT_ORDER.length || input.checkpoint_id !== CHECKPOINT_ORDER[nextOrdinal - 1]) reject("UAT_PROMOTION_CHECKPOINT_SKIP_FORBIDDEN");
@@ -1440,6 +1689,7 @@ export function createNextUatPromotionCheckpointReceipt(previousInput, input) {
   digest(input.checkpoint_authorization_sha256, "UAT_PROMOTION_CHECKPOINT_AUTHORIZATION_INVALID");
   digest(input.promotion_snapshot_binding_sha256, "UAT_PROMOTION_CHECKPOINT_SNAPSHOT_INVALID", nextOrdinal < 5);
   digest(input.writer_quiesce_binding_sha256, "UAT_PROMOTION_CHECKPOINT_QUIESCE_INVALID", nextOrdinal < 6);
+  digest(input.migration_authorization_binding_sha256, "UAT_PROMOTION_CHECKPOINT_MIGRATION_AUTHORIZATION_INVALID", nextOrdinal < 7);
   if (previous.authorization_sha256_chain.includes(input.checkpoint_authorization_sha256)) reject("UAT_PROMOTION_CHECKPOINT_AUTHORIZATION_REUSED");
   if (nextOrdinal === 5) {
     if (input.promotion_snapshot_binding_sha256 === ZERO_SHA256) reject("UAT_PROMOTION_CHECKPOINT_SNAPSHOT_INVALID");
@@ -1450,6 +1700,13 @@ export function createNextUatPromotionCheckpointReceipt(previousInput, input) {
     if (input.writer_quiesce_binding_sha256 === ZERO_SHA256) reject("UAT_PROMOTION_CHECKPOINT_QUIESCE_INVALID");
   } else if (input.writer_quiesce_binding_sha256 !== previous.writer_quiesce_binding_sha256) {
     reject("UAT_PROMOTION_CHECKPOINT_QUIESCE_INVALID");
+  }
+  if (nextOrdinal === 7) {
+    if (input.migration_authorization_binding_sha256 === ZERO_SHA256) {
+      reject("UAT_PROMOTION_CHECKPOINT_MIGRATION_AUTHORIZATION_INVALID");
+    }
+  } else if (input.migration_authorization_binding_sha256 !== previous.migration_authorization_binding_sha256) {
+    reject("UAT_PROMOTION_CHECKPOINT_MIGRATION_AUTHORIZATION_INVALID");
   }
   iso(input.recorded_at, "UAT_PROMOTION_CHECKPOINT_TIME_INVALID");
   if (Date.parse(input.recorded_at) < Date.parse(previous.recorded_at) || Date.parse(input.recorded_at) >= Date.parse(previous.promotion_expires_at)) reject("UAT_PROMOTION_CHECKPOINT_TIME_INVALID");
@@ -1464,6 +1721,7 @@ export function createNextUatPromotionCheckpointReceipt(previousInput, input) {
     recorded_at: input.recorded_at,
     promotion_snapshot_binding_sha256: input.promotion_snapshot_binding_sha256,
     writer_quiesce_binding_sha256: input.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: input.migration_authorization_binding_sha256,
     previous_checkpoint_receipt_sha256: previous.receipt_sha256,
     checkpoint_authorization_sha256: input.checkpoint_authorization_sha256,
     authorization_sha256_chain: [...previous.authorization_sha256_chain, input.checkpoint_authorization_sha256],
@@ -1494,6 +1752,7 @@ function createIntent(context) {
       BEGIN_UAT_PROMOTION: "IMPLEMENTED",
       CAPTURE_UAT_PROMOTION_SNAPSHOT: "IMPLEMENTED",
       QUIESCE_UAT_WRITERS: "IMPLEMENTED",
+      AUTHORIZE_UAT_PROMOTION_MIGRATION: "IMPLEMENTED",
       RUN_UAT_PROMOTION_MIGRATION: "NOT_IMPLEMENTED",
       DEPLOY_UAT_RELEASE: "NOT_IMPLEMENTED",
       ROLLBACK_UAT_RELEASE: "NOT_IMPLEMENTED",
@@ -1526,8 +1785,9 @@ export function validateUatPromotionIntent(value) {
     || value.adapter_statuses?.BEGIN_UAT_PROMOTION !== "IMPLEMENTED"
     || value.adapter_statuses?.CAPTURE_UAT_PROMOTION_SNAPSHOT !== "IMPLEMENTED"
     || value.adapter_statuses?.QUIESCE_UAT_WRITERS !== "IMPLEMENTED"
+    || value.adapter_statuses?.AUTHORIZE_UAT_PROMOTION_MIGRATION !== "IMPLEMENTED"
     || value.adapter_statuses?.RECOVER_UAT_PROMOTION !== "IMPLEMENTED"
-    || Object.entries(value.adapter_statuses ?? {}).filter(([operation]) => !new Set(["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "RECOVER_UAT_PROMOTION"]).has(operation)).some(([, status]) => status !== "NOT_IMPLEMENTED")
+    || Object.entries(value.adapter_statuses ?? {}).filter(([operation]) => !new Set(["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RECOVER_UAT_PROMOTION"]).has(operation)).some(([, status]) => status !== "NOT_IMPLEMENTED")
     || clusterSha256(bodyWithout(value, "intent_sha256")) !== value.intent_sha256) reject("UAT_PROMOTION_INTENT_BINDING_INVALID");
   return value;
 }
@@ -1680,9 +1940,88 @@ export function validateUatPromotionQuiesceIntent(value) {
   return value;
 }
 
+function createMigrationAuthorizationIntent(context, sources) {
+  const parameters = context.parameters;
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT,
+    migration_authorization_operation_id: context.operation_id,
+    execution_scope: "APPROVAL_ONLY_NO_SQL_NO_DATABASE_FENCE",
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    created_at: parameters.authorization_created_at,
+    expires_at: parameters.authorization_expires_at,
+    execution_authorization_sha256: context.original_authorization_sha256,
+    supervisor_bundle_sha256: context.supervisor_bundle_sha256,
+    parameters,
+    promotion_intent_sha256: parameters.promotion_intent_sha256,
+    previous_checkpoint_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    quiesce_operation_id: parameters.quiesce_operation_id,
+    quiesce_intent_sha256: parameters.quiesce_intent_sha256,
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: sources.binding,
+  };
+  return Object.freeze({ ...body, migration_authorization_intent_sha256: clusterSha256(body) });
+}
+
+export function validateUatPromotionMigrationAuthorizationIntent(value) {
+  exactKeys(value, [
+    "schema_version", "contract", "migration_authorization_operation_id", "execution_scope", "promotion_id",
+    "promotion_generation", "created_at", "expires_at", "execution_authorization_sha256",
+    "supervisor_bundle_sha256", "parameters", "promotion_intent_sha256", "previous_checkpoint_receipt_sha256",
+    "quiesce_operation_id", "quiesce_intent_sha256", "candidate_binding_sha256", "database_binding_sha256",
+    "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_authorization_intent_sha256",
+  ], "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_INVALID");
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT
+    || value.execution_scope !== "APPROVAL_ONLY_NO_SQL_NO_DATABASE_FENCE") {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_INVALID");
+  }
+  for (const field of ["migration_authorization_operation_id", "promotion_id", "quiesce_operation_id"]) {
+    identifier(value[field], "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_INVALID");
+  }
+  validateUatPromotionMigrationAuthorizationParameters(value.parameters);
+  for (const field of [
+    "execution_authorization_sha256", "supervisor_bundle_sha256", "promotion_intent_sha256",
+    "previous_checkpoint_receipt_sha256", "quiesce_intent_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+    "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+    "migration_authorization_binding_sha256", "migration_authorization_intent_sha256",
+  ]) digest(value[field], "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_INVALID");
+  if (value.migration_authorization_operation_id === value.promotion_id
+    || value.migration_authorization_operation_id === value.quiesce_operation_id
+    || value.promotion_id !== value.parameters.promotion_id
+    || value.promotion_generation !== value.parameters.promotion_generation
+    || value.created_at !== value.parameters.authorization_created_at
+    || value.expires_at !== value.parameters.authorization_expires_at
+    || value.promotion_intent_sha256 !== value.parameters.promotion_intent_sha256
+    || value.previous_checkpoint_receipt_sha256 !== value.parameters.previous_checkpoint_receipt_sha256
+    || value.quiesce_operation_id !== value.parameters.quiesce_operation_id
+    || value.quiesce_intent_sha256 !== value.parameters.quiesce_intent_sha256
+    || value.candidate_binding_sha256 !== value.parameters.candidate_binding_sha256
+    || value.database_binding_sha256 !== value.parameters.database_binding_sha256
+    || value.runtime_binding_sha256 !== value.parameters.runtime_binding_sha256
+    || value.preupgrade_recovery_binding_sha256 !== value.parameters.preupgrade_recovery_binding_sha256
+    || value.promotion_snapshot_binding_sha256 !== value.parameters.promotion_snapshot_binding_sha256
+    || value.writer_quiesce_binding_sha256 !== value.parameters.writer_quiesce_binding_sha256
+    || clusterSha256(bodyWithout(value, "migration_authorization_intent_sha256")) !== value.migration_authorization_intent_sha256) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_BINDING_INVALID");
+  }
+  return value;
+}
+
 function intentFile(paths, intent) { return path.join(paths.intents, `${intent.promotion_id}.${intent.intent_sha256}.json`); }
 function snapshotIntentFile(paths, intent) { return path.join(paths.intents, `${intent.snapshot_operation_id}.${intent.snapshot_intent_sha256}.json`); }
 function quiesceIntentFile(paths, intent) { return path.join(paths.intents, `${intent.quiesce_operation_id}.${intent.quiesce_intent_sha256}.json`); }
+function migrationAuthorizationIntentFile(paths, intent) {
+  return path.join(paths.intents, `${intent.migration_authorization_operation_id}.${intent.migration_authorization_intent_sha256}.json`);
+}
 function generationName(intent) { return `${String(intent.promotion_generation).padStart(16, "0")}.${intent.intent_sha256}.json`; }
 function receiptName(receipt) { return `${String(receipt.promotion_generation).padStart(16, "0")}.${String(receipt.journal_sequence).padStart(2, "0")}.${receipt.receipt_sha256}.json`; }
 function generationFile(paths, intent) { return path.join(paths.generations, generationName(intent)); }
@@ -1738,8 +2077,10 @@ async function committedChain(paths, allowed = {}) {
         || receipt.value.previous_promotion_receipt_sha256 !== previous.previous_promotion_receipt_sha256
         || receipt.value.promotion_snapshot_binding_sha256 !== previous.promotion_snapshot_binding_sha256
           && receipt.value.checkpoint_ordinal !== 5
-        || receipt.value.writer_quiesce_binding_sha256 !== previous.writer_quiesce_binding_sha256
-          && receipt.value.checkpoint_ordinal !== 6) reject("UAT_PROMOTION_CHECKPOINT_CHAIN_INVALID");
+      || receipt.value.writer_quiesce_binding_sha256 !== previous.writer_quiesce_binding_sha256
+          && receipt.value.checkpoint_ordinal !== 6
+        || receipt.value.migration_authorization_binding_sha256 !== previous.migration_authorization_binding_sha256
+          && receipt.value.checkpoint_ordinal !== 7) reject("UAT_PROMOTION_CHECKPOINT_CHAIN_INVALID");
     }
     receipts.push(receipt);
   }
@@ -1870,6 +2211,7 @@ function createSnapshotCheckpointReceipt(context, snapshotIntent, previous) {
     recovery_binding_sha256: snapshotIntent.preupgrade_recovery_binding_sha256,
     promotion_snapshot_binding_sha256: snapshotIntent.promotion_snapshot_binding_sha256,
     writer_quiesce_binding_sha256: ZERO_SHA256,
+    migration_authorization_binding_sha256: ZERO_SHA256,
   });
 }
 
@@ -1983,6 +2325,7 @@ function createQuiesceCheckpointReceipt(context, quiesceIntent, previous) {
     recovery_binding_sha256: quiesceIntent.preupgrade_recovery_binding_sha256,
     promotion_snapshot_binding_sha256: quiesceIntent.promotion_snapshot_binding_sha256,
     writer_quiesce_binding_sha256: quiesceIntent.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: ZERO_SHA256,
   });
 }
 
@@ -2103,6 +2446,182 @@ async function commitQuiesce(context, intent, sources, paths, options) {
   });
 }
 
+function createMigrationAuthorizationCheckpointReceipt(context, intent, previous) {
+  return createNextUatPromotionCheckpointReceipt(previous, {
+    checkpoint_id: "ONE_TIME_MIGRATION_AUTHORIZATION",
+    checkpoint_status: "COMMITTED",
+    journal_status: "IN_PROGRESS",
+    recorded_at: intent.created_at,
+    checkpoint_evidence_sha256: intent.migration_authorization_intent_sha256,
+    checkpoint_authorization_sha256: context.original_authorization_sha256,
+    intent_sha256: intent.promotion_intent_sha256,
+    candidate_binding_sha256: intent.candidate_binding_sha256,
+    database_binding_sha256: intent.database_binding_sha256,
+    runtime_binding_sha256: intent.runtime_binding_sha256,
+    recovery_binding_sha256: intent.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: intent.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: intent.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: intent.migration_authorization_binding_sha256,
+  });
+}
+
+async function migrationAuthorizationCandidateState(paths, intent, previous, receipt) {
+  const name = receiptName(receipt);
+  const receiptRaw = Buffer.from(canonicalClusterJson(receipt));
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  if (current?.value.receipt_sha256 === receipt.receipt_sha256) {
+    const chain = await committedChain(paths);
+    if (chain.current?.value.receipt_sha256 !== receipt.receipt_sha256) {
+      reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_COMMITTED_STATE_MISMATCH");
+    }
+    return Object.freeze({ committed: true, history: true, receipt: true, current: true, receiptRaw, chain });
+  }
+  const chain = await committedChain(paths, { history: new Set([name]), receipts: new Set([name]) });
+  if (chain.current?.value.receipt_sha256 !== previous.receipt_sha256
+    || chain.current.value.intent_sha256 !== intent.promotion_intent_sha256
+    || chain.current.value.promotion_snapshot_binding_sha256 !== intent.promotion_snapshot_binding_sha256
+    || chain.current.value.writer_quiesce_binding_sha256 !== intent.writer_quiesce_binding_sha256
+    || chain.current.value.migration_authorization_binding_sha256 !== ZERO_SHA256
+    || chain.current.value.checkpoint_ordinal !== 6) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_PREVIOUS_CHANGED");
+  }
+  const history = await trustedJsonFile(
+    historyFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_HISTORY_INVALID",
+  );
+  const storedReceipt = await trustedJsonFile(
+    receiptFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_RECEIPT_INVALID",
+  );
+  const historyDone = history?.raw.equals(receiptRaw) ?? false;
+  const receiptDone = storedReceipt?.raw.equals(receiptRaw) ?? false;
+  if (history !== null && !historyDone || storedReceipt !== null && !receiptDone) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_PUBLICATION_CONFLICT");
+  }
+  if (receiptDone && !historyDone) reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_PUBLICATION_STAGE_ORDER_INVALID");
+  return Object.freeze({ committed: false, history: historyDone, receipt: receiptDone, current: false, receiptRaw, chain });
+}
+
+async function prepareMigrationAuthorization(context, options) {
+  await repositoryPolicy(options.siteRoot);
+  const paths = await layout(options.filesystemRoot, false);
+  if ((await readdir(paths.quarantine)).length !== 0) reject("UAT_PROMOTION_QUARANTINE_PRESENT");
+  const sources = await verifyMigrationAuthorizationSources(context, options.filesystemRoot);
+  const intent = createMigrationAuthorizationIntent(context, sources);
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => name.startsWith(`${context.operation_id}.`));
+  if (matches.length > 1 || matches.length === 1 && matches[0] !== path.basename(migrationAuthorizationIntentFile(paths, intent))) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_OPERATION_ID_REUSED");
+  }
+  const receipt = createMigrationAuthorizationCheckpointReceipt(context, intent, sources.previous);
+  await migrationAuthorizationCandidateState(paths, intent, sources.previous, receipt);
+  const raw = Buffer.from(canonicalClusterJson(intent));
+  if (matches.length === 1) {
+    const existing = await trustedJsonFile(
+      migrationAuthorizationIntentFile(paths, intent), 0o400, validateUatPromotionMigrationAuthorizationIntent,
+      "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_INVALID",
+    );
+    if (!existing?.raw.equals(raw)) reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONFLICT");
+    return Object.freeze({
+      result: "ALREADY_PREPARED", promotion_id: intent.promotion_id,
+      intent_sha256: intent.migration_authorization_intent_sha256, receipt_sha256: receipt.receipt_sha256,
+    });
+  }
+  await ensureRawFile(
+    migrationAuthorizationIntentFile(paths, intent), raw, 0o400, validateUatPromotionMigrationAuthorizationIntent,
+    "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONFLICT",
+  );
+  await syncDirectory(paths.intents, "UAT_PROMOTION_INTENT_SYNC_FAILED");
+  return Object.freeze({
+    result: "PREPARED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.migration_authorization_intent_sha256, receipt_sha256: receipt.receipt_sha256,
+  });
+}
+
+async function loadStoredMigrationAuthorizationIntent(context, paths) {
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => name.startsWith(`${context.operation_id}.`));
+  if (matches.length !== 1 || !matches[0].endsWith(`.${context.expected_intent_sha256}.json`)) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_MISSING");
+  }
+  const stored = await trustedJsonFile(
+    path.join(paths.intents, matches[0]), 0o400, validateUatPromotionMigrationAuthorizationIntent,
+    "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_INVALID",
+  );
+  if (!stored || stored.value.migration_authorization_intent_sha256 !== context.expected_intent_sha256
+    || stored.value.migration_authorization_operation_id !== context.operation_id
+    || stored.value.execution_authorization_sha256 !== context.original_authorization_sha256) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_BINDING_INVALID");
+  }
+  return stored.value;
+}
+
+async function loadMigrationAuthorizationIntent(context, paths, sources) {
+  const expected = createMigrationAuthorizationIntent(context, sources);
+  if (context.expected_intent_sha256 !== null
+    && context.expected_intent_sha256 !== expected.migration_authorization_intent_sha256) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_BINDING_INVALID");
+  }
+  const stored = await loadStoredMigrationAuthorizationIntent(
+    { ...context, expected_intent_sha256: expected.migration_authorization_intent_sha256 }, paths,
+  );
+  if (canonicalClusterJson(stored) !== canonicalClusterJson(expected)) {
+    reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_BINDING_INVALID");
+  }
+  return stored;
+}
+
+async function commitMigrationAuthorization(context, intent, sources, paths, options) {
+  const receipt = createMigrationAuthorizationCheckpointReceipt(context, intent, sources.previous);
+  let state = await migrationAuthorizationCandidateState(paths, intent, sources.previous, receipt);
+  if (state.committed) {
+    return Object.freeze({
+      result: "ALREADY_COMMITTED", promotion_id: intent.promotion_id,
+      intent_sha256: intent.migration_authorization_intent_sha256, receipt_sha256: receipt.receipt_sha256,
+    });
+  }
+  if (!state.history) {
+    await ensureRawFile(
+      historyFile(paths, receipt), state.receiptRaw, 0o400, validateUatPromotionCheckpointReceipt,
+      "UAT_PROMOTION_HISTORY_CONFLICT",
+    );
+    await syncDirectory(paths.history, "UAT_PROMOTION_HISTORY_SYNC_FAILED");
+    await options.fault?.("AFTER_MIGRATION_AUTHORIZATION_HISTORY");
+  }
+  state = await migrationAuthorizationCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.receipt) {
+    await ensureRawFile(
+      receiptFile(paths, receipt), state.receiptRaw, 0o400, validateUatPromotionCheckpointReceipt,
+      "UAT_PROMOTION_RECEIPT_CONFLICT",
+    );
+    await syncDirectory(paths.receipts, "UAT_PROMOTION_RECEIPT_SYNC_FAILED");
+    await options.fault?.("AFTER_MIGRATION_AUTHORIZATION_RECEIPT");
+  }
+  state = await migrationAuthorizationCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.current) {
+    const temporary = path.join(
+      paths.stateRoot, `.current.${intent.migration_authorization_operation_id}.${receipt.receipt_sha256}.tmp`,
+    );
+    await atomicAlias(
+      paths.current, temporary, state.receiptRaw, 0o400, validateUatPromotionCheckpointReceipt,
+      state.chain.current?.raw ?? null, "UAT_PROMOTION_CURRENT_PUBLICATION",
+    );
+    await options.fault?.("AFTER_MIGRATION_AUTHORIZATION_CURRENT");
+  }
+  state = await migrationAuthorizationCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.committed) reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_COMMIT_INCOMPLETE");
+  return Object.freeze({
+    result: "COMMITTED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.migration_authorization_intent_sha256, receipt_sha256: receipt.receipt_sha256,
+  });
+}
+
 function recoveryPlan(context, decision, reason) {
   const body = {
     schema_version: 3,
@@ -2128,7 +2647,7 @@ function validateRecoveryPlan(value) {
     "decision", "reason", "recovery_sha256",
   ], "UAT_PROMOTION_RECOVERY_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_RECOVERY_CONTRACT
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS"]).has(value.original_operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION"]).has(value.original_operation)
     || !new Set(["RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"]).has(value.decision)
     || (value.decision === "QUARANTINE") !== (typeof value.reason === "string")) reject("UAT_PROMOTION_RECOVERY_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_RECOVERY_INVALID");
@@ -2152,6 +2671,7 @@ function recoverableStateFailure(error) {
     "UAT_PROMOTION_RECOVERY_DATABASE_MISMATCH", "UAT_PROMOTION_CURRENT_SOURCE_INVALID",
     "UAT_PROMOTION_SNAPSHOT_", "UAT_PROMOTION_CURRENT_INVALID", "UAT_PROMOTION_HISTORY_INVALID",
     "UAT_PROMOTION_QUIESCE_",
+    "UAT_PROMOTION_MIGRATION_AUTHORIZATION_",
   ].some((prefix) => error.code.startsWith(prefix));
 }
 
@@ -2193,7 +2713,7 @@ async function prepareRecovery(context, options) {
           reason = "UAT_PROMOTION_SNAPSHOT_AUTHORIZATION_WINDOW_EXPIRED";
         }
       }
-    } else {
+    } else if (context.operation === "QUIESCE_WRITERS") {
       const storedIntent = await loadStoredQuiesceIntent(context, paths);
       const current = await trustedJsonFile(paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID");
       if (current?.value.checkpoint_id === "WRITER_QUIESCE_RECEIPT"
@@ -2214,6 +2734,30 @@ async function prepareRecovery(context, options) {
           && !state.history && !state.receipt) {
           decision = "QUARANTINE";
           reason = "UAT_PROMOTION_QUIESCE_AUTHORIZATION_WINDOW_EXPIRED";
+        }
+      }
+    } else {
+      const storedIntent = await loadStoredMigrationAuthorizationIntent(context, paths);
+      const current = await trustedJsonFile(
+        paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+      );
+      if (current?.value.checkpoint_id === "ONE_TIME_MIGRATION_AUTHORIZATION"
+        && current.value.previous_checkpoint_receipt_sha256 === storedIntent.previous_checkpoint_receipt_sha256
+        && current.value.checkpoint_authorization_sha256 === storedIntent.execution_authorization_sha256
+        && current.value.migration_authorization_binding_sha256 === storedIntent.migration_authorization_binding_sha256
+        && current.value.checkpoint_evidence_sha256 === storedIntent.migration_authorization_intent_sha256) {
+        await committedChain(paths);
+        decision = "ALREADY_COMMITTED";
+      } else {
+        const sources = await verifyMigrationAuthorizationSources(context, options.filesystemRoot);
+        const intent = await loadMigrationAuthorizationIntent(context, paths, sources);
+        const receipt = createMigrationAuthorizationCheckpointReceipt(context, intent, sources.previous);
+        const state = await migrationAuthorizationCandidateState(paths, intent, sources.previous, receipt);
+        if (state.committed) decision = "ALREADY_COMMITTED";
+        else if (Date.parse(context.execution_created_at) >= Date.parse(context.parameters.authorization_expires_at)
+          && !state.history && !state.receipt) {
+          decision = "QUARANTINE";
+          reason = "UAT_PROMOTION_MIGRATION_AUTHORIZATION_WINDOW_EXPIRED";
         }
       }
     }
@@ -2249,7 +2793,7 @@ function validateQuarantine(value) {
     "intent_sha256", "recovery_sha256", "reason", "preservation", "quarantine_sha256",
   ], "UAT_PROMOTION_QUARANTINE_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_QUARANTINE_CONTRACT || value.status !== "QUARANTINED"
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS"]).has(value.operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION"]).has(value.operation)
     || value.preservation !== "FILES_LEFT_IN_PLACE_NO_AUTOMATIC_DELETE" || typeof value.reason !== "string" || value.reason.length < 4) reject("UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.promotion_id, "UAT_PROMOTION_QUARANTINE_INVALID");
@@ -2283,26 +2827,47 @@ async function executeRecovery(context, options) {
         const intent = await loadSnapshotIntent(context, paths, sources);
         result = await commitSnapshot(context, intent, sources, paths, options);
       }
+    } else if (context.operation === "QUIESCE_WRITERS") {
+      if (plan.decision === "ALREADY_COMMITTED") {
+        const intent = await loadStoredQuiesceIntent(context, paths);
+        const chain = await committedChain(paths);
+        const current = chain.current?.value;
+        if (current?.checkpoint_id !== "WRITER_QUIESCE_RECEIPT"
+          || current.previous_checkpoint_receipt_sha256 !== intent.previous_checkpoint_receipt_sha256
+          || current.checkpoint_authorization_sha256 !== intent.execution_authorization_sha256
+          || current.promotion_snapshot_binding_sha256 !== intent.promotion_snapshot_binding_sha256
+          || current.writer_quiesce_binding_sha256 !== intent.writer_quiesce_binding_sha256
+          || current.checkpoint_evidence_sha256 !== intent.quiesce_intent_sha256) {
+          reject("UAT_PROMOTION_QUIESCE_COMMITTED_STATE_MISMATCH");
+        }
+        result = Object.freeze({
+          result: "ALREADY_COMMITTED", promotion_id: intent.promotion_id,
+          intent_sha256: intent.quiesce_intent_sha256, receipt_sha256: current.receipt_sha256,
+        });
+      } else {
+        const sources = await verifyQuiesceAuthorizedSources(context, options.filesystemRoot, options);
+        const intent = await loadQuiesceIntent(context, paths, sources);
+        result = await commitQuiesce(context, intent, sources, paths, options);
+      }
     } else if (plan.decision === "ALREADY_COMMITTED") {
-      const intent = await loadStoredQuiesceIntent(context, paths);
+      const intent = await loadStoredMigrationAuthorizationIntent(context, paths);
       const chain = await committedChain(paths);
       const current = chain.current?.value;
-      if (current?.checkpoint_id !== "WRITER_QUIESCE_RECEIPT"
+      if (current?.checkpoint_id !== "ONE_TIME_MIGRATION_AUTHORIZATION"
         || current.previous_checkpoint_receipt_sha256 !== intent.previous_checkpoint_receipt_sha256
         || current.checkpoint_authorization_sha256 !== intent.execution_authorization_sha256
-        || current.promotion_snapshot_binding_sha256 !== intent.promotion_snapshot_binding_sha256
-        || current.writer_quiesce_binding_sha256 !== intent.writer_quiesce_binding_sha256
-        || current.checkpoint_evidence_sha256 !== intent.quiesce_intent_sha256) {
-        reject("UAT_PROMOTION_QUIESCE_COMMITTED_STATE_MISMATCH");
+        || current.migration_authorization_binding_sha256 !== intent.migration_authorization_binding_sha256
+        || current.checkpoint_evidence_sha256 !== intent.migration_authorization_intent_sha256) {
+        reject("UAT_PROMOTION_MIGRATION_AUTHORIZATION_COMMITTED_STATE_MISMATCH");
       }
       result = Object.freeze({
         result: "ALREADY_COMMITTED", promotion_id: intent.promotion_id,
-        intent_sha256: intent.quiesce_intent_sha256, receipt_sha256: current.receipt_sha256,
+        intent_sha256: intent.migration_authorization_intent_sha256, receipt_sha256: current.receipt_sha256,
       });
     } else {
-      const sources = await verifyQuiesceAuthorizedSources(context, options.filesystemRoot, options);
-      const intent = await loadQuiesceIntent(context, paths, sources);
-      result = await commitQuiesce(context, intent, sources, paths, options);
+      const sources = await verifyMigrationAuthorizationSources(context, options.filesystemRoot);
+      const intent = await loadMigrationAuthorizationIntent(context, paths, sources);
+      result = await commitMigrationAuthorization(context, intent, sources, paths, options);
     }
     return Object.freeze({ ...result, recovery_sha256: plan.recovery_sha256 });
   }
@@ -2347,7 +2912,8 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
     if (context.execution_mode !== "ORIGINAL") reject("UAT_PROMOTION_PHASE_INVALID");
     if (context.operation === "BEGIN") return prepareOriginal(context, resolved);
     if (context.operation === "CAPTURE_SNAPSHOT") return prepareSnapshot(context, resolved);
-    return prepareQuiesce(context, resolved);
+    if (context.operation === "QUIESCE_WRITERS") return prepareQuiesce(context, resolved);
+    return prepareMigrationAuthorization(context, resolved);
   }
   const paths = await layout(filesystemRoot, false);
   if (phase === "execute") {
@@ -2362,9 +2928,14 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
       const intent = await loadSnapshotIntent(context, paths, sources);
       return commitSnapshot(context, intent, sources, paths, resolved);
     }
-    const sources = await verifyQuiesceAuthorizedSources(context, filesystemRoot, resolved);
-    const intent = await loadQuiesceIntent(context, paths, sources);
-    return commitQuiesce(context, intent, sources, paths, resolved);
+    if (context.operation === "QUIESCE_WRITERS") {
+      const sources = await verifyQuiesceAuthorizedSources(context, filesystemRoot, resolved);
+      const intent = await loadQuiesceIntent(context, paths, sources);
+      return commitQuiesce(context, intent, sources, paths, resolved);
+    }
+    const sources = await verifyMigrationAuthorizationSources(context, filesystemRoot);
+    const intent = await loadMigrationAuthorizationIntent(context, paths, sources);
+    return commitMigrationAuthorization(context, intent, sources, paths, resolved);
   }
   if (phase === "recover-prepare") {
     if (context.execution_mode !== "RECOVERY") reject("UAT_PROMOTION_PHASE_INVALID");

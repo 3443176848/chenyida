@@ -19,6 +19,7 @@ import { readinessPolicySha256 } from "../scripts/postgresql-cluster-recovery-po
 import { activateClusterRecoveryPolicyV2 } from "../scripts/postgresql-cluster-recovery-policy-v2.mjs";
 import {
   UAT_PROMOTION_CURRENT_FILE,
+  UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT,
   UAT_PROMOTION_POLICY_FILE_SHA256,
   UAT_PROMOTION_POLICY_SHA256,
   UAT_PROMOTION_QUIESCE_INTENT_CONTRACT,
@@ -629,6 +630,88 @@ function quiesceRecoveryContext(original, intentSha256, suffix = "recovery") {
   };
 }
 
+async function migrationAuthorizationFixture({ promotionId = "promotion-migration-authorization-001", operationId = null } = {}) {
+  const base = await quiesceFixture({ promotionId });
+  await run(base.context, "prepare", base.root, base.quiesceValidators);
+  await run(base.context, "execute", base.root, base.quiesceValidators);
+  const current = validateUatPromotionCheckpointReceipt(
+    JSON.parse(await readFile(physical(base.root, UAT_PROMOTION_CURRENT_FILE), "utf8")),
+  );
+  const quiesceIntentFile = await intentPath(base.root, base.context.operation_id);
+  const quiesceIntent = JSON.parse(await readFile(quiesceIntentFile, "utf8"));
+  const identity = JSON.parse(await readFile(physical(base.root, identityPath), "utf8"));
+  const authorizationOperationId = operationId ?? `${promotionId}-migration-authorization`;
+  const parameters = {
+    promotion_state_root: UAT_PROMOTION_STATE_ROOT,
+    promotion_id: promotionId,
+    promotion_generation: current.promotion_generation,
+    previous_checkpoint_receipt_sha256: current.receipt_sha256,
+    promotion_intent_sha256: current.intent_sha256,
+    promotion_original_authorization_sha256: current.original_authorization_sha256,
+    quiesce_operation_id: base.context.operation_id,
+    quiesce_intent_sha256: quiesceIntent.quiesce_intent_sha256,
+    quiesce_intent_source: await source(
+      base.root, `${UAT_PROMOTION_STATE_ROOT}/intents/${path.basename(quiesceIntentFile)}`,
+    ),
+    candidate_binding_sha256: current.candidate_binding_sha256,
+    database_binding_sha256: current.database_binding_sha256,
+    runtime_binding_sha256: current.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: current.recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: current.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: current.writer_quiesce_binding_sha256,
+    current_checkpoint_source: await source(base.root, UAT_PROMOTION_CURRENT_FILE),
+    runtime_identity_source: await source(base.root, identityPath),
+    release_manifest: manifestPath,
+    release_manifest_sha256: (await source(base.root, manifestPath)).sha256,
+    release_manifest_source: await source(base.root, manifestPath),
+    deployment_class: "UAT",
+    deployment_id: "chenyida-erp",
+    database_name: "chenyida_erp",
+    database_oid: databaseOid,
+    database_system_identifier: databaseSystemIdentifier,
+    database_marker: databaseMarker,
+    expected_current_migration_head: identity.migration_head,
+    target_migration_head: migrations().at(-1).filename,
+    migration_manifest_sha256: migrationAllowlistDigest(migrations()),
+    migration_role: "chenyida_erp_owner",
+    authorization_created_at: "2026-08-15T01:37:00.000Z",
+    authorization_expires_at: "2026-08-15T01:43:00.000Z",
+    requester_identity_sha256: digest("migration-authorization-requester"),
+    approver_identity_sha256: digest("migration-authorization-approver"),
+    executor_identity_sha256: digest("migration-authorization-executor"),
+    policy_file_sha256: UAT_PROMOTION_POLICY_FILE_SHA256,
+    policy_sha256: UAT_PROMOTION_POLICY_SHA256,
+  };
+  const authorization = digest(`authorization-${authorizationOperationId}`);
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: authorizationOperationId,
+    operation: "MIGRATION_AUTHORIZATION",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: authorizationOperationId,
+    execution_authorization_sha256: authorization,
+    execution_created_at: parameters.authorization_created_at,
+    original_authorization_sha256: authorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  return { ...base, context, quiesceIntent };
+}
+
+function migrationAuthorizationRecoveryContext(original, intentSha256, suffix = "recovery") {
+  const executionId = `${original.operation_id}-${suffix}`;
+  return {
+    ...original,
+    execution_mode: "RECOVERY",
+    execution_authorization_id: executionId,
+    execution_authorization_sha256: digest(`authorization-${executionId}`),
+    execution_created_at: "2026-08-15T01:40:00.000Z",
+    expected_intent_sha256: intentSha256,
+  };
+}
+
 async function run(context, phase, root, options = {}) {
   return runUatPromotionTransactionPhase(context, phase, { filesystemRoot: root, siteRoot, allowTestRoot: true, ...options });
 }
@@ -687,6 +770,7 @@ test("checkpoint contract rejects skip, cross-binding, authorization reuse and U
     recovery_binding_sha256: previous.recovery_binding_sha256,
     promotion_snapshot_binding_sha256: digest("promotion-snapshot"),
     writer_quiesce_binding_sha256: ZERO_SHA256,
+    migration_authorization_binding_sha256: ZERO_SHA256,
   };
   const next = createNextUatPromotionCheckpointReceipt(previous, base);
   assert.equal(next.previous_checkpoint_receipt_sha256, previous.receipt_sha256);
@@ -712,6 +796,7 @@ test("checkpoint contract rejects skip, cross-binding, authorization reuse and U
     recorded_at: "2026-08-15T01:12:00.000Z",
     checkpoint_authorization_sha256: digest("snapshot-authorization"),
     writer_quiesce_binding_sha256: quiesce.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: digest("migration-authorization"),
   }), (error) => error.code === "UAT_PROMOTION_CHECKPOINT_AUTHORIZATION_REUSED");
 });
 
@@ -971,6 +1056,114 @@ test("linked QUIESCE intents are never followed and are quarantined", async (t) 
     const recovery = quiesceRecoveryContext(fixtureValue.context, prepared.intent_sha256, `recovery-${kind}`);
     assert.equal((await run(recovery, "recover-prepare", fixtureValue.root, fixtureValue.quiesceValidators)).decision, "QUARANTINE");
     assert.equal((await run(recovery, "recover-execute", fixtureValue.root, fixtureValue.quiesceValidators)).result, "QUARANTINED");
+  }
+});
+
+test("migration approval publishes checkpoint 7 without a SQL or database-fence execution grant", async (t) => {
+  const { root, context } = await migrationAuthorizationFixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const prepared = await run(context, "prepare", root);
+  assert.equal(prepared.result, "PREPARED");
+  assert.equal((await run(context, "prepare", root)).result, "ALREADY_PREPARED");
+  const storedIntent = JSON.parse(await readFile(await intentPath(root, context.operation_id), "utf8"));
+  assert.equal(storedIntent.contract, UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT);
+  assert.equal(storedIntent.execution_scope, "APPROVAL_ONLY_NO_SQL_NO_DATABASE_FENCE");
+  assert.equal(storedIntent.migration_authorization_intent_sha256, prepared.intent_sha256);
+  assert.equal(storedIntent.previous_checkpoint_receipt_sha256, context.parameters.previous_checkpoint_receipt_sha256);
+  assert.notEqual(storedIntent.migration_authorization_binding_sha256, ZERO_SHA256);
+  const committed = await run(context, "execute", root);
+  assert.equal(committed.result, "COMMITTED");
+  const current = validateUatPromotionCheckpointReceipt(
+    JSON.parse(await readFile(physical(root, UAT_PROMOTION_CURRENT_FILE), "utf8")),
+  );
+  assert.equal(current.checkpoint_id, "ONE_TIME_MIGRATION_AUTHORIZATION");
+  assert.equal(current.checkpoint_ordinal, 7);
+  assert.equal(current.checkpoint_evidence_sha256, prepared.intent_sha256);
+  assert.equal(
+    current.migration_authorization_binding_sha256,
+    storedIntent.migration_authorization_binding_sha256,
+  );
+  assert.equal(current.checkpoint_authorization_sha256, context.execution_authorization_sha256);
+  await assert.rejects(
+    run(context, "execute", root),
+    (error) => error.code === "UAT_PROMOTION_MIGRATION_AUTHORIZATION_CURRENT_SOURCE_INVALID",
+  );
+});
+
+test("migration approval rejects binding drift and preserves replaced sources for quarantine", async (t) => {
+  const crossed = await migrationAuthorizationFixture({ promotionId: "promotion-migration-authorization-crossed" });
+  t.after(() => rm(crossed.root, { recursive: true, force: true }));
+  const changed = structuredClone(crossed.context);
+  changed.parameters.target_migration_head = "0045_wrong_target.sql";
+  await assert.rejects(
+    run(changed, "prepare", crossed.root),
+    (error) => error.code === "UAT_PROMOTION_MIGRATION_AUTHORIZATION_PROMOTION_MISMATCH",
+  );
+
+  const replaced = await migrationAuthorizationFixture({ promotionId: "promotion-migration-authorization-replaced" });
+  t.after(() => rm(replaced.root, { recursive: true, force: true }));
+  const prepared = await run(replaced.context, "prepare", replaced.root);
+  const manifestFile = physical(replaced.root, manifestPath);
+  const original = await readFile(manifestFile);
+  await chmod(manifestFile, 0o600);
+  await writeFile(manifestFile, Buffer.concat([original, Buffer.from(" ")]));
+  await chmod(manifestFile, 0o440);
+  await assert.rejects(run(replaced.context, "execute", replaced.root));
+  const recovery = migrationAuthorizationRecoveryContext(replaced.context, prepared.intent_sha256, "source-replaced");
+  assert.equal((await run(recovery, "recover-prepare", replaced.root)).decision, "QUARANTINE");
+  assert.equal((await run(recovery, "recover-execute", replaced.root)).result, "QUARANTINED");
+  assert.deepEqual(await readFile(manifestFile), Buffer.concat([original, Buffer.from(" ")]));
+});
+
+test("migration approval publication crashes converge only through fresh recovery authorization", async (t) => {
+  const failpoints = [
+    "AFTER_MIGRATION_AUTHORIZATION_HISTORY",
+    "AFTER_MIGRATION_AUTHORIZATION_RECEIPT",
+    "AFTER_MIGRATION_AUTHORIZATION_CURRENT",
+  ];
+  for (const [index, failpoint] of failpoints.entries()) {
+    const fixtureValue = await migrationAuthorizationFixture({
+      promotionId: `promotion-migration-authorization-crash-${index}`,
+    });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+    await assert.rejects(
+      run(fixtureValue.context, "execute", fixtureValue.root, {
+        fault: async (point) => { if (point === failpoint) throw new Error(`CRASH:${point}`); },
+      }),
+      new RegExp(`CRASH:${failpoint}`),
+    );
+    const recovery = migrationAuthorizationRecoveryContext(
+      fixtureValue.context, prepared.intent_sha256, `recovery-${index}`,
+    );
+    const planned = await run(recovery, "recover-prepare", fixtureValue.root);
+    assert.ok(["RESUME_PUBLICATION", "ALREADY_COMMITTED"].includes(planned.decision));
+    const result = await run(recovery, "recover-execute", fixtureValue.root);
+    assert.ok(["COMMITTED", "ALREADY_COMMITTED"].includes(result.result));
+    assert.equal(
+      JSON.parse(await readFile(physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8")).receipt_sha256,
+      result.receipt_sha256,
+    );
+  }
+});
+
+test("linked migration approval intents are never followed and are quarantined", async (t) => {
+  for (const kind of ["hardlink", "symlink"]) {
+    const fixtureValue = await migrationAuthorizationFixture({
+      promotionId: `promotion-migration-authorization-${kind}`,
+    });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+    const intent = await intentPath(fixtureValue.root, fixtureValue.context.operation_id);
+    const preserved = path.join(fixtureValue.root, `${kind}-migration-authorization-intent.json`);
+    await rename(intent, preserved);
+    if (kind === "hardlink") await link(preserved, intent);
+    else await symlink(preserved, intent);
+    const recovery = migrationAuthorizationRecoveryContext(
+      fixtureValue.context, prepared.intent_sha256, `recovery-${kind}`,
+    );
+    assert.equal((await run(recovery, "recover-prepare", fixtureValue.root)).decision, "QUARANTINE");
+    assert.equal((await run(recovery, "recover-execute", fixtureValue.root)).result, "QUARANTINED");
   }
 });
 
