@@ -359,6 +359,8 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
         files = generator.parse_bundle_files(launcher_raw)
         self.assertEqual(len(files), generator.MAX_BUNDLE_FILES)
         self.assertIn("chenyida_erp_site/scripts/release-migration-authorization.ts", files)
+        self.assertIn("chenyida_erp_site/scripts/uat-promotion-compose-deployment-contract.mjs", files)
+        self.assertIn("chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs", files)
         self.assertIn("chenyida_erp_site/tests/test_release_supervisor_installer.py", files)
         self.assertEqual(files["chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh"], "0555")
         blobs = {relative: f"blob:{relative}\n".encode() for relative in files}
