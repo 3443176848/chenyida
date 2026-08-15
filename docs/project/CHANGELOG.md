@@ -4,6 +4,18 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-PROMOTION-TRANSACTION-JOURNAL-69 - `feat: add UAT promotion transaction journal` / `release: bind monitoring bundle to promotion journal` / `release: bind supervisor bundle to promotion journal` / `docs: close promotion journal and start bound snapshot`
+
+- 调度/范围：从TASK68最终Supervisor提交`1c70602`/tree`46ec0e9a`启动唯一active task；只实现仓库事务控制与fake-root恢复，不连接数据库、读取备份/Volume或修改UAT/生产。
+- 事务合同：新增版本化policy与1,120行journal，固定15检查点、候选/manifest/镜像/Migration/runtime/数据库/恢复证据/三方actor；intent先于授权消费持久化，generation/history/receipt为内容寻址无覆盖对象，current为核验前代后的原子指针，文件与目录逐级fsync。
+- Supervisor/恢复：新增authorization v6及`BEGIN_UAT_PROMOTION`/`RECOVER_UAT_PROMOTION`，窗口最多60分钟且requester/approver/executor互异；恢复新授权精确绑定原已消费授权和原intent，可证明partial收敛，替换/断链/hardlink/symlink/过期只写recovery/quarantine并保留现场。
+- 失败关闭：checkpoint严格单调并绑定同一intent/candidate/database/runtime/recovery/snapshot和完整唯一授权摘要链；跳步、隔步授权复用、UNKNOWN/PARTIAL继续、跨代或摘要漂移拒绝。其余snapshot/quiesce/Migration/Compose/postdeploy/UAT/rollback adapter保持NOT_IMPLEMENTED。
+- 审计/发布链：审计由5项SUPPORTED/10项阻断收敛为6项SUPPORTED/9项阻断（P0=8、P1=1），artifact/source-manifest为`353abf12…5a67`/`68fd118d…1f91`且`assert-ready`继续拒绝。source`175873a`/tree`c7bfcfb2`→monitor`c2d9944`/tree`e50b7a50`→Supervisor`a3fbbfd`/tree`5e275be8`形成30/128文件链，manifest为`292d8aea…65b8`/`ff086ff7…a412`。
+- 验证：事务7/7、审计8/8、release合同57/57、Supervisor108/108、inventory257/233/24、credentials 1,740文件、JSON/AST及diff门通过；未跳过或降低断言。
+- 资源/边界：收口available约1.9GiB、Swap867MiB/1GiB、根盘13GiB、Load`0.69/0.37/0.22`；四服务restart0/OOM false，Web/PostgreSQL healthy，临时容器及扫描清单清零。未运行build、backup、Compose/PostgreSQL、Migration、镜像、快照、恢复、部署、回滚或业务写。
+- 数据库/API：无Schema、Migration或业务API行为变化；只新增root Supervisor仓库控制面。真实A1/A6、备份恢复、账号、UAT/生产和数据动作均未授权。
+- 治理：新增D-145，TASK69转`DONE`；自动启动`SELFHOST-UAT-PROMOTION-BOUND-SNAPSHOT-71`为唯一`DOING`，TASK70继续等待资源与执行器依赖。
+
 ### SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68 - `test: audit UAT promotion rollback checkpoints` / `release: bind monitoring bundle to UAT audit source` / `release: bind supervisor bundle to UAT audit source` / `test: update UAT audit runtime policy anchor` / `release: rebind monitoring bundle after audit anchor fix` / `release: rebind supervisor bundle after audit anchor fix` / `docs: close promotion audit and start transaction journal`
 
 - 调度/范围：从TASK67最终Supervisor提交`186e117c`/tree`c36d57a9`启动唯一active task；只读审计candidate、预部署、快照/备份、Migration、Compose部署、postdeploy、业务UAT和回退后复核，不连接数据库或修改UAT/生产。

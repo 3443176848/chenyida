@@ -2802,6 +2802,41 @@
 - 拒绝把TEST-only恢复器扩权解释为UAT回退已实现，也拒绝在缺少已验快照时声称“可回滚”。
 - 拒绝把静态审计、fake-root或合成测试标记为真实晋升/回滚PASS，或因资源停止线而跳过动态验证。
 
+## D-145 UAT晋升事务采用三方一次性授权、内容寻址回执链与保全式恢复
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / BEGIN+RECOVER VERIFIED / REAL ADAPTERS AND UAT NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK69对TASK68机器缺口、既有Supervisor一次性授权、内容寻址激活事务与崩溃恢复模式的实施及事务7/7、审计8/8、Supervisor108/108验证
+- 确认边界：只接受仓库内promotion intent/journal、BEGIN/RECOVER和fake-root证据；不授权真实快照、writer停止、数据库、Migration、Compose、UAT、回滚、host安装或数据访问
+
+### Context
+
+- TASK68证明候选、ELIGIBLE manifest、预部署稳定性、postdeploy配置和identity虽各自存在，但没有一条把同一候选、数据库、恢复证据、授权和15个检查点串联起来的耐久事务；root手工顺序无法证明崩溃边界或阻止跨代复用。
+- 既有Supervisor v2—v5已经形成短时一次性授权及“先持久化intent、再消费授权、再发布回执”的成熟模式，但晋升操作仍为0/7，任何直接加入真实backup/Migration/Compose都会放大partial与不可恢复风险。
+- 仅保存当前状态或最终health会覆盖前代证据；仅比较当前与上一步授权又无法阻止隔步复用。恢复时删除不一致文件则会破坏事故调查和后续人工处置证据。
+
+### Decision
+
+1. 固定`chenyida-erp-uat-promotion-transaction-policy/v1`和15检查点顺序；intent必须绑定候选commit/tree/version、prepared candidate receipt、ELIGIBLE manifest、Web/Worker完整引用、Migration head/allowlist、当前runtime identity、精确UAT数据库、升级前actual-offhost恢复证据、授权窗口与三方actor。
+2. `BEGIN_UAT_PROMOTION`和`RECOVER_UAT_PROMOTION`使用Supervisor authorization v6，最长60分钟且requester/approver/executor三方摘要互异。BEGIN必须先持久化完整intent，再消费授权，再依次发布generation/history/receipt/current。
+3. generation、history、receipt、intent、recovery和quarantine采用root-only、canonical JSON、no-follow、单硬链接、内容寻址无覆盖对象并执行file/directory fsync；`current`仅为核验前代后原子替换的派生指针，不能代替不可变历史。
+4. 每个checkpoint必须严格单调、绑定上一回执及同一intent/candidate/database/runtime/recovery/snapshot，并保存完整且唯一的授权摘要链。跳步、跨代、隔步授权复用、UNKNOWN/PARTIAL继续或终态猜测全部失败关闭。
+5. 恢复必须使用新授权精确绑定原已消费授权和原intent；可证明的发布partial才允许收敛。源码替换、断链、hardlink/symlink、冲突或过期状态只写recovery/quarantine证据并保留原文件，不递归删除或自动宣称成功。
+6. TASK69只关闭`PROMOTION_INTENT_AND_DURABLE_JOURNAL`。snapshot/quiesce/Migration/Compose/postdeploy/UAT/rollback adapter仍逐项为`NOT_IMPLEMENTED`，机器`assert-ready`在任一阻断存在时必须继续返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+
+### Consequences
+
+- 机器审计由5项SUPPORTED/10项阻断收敛为6项SUPPORTED/9项阻断（P0=8、P1=1）；artifact/source-manifest SHA-256为`353abf12…5a67`/`68fd118d…1f91`，没有把仓库事务能力误报为真实UAT就绪。
+- 最终source`175873ad58fe26af444e54d636722deb2009af3e`→monitor`c2d994464e208602137fc4e89d7934290a7984e7`→Supervisor`a3fbbfd01987388be919fdaa0ca506d170e93197`形成30/128文件canonical链；manifest raw SHA-256为`292d8aea…65b8`/`ff086ff7…a412`。
+- 事务专项7/7、审计8/8、release合同57/57、Supervisor108/108、inventory257/233/24和credentials 1,740文件通过。未执行backup、restore、writer停止、Migration、Compose、镜像、部署、UAT或业务写。
+- 下一P0为TASK71 promotion-bound recoverable snapshot adapter；TASK70继续等待执行器完整和Swap停止线解除。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝用shell手册、环境变量确认、旧恢复readiness、最终health、可变状态文件或人工备注代替一次性授权与不可变逐检查点回执。
+- 拒绝只比较原始/上一步授权而允许隔步复用，拒绝覆盖history/current、删除不一致对象、在过期窗口继续猜测partial结果或自动清空quarantine。
+- 拒绝把fake-root、静态审计或BEGIN成功描述为promotion snapshot、Migration、部署、回滚、人工UAT或A6已通过。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

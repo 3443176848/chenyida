@@ -2,17 +2,31 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-TRANSACTION-JOURNAL-69（执行中；先建立内容寻址事务基座）
+## SELFHOST-UAT-PROMOTION-BOUND-SNAPSHOT-71（执行中；接入晋升绑定可恢复快照）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY TRANSACTION CONTROL FIRST / RESOURCE STOP LINE ACTIVE / NO UAT OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；建立promotion intent/history/receipt/current、一次性BEGIN/RECOVER、单调检查点与unknown/partial保全 |
-| 严格起点 | PASS / CONTROLLED | `1c70602282902c79066452d14fd836f868e94efb`/tree`46ec0e9a827b11d6d5d346b87f2eafab9f53ea96`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / MACHINE AUDIT READY | TASK68/D-144固定15检查点、5项SUPPORTED和10项阻断；TASK69只关闭最先决的durable journal，不执行真实适配器 |
+| 当前状态 | DOING / REPOSITORY SNAPSHOT ADAPTER FIRST / RESOURCE STOP LINE ACTIVE / NO BACKUP OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；核对backup/writer真实依赖并接入promotion checkpoint 5 snapshot adapter、回执和保全式恢复 |
+| 严格起点 | PASS / CONTROLLED | `a3fbbfd01987388be919fdaa0ca506d170e93197`/tree`5e275be8854f6752a776ceeb3c80d39797c7b196`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / DURABLE JOURNAL READY | TASK69/D-145固定三方v6 BEGIN/RECOVER、内容寻址回执链和9项剩余阻断；TASK71只关闭promotion-bound snapshot，不执行真实备份 |
 | 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap865MiB/1GiB（超过80%）、根盘13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不启动Compose/PostgreSQL，不连接数据库或执行UAT写/回滚；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap867MiB/1GiB（超过80%）、根盘13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不启动backup/Compose/PostgreSQL，不连接数据库或执行UAT写/回滚；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
 | 系统是否可用 | NO | 无完整晋升执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+
+## SELFHOST-UAT-PROMOTION-TRANSACTION-JOURNAL-69（完成；内容寻址事务与恢复基座通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / DURABLE TRANSACTION JOURNAL VERIFIED / BEGIN+RECOVER FAIL-CLOSED / REAL ADAPTERS NOT EXECUTED / PRODUCTION NO-GO | TASK69已释放active slot；TASK71接入snapshot，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`175873a`/tree`c7bfcfb2`→monitor`c2d9944`/tree`e50b7a50`→Supervisor`a3fbbfd`/tree`5e275be8`；30/128文件manifest为`292d8aea…65b8`/`ff086ff7…a412`且重放一致 |
+| 事务合同 | PASS / FAIL CLOSED | 固定15检查点intent、三方v6最长60分钟授权、intent先于消费、generation/history/receipt/current、完整授权摘要链、单调推进与unknown/partial阻断 |
+| 恢复 | PASS / PRESERVATION FIRST | 新授权绑定原已消费授权和原intent；可证明partial收敛，冲突/替换/hardlink/symlink/过期只写recovery/quarantine并保留现场 |
+| 审计 | PASS / EXECUTOR STILL BLOCKED | artifact/source-manifest SHA-256为`353abf12…5a67`/`68fd118d…1f91`；6项SUPPORTED、9项阻断（P0=8、P1=1），`assert-ready`继续精确拒绝 |
+| 自动验证 | PASS / SCOPED APPLICABLE | 事务7/7、审计8/8、release合同57/57、Supervisor108/108、inventory257/233/24、credentials1740及diff门通过 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | available约1.9GiB、Swap867MiB/1GiB、根盘13GiB、Load`0.69/0.37/0.22`；四服务restart0/OOM false，临时容器及扫描清单清零 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未运行build、backup、Compose/PostgreSQL、Migration、镜像、快照、恢复、部署、回滚或业务写 |
+| 系统是否可用 | NO | BEGIN/RECOVER只关闭首个事务阻断；仍缺9项adapter、真实恢复、正式门、业务批准、人工UAT和切换 |
 
 ## SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68（完成；机器审计通过，执行器仍失败关闭）
 
