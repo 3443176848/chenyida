@@ -2,17 +2,32 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-FINAL-RECEIPT-78（执行中；发布checkpoint 13单调终态回执）
+## SELFHOST-UAT-PROMOTION-ROLLBACK-EXECUTOR-79（执行中；实现checkpoint 14/15精确前代回退）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / PROMOTION FINAL RECEIPT ADAPTER / ACTUAL UAT EVIDENCE ABSENT / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；以独立finalization授权、完整checkpoint 1—12链和单调binding聚合实现checkpoint 13 COMMITTED终态 |
-| 严格代码起点 | PASS / CONTROLLED | `2798862ebdd7df85748a0a69d6b3ddeea765d808`/tree`2c74e6b0e110d28e345588c79060d8ff29ab9c1e`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / CHECKPOINT 12 REPOSITORY ADAPTER READY WITHOUT ACTUAL HUMAN UAT | TASK77/D-152已固定双摘要签字合同、独立摄取授权、全局联锁及checkpoint 12；真实员工账号、范围、窗口、签字和执行仍未授权/提供 |
+| 当前状态 | DOING / ROLLBACK CHECKPOINT 14/15 EXECUTOR / ACTUAL ROLLBACK NOT AUTHORIZED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；实现精确前代四域/镜像/运行配置回退、分阶段结果、回退后严格核验和ROLLED_BACK终态 |
+| 严格代码起点 | PASS / CONTROLLED | `1baa01a829e9475f21ed01493d4bbbde2a318955`/tree`e3e6b435703fcdc16466444b6cbb91fe1c840698`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / CHECKPOINT 13 REPOSITORY ADAPTER READY WITHOUT ACTUAL HUMAN UAT | TASK78/D-153已固定完整链聚合、独立finalization授权、双重联锁及checkpoint 13；真实员工UAT和实际晋升均未授权/执行 |
 | 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap887MiB/1GiB（超过80%）、根盘约13GiB；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不创建账号、不执行员工业务写，不运行UAT/finalization实际动作、Compose、pull/build/recreate/start/stop，不连接数据库或读取env/log/Volume；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
-| 系统是否可用 | NO | 无完整晋升/rollback执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+| 资源 | STOP LINE ACTIVE | available约1.8GiB、Swap858MiB/1GiB（超过80%）、根盘约13GiB；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不运行restore/rollback/Compose、pull/build/recreate/start/stop，不连接数据库或读取env/log/Volume/备份；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 系统是否可用 | NO | rollback 14/15、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
+
+## SELFHOST-UAT-PROMOTION-FINAL-RECEIPT-78（完成；checkpoint 13单调终态回执通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY PROMOTION CHECKPOINT 13 FINAL RECEIPT VERIFIED / ACTUAL HUMAN UAT NOT PERFORMED / ROLLBACK 14/15 OPEN / PRODUCTION NO-GO | TASK78已释放active slot；TASK79接入rollback 14/15，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`c39caad`/tree`f4deb34e`→Supervisor`1baa01a`/tree`e3e6b435`；138文件manifest raw SHA-256为`7dd7a83c…591c3`且重放一致 |
+| 聚合/授权 | PASS / STRICT PREFIX | 独立finalization授权和消费前intent绑定ordinal 4—12九份receipt/evidence/intent、既有authorization严格前缀、全部前代binding和checkpoint 12最终result |
+| 事务/联锁 | PASS / FAIL CLOSED | history→receipt→current无覆盖发布ordinal 13 COMMITTED；全局pending-intent与installer bundle-switch双重联锁阻断未完成事务 |
+| 恢复 | PASS / PRESERVATION FIRST | 三个failpoint可由新恢复授权续写；只排除精确计算的本操作staged文件，source替换、授权复用、跨promotion或未知partial保全/quarantine |
+| 审计 | PASS / EXECUTOR STILL BLOCKED | 13项SUPPORTED、2项P0阻断；rollback 14/15仍开放，人工readiness为`HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED`，`assert-ready`继续拒绝 |
+| 自动验证 | PASS / SCOPED APPLICABLE | Node111/111、Python65/65、manifest重放、inventory259/235/24及generator/syntax/JSON/diff/敏感门通过；首次47/48恢复缺口修复后完整48/48通过 |
+| 资源/清理 | STOP LINE ACTIVE / CONTAINER OOM NONE | 收口available约1.8GiB、Swap858/1024MiB、根盘约13GiB、Load`0.74/0.51/0.31`；四服务restart0/OOM false，宿主`oom_kill=2`无增量，临时Node目录已清理 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未运行build、backup、Compose/PostgreSQL、Migration、镜像、部署、真实员工UAT、回滚或业务写；四个受保护Volume未触碰 |
+| 系统是否可用 | NO | 仓库checkpoint 13和合成fixture不等于actual人工UAT或晋升；仍缺rollback、真实恢复、正式门、业务批准、试运行和切换 |
 
 ## SELFHOST-UAT-CROSS-ROLE-TRANSACTION-77（完成；checkpoint 12双摘要证据与保全恢复通过）
 

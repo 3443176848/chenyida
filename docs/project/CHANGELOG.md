@@ -4,6 +4,18 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-PROMOTION-FINAL-RECEIPT-78 - `feat: add UAT promotion final receipt` / `build: bind UAT final receipt supervisor bundle` / `docs: close final receipt and start rollback executor`
+
+- 调度/范围：从TASK77最终Supervisor提交`2798862`/tree`2c74e6b0`启动唯一active task；只在仓库、fake-root和轻量Node/Python中实现checkpoint 13，不创建账号、不访问真实UAT/数据库、不把合成checkpoint 12冒充员工验收。
+- 边界决策：D-153固定checkpoint 13只接受同generation ordinal 4—12完整receipt/evidence/intent/authorization严格前缀及全部单调binding；checkpoint 12必须绑定含签字最终result，finalization使用独立15分钟一次性授权。
+- Supervisor/事务：新增`FINALIZE_UAT_PROMOTION`、精确root-owned current/cross-role source验证、消费前final intent、全局pending联锁和installer bundle-switch联锁。history→receipt→current无覆盖发布ordinal 13 `PROMOTION_FINAL_RECEIPT / COMMITTED`。
+- 恢复：三个failpoint均只用新恢复授权续写；恢复只排除由intent精确计算的本操作目标history/receipt，source替换、授权复用、跨promotion、链/binding漂移和其他unknown partial均保全/quarantine，不重跑UAT/Migration/Compose/postdeploy。
+- 审计/发布链：机器审计收敛为13项SUPPORTED、2项P0阻断，人工readiness继续`HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED`。source`c39caad`/tree`f4deb34e`→Supervisor`1baa01a`/tree`e3e6b435`形成138文件链，manifest raw SHA-256为`7dd7a83c…591c3`。
+- 验证：Node组合111/111、Python Supervisor65/65、manifest逐字节重放、inventory259/235/24及generator/syntax/JSON/diff/敏感门通过。首次完整journal 47/48暴露staged回执恢复缺口，精确修复后定向1/1及完整48/48通过，未降低断言。
+- 资源/边界：Swap持续高于80%，未运行typecheck、全量测试、Docker build、Compose/PostgreSQL、backup/restore、Migration、镜像、部署、真实UAT、回滚或业务写。收口available约1.8GiB、Swap858/1024MiB、根盘约13GiB、Load`0.74/0.51/0.31`；四服务restart0/OOM false，宿主`oom_kill=2`无增量，临时Node目录已清理。
+- 数据库/API：无Schema、Migration或普通业务API变化；只扩展root Supervisor、promotion journal、安装联锁和机器审计。真实A4/A6/A7、账号、员工UAT、数据库和生产动作均未授权。
+- 治理：新增D-153，TASK78转`DONE`；自动启动`SELFHOST-UAT-PROMOTION-ROLLBACK-EXECUTOR-79`为唯一`DOING`，关闭checkpoint 14/15，TASK70继续等待资源与完整执行器依赖。
+
 ### SELFHOST-UAT-CROSS-ROLE-TRANSACTION-77 - `feat: add cross-role UAT promotion checkpoint` / `build: refresh release supervisor bundle manifest` / `docs: close cross-role checkpoint and start final receipt`
 
 - 调度/范围：从TASK76最终Supervisor提交`694f485`/tree`45007b67`启动唯一active task；只在仓库、fake-root和轻量Node/Python中实现checkpoint 12，不创建账号、不访问真实UAT/数据库、不执行业务写或伪造员工签字。

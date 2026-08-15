@@ -3081,6 +3081,41 @@
 - 拒绝把TASK67静态模板、合成fixture、Supervisor操作者声明或checkpoint 12仓库回执描述为真实员工已执行。
 - 拒绝在内部result已持久化后因外部staging清理而重跑业务动作；也拒绝在内部副本不存在或不匹配时绕过外部source复验。
 
+## D-153 checkpoint 13只从完整单调前代链聚合并以独立授权提交终态
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY PROMOTION CHECKPOINT 13 FINAL RECEIPT VERIFIED / ACTUAL HUMAN UAT NOT PERFORMED / ROLLBACK 14/15 OPEN / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK78对checkpoint 1—12前置、ordinal 4—12事务回执、授权链、Migration/deployment/postdeploy/cross-role结果、Supervisor全局联锁和bundle切换的源码核对，以及Node/Python轻量专项与独立只读攻击复核
+- 确认边界：只接受仓库/fake-root内容寻址finalization、不可变intent/history/receipt/current及合成证据；不授权或声称真实员工UAT、数据库、Compose、部署、回滚、备份恢复或生产动作已发生
+
+### Context
+
+- checkpoint 12仍为`IN_PROGRESS`，且其evidence存在预签名`evidence_subject_sha256`与含全部签字的最终`result_sha256`两种摘要。最终回执若只看current或任意非零摘要，可能跳过历史回执、拼接跨promotion证据或把未签名主题误当人工验收结果。
+- finalization落盘后、current切换前允许出现本操作唯一可计算的history/receipt staged文件；恢复必须只忽略这一个精确目标，不能放宽目录校验或把其他未知文件视为合法partial。
+- Supervisor bundle切换如果只检查运行入口而不检查pending finalization intent，可能让已消费授权但未提交的终态事务失去精确恢复代码。
+
+### Decision
+
+1. checkpoint 13使用独立`FINALIZE_UAT_PROMOTION`一次性授权，最长15分钟且请求人、批准人、执行人不同。finalization intent必须先于授权消费内容寻址落盘，授权不得复用promotion开始、checkpoint 4—12或人工UAT执行授权。
+2. journal必须从同generation的canonical generation/history/receipt/intent/result逐份重建ordinal 4—12链。检查点严格连续、前代COMMITTED、时间单调、promotion expiry稳定、authorization chain严格追加；candidate/database/runtime/snapshot/writer/Migration/deployment binding必须连续且非零。
+3. checkpoint 12 evidence必须等于内部cross-role最终`result_sha256`，并与其intent、人工执行授权、预签名主题及批准主题一致；不得用`evidence_subject_sha256`、静态模板状态或任意重签外壳代替。
+4. final intent聚合九份receipt/evidence/intent摘要、既有九份authorization摘要和全部前代binding。checkpoint 13再追加独立finalization授权，按history→receipt→current无覆盖发布`PROMOTION_FINAL_RECEIPT / COMMITTED`；同一结果可幂等读取，其他冲突失败关闭。
+5. 三个发布failpoint仅能用新的精确恢复授权续写。恢复只排除由intent和前代计算出的唯一目标history/receipt文件；source替换、链漂移、未知partial或摘要不一致必须保全/quarantine。Supervisor全局pending联锁及installer bundle-switch联锁同时阻断未完成finalization。
+6. finalization明确记录rollback checkpoint 14/15仍为`NOT_IMPLEMENTED`，不释放数据库/备份保护、不赋予UAT/生产执行权，也不把仓库COMMITTED回执解释为actual员工UAT已完成。
+
+### Consequences
+
+- feature source`c39caad889b31c03cdacca4be8c6947bc9ad4339`/tree`f4deb34e4ed7d0799a75f66ae345d57cf4c29f0c`→manifest-only`1baa01a829e9475f21ed01493d4bbbde2a318955`/tree`e3e6b435703fcdc16466444b6cbb91fe1c840698`形成138文件canonical链；manifest raw SHA-256为`7dd7a83cd2619e113ccc1793b43eda55ccebc7e491a7c4471c7ac82c4dd591c3`。
+- 机器审计由12项SUPPORTED/3项P0阻断收敛为13项SUPPORTED/2项P0阻断；只剩rollback checkpoint 14/15，`assert-ready`继续以`UAT_PROMOTION_EXECUTOR_NOT_READY`拒绝，人工readiness仍为`HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED`。
+- Node轻量组合111/111、Python Supervisor65/65、inventory259/235/24、bundle逐字节重放、generator/语法/JSON/敏感/diff门通过。首次journal 47/48暴露精确staged回执恢复缺口，修复后定向1/1及完整48/48通过，未降低断言。
+- Swap持续超过80%，未运行build、全量测试、Compose/PostgreSQL、Migration、backup/restore、镜像、部署、真实UAT或回滚。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝只凭ordinal 12 current、操作者声明或单个result摘要直接提交终态，也拒绝复用既有授权、跨promotion/generation拼接或允许时间/expiry倒退。
+- 拒绝把预签名subject、静态TASK67模板、fake-root fixture或仓库checkpoint 13描述为真实员工验收或actual UAT晋升。
+- 拒绝用宽泛目录白名单恢复partial、覆盖current、删除未知证据或在恢复中重跑UAT/Migration/Compose/postdeploy；也拒绝让bundle切换绕过pending finalization。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
