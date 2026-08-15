@@ -2,17 +2,32 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-BOUND-SNAPSHOT-71（执行中；接入晋升绑定可恢复快照）
+## SELFHOST-UAT-WRITER-QUIESCE-72（执行中；接入writer持续停写回执）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY SNAPSHOT ADAPTER FIRST / RESOURCE STOP LINE ACTIVE / NO BACKUP OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；核对backup/writer真实依赖并接入promotion checkpoint 5 snapshot adapter、回执和保全式恢复 |
-| 严格起点 | PASS / CONTROLLED | `a3fbbfd01987388be919fdaa0ca506d170e93197`/tree`5e275be8854f6752a776ceeb3c80d39797c7b196`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / DURABLE JOURNAL READY | TASK69/D-145固定三方v6 BEGIN/RECOVER、内容寻址回执链和9项剩余阻断；TASK71只关闭promotion-bound snapshot，不执行真实备份 |
+| 当前状态 | DOING / REPOSITORY CONTINUED-QUIESCENCE ADAPTER / RESOURCE STOP LINE ACTIVE / NO REAL CONTAINER OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；接入promotion checkpoint 6 quiesce adapter、回执和保全式恢复，只证明持续停写 |
+| 严格起点 | PASS / CONTROLLED | `bc339b6b1533acdd1123cebea818bc3302332440`/tree`f7fd37bd3a79d9f99ecbfc7b3151e13291710c7c`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / SNAPSHOT CHECKPOINT READY | TASK71/D-146固定三方v6 CAPTURE/RECOVER、V4 actual-offhost四域和8项剩余阻断；TASK72只关闭writer持续停写回执，不实际操控容器 |
 | 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap867MiB/1GiB（超过80%）、根盘13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不启动backup/Compose/PostgreSQL，不连接数据库或执行UAT写/回滚；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap868MiB/1GiB（超过80%）、根盘13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不停止/启动容器，不启动backup/Compose/PostgreSQL，不连接数据库或执行UAT写/回滚；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
 | 系统是否可用 | NO | 无完整晋升执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+
+## SELFHOST-UAT-PROMOTION-BOUND-SNAPSHOT-71（完成；promotion-bound四域快照适配器通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / PROMOTION-BOUND ACTUAL-OFFHOST SNAPSHOT ADAPTER VERIFIED / REAL BACKUP AND WRITER ACTION NOT EXECUTED / PRODUCTION NO-GO | TASK71已释放active slot；TASK72接入持续停写，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`e8dea20`/tree`8c29bc22`→monitor`7c645ab`/tree`8861d444`→Supervisor`bc339b6`/tree`f7fd37bd`；30/128文件manifest为`5c0ccda1…b27b`/`5889e746…cabe`且重放一致 |
+| 依赖决策 | PASS / D-146 | checkpoint 5保留在checkpoint 6之前：V4证明采集时writer已停，下一回执再证明Migration前持续停写；snapshot adapter不操控writer |
+| snapshot合同 | PASS / FAIL CLOSED | 一次性CAPTURE、授权消费前intent、同promotion/candidate/database/runtime/policy activation、四域对象和本窗口新鲜actual-offhost恢复链完整绑定 |
+| 恢复 | PASS / PRESERVATION FIRST | CAPTURE三个发布崩溃点可由新授权收敛；source替换、冲突、hardlink/symlink和未知状态保全并quarantine |
+| 审计 | PASS / EXECUTOR STILL BLOCKED | artifact self SHA-256为`a7004c2e…1eae9`；7项SUPPORTED、8项阻断（P0=7、P1=1），`assert-ready`继续精确拒绝 |
+| 自动验证 | PASS / SCOPED APPLICABLE | Node62/62、monitor15/15、Supervisor110/110、monitor Python14/14、inventory257/233/24、生成物重放及diff/敏感门通过 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | 起点/收口available约1.9GiB、Swap约867→868MiB/1GiB、根盘13GiB、Load低于1；四服务restart0/OOM false，临时容器自动清理 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未运行build、backup、writer stop/start、Compose/PostgreSQL、Migration、镜像、快照、恢复、部署、回滚或业务写 |
+| 系统是否可用 | NO | 仓库snapshot adapter不等于真实回滚锚点；仍缺8项adapter、真实恢复、正式门、业务批准、人工UAT和切换 |
 
 ## SELFHOST-UAT-PROMOTION-TRANSACTION-JOURNAL-69（完成；内容寻址事务与恢复基座通过）
 

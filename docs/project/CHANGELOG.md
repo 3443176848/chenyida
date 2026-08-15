@@ -4,6 +4,19 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-PROMOTION-BOUND-SNAPSHOT-71 - `feat: bind promotion snapshot checkpoint` / `chore: refresh monitoring delivery manifest` / `chore: refresh release supervisor manifest` / `docs: close bound snapshot and start writer quiesce`
+
+- 调度/范围：从TASK69最终Supervisor提交`a3fbbfd`/tree`5e275be8`启动唯一active task；只实现仓库snapshot adapter和fake-root恢复，不停止writer、不连接数据库、不读取备份/Volume或修改UAT/生产。
+- 依赖决策：源码核对确认`backup-selfhost.sh`要求精确Web/Worker在采集前后均停止，采集四域并只释放数据库fence、不重启writer。D-146保持checkpoint 5→6顺序：V4证明采集时停写，下一检查点再证明Migration前持续停写。
+- Supervisor/事务：authorization v6新增`CAPTURE_UAT_PROMOTION_SNAPSHOT`；独立短时operation ID、三方actor和精确source metadata在prepare前、消费前、消费后重验。snapshot intent先于消费，checkpoint 5通过history→receipt→current发布非零snapshot binding，RECOVER v2精确绑定原已消费授权和intent。
+- 证据边界：生产路径完整验证V4 actual-offhost、V2 policy/activation、current release identity、同promotion/candidate/database/runtime及本授权窗口新鲜性；绑定PostgreSQL/uploads/attachments/backup-status四域及inner restore、joint transfer、cluster security、credential、tablespace、final state和activation。旧、synthetic、same-host、cross-database、缺域或partial失败关闭。
+- 审计/发布链：审计收敛为7项SUPPORTED、8项阻断（P0=7、P1=1），artifact self SHA-256`a7004c2e…1eae9`且`assert-ready`继续拒绝。source`e8dea20`/tree`8c29bc22`→monitor`7c645ab`/tree`8861d444`→Supervisor`bc339b6`/tree`f7fd37bd`形成30/128文件链，manifest为`5c0ccda1…b27b`/`5889e746…cabe`。
+- 验证：受限Node专项62/62、monitor15/15、Supervisor Python110/110、monitor Python14/14、inventory257/233/24、cross-role 4链/32步骤、生成物重放、1742文件凭据扫描及diff/敏感门通过；未跳过或降低断言。
+- 诚实失败：cross-role生成器首次在不完整Site-only挂载中返回`UNSAFE_REPOSITORY_PATH`，恢复完整仓库布局后同一验证通过；凭据扫描首次因固定Node镜像无Git失败，改由宿主Git生成不含受保护未跟踪路径的显式排序清单后通过并精确清理；`docker compose ps`因未读取`.env`且缺必需插值变量退出1，精确Docker inspect仍确认四服务running/restart0/OOM false，未修改环境或Compose。
+- 资源/边界：起点/收口available约1.9GiB、Swap由约867MiB至868MiB/1GiB、根盘13GiB、Load低于1；Swap持续超过80%停止线，仅运行单个受限Node容器和轻量Python，临时容器自动清理。未运行build、全量Node/PostgreSQL、Docker数据库、typecheck、backup/restore、Migration、镜像、部署、回滚或业务写。
+- 数据库/API：无Schema、Migration或业务API行为变化；只扩展root Supervisor仓库控制面。真实A4/A6、writer、账号、UAT/生产和数据动作均未授权。
+- 治理：新增D-146，TASK71转`DONE`；自动启动`SELFHOST-UAT-WRITER-QUIESCE-72`为唯一`DOING`，TASK70继续等待资源与执行器依赖。
+
 ### SELFHOST-UAT-PROMOTION-TRANSACTION-JOURNAL-69 - `feat: add UAT promotion transaction journal` / `release: bind monitoring bundle to promotion journal` / `release: bind supervisor bundle to promotion journal` / `docs: close promotion journal and start bound snapshot`
 
 - 调度/范围：从TASK68最终Supervisor提交`1c70602`/tree`46ec0e9a`启动唯一active task；只实现仓库事务控制与fake-root恢复，不连接数据库、读取备份/Volume或修改UAT/生产。

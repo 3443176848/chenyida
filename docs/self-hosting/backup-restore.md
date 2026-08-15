@@ -96,6 +96,8 @@ launcher在执行前消费一次性授权并只映射到固定动作。验证器
 4. 检查内存、Swap、磁盘、Load、容器 restart/OOM 与目标容量；
 5. 确认没有残留 `.backup-fence-v2.json`。存在时不得重跑，必须按第 5 节恢复守卫。
 
+TASK71/D-146已把该入口接入未来promotion checkpoint 5，但没有执行真实备份。`backup-selfhost.sh`只接受采集前、中、后均已停止且没有替代writer的精确Web/Worker，并在成功后保持它们停止；脚本不负责停止或重启容器。checkpoint 5只绑定本窗口新产生的V4 `ACTUAL_OFFHOST + RECOVERY_READY`四域证据及采集停写证明。未来获专项授权的真实晋升必须继续保持同一Web/Worker停止，直到checkpoint 6独立证明持续停写；期间任何启动、重启、替换、跨Compose project或未知writer都使该晋升链失败关闭。
+
 入口为 `scripts/backup-selfhost.sh`。它要求显式 deployment class/token、专用根、两个物理独立的 root-only service 文件、四个源目录、精确已停止 Web/Worker、策略/RPO 和目标 reader GID。control 文件只供离线高权限围栏身份使用，capture 文件必须连接固定的非 superuser、非 owner `chenyida_erp_backup`；两者路径、inode 和 service name 都必须不同。示意：
 
 ```bash

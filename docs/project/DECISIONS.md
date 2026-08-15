@@ -2837,6 +2837,41 @@
 - 拒绝只比较原始/上一步授权而允许隔步复用，拒绝覆盖history/current、删除不一致对象、在过期窗口继续猜测partial结果或自动清空quarantine。
 - 拒绝把fake-root、静态审计或BEGIN成功描述为promotion snapshot、Migration、部署、回滚、人工UAT或A6已通过。
 
+## D-146 promotion-bound快照采用V4 actual-offhost四域绑定，writer持续停写由下一检查点独立证明
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / SNAPSHOT CHECKPOINT VERIFIED / REAL BACKUP AND WRITER ACTION NOT AUTHORIZED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK71对`backup-selfhost.sh`、offhost transfer、V4 readiness、policy activation、release identity和promotion journal的源码核对及Node62/62、Supervisor110/110验证
+- 确认边界：只接受仓库内snapshot adapter、一次性授权、内容寻址回执和fake-root证据；不授权真实writer停止、备份、异机传输/恢复、数据库、Migration、Compose、host或UAT/生产动作
+
+### Context
+
+- 受控backup入口要求精确Compose Web/Worker在采集前、采集中和采集后均停止，拒绝替代writer；它采集PostgreSQL、uploads、attachments、backup_status四域，结束时只释放数据库fence，不负责重启writer。
+- TASK69的BEGIN只绑定升级前既有恢复基线，不能证明本次promotion窗口产生了新快照；旧V4、TEST-only、同机、自洽重签名或跨数据库证据不能成为回滚锚点。
+- 15检查点把`PROMOTION_BOUND_RECOVERABLE_SNAPSHOT`置于`WRITER_QUIESCE_RECEIPT`之前。机械换序会破坏既有审计和事务链，也无法解决“谁证明采集时已停写”与“谁证明Migration前仍停写”是两个时点的问题。
+
+### Decision
+
+1. 保持检查点顺序。checkpoint 5只接受V4 `ACTUAL_OFFHOST + RECOVERY_READY`中已经绑定的`EXACT_COMPOSE_WEB_WORKER_STOPPED`采集证明；snapshot adapter不停止、启动或重启writer。
+2. `CAPTURE_UAT_PROMOTION_SNAPSHOT`使用与promotion ID不同、最长60分钟、requester/approver/executor互异的Supervisor v6一次性授权。snapshot intent必须在授权消费前持久化，并精确引用ordinal-4回执、原promotion intent/authorization、candidate/database/runtime/recovery baseline及当前policy activation。
+3. 正向证据必须是本授权窗口内新产生、未过期、内容寻址且root-published的V4 history文件；完整生产validator同时验证V2 policy/activation、inner restore、joint transfer、cluster security、credential、tablespace、recovery final state和policy activation。fake validator只允许显式非`/`测试根。
+4. promotion snapshot binding必须覆盖PostgreSQL dump、uploads、attachments、backup-status四个对象的固定文件名、SHA-256、bytes和entries，以及精确UAT deployment/database、candidate/runtime/Migration、backup/restore ID和全部恢复证明。缺域、旧证据、synthetic、same-host、cross-database或unknown/partial一律失败关闭。
+5. checkpoint 5通过history→receipt→current无覆盖发布非零snapshot binding；新恢复授权精确绑定原已消费snapshot授权和intent。可证明partial才能收敛，替换、冲突、hardlink/symlink或未知状态只保全/quarantine，不删除备份、外部对象或业务数据。
+6. checkpoint 6另行证明快照采集后同一Web/Worker持续停止、没有替代writer且操作责任已接续，才能进入Migration授权。TASK71完成不表示当前UAT停写、已有真实快照或A4/A6已获授权。
+
+### Consequences
+
+- 机器审计由6项SUPPORTED/9项阻断收敛为7项SUPPORTED/8项阻断（P0=7、P1=1）；三个必需Supervisor操作实现，artifact self SHA-256为`a7004c2e…1eae9`，`assert-ready`继续返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+- source`e8dea203547788d3cb1159adc892c1f84917457b`/tree`8c29bc22e328886773bbbe7f9689e1c55a8938c6`→monitor`7c645ab669cf37219e30623f7b4f0dbbd01d3ad7`/tree`8861d4445e9abd4cfe9a58f3aa3fe463257c750e`→Supervisor`bc339b6b1533acdd1123cebea818bc3302332440`/tree`f7fd37bd3a79d9f99ecbfc7b3151e13291710c7c`形成30/128文件canonical链；manifest raw SHA-256为`5c0ccda1…b27b`/`5889e746…cabe`。
+- Node专项62/62、monitor15/15、Supervisor110/110、monitor Python14/14及inventory257/233/24通过；未执行真实备份、恢复、writer、数据库、Migration、Compose、镜像、部署、回滚或UAT写。
+- 下一P0为TASK72 `WRITER_QUIESCE_RECEIPT`仓库适配器；TASK70继续等待执行器完整和Swap停止线解除。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝把BEGIN绑定的旧恢复基线、TEST-only restore、synthetic fixture、同机副本、文件名或operator声明重新标记为promotion-bound快照。
+- 拒绝只绑定PostgreSQL而遗漏三个文件域，或只比较最终readiness摘要而不绑定内层恢复、transfer、cluster/credential/tablespace和policy activation。
+- 拒绝因backup入口需要停写就静默换序、让snapshot adapter自行操控当前容器，或把采集时停写证明冒充Migration前持续停写回执。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

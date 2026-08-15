@@ -6,7 +6,7 @@
 
 - 唯一未来生产权威方向是 Node.js、PostgreSQL、本地持久文件和独立 Worker。
 - `chenyida-erp-parallel`仍是受控非生产 UAT：Web `0.1.0-alpha.42` / source revision `569aa954d764309e239d1f6c174e582596d33a24`，PostgreSQL 40/head `0040_warehouse_receipt_readiness.sql`。
-- 当前仓库源码为`0.1.0-alpha.46`/45/head`0045_runtime_worker_readiness.sql`及TASK53链`08608eb1`→`d246cbde`；TASK51的`8084d6c3`本机候选、六服务runtime和零发现诊断已为`STALE / NOT AUTHORIZABLE`，0041—0045仍未部署或应用到UAT。无当前候选、正式supervisor gate或`ELIGIBLE`manifest，源码/历史诊断/运行面不得描述为同一发布。
+- 当前仓库源码为`0.1.0-alpha.47`/46/head`0046_runtime_lock_privilege_boundary.sql`，当前不可变治理输入为TASK71 source`e8dea20`→monitor`7c645ab`→Supervisor`bc339b6`；TASK51的`8084d6c3`本机候选、六服务runtime和零发现诊断已为`STALE / NOT AUTHORIZABLE`，0041—0046仍未部署或应用到UAT。无当前候选、正式supervisor gate或`ELIGIBLE`manifest，源码/历史诊断/运行面不得描述为同一发布。
 - Python/SQLite 常驻面仍是开发运行和迁移来源，不是未来生产底座；正式切换前必须另有停写、只读或隔离决定。
 - 入口、受控业务事实与历史操作见 `parallel-http-acceptance.md`；未经任务授权不得登录、发送业务 POST 或查询业务行。
 
@@ -52,6 +52,8 @@ Compose 配置展开需要数据库和 setup 变量；只读状态检查可使�
 
 TASK42已形成release manifest、Migration allowlist、content-addressed supervisor和`test:release`仓库工具；TASK46/TASK47分别关闭38配置TypeScript和6文件Browser子门；TASK53按D-130完成部署前/隔离候选/部署后三阶段合同及47文件bundle，见[自托管发布门V2](../testing/selfhost-release-gate.md)。TASK51本机候选与诊断已因源码变化成为`STALE / NOT AUTHORIZABLE`；host supervisor、当前精确候选、正式scan provenance/SBOM/security evidence和完整gate PASS仍不存在，UAT仍为alpha.42/0040。因此G3为`LIFECYCLE REPOSITORY VERIFIED / NO CURRENT ELIGIBLE CANDIDATE`，仍是投产阻断。
 
+TASK69/D-145已建立promotion intent与BEGIN/RECOVER事务；TASK71/D-146新增checkpoint 5 `CAPTURE_UAT_PROMOTION_SNAPSHOT`，只接受本次窗口、内容寻址、root-published的V4 `ACTUAL_OFFHOST + RECOVERY_READY`四域证据，并绑定PostgreSQL、uploads、attachments、backup_status及完整恢复链。实际备份入口要求Web/Worker在采集前、中、后均已停止且不会替operator重启；checkpoint 5只承认该采集证明，不控制容器。当前TASK72必须另在checkpoint 6证明同一writer自采集后持续停止且无替代writer，才能进入Migration授权。审计现为7项SUPPORTED、8项阻断，真实快照、停写和UAT动作均未执行。
+
 ## 发布制品和Migration操作保护
 
 - release gate只能由root通过固定`/var/lock/chenyida-erp-release-gate-v1.lock`运行；run ID最多80字符，证据根必须在仓库外且为root-owned `0750`，禁止环境变量改写锁路径。
@@ -91,6 +93,7 @@ TASK50已经在仓库和任务私有隔离容器中验证[D-127](../project/DECI
 - 获专项授权后也必须先由installed Supervisor在全局release锁内prepare，逐字节复核template、bundle、environment/generation/previous、actor/approver、时效和固定路径，再消费对应一次性`ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2`授权；提交只允许intent→history→target→receipt→current顺序。操作后必须让V4、monitor backup publisher和installer interlock复核同一current链，任一消费者不一致即停止后续恢复或升级。
 - 回退只能使用`ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2`精确绑定一个历史已提交代次，不能按文件名或“上一版”猜测。崩溃后保全全部现场，使用引用原已消费授权的新`RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION`授权；可证明partial才继续，过期或矛盾状态只隔离并升级事故，禁止删除后重试或手改current。
 - 若备份进程中断且 `.backup-fence-v2.json`存在，数据库保持安全只读，且`CONNECT`只保留给固定的非superuser `chenyida_erp_backup`采集身份和当前一次性control身份；Web、Worker、Admin与Migration owner均被数据库级deny。禁止手工删除intent、手工补GRANT或直接重跑；只能由root调度的同一control service使用`recover-backup-guard.sh`核对v3 intent、稳定数据库/部署身份和精确ACL后，在一个事务中恢复默认读写与固定四个在线/owner角色的`CONNECT`。capture service不能执行恢复。
+- promotion checkpoint 5不能把历史V4 readiness或单次`running=false`冒充当前停写。未来获专项授权的真实晋升中，`backup-selfhost.sh`完成后必须保持原Web/Worker停止；在checkpoint 6对容器ID、镜像、Compose project、重启/替换和未知writer完成持续性复核前，禁止启动writer或进入Migration。当前仓库没有执行这项真实复核。
 - TASK56之后，`backup-selfhost.sh`必须同时收到物理文件、libpq service名和登录角色都相互独立的control/capture凭据。control只做fence、backend终止、身份核验和恢复控制；所有业务relation reconciliation、Migration只读核对和`pg_dump --no-large-objects --no-owner --no-acl`都由`chenyida_erp_backup`执行。当前应用数据模型声明零large object，control在写入WORK/发布制品前按metadata强制计数为零；发现任一large object即失败关闭并精确解除本次fence，禁止临时给capture读取`pg_largeobject`正文的能力。
 - 若隔离恢复在 prepared receipt 后发布失败，保留精确 TEST 数据库、文件目标和 prepared evidence；使用 `publish-restore-receipt-selfhost.sh`补发，不重跑恢复。
 - 若容器 OOM/反复重启、数据库不健康、身份漂移、回执过期/损坏、Migration 不符或关键数据核对失败，立即停止新写操作，保全日志/审计/证据，不清理持久卷或备份，按已批准的事故任务升级。
@@ -108,7 +111,7 @@ TASK43已在源码实现D-117安全合同，但当前alpha.42/0040 UAT未部署�
 
 ## 会话超时与撤销处置
 
-alpha.46源码继承0044的8小时 idle、24小时 absolute和一次性超时终态；当前UAT未部署。未来获准部署后，运维只按稳定响应和审计排障：
+alpha.47源码继承alpha.46/0044的8小时 idle、24小时 absolute和一次性超时终态；当前UAT未部署。未来获准部署后，运维只按稳定响应和审计排障：
 
 1. `SESSION_EXPIRED`表示`IDLE_TIMEOUT`或`ABSOLUTE_TIMEOUT`，用户应重新登录；不得手工延长`expires_at`或`absolute_expires_at`。
 2. `SESSION_REVOKED`表示logout、停用、密码重置/修改等明确撤销；先核对受控账号操作和对应Identity Audit，不得恢复旧Token。
@@ -120,7 +123,7 @@ alpha.46源码继承0044的8小时 idle、24小时 absolute和一次性超时终
 
 ## Liveness、Readiness与Worker租约处置
 
-alpha.46/0045源码已按D-119实现下列合同，但当前alpha.42/0040 UAT仍未部署；当前Worker显示`running/health=none`只能记录为旧运行事实，不能冒充新合同通过：
+alpha.47/0046源码保留alpha.46/0045按D-119实现的下列合同，但当前alpha.42/0040 UAT仍未部署；当前Worker显示`running/health=none`只能记录为旧运行事实，不能冒充新合同通过：
 
 1. `/api/live`必须在PostgreSQL Pool初始化前返回，只证明Web进程和版本元数据可读取；它不能用于接流或发布身份。
 2. `/api/health`是readiness。HTTP 200要求Web运行version/Git有效、镜像内root-owned只读Migration allowlist与数据库完整history/checksum一致、数据库时钟下同候选Worker租约新鲜，并且Web实际完成uploads与attachments的随机私有写入、fsync和清理。
@@ -133,7 +136,7 @@ alpha.46/0045源码已按D-119实现下列合同，但当前alpha.42/0040 UAT仍
 
 ## 监控、告警与值班处置
 
-TASK49提供`chenyida-erp-operations-monitoring/v1`评估合同，TASK61/D-137把它封装为内容寻址host delivery，TASK62/D-138加入权威components/backup投影producer，TASK63/D-139与TASK64/D-140补齐V2 actual recovery及逐代激活，TASK65/D-141再加入target-bound notifier egress和effective systemd证明。当前canonical链为30文件monitor bundle`8260bed4…302`及126文件Release Supervisor bundle`aab36e62…53a3`，包含三身份launcher、七个固定unit/timer、安装/回退/停用事务、精确远端ACK、两项root-only投影、V2 recovery policy及notifier egress逐代激活合同。当前状态为`REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / POLICIES NOT ACTIVATED / REAL NOTIFIER EGRESS NOT AUTHORIZED`：没有在宿主创建账号、安装service/timer、激活实际policy、发布真实projection、开放notifier出口、配置真实target/凭据/值班表或取得外送确认。以下是未来获专项授权后的运行合同，不是当前已经启用的生产监控。
+TASK49提供`chenyida-erp-operations-monitoring/v1`评估合同，TASK61/D-137把它封装为内容寻址host delivery，TASK62/D-138加入权威components/backup投影producer，TASK63/D-139与TASK64/D-140补齐V2 actual recovery及逐代激活，TASK65/D-141再加入target-bound notifier egress和effective systemd证明。当前canonical链为30文件monitor bundle`5c0ccda1…b27b`及128文件Release Supervisor bundle`5889e746…cabe`，包含三身份launcher、七个固定unit/timer、安装/回退/停用事务、精确远端ACK、两项root-only投影、V2 recovery policy、notifier egress逐代激活及promotion transaction/snapshot合同。当前状态为`REPOSITORY AND SYNTHETIC-ISOLATED VERIFIED / HOST NOT INSTALLED / POLICIES NOT ACTIVATED / REAL NOTIFIER EGRESS NOT AUTHORIZED`：没有在宿主创建账号、安装service/timer、激活实际policy、发布真实projection、开放notifier出口、配置真实target/凭据/值班表或取得外送确认。以下是未来获专项授权后的运行合同，不是当前已经启用的生产监控。
 
 ### 信任边界与输入
 
@@ -191,7 +194,7 @@ Projection根固定为`/var/lib/chenyida-erp/monitoring-v1/projections`：marker
 
 ### 安装、验证与回滚门
 
-host安装必须另立专项任务并获项目负责人授权，至少固定：TASK65 source`05502fda…`、monitor manifest-only`013e61fd…`、Supervisor manifest-only`7c69385c…`及两个manifest摘要`8260bed4…302`/`aab36e62…53a3`、Node绝对路径/dev/inode/bytes/SHA/版本、两个已预建非特权uid/gid、root采集边界、private config与各view摘要、projection/egress状态根和权威源、状态/事件目录、七个unit/timer、真实渠道target/固定地址/Host/SNI/path与root-only凭据、值班/升级责任人、保留周期、安装/egress journal和精确rollback/disable输入。账号创建、网络出口和systemd写入必须逐项列明；不得把应用账号加入Docker组，也不得给Web挂Docker socket。
+host安装必须另立专项任务并获项目负责人授权，至少固定：当时全部安全仓库变化收口后的最终source/monitor/Supervisor三提交链、两个canonical manifest完整摘要、launcher/installer摘要、Node绝对路径/dev/inode/bytes/SHA/版本、两个已预建非特权uid/gid、root采集边界、private config与各view摘要、projection/egress状态根和权威源、状态/事件目录、七个unit/timer、真实渠道target/固定地址/Host/SNI/path与root-only凭据、值班/升级责任人、保留周期、安装/egress journal和精确rollback/disable输入。当前仅供复核的TASK71链为source`e8dea20`→monitor`7c645ab`→Supervisor`bc339b6`，manifest摘要为`5c0ccda1…b27b`/`5889e746…cabe`；TASK72仍会使其成为历史输入，不能据此安装。账号创建、网络出口和systemd写入必须逐项列明；不得把应用账号加入Docker组，也不得给Web挂Docker socket。
 
 安装验收需依次证明：Supervisor/monitor/runtime/config/账号与authorization完全闭合；effective `FragmentPath`、无drop-in/transient、User/Group/ExecStart/hardening/credential/读写路径精确；权威projection producer已发布当前身份；四服务和完整组件形成健康窗口；逐类合成故障产生预期FIRING/REMINDER/ESCALATED/RECOVERED；经单独批准的出口让真实渠道收到测试与恢复事件且重复event ID幂等；停止/重启monitor不丢状态；损坏/锁/时间倒退失败关闭；重启宿主后timer恢复；资源开销符合低资源门限。回滚只恢复唯一已提交activation，停用默认保全全部证据；不删除Docker服务、卷、备份或业务数据。
 
