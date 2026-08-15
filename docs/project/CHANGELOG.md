@@ -4,6 +4,19 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-MIGRATION-COMMIT-74 - `feat: add fenced UAT migration commit adapter` / `fix: bound expanded supervisor bundle` / `chore: publish UAT migration supervisor bundle` / `docs: close migration commit and start compose deployment`
+
+- 调度/范围：从TASK73最终Supervisor提交`302661c`/tree`0a05618b`启动唯一active task；只在仓库、fake-root、模拟数据库与只读Docker metadata中实现checkpoint 8，不连接真实数据库、不执行Migration、不修改UAT/生产。
+- 边界决策：D-149固定checkpoint 8使用独立最长15分钟execution authorization/grant；checkpoint 7批准SHA不可复用。成功后的database active fence必须保持到checkpoint 9精确接管或同operation保全恢复，未知/部分结果不得重跑SQL、运行down SQL或自动释放writer。
+- Supervisor/事务：新增`RUN_UAT_PROMOTION_MIGRATION`与精确RECOVER路径，execution intent先于授权消费；ordinal-7前代、promotion/candidate/runtime/database/snapshot/quiesce/approval、allowlist、current/target head、角色和三方actor完整绑定。checkpoint 8继续按history→receipt→current无覆盖发布。
+- 数据库/执行器：完整release artifact目录在源root identity前后重验并冻结；控制器在任何业务SQL前验证released角色/ACL/session基线，设置default-read-only、CONNECT/connection-limit围栏，只启动精确worker digest/label的Migration容器。SQL lexer拒绝顶层事务控制，每文件单事务并在commit前复核deadline/identity/ledger，最终核对完整有序`schema_migrations`摘要并把数据库seal为零连接。
+- 恢复/联锁：active fence阻断除同一operation精确恢复外的全部Supervisor操作。恢复先emergency seal数据库，再按operation+grant唯一label定位候选并stop→kill→退出证明；已消费未执行、部分提交、结果/围栏/发布未知均保全/quarantine，不删除容器或证据。
+- 审计/发布链：机器审计收敛为10项SUPPORTED、5项阻断（P0=4、P1=1），artifact/source-manifest为`e4aa3687…e2fc`/`53a1515a…4239`且`assert-ready`继续拒绝。source`ce7bb23`/tree`f5043439`→fix`5610a0d`/tree`26edea69`→Supervisor`52242f8`/tree`6a20ec8f`形成130文件链，manifest raw SHA-256为`17efe85d…aad5`。
+- 验证：受限Node专项120/120、Python专项57/57、inventory258/234/24、Python compile、Node/TS syntax、cross-role/audit生成物重放、发布门、凭据扫描30+3文件及diff检查通过；未跳过或降低断言。
+- 资源/边界：Swap持续高于80%，未运行typecheck、全量测试、Docker build、Compose/PostgreSQL动态测试、backup/restore、Migration、镜像、部署、回滚或业务写。收口前available 1.9GiB、Swap879/1024MiB、根盘12,699MiB、Load`0.33/0.26/0.16`；四服务restart0/OOM false。宿主`oom_kill=2`缺同窗口起点，不作增量结论；两个临时Node目录精确清零。
+- 数据库/API：无Schema或Migration文件变化，不改变普通业务API；只扩展root Supervisor、Migration受控入口和运行连接身份。真实A4/A6、数据库围栏、账号、UAT/生产和数据动作均未授权。
+- 治理：新增D-149，TASK74转`DONE`；自动启动`SELFHOST-UAT-COMPOSE-DEPLOY-75`为唯一`DOING`，以独立部署授权关闭checkpoint 9，TASK70继续等待资源与执行器依赖。
+
 ### SELFHOST-UAT-MIGRATION-TRANSACTION-73 - `feat: add UAT migration approval checkpoint` / `chore: refresh monitoring delivery manifest` / `chore: refresh release supervisor manifest` / `docs: close migration approval and start commit receipt`
 
 - 调度/范围：从TASK72最终Supervisor提交`ad98661`/tree`8912ce10`启动唯一active task；原计划覆盖checkpoint 7/8，只在仓库/fake-root/可注入client中核对与实现，不连接数据库、不运行Migration或修改UAT/生产。

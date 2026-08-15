@@ -1,7 +1,7 @@
 # 晨亿达 ERP 投产专项授权执行包
 
 > 权威基线任务：`SELFHOST-EXTERNAL-AUTHORIZATION-READINESS-52`
-> 当前事实刷新：`SELFHOST-UAT-MIGRATION-TRANSACTION-73` / D-148
+> 当前事实刷新：`SELFHOST-UAT-MIGRATION-COMMIT-74` / D-149
 > 事实快照：2026-08-15（Asia/Shanghai）
 > 当前结论：`PRODUCTION NO-GO / CONTROL PLANE ONLY / NO AUTHORIZATION GRANTED`
 
@@ -23,14 +23,14 @@
 | 项目 | 当前事实 | 含义 |
 | --- | --- | --- |
 | TASK68严格起点 | `186e117cdebf2076619c75379edf4e36a1f7394a` / tree `c36d57a969afc720cf12ed032ffb025933617b50` | TASK68从TASK67最终manifest-only根启动；最终提交链如下，治理收口提交以`git log`为准 |
-| 当前快照输入 | `302661c5d49722c6c4b4bcfe18749417e3688e52` / tree `0a05618b217878c9dd71bb0226bebfb16f5e4a78` | alpha.47 / Migration 46/head；表示D-135—D-148及promotion transaction BEGIN/RECOVER/CAPTURE/QUIESCE/AUTHORIZE仓库输入，不表示存在源码匹配Web/Worker镜像、完整晋升执行器、数据库全局围栏或已安装host |
+| 当前快照输入 | `52242f826b542456ee22bae55dcc0b83c746dfea` / tree `6a20ec8fe44238a438401bdf15f777b22df6f47b` | alpha.47 / Migration 46/head；表示D-135—D-149及promotion transaction BEGIN/RECOVER/CAPTURE/QUIESCE/AUTHORIZE/MIGRATION COMMIT仓库输入，不表示存在源码匹配Web/Worker镜像、真实checkpoint 8回执、Compose部署回执或已安装host |
 | Web/Worker镜像 | TASK57 Web manifest/config `b7b21508…8a30`/`3c83d60f…f56e`、Worker `c5bf9d5c…b113`/`3bebff16…f971` | `STALE / NOT AUTHORIZABLE`；TASK59—TASK65改变Site输入后当前没有源码匹配镜像，A3不得使用这些历史对象 |
-| supervisor source | `18b93e90ecd8f90b084d82596f847e7651aec6ee` / tree `a5967c5bfbe853bb322bb77a11eadecd6a495f33` | 包含当前monitor manifest、D-135—D-148、promotion transaction policy/journal、批准/授权/UAT审计release门及128个固定文件的权威Supervisor来源提交 |
-| supervisor manifest | `302661c5d49722c6c4b4bcfe18749417e3688e52` / tree `0a05618b217878c9dd71bb0226bebfb16f5e4a78` | monitor manifest-only提交的直接子提交，只更新canonical Supervisor bundle manifest |
-| supervisor bundle | `090c3a23c0d3e4680dec3f909e60f62824ed1eef36ae1bff3621f5edee924800` | 128文件，生成器逐字节重放一致；本值是manifest文件SHA-256 |
+| supervisor source | `5610a0db8adadc04cae6f0b239c1fcd7a1e9bc1a` / tree `26edea69c120c7f2d3977d40aab971cf2a90f4e0` | 包含当前monitor manifest、D-135—D-149、promotion transaction policy/journal、数据库围栏、逐文件Migration提交回执、批准/授权/UAT审计release门及130个固定文件的权威Supervisor来源提交 |
+| supervisor manifest | `52242f826b542456ee22bae55dcc0b83c746dfea` / tree `6a20ec8fe44238a438401bdf15f777b22df6f47b` | supervisor source的直接子提交，只更新canonical Supervisor bundle manifest |
+| supervisor bundle | `17efe85dec35a233090eb97f7f93a9df94b26a3aa8120a6a3fe0b00df757aad5` | 130文件，生成器逐字节重放一致；本值是manifest文件SHA-256 |
 | monitor bundle | source`32860b86be13cab880b5cf0cd8e9cfb255956809`/tree`b950a29944c48a73be78bab730f252b6f5ccf9c4`，manifest-only`18b93e90ecd8f90b084d82596f847e7651aec6ee`，SHA-256`59ea10842df37d47dcf598a08fd2e56bf417680a61ded714897f647f1e6077c0` | 30文件内容寻址host delivery与egress消费；仓库可审阅，不表示已安装、已有账号/systemd、网络出口或真实ACK |
-| installer | `f8e86a6be570ea4c802e2dbcb55a59cd7153a64135ccf3574df67a315c060d85` | 只接受固定安装动作和短时root-only授权；未解决的recovery或egress activation链会阻断bundle切换 |
-| launcher | `6a9727b216ae441d1452689d6d2d6dc98381b4b6a5604f7b5cf462fe4adcdfc0` | 先取得全局锁、验证候选快照/runtime/monitor/recovery/egress/promotion输入，再消费授权；v6 BEGIN/CAPTURE/QUIESCE/AUTHORIZE先写intent，RECOVER精确绑定原已消费授权 |
+| installer | `c23908f0fb09ce412c25e2daa8ea94a15bfe6ba90c0faae5be59eecfe91cc394` | 只接受固定安装动作和短时root-only授权；固定上限已与130文件bundle一致，未解决的recovery或egress activation链会阻断bundle切换 |
+| launcher | `eba153081614ac4ad893242086aea066df2bdc78414104d2b86d2dca47e8295f` | 先取得全局锁、验证候选快照/runtime/monitor/recovery/egress/promotion输入，再消费授权；v6 BEGIN/CAPTURE/QUIESCE/AUTHORIZE/MIGRATION EXECUTION先写intent，RECOVER精确绑定原已消费授权；checkpoint 8成功后的数据库主动围栏保持到后续部署精确接管 |
 | snapshot工具 | `release-candidate-snapshot.py` SHA-256 `296f61efb552a5fdd327e7b60b567a4dc2a569f9ec1c93bd57ef4dfe0f4fe98d` | PREPARE/VERIFY/REMOVE、创建前reservation、同inode no-clobber提升与守恒恢复已验；未获A2授权时仍不能实际进入正式候选 |
 | 历史构建回执 | `33b1b9219c17ac3000b058a2cf16ab25ccdd2d859a09039e58abc074f2107a9a` | 仅解释TASK57旧本机诊断来源；已失效，不是正式release evidence或当前A3输入 |
 | UAT | Web alpha.42 / source `569aa954…d33a24`；PostgreSQL 0040；四服务旧运行配置 | 与候选不一致，且现行容器仍非只读 rootfs |
@@ -38,9 +38,9 @@
 | 恢复能力 | V2 合成/双集群隔离合同已通过；真实异机目标、当前四域副本和真实恢复回执不存在 | 不能宣称故障后可恢复 |
 | 监控 | D-137—D-141内容寻址installer、三身份、unit/timer、state/outbox/delivery、权威投影、V2 policy激活、target-bound egress和远端ACK仓库合同已验；未安装host，base unit默认deny-all，真实渠道/值班演练不存在 | 不能宣称持续监控或告警已启用；须按A5a专项授权安装并激活真实target/credential/网络 |
 
-TASK73收口只读资源快照：available memory约1.9 GiB、Swap约868 MiB/1 GiB、根盘可用13 GiB、Load未持续越线；四个项目UAT容器restart 0/OOM false，当前仍running。Swap已超过80%停止线，当前不得启动新的build、全量测试或数据库重任务；未来执行仍须重新预检。
+TASK74收口前只读资源快照：available memory约1.9 GiB、Swap约879 MiB/1 GiB、根盘可用约13 GiB、Load未持续越线；四个项目UAT容器restart 0/OOM false，当前仍running。Swap已超过80%停止线，当前不得启动新的build、全量测试或数据库重任务；未来执行仍须重新预检。
 
-本节已由TASK73刷新到D-148不可变链，但仍不是可消费授权。`090c3a23…800`和`59ea1084…7c0`可作A1/A5设计复核输入；机器审计证明BEGIN/RECOVER、promotion-bound四域snapshot、精确Compose writer持续静默及checkpoint 7一次性Migration批准已闭合，但执行器仍有6个阻断点并返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。TASK74及后续安全仓库任务还会改变bundle，当前不应请求安装，A1/A5a均未授予。checkpoint 7只接受`APPROVAL_ONLY_NO_SQL_NO_DATABASE_FENCE`批准，不能证明数据库client不存在或SQL已获执行权；外部writer、数据库session/role围栏和提交结果必须由checkpoint 8使用另一份一次性授权关闭。A3必须在这些候选输入变化收口后重建Web/Worker，并把最终同一对象锚定为批准私有registry完整digest；A2再使用对应精确快照、reservation/receipt摘要、借用runtime和新鲜正式安全证据。TASK57本机对象不得冒充当前候选或外部锚点。
+本节已由TASK74刷新到D-149不可变链，但仍不是可消费授权。`17efe85d…aad5`和`59ea1084…7c0`可作A1/A5设计复核输入；机器审计证明BEGIN/RECOVER、promotion-bound四域snapshot、精确Compose writer持续静默、checkpoint 7一次性Migration批准以及checkpoint 8独立执行授权、数据库client/session/role围栏、逐文件事务、最终ledger和不可覆盖提交回执的仓库调用链已闭合，但执行器仍有5个阻断点并返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。当前并未连接真实数据库、运行Migration或生成actual checkpoint 8回执；active database fence只是成功路径合同，不是当前UAT事实。TASK75及后续安全仓库任务还会改变bundle，当前不应请求安装，A1/A5a均未授予。A3必须在这些候选输入变化收口后重建Web/Worker，并把最终同一对象锚定为批准私有registry完整digest；A2再使用对应精确快照、reservation/receipt摘要、借用runtime和新鲜正式安全证据。TASK57本机对象不得冒充当前候选或外部锚点。
 
 ## 3. 全局执行前门禁
 
@@ -57,7 +57,7 @@ TASK73收口只读资源快照：available memory约1.9 GiB、Swap约868 MiB/1 G
 
 | 授权域 | 动作 | 当前状态 | 关键依赖 | 成功后仍未获权 |
 | --- | --- | --- | --- | --- |
-| `A1` | 安装 content-addressed host supervisor | `TASK73 128-FILE BUNDLE REVIEWABLE / INSTALL DEFERRED UNTIL FINAL SAFE REPOSITORY BUNDLE / AUTHORIZATION NOT GRANTED` | TASK74及剩余安全仓库变化收口后重新固定精确source/manifest/bundle/installer/launcher；执行前仍须独立任务、root bootstrap路径和项目负责人专项授权 | `A2`—`A8`全部仍未授权 |
+| `A1` | 安装 content-addressed host supervisor | `TASK74 130-FILE BUNDLE REVIEWABLE / INSTALL DEFERRED UNTIL FINAL SAFE REPOSITORY BUNDLE / AUTHORIZATION NOT GRANTED` | TASK75及剩余安全仓库变化收口后重新固定精确source/manifest/bundle/installer/launcher；执行前仍须独立任务、root bootstrap路径和项目负责人专项授权 | `A2`—`A8`全部仍未授权 |
 | `A2` | 正式镜像证据、19步门、UAT-class manifest | `BLOCKED BY CURRENT IMAGES + A1 + A3` | 最终snapshot reservation/receipt+digest+runtime root、A1回执、A3不可变registry完整引用、新鲜Trivy DB | UAT部署、真实数据仍未授权 |
 | `A3` | 私有异机源码与镜像锚点 | `CURRENT IMAGE CANDIDATE ABSENT / TARGET AND CREDENTIAL AUTHORIZATION REQUIRED` | 最终安全源码收口后的同一源码与重建Web/Worker对象、批准私有Git/registry、root-only短时凭据 | 正式门、数据备份、UAT部署仍未授权 |
 | `A4a` | 三故障域/RPO/RTO/加密/保留设计与空目标准备 | `READY FOR NON-SECRET OWNER INPUT` | source/offhost/restore位置、责任人和策略；不复制数据 | A4b—A4e及UAT动作仍未授权 |
@@ -125,7 +125,7 @@ supervisor本身没有后台进程；没有pending release authorization时保�
 
 A2必须等TASK53生命周期合同、TASK59—TASK60/D-135—D-136快照及创建前target reservation合同、A1安装回执、最终源码匹配Web/Worker和A3不可变外部镜像引用全部通过。TASK53已建立“旧运行面保持不退化、隔离候选严格验证Worker health、部署后再独立严格验证”的失败关闭合同，TASK59—TASK60已建立独立detached快照、reservation/receipt/runtime绑定及锁内双重验证；当前阻断为当前镜像不存在、A1未安装且A3外部完整引用不存在。
 
-TASK71当前快照输入为`bc339b6b1533acdd1123cebea818bc3302332440`/tree`f7fd37bd3a79d9f99ecbfc7b3151e13291710c7c`，reservation、monitor projection、V2 policy activation、target-bound egress、application authorization matrix、cross-role UAT evidence、promotion checkpoint audit、事务BEGIN/RECOVER/CAPTURE及30/128文件双bundle合同已逐字节复核；但机器审计明确还有8个阻断点，且TASK72及剩余安全仓库变化仍会使本快照成为历史输入，故不得预签正式A2或A6授权。最终A2必须由D-135/D-136工具在仓库外root-owned、不可组/全局写的固定根，以同设备私有staging和创建前0400 reservation建立locked detached worktree，并以不可变prepared receipt、receipt SHA-256和canonical借用runtime root绑定authorization；launcher先取得全局锁再VERIFY，wrapper在制品发布前复核。不得回退或切换共享主工作区，不得把更晚治理HEAD、branch、foreign target、旧audit或路径名冒充候选所有权；REMOVE只处理reservation/receipt证明的对象，quarantine默认永久保留。
+TASK74当前快照输入为`52242f826b542456ee22bae55dcc0b83c746dfea`/tree`6a20ec8fe44238a438401bdf15f777b22df6f47b`，reservation、monitor projection、V2 policy activation、target-bound egress、application authorization matrix、cross-role UAT evidence、promotion checkpoint audit、事务BEGIN/RECOVER/CAPTURE/QUIESCE/AUTHORIZE/MIGRATION COMMIT及30/130文件双bundle合同已逐字节复核；机器审计明确仍有5个阻断点，且TASK75及剩余安全仓库变化仍会使本快照成为历史输入，故不得预签正式A2或A6授权。最终A2必须由D-135/D-136工具在仓库外root-owned、不可组/全局写的固定根，以同设备私有staging和创建前0400 reservation建立locked detached worktree，并以不可变prepared receipt、receipt SHA-256和canonical借用runtime root绑定authorization；launcher先取得全局锁再VERIFY，wrapper在制品发布前复核。不得回退或切换共享主工作区，不得把更晚治理HEAD、branch、foreign target、旧audit或路径名冒充候选所有权；REMOVE只处理reservation/receipt证明的对象，quarantine默认永久保留。
 
 A2允许在仓库外唯一artifact root生成正式镜像provenance、SBOM/security evidence、19步gate report和条件式UAT-class manifest；镜像参数必须使用A3批准私有registry的完整`repository@sha256:digest`引用，不能使用已删除loopback registry留下的`127.0.0.1:32776/...`引用。它允许按计划串行启动隔离测试容器和数据库，但不修改UAT/生产、不push外部registry、不读真实业务数据或四卷。
 
@@ -292,13 +292,14 @@ TASK53已完成首次晋升自锁修复，TASK54关闭原异机传输合同，TA
 16. `DONE / TASK71`：`CAPTURE_UAT_PROMOTION_SNAPSHOT`、snapshot intent、V4 actual-offhost四域内容绑定、history/receipt/current发布及保全式RECOVER已闭合；audit为7项SUPPORTED、8项阻断。source`e8dea20`→monitor`7c645ab`→Supervisor`bc339b6`形成30/128文件链；没有执行真实writer、备份、数据库、异机或恢复动作。
 17. `DONE / TASK72`：checkpoint 6一次性QUIESCE、精确Compose Web/Worker连续停止区间、无同project替代writer、非零binding及保全恢复已闭合；audit为8项SUPPORTED、7项阻断。source`8ab249e`→monitor`55c1b91`→Supervisor`ad98661`形成30/128文件链；证明范围不含未标注容器和外部数据库client，未执行真实writer、数据库或部署动作。
 18. `DONE / TASK73`：checkpoint 7一次性AUTHORIZE、批准intent、精确前代/候选/runtime/数据库/head/allowlist/role绑定、非零binding及保全恢复已闭合；受控Migration在数据库pool前失败关闭。审计为9项SUPPORTED、6项阻断；source`32860b8`→monitor`18b93e9`→Supervisor`302661c`形成30/128文件链，未连接数据库或运行Migration。
-19. `DOING / TASK74`：以独立`RUN_UAT_PROMOTION_MIGRATION`一次性授权接入checkpoint 8数据库client/session/role围栏、逐文件结果、最终reconciliation、不可覆盖提交回执和partial恢复；只做仓库、fake-root及可注入client，不连接真实数据库或执行Migration。
+19. `DONE / TASK74`：独立`RUN_UAT_PROMOTION_MIGRATION`一次性授权、checkpoint 8数据库client/session/role围栏、逐文件事务、最终reconciliation、不可覆盖提交回执和partial恢复已闭合；机器审计为10项SUPPORTED、5项阻断。source`5610a0d`→Supervisor`52242f8`形成130文件bundle`17efe85d…aad5`；未连接真实数据库、执行Migration或形成actual checkpoint 8回执。
+20. `DOING / TASK75`：实现checkpoint 9一次性Compose部署接管，精确替换Web/Worker、保留Caddy/PostgreSQL边界、验证新runtime/postdeploy identity，并在成功回执后接管checkpoint 8 active database fence；只做仓库、fake-root和可注入adapter，不操作真实Compose、容器或数据库。
 
 后续调度按对A1/A2、恢复和运行安全的影响选择最高优先级，保持一次一个正式任务编号。
 
 ## 14. 当前最小外部请求
 
-当前不需要项目负责人立即批准host或数据动作：D-135—D-148快照、reservation、monitor host delivery、权威projection、V2 cluster policy、逐代激活、target-bound egress、授权矩阵、跨岗UAT证据、晋升审计、事务BEGIN/RECOVER、promotion-bound四域snapshot、精确Compose writer持续静默及一次性Migration批准仓库合同已完成，但当前镜像已失效且执行器仍有6个阻断点，A2仍被最终镜像、A1和A3阻断，A6另被promotion executor/A4d/A5a及数据库围栏阻断；A4真实链缺目标/策略/真实数据授权，A5a还缺真实target/credential、实际安装、账号/systemd/网络授权和值班输入。持续交付负责人已按第13节第19项启动TASK74；TASK70等待资源与依赖。项目负责人若愿意并行准备非秘密外部信息，最小输入仍是A4a的三个故障域/RPO/RTO/加密/保留/责任人，未来A3的私有Git/registry目标名称，或A5a渠道类型/非秘密目标与值班责任人；A7d仍需要业务负责人逐项确认职责分离、全员只读范围和legacy grant处置。密码、Token和密钥仍只放root-only文件，不发聊天。
+当前不需要项目负责人立即批准host或数据动作：D-135—D-149快照、reservation、monitor host delivery、权威projection、V2 cluster policy、逐代激活、target-bound egress、授权矩阵、跨岗UAT证据、晋升审计、事务BEGIN/RECOVER、promotion-bound四域snapshot、精确Compose writer持续静默、一次性Migration批准及checkpoint 8提交仓库合同已完成，但当前镜像已失效且执行器仍有5个阻断点，A2仍被最终镜像、A1和A3阻断，A6另被promotion executor/A4d/A5a、实际数据库围栏与部署回执阻断；A4真实链缺目标/策略/真实数据授权，A5a还缺真实target/credential、实际安装、账号/systemd/网络授权和值班输入。持续交付负责人已按第13节第20项启动TASK75；TASK70等待资源与依赖。项目负责人若愿意并行准备非秘密外部信息，最小输入仍是A4a的三个故障域/RPO/RTO/加密/保留/责任人，未来A3的私有Git/registry目标名称，或A5a渠道类型/非秘密目标与值班责任人；A7d仍需要业务负责人逐项确认职责分离、全员只读范围和legacy grant处置。密码、Token和密钥仍只放root-only文件，不发聊天。
 
 第一个host变更请求最终仍是A1，但须等全部安全仓库变化收口并重建最终bundle/镜像后才请求；在此之前系统安全保持：UAT继续alpha.42/0040、历史候选和诊断证据只读保留但不可授权、正式入口失败关闭、无真实员工使用。
 

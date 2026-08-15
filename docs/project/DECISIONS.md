@@ -2942,6 +2942,42 @@
 - 拒绝因为执行adapter未实现就让legacy production路径继续创建pool；受控证据存在时必须在SQL和连接之前失败关闭。
 - 拒绝把fake-root、测试client、checkpoint 7回执或Migration最终head描述为真实数据库围栏、提交回执、A6通过或UAT已迁移。
 
+## D-149 checkpoint 8采用独立短时执行grant，数据库围栏保持到部署接管且未知结果只保全不重跑
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY FENCED MIGRATION COMMIT ADAPTER VERIFIED / DYNAMIC DATABASE VALIDATION DEFERRED / NO REAL DATABASE OR UAT ACTION / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK74对checkpoint 7批准、Migration runner、PostgreSQL角色/ACL/session、CONNECT/read-only fence、`schema_migrations`、promotion journal及恢复责任的源码核对，以及受限Node120/120、Python57/57验证
+- 确认边界：只接受仓库内execution intent/grant、fake-root、模拟数据库/Docker adapter、内容寻址checkpoint 8回执与负向门；不授权真实数据库连接/围栏、Migration SQL、CONNECT/role/ACL、Compose、host或UAT/生产动作
+
+### Context
+
+- checkpoint 7只表达一次性批准，不能证明执行时数据库client、角色和ACL仍满足released基线，也不能证明任何SQL提交。批准授权SHA若被执行复用，会破坏逐检查点单次消费和完整授权摘要链。
+- 每个Migration文件独立事务意味着故障可能发生在零文件、部分文件、全部文件但结果未落盘或结果已落盘但journal未发布。仅看最终head会把“已经精确提交”和“未知部分提交”混为一谈，自动重跑可能扩大事故。
+- checkpoint 8完成后新Web/Worker尚未建立。此时恢复数据库CONNECT或启动writer会在checkpoint 9之前留下未受控写窗口；因此Migration成功不能等同于围栏释放。
+
+### Decision
+
+1. `RUN_UAT_PROMOTION_MIGRATION`使用与checkpoint 7不同的Supervisor v6一次性授权，窗口最长15分钟，requester/approver/executor摘要互异。execution intent和内容寻址grant必须先于授权消费落盘，精确绑定ordinal-7、approval receipt/binding、promotion/candidate/runtime/database/snapshot/quiesce、current/target head、完整allowlist、Migration/control角色及Supervisor bundle。
+2. production入口只接受固定Supervisor派生grant和精确release artifact目录。源root、manifest及每个文件必须root-owned、单硬链接、无symlink、权限/bytes/SHA受限，目录identity在复制前后相同；环境变量和测试client不能形成真实执行权。
+3. 任何业务SQL前先重验精确Compose writer静默、released数据库/system identifier/OID/marker、9角色、5 LOGIN、4 membership、数据库ACL/owner privileges、唯一platform superuser、零额外backend/unknown CONNECT。只有这些基线完全一致才设置default-read-only、收紧CONNECT/connection limit并建立只允许精确Migration会话的数据库围栏。
+4. Migration容器必须使用manifest绑定的worker digest、固定network/mount/user/read-only/capability/resource/label，并由operation+grant唯一识别。SQL lexer拒绝顶层BEGIN/COMMIT/ROLLBACK等事务控制；每文件单事务、commit前deadline/身份/ledger复核，成功后核对完整有序`schema_migrations`摘要和围栏，数据库最终seal为`allow_connections=false`、connection limit 0。
+5. checkpoint 8回执绑定before/after fence、engine result、每文件outcome、最终ledger、approval receipt、execution grant及授权摘要链，并按history→receipt→current无覆盖发布。active fence在checkpoint 9显式交接或同operation恢复/quarantine解决前保持，其他Supervisor操作全部失败关闭。
+6. 超时/恢复先对精确数据库执行emergency seal，再按operation+grant唯一label定位候选并stop→kill→退出证明。已消费未执行、部分提交、全部提交但结果/回执未知、身份/head/checksum/fence漂移或发布冲突只保全/quarantine；禁止down SQL、猜测重跑、自动释放writer、删除未知容器或事故证据。
+
+### Consequences
+
+- 机器审计由9项SUPPORTED/6项阻断收敛为10项SUPPORTED/5项阻断（P0=4、P1=1）；6/8必需Supervisor操作实现，artifact/source-manifest SHA-256为`e4aa3687…e2fc`/`53a1515a…4239`，`assert-ready`继续返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+- source`ce7bb230974ac2f7d50ff16b751a5f99915f9d7a`/tree`f5043439aaaecf885305dccda6fc9e9cf82b3909`→边界修正`5610a0db8adadc04cae6f0b239c1fcd7a1e9bc1a`/tree`26edea69c120c7f2d3977d40aab971cf2a90f4e0`→Supervisor manifest-only`52242f826b542456ee22bae55dcc0b83c746dfea`/tree`6a20ec8fe44238a438401bdf15f777b22df6f47b`形成130文件canonical链；manifest raw SHA-256为`17efe85d…aad5`。
+- 受限Node120/120、Python57/57及inventory258/234/24通过。Swap停止线下未运行typecheck、全量测试、PostgreSQL或Docker动态执行；该范围归TASK70，不能由静态证据冒充。
+- 下一P0为TASK75 checkpoint 9一次性Compose部署与active fence交接；TASK70继续等待执行器完整和Swap停止线解除。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝复用checkpoint 7授权、把环境变量/advisory lock/最终head/进程退出0当作执行权或提交回执。
+- 拒绝在角色/ACL/session基线未知时先修改数据库，或只靠单次`pg_stat_activity`、容器名、operator声明证明全局围栏。
+- 拒绝把多文件Migration包进一个不可恢复大事务、允许迁移文件自行控制事务，或对未知部分提交自动重跑/down。
+- 拒绝在checkpoint 8成功后立即恢复CONNECT、启动writer或删除Migration容器/证据；围栏必须由checkpoint 9或同一operation恢复路径显式接管。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
