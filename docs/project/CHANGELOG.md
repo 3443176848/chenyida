@@ -4,6 +4,18 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-PROMOTION-ROLLBACK-RUNTIME-ADAPTER-80 - `feat: add trusted UAT rollback runtime gateway` / `build: bind UAT rollback runtime gateway bundle` / `docs: close rollback runtime gateway and start fixed executor`
+
+- 调度/范围：从TASK79最终Supervisor提交`cd9c9de`/tree`e6f035b1`启动唯一active task；只在仓库、fake-root和断网轻量测试中实现受信gateway，不连接真实数据库、不读取Volume/备份、不运行Compose或UAT/生产回退。
+- 边界决策：D-155将本任务限定为runtime gateway而非执行权。gateway只接受canonical plan/request/intent、固定activation/executor/Docker/source摘要和root-owned不可写父链；executor通过打开描述符及`/proc/self/fd`启动，环境、argv、deadline、输出和process group均受限。固定executor与activation另立TASK81。
+- 观察/保护：运行观察覆盖完整Compose project成员、unexpected writer、数据库和四服务identity、active及retained candidate volumes、derived targets和保护对象；未知container复用任何已知service ID、对象缺失/替换或摘要漂移均失败关闭。
+- containment/恢复：unknown/partial最多三次，每次先持久化内容寻址intent，再执行PROBE→CONTAIN→PROBE并写追加式attempt receipt。before/after drift、`STALE_INTENT`、refresh拒绝、非法响应或连续漂移只保全证据并阻断；不得自动删除candidate数据库/Volume或猜测重跑restore/switch。
+- 审计/发布链：15/15 checkpoint保持SUPPORTED，但固定executor/activation、隔离回退演练和人工UAT三项条件继续阻断；`assert-ready`精确返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。source`dff6793`/tree`71fb080f`→Supervisor`3509a71`/tree`c7d063db`形成145文件链，manifest raw SHA-256为`b3ecdf11…ab7e5`。
+- 验证：runtime contract9/9、Python gateway17/17、containment定向11/11、Python Supervisor/installer59/59、发布链Node组合48/48、manifest门20/20、inventory261/237/24、cross-role/audit生成物重放、Node syntax、Python AST、凭据和diff门通过。定向ESLint曾在192MiB V8 heap下退出134，未提高heap或继续全仓库lint。
+- 资源/边界：未运行build、Docker全量测试、Compose/PostgreSQL、backup/restore、Migration、镜像、部署、真实UAT、回退或业务写。收口available约1.3GiB、Swap813/1024MiB、根盘约12GiB、Load`0.04/0.28/0.26`；四服务restart0/OOM false，宿主`oom_kill=2`无任务内增量，无任务临时容器/manifest temp残留。
+- 数据库/API：无Schema、Migration或普通业务API变化；只扩展root Supervisor、rollback runtime合同/gateway、journal containment、安装联锁和机器审计。真实A4/A6/A7、账号、员工UAT、数据库和生产动作均未授权。
+- 治理：新增D-155，TASK80转`DONE`；自动启动`SELFHOST-UAT-PROMOTION-ROLLBACK-FIXED-EXECUTOR-81`为唯一`DOING`，实现固定executor与activation合同，TASK70继续等待资源与动态验证依赖。
+
 ### SELFHOST-UAT-PROMOTION-ROLLBACK-EXECUTOR-79 - `feat: add recoverable UAT rollback checkpoints` / `build: bind UAT rollback supervisor bundle` / `docs: close rollback checkpoints and start runtime adapter`
 
 - 调度/范围：从TASK78最终Supervisor提交`1baa01a`/tree`e3e6b435`启动唯一active task；只在仓库、fake-root和可注入无副作用adapter中实现checkpoint 14/15，不连接真实数据库、不读取Volume/备份、不运行Compose或UAT/生产回退。

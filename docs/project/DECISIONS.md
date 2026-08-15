@@ -3150,6 +3150,42 @@
 - 拒绝在授权消费后才做runtime preflight、让checkpoint 14/15共用授权，或以同一stage/check名称覆盖旧结果。
 - 拒绝在unknown/partial时猜测重跑、删除证据、直接回退Migration或改写已过账业务事实；也拒绝把15/15静态SUPPORTED描述为真实回退已验或可投产。
 
+## D-155 回退运行时采用内容寻址root受信gateway与有界可审计containment刷新
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / TRUSTED ROLLBACK RUNTIME GATEWAY VERIFIED / FIXED EXECUTOR AND ACTIVATION ABSENT / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK80对cluster recovery、四域restore、Compose deployment、postdeploy probe、identity工具和TASK79执行包的逐项核对，以及Node/Python轻量专项和数据/运行安全只读复审
+- 确认边界：只接受仓库/fake-root中的受信gateway、运行观察和containment控制；不授权或声称固定executor已安装/激活、真实数据库/Volume/Compose/UAT回退、数据恢复或人工UAT已发生
+
+### Context
+
+- TASK79只固定了Supervisor控制平面，生产adapter故意不存在。直接把root脚本路径或operator命令接入控制器，会使被替换的路径、继承环境、自由参数、daemon化子进程或不完整运行观察获得不可审计的回退权。
+- unknown/partial发生后，writer、数据库、candidate volume或容器可能在PROBE与CONTAIN之间变化。仅写最终contain结果会丢失每次尝试的输入、观察与因果关系，并诱使恢复逻辑对新对象执行旧intent。
+- 当前仓库已有TEST-only恢复/部署工具，但它们的目标、权限、幂等和真实UAT前置并不等价。gateway源码存在也不能证明固定executor、host activation或隔离动态演练已完成。
+
+### Decision
+
+1. runtime gateway只接受Supervisor生成的newline-terminated canonical JSON，精确绑定runtime plan、execution package、intent、operation/generation、action/label、deadline、activation、executor、Docker、deployment identity及所有source摘要。协议或摘要漂移在授权消费/外部动作前失败。
+2. activation、executor、Docker与source必须位于root-owned且不可组/全局写的父链，打开后复核device/inode/mode/owner/size/SHA；executor通过`/proc/self/fd`启动，Docker及source只以继承descriptor manifest传入。环境、argv、超时、输出和process group均固定，路径swap-back、子孙/daemon残留或超限输出均失败并收敛。
+3. 每次运行观察必须完整列出Compose project全部成员与writer inventory，且unexpected writer不得复用任何已知服务container ID；数据库、Caddy/PostgreSQL/Web/Worker、active volumes、retained candidate volumes、derived targets及保护对象均须精确且自摘要。
+4. unknown/partial containment最多三次。每次先无覆盖发布包含attempt序号及前一intent/receipt摘要的intent，再执行PROBE→CONTAIN→PROBE并写内容寻址attempt receipt；before drift、`STALE_INTENT`、after drift、refresh拒绝或非法contain响应都必须留下receipt，下一状态不得伪造为contained。
+5. 重试只允许停止同一ledger已知或观察到的新Web/Worker writer；数据库identity、Caddy/PostgreSQL、active/retained candidate volumes、derived targets和保护对象必须跨attempt不变。candidate数据库与四域只保全，不自动删除、覆盖、重建或猜测重跑。
+6. 本任务不实现或激活固定executor。正式gateway在executor/activation缺失时继续失败；下一任务TASK81独立实现固定executor和content-addressed activation合同，TASK70随后仍须在资源门允许时完成隔离Compose/PostgreSQL动态演练。
+
+### Consequences
+
+- feature source`dff6793959d0cf0ac14d8bf3d84a2be53b8b037c`/tree`71fb080f77b337f5414ba14baed9d333d18862c4`→manifest-only`3509a71848d682153c18e139617def56132e4890`/tree`c7d063db001978aea711c9bd29dc2338c72d9c6d`形成145文件canonical链；manifest raw SHA-256为`b3ecdf114009531332e3e19c25d9a20fdb5b80e550cb07ef97906f4b8f8ab7e5`。
+- runtime contract9/9、Python gateway17/17、containment定向11/11、Python Supervisor/installer59/59、发布链Node48/48、manifest20/20和inventory261/237/24通过；cross-role/audit artifact SHA-256为`8532ee92…f1e79`/`ee87cbf9…5cc94`。
+- 机器审计仍为`BLOCKED`，固定executor/activation、隔离回退演练和人工UAT三项条件未满足，`assert-ready`继续返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。静态/fixture证据不能替代actual checkpoint 8—15或真实回退回执。
+- 收口available约1.3GiB、Swap813/1024MiB、根盘约12GiB，宿主`oom_kill=2`无任务内增量；未运行全量lint/build、Docker/Compose/PostgreSQL、Migration、backup/restore、部署、真实UAT或回退。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝直接执行路径名、shell、operator自由argv/env，或只在exec前校验一次而不使用打开descriptor及返回后复核。
+- 拒绝只观察Web/Worker而遗漏同project成员、unexpected writer、数据库/Volume/保护对象，或允许未知writer复用Caddy/PostgreSQL等已知container ID。
+- 拒绝无限重试、覆盖旧intent/result、用新观察改写旧attempt，或在漂移后仍称contain成功；也拒绝自动删除candidate数据库/Volume以“清理”unknown状态。
+- 拒绝把gateway存在、15/15静态SUPPORTED、fake-root containment或当前bundle描述为固定executor已激活、真实回退已验或可投产。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

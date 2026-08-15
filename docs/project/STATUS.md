@@ -2,17 +2,32 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-ROLLBACK-RUNTIME-ADAPTER-80（执行中；建立受信回退运行时适配器）
+## SELFHOST-UAT-PROMOTION-ROLLBACK-FIXED-EXECUTOR-81（执行中；建立固定执行器与激活合同）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / TRUSTED ROLLBACK RUNTIME ADAPTER / REPOSITORY AND FAKE-ROOT ONLY / REAL ROLLBACK NOT AUTHORIZED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；核对既有恢复/部署/probe边界并实现固定binary/argv、最小权限、阶段化执行/contain/probe和unknown不重跑协议 |
-| 严格代码起点 | PASS / CONTROLLED | `cd9c9dee3bcf6aa859f177c699b754a129e2c54f`/tree`e6f035b180ab4be8f1613268b3f5e745ced05cac`；141文件bundle`e635792d…4645d`，用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / CONTROL PLANE COMPLETE WITHOUT RUNTIME | TASK79/D-154已固定checkpoint 14/15双授权、九阶段、十三检查、终态和恢复；生产runtime adapter、隔离演练及人工UAT仍缺失 |
-| 动态验收 | BLOCKED / TASK70 | Swap超过80%且受信adapter尚未完成；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
-| 资源 | STOP LINE ACTIVE | available约1.6GiB、Swap870MiB/1GiB（超过80%）、根盘约12GiB；仅运行仓库静态、Python、受限Node及fake-root轻量验证，不修改Swap或服务 |
+| 当前状态 | DOING / FIXED ROLLBACK EXECUTOR AND ACTIVATION CONTRACT / REPOSITORY AND FAKE-ROOT ONLY / REAL ROLLBACK NOT AUTHORIZED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；实现固定executor、content-addressed activation及九阶段/十三检查的受控工具映射 |
+| 严格代码起点 | PASS / CONTROLLED | `3509a71848d682153c18e139617def56132e4890`/tree`c7d063db001978aea711c9bd29dc2338c72d9c6d`；145文件bundle`b3ecdf11…ab7e5`，用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / TRUSTED GATEWAY COMPLETE WITHOUT EXECUTOR | TASK80/D-155已固定canonical gateway、descriptor执行、完整运行观察和三次containment receipt；固定executor/activation、隔离演练及人工UAT仍缺失 |
+| 动态验收 | BLOCKED / TASK70 | 固定executor尚未完成且资源余量窄；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
+| 资源 | STOP LINE ACTIVE | available约1.3GiB、Swap813MiB/1GiB、根盘约12GiB；此前受限ESLint发生V8 heap OOM，仅运行仓库静态、Python、受限Node及fake-root轻量验证，不修改Swap或服务 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不运行restore/rollback/Compose、pull/build/recreate/start/stop，不连接数据库或读取env/log/Volume/备份；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
-| 系统是否可用 | NO | runtime adapter/动态回退、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
+| 系统是否可用 | NO | fixed executor/activation、动态回退、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
+
+## SELFHOST-UAT-PROMOTION-ROLLBACK-RUNTIME-ADAPTER-80（完成；受信runtime gateway通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / TRUSTED ROLLBACK RUNTIME GATEWAY VERIFIED / FIXED EXECUTOR AND ACTIVATION ABSENT / PRODUCTION NO-GO | TASK80已释放active slot；TASK81接入固定executor/activation，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`dff6793`/tree`71fb080f`→Supervisor`3509a71`/tree`c7d063db`；145文件manifest raw SHA-256为`b3ecdf11…ab7e5`且重放一致 |
+| gateway/信任 | PASS / FAIL CLOSED | canonical request/response绑定plan、intent、activation、executor、deployment及source；root-owned不可写父链和打开描述符前后复核，executor经`/proc/self/fd`在净化环境和独立process group中启动 |
+| 运行观察 | PASS / COMPLETE INVENTORY | 完整Compose project成员、unexpected writer、数据库与四服务身份、active/retained candidate volumes、derived targets和保护对象均须精确且无service-ID复用 |
+| containment | PASS / BOUNDED PRESERVATION | 最多三次intent→PROBE/CONTAIN/PROBE→attempt receipt；before/after drift、STALE_INTENT、refresh拒绝或非法响应均追加证据并失败，不删除candidate数据库/Volume或猜测重跑 |
+| 审计 | PASS / EXECUTOR STILL BLOCKED | 15/15 checkpoint均SUPPORTED；固定executor/activation、隔离回退演练、人工UAT仍阻断，`assert-ready`精确返回`UAT_PROMOTION_EXECUTOR_NOT_READY` |
+| 自动验证 | PASS / SCOPED APPLICABLE | runtime contract9/9、Python gateway17/17、containment11/11、Python Supervisor/installer59/59、发布链Node48/48、manifest20/20、inventory261/237/24、syntax/AST/diff/凭据门通过 |
+| 资源/清理 | STOP LINE ACTIVE / CONTAINER OOM NONE | 收口available约1.3GiB、Swap813/1024MiB、根盘约12GiB、Load`0.04/0.28/0.26`；四服务restart0/OOM false，宿主`oom_kill=2`无任务内增量，无任务临时容器/manifest temp残留 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未运行全量lint/build、backup、Compose/PostgreSQL、Migration、镜像、部署、真实员工UAT、恢复、回滚或业务写；四个受保护Volume未触碰 |
+| 系统是否可用 | NO | 仓库gateway和fake-root结果不等于actual executor或回退；仍缺真实恢复、正式门、业务批准、试运行和切换 |
 
 ## SELFHOST-UAT-PROMOTION-ROLLBACK-EXECUTOR-79（完成；checkpoint 14/15控制平面通过）
 
