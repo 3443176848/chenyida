@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "c0a5a5619835bf82d478494ed63d2e2d68c54542634495aae93986090ad6f24d",
+  "artifact_sha256": "353abf12ff2779eeed984574eb07b39379f05eb5897a618a1dad6b04f2ce5a67",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -40,12 +40,15 @@
       "status": "SUPPORTED"
     },
     {
-      "evidence": [],
-      "finding": "没有把同一候选、授权、当前运行面、数据库、快照和逐检查点状态绑定的durable promotion intent/journal。",
+      "evidence": [
+        "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_INTENT_CONTRACT",
+        "uat-promotion-transaction-journal.mjs:runUatPromotionTransactionPhase"
+      ],
+      "finding": null,
       "id": "PROMOTION_INTENT_AND_DURABLE_JOURNAL",
       "ordinal": 4,
       "severity_if_incomplete": "P0",
-      "status": "MISSING"
+      "status": "SUPPORTED"
     },
     {
       "evidence": [
@@ -166,21 +169,15 @@
   "deployment_class": "UAT",
   "execution_class": "AUDIT_ONLY_NOT_AUTHORIZED",
   "execution_readiness": {
-    "blocking_checkpoint_count": 10,
+    "blocking_checkpoint_count": 9,
     "code": "UAT_PROMOTION_EXECUTOR_NOT_READY",
     "may_start": false,
-    "p0_blocker_count": 9,
+    "p0_blocker_count": 8,
     "p1_blocker_count": 1,
     "statement": "当前只允许继续仓库实施和隔离验证；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
     "status": "BLOCKED"
   },
   "findings": [
-    {
-      "finding": "没有把同一候选、授权、当前运行面、数据库、快照和逐检查点状态绑定的durable promotion intent/journal。",
-      "id": "PROMOTION_INTENT_AND_DURABLE_JOURNAL",
-      "severity": "P0",
-      "status": "MISSING"
-    },
     {
       "finding": "备份可生成UAT来源回执，但现有恢复只允许不同集群的可丢弃TEST目标；没有绑定本次晋升并可恢复到UAT的执行合同。",
       "id": "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
@@ -239,18 +236,18 @@
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "7773150b236325bf8c5ecb0503eaa835a844b8941e11787d0b488b8a0517e84a"
+      "sha256": "d0284911aa3f9d9adb7d1784c3279d1ee5b3431f81797523f8b2a74dcdbc29d0"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
-      "sha256": "02e59718b1158df6028888e19c11cd499c50469f4582dbbacbd4df20d0344f7e"
+      "sha256": "bd427a7bba4189c03426fb319fe1b6b5a5a51d6458b1fb648ea06da5ea8e92eb"
     },
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-      "required_tests": 232,
-      "sha256": "da85d92555b957c6b9a2d4697f88e96156230b8d37e6951e839c67189dfe187b",
-      "total_tests": 256
+      "required_tests": 233,
+      "sha256": "05a0c265feb1ee23d1b24563ee4bd698a5c921dddcbe7a776aa7806441d922fd",
+      "total_tests": 257
     },
     "source_manifest": {
       "files": [
@@ -277,6 +274,14 @@
           ],
           "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
           "sha256": "b5799f986211d3589cf0f68bcde7b35252f49489deb08ba111d7017821a0fba5"
+        },
+        {
+          "markers": [
+            "chenyida-erp-uat-promotion-transaction-policy/v1",
+            "\"status\": \"NOT_IMPLEMENTED\""
+          ],
+          "path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json",
+          "sha256": "e2c37a6b6afa5190e011e5a2a9d90b2266ccf551cdf51baf70ec54c813180bf8"
         },
         {
           "markers": [
@@ -348,7 +353,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "ec707ccdf1d59ef32495fe8af0776850281e0e43877f125a3a7a1e04a1223986"
+          "sha256": "671ec81c1da0c59fa605943fff2ffd4125b79dcff5d2fb33e8d307c59010834f"
         },
         {
           "markers": [
@@ -365,7 +370,7 @@
             "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
           ],
           "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
-          "sha256": "75d474fcabcd806d61079b22b0b6339ff9c066d643d676bdf37d9c6d56c66df5"
+          "sha256": "7b725bc761ef159b2bcee2b9e17c80ca1175e2c52d7a4db829e60f26e472bab3"
         },
         {
           "markers": [
@@ -374,31 +379,41 @@
           ],
           "path": "chenyida_erp_site/scripts/restore-selfhost.sh",
           "sha256": "c648db054afdcec661ffc293eec71f3087315412aa222078aabea3a4de102b22"
+        },
+        {
+          "markers": [
+            "UAT_PROMOTION_INTENT_CONTRACT",
+            "runUatPromotionTransactionPhase"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs",
+          "sha256": "ffb51d7c9a31ef1d4ad7185b6aac79d4d31ee4213f3380aa52518519a800750a"
         }
       ],
-      "sha256": "eab97c64078d00ff75e0da55710e3c9b9b2b7780d996c35e5e6a7a093f9de093"
+      "sha256": "68fd118d005d00a024cc0a90655c20f069533d81782e56ded763e28e8eda1f91"
     }
   },
   "observations": {
     "compose_release_image_binding": "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT",
     "cross_role_uat_readiness": "BLOCKED",
-    "implemented_required_promotion_operations": [],
+    "implemented_required_promotion_operations": [
+      "BEGIN_UAT_PROMOTION",
+      "RECOVER_UAT_PROMOTION"
+    ],
     "migration_authorization": "REPEATABLE_ENVIRONMENT_CONFIRMATION",
     "missing_required_promotion_operations": [
-      "BEGIN_UAT_PROMOTION",
       "CAPTURE_UAT_PROMOTION_SNAPSHOT",
       "QUIESCE_UAT_WRITERS",
       "RUN_UAT_PROMOTION_MIGRATION",
       "DEPLOY_UAT_RELEASE",
-      "ROLLBACK_UAT_RELEASE",
-      "RECOVER_UAT_PROMOTION"
+      "ROLLBACK_UAT_RELEASE"
     ],
     "required_promotion_operation_count": 7,
     "restore_target_policy": "TEST_ONLY",
-    "supervisor_operation_count": 19,
+    "supervisor_operation_count": 21,
     "supervisor_operations": [
       "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1",
       "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
+      "BEGIN_UAT_PROMOTION",
       "BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES",
       "CREATE_IMAGE_EVIDENCE",
       "CREATE_RELEASE_MANIFEST",
@@ -411,6 +426,7 @@
       "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION",
       "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION",
       "RECOVER_POSTGRESQL_RUNTIME_PRIVILEGE_INTENT",
+      "RECOVER_UAT_PROMOTION",
       "ROLLBACK_MONITORING_HOST_DELIVERY",
       "ROLLBACK_MONITORING_NOTIFIER_EGRESS_V1",
       "ROLLBACK_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",

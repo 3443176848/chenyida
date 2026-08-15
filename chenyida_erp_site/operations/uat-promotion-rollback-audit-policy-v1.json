@@ -13,6 +13,10 @@
     "ROLLBACK_UAT_RELEASE",
     "RECOVER_UAT_PROMOTION"
   ],
+  "expected_implemented_supervisor_operations": [
+    "BEGIN_UAT_PROMOTION",
+    "RECOVER_UAT_PROMOTION"
+  ],
   "required_checkpoint_order": [
     "CANDIDATE_SOURCE_SNAPSHOT",
     "ELIGIBLE_RELEASE_MANIFEST",
@@ -54,10 +58,10 @@
     },
     {
       "id": "PROMOTION_INTENT_AND_DURABLE_JOURNAL",
-      "status": "MISSING",
+      "status": "SUPPORTED",
       "severity_if_incomplete": "P0",
-      "evidence": [],
-      "finding": "没有把同一候选、授权、当前运行面、数据库、快照和逐检查点状态绑定的durable promotion intent/journal。"
+      "evidence": ["uat-promotion-transaction-journal.mjs:UAT_PROMOTION_INTENT_CONTRACT", "uat-promotion-transaction-journal.mjs:runUatPromotionTransactionPhase"],
+      "finding": null
     },
     {
       "id": "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
@@ -152,6 +156,8 @@
     {"path": "chenyida_erp_site/scripts/postdeploy-runtime-configuration-probe.mjs", "markers": ["POSTDEPLOY_RUNTIME_CONFIGURATION_PROBE_CONTRACT", "runtime_configuration_sha256"]},
     {"path": "chenyida_erp_site/scripts/postdeploy-release-contract.mjs", "markers": ["POSTDEPLOY_RECEIPT_CONTRACT", "buildReleaseIdentityFromPostDeployReceipt"]},
     {"path": "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs", "markers": ["buildReleaseIdentityFromPostDeployReceipt", "assertPostDeployReadinessStable"]},
-    {"path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json", "markers": ["HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED", "\"status\": \"BLOCKED\""]}
+    {"path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json", "markers": ["HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED", "\"status\": \"BLOCKED\""]},
+    {"path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json", "markers": ["chenyida-erp-uat-promotion-transaction-policy/v1", "\"status\": \"NOT_IMPLEMENTED\""]},
+    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "runUatPromotionTransactionPhase"]}
   ]
 }

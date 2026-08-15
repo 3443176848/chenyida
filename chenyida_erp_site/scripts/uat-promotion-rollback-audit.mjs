@@ -20,7 +20,7 @@ const REQUIRED_STATUS = Object.freeze({
   CANDIDATE_SOURCE_SNAPSHOT: "SUPPORTED",
   ELIGIBLE_RELEASE_MANIFEST: "SUPPORTED",
   PRE_DEPLOY_RUNTIME_STABILITY: "SUPPORTED",
-  PROMOTION_INTENT_AND_DURABLE_JOURNAL: "MISSING",
+  PROMOTION_INTENT_AND_DURABLE_JOURNAL: "SUPPORTED",
   PROMOTION_BOUND_RECOVERABLE_SNAPSHOT: "PARTIAL",
   WRITER_QUIESCE_RECEIPT: "PARTIAL",
   ONE_TIME_MIGRATION_AUTHORIZATION: "PARTIAL",
@@ -140,12 +140,13 @@ function validateCapabilities(policy, sourceBodies, errors) {
 
 function inspectRepository(policy, sourceBodies, errors) {
   const launcher = sourceBodies.get("chenyida_erp_site/scripts/release-supervisor-launcher.py") ?? "";
-  const mappings = ["ENTRYPOINTS", "RUNTIME_PRIVILEGE_OPERATIONS", "CLUSTER_POLICY_OPERATIONS", "NOTIFIER_EGRESS_OPERATIONS"];
+  const mappings = ["ENTRYPOINTS", "RUNTIME_PRIVILEGE_OPERATIONS", "CLUSTER_POLICY_OPERATIONS", "NOTIFIER_EGRESS_OPERATIONS", "UAT_PROMOTION_OPERATIONS"];
   const supervisorOperations = [...new Set(mappings.flatMap((name) => extractPythonMappingKeys(launcher, name, errors)))].sort();
   const required = policy.required_supervisor_operations ?? [];
   if (!Array.isArray(required) || required.length < 7 || required.some((item) => !IDENTIFIER.test(item))) error(errors, "AUDIT_REQUIRED_SUPERVISOR_OPERATIONS_INVALID");
   const implementedRequired = required.filter((item) => supervisorOperations.includes(item));
   const missingRequired = required.filter((item) => !supervisorOperations.includes(item));
+  const expectedImplemented = policy.expected_implemented_supervisor_operations ?? [];
 
   const restore = sourceBodies.get("chenyida_erp_site/scripts/restore-selfhost.sh") ?? "";
   const migration = sourceBodies.get("chenyida_erp_site/scripts/release-migration-authorization.ts") ?? "";
@@ -162,7 +163,8 @@ function inspectRepository(policy, sourceBodies, errors) {
     compose_release_image_binding: compose.includes("ERP_WEB_IMAGE") && compose.includes("ERP_WORKER_IMAGE") ? "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT" : "UNKNOWN",
     cross_role_uat_readiness: crossRole?.readiness?.status ?? "UNKNOWN",
   };
-  if (implementedRequired.length !== 0) error(errors, "AUDIT_DECLARED_ABSENCE_STALE", implementedRequired.join(","));
+  if (!Array.isArray(expectedImplemented) || expectedImplemented.some((item) => !IDENTIFIER.test(item))
+    || !exactSet(implementedRequired, expectedImplemented)) error(errors, "AUDIT_IMPLEMENTED_OPERATION_DRIFT", implementedRequired.join(","));
   if (observations.restore_target_policy !== "TEST_ONLY") error(errors, "AUDIT_RESTORE_BOUNDARY_DRIFT");
   if (observations.migration_authorization !== "REPEATABLE_ENVIRONMENT_CONFIRMATION") error(errors, "AUDIT_MIGRATION_AUTHORIZATION_DRIFT");
   if (observations.compose_release_image_binding !== "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT") error(errors, "AUDIT_COMPOSE_BINDING_DRIFT");
@@ -255,7 +257,7 @@ export function renderMarkdown(artifact) {
     `- 执行判定：\`${artifact.execution_readiness.code}\`；P0=${artifact.execution_readiness.p0_blocker_count}，P1=${artifact.execution_readiness.p1_blocker_count}，may_start=\`${artifact.execution_readiness.may_start}\`。`,
     `- ${artifact.execution_readiness.statement}`,
     "",
-    "仓库已有候选source snapshot、ELIGIBLE manifest、pre-deploy runtime guard、postdeploy probe和runtime identity；但没有把备份、writer quiesce、Migration、Compose部署、业务UAT和回退串成同一耐久逐检查点事务。",
+    "仓库已有候选source snapshot、ELIGIBLE manifest、pre-deploy runtime guard、promotion intent/journal、postdeploy probe和runtime identity；但尚未把promotion-bound snapshot、writer quiesce、Migration、Compose部署、业务UAT和回退适配器接入同一耐久逐检查点事务。",
     "",
     "## 2. Supervisor操作面",
     "",
@@ -282,7 +284,7 @@ export function renderMarkdown(artifact) {
     "",
     "任何工具、手册或operator在本artifact仍为BLOCKED时调用晋升断言，必须得到`UAT_PROMOTION_EXECUTOR_NOT_READY`。不得用root手工Compose、可重复环境变量、TEST恢复回执、旧postdeploy receipt或最终health页面绕过缺失检查点。",
     "",
-    "下一实现必须建立内容寻址promotion intent/history/receipts/current、每步一次性授权、精确前代回退、unknown/partial保全与同一候选/数据库/快照/运行面绑定；之后才可在合成Compose和隔离PostgreSQL做动态验证。",
+    "下一实现必须接入promotion-bound可恢复快照和writer quiesce，并继续沿用内容寻址history/receipts/current、每步一次性授权、精确前代回退及unknown/partial保全；执行器完整后才可在合成Compose和隔离PostgreSQL做动态验证。",
     "",
     "## 6. 源码manifest",
     "",

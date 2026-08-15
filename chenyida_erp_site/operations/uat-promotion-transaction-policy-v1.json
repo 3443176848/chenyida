@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-uat-promotion-transaction-policy/v1",
+  "authority": "ROOT_RELEASE_SUPERVISOR_ONE_TIME_AUTHORIZATION",
+  "deployment": {
+    "class": "UAT",
+    "id": "chenyida-erp",
+    "database": "chenyida_erp",
+    "database_marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp"
+  },
+  "state": {
+    "root": "/var/lib/chenyida-erp/uat-promotion-transactions-v1",
+    "marker": ".chenyida-erp-uat-promotion-transactions-v1",
+    "marker_value": "chenyida-erp-uat-promotion-transactions/v1\n",
+    "directory_mode": "0700",
+    "file_mode": "0400",
+    "owner_uid": 0,
+    "owner_gid": 0
+  },
+  "authorization": {
+    "contract": "chenyida-erp-release-supervisor-authorization/v6",
+    "maximum_window_minutes": 60,
+    "required_distinct_actors": [
+      "requester_identity_sha256",
+      "approver_identity_sha256",
+      "executor_identity_sha256"
+    ],
+    "begin_operation": "BEGIN_UAT_PROMOTION",
+    "recovery_operation": "RECOVER_UAT_PROMOTION"
+  },
+  "required_intent_bindings": [
+    "candidate_commit",
+    "candidate_tree",
+    "application_version",
+    "candidate_snapshot_receipt_sha256",
+    "eligible_release_manifest_sha256",
+    "web_image_reference",
+    "worker_image_reference",
+    "migration_head",
+    "migration_manifest_sha256",
+    "current_runtime_identity_sha256",
+    "database_identity_sha256",
+    "preupgrade_recovery_readiness_sha256",
+    "preupgrade_recovery_snapshot_sha256",
+    "authorization_window",
+    "three_distinct_actors",
+    "checkpoint_order"
+  ],
+  "checkpoint_order": [
+    "CANDIDATE_SOURCE_SNAPSHOT",
+    "ELIGIBLE_RELEASE_MANIFEST",
+    "PRE_DEPLOY_RUNTIME_STABILITY",
+    "PROMOTION_INTENT_AND_DURABLE_JOURNAL",
+    "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
+    "WRITER_QUIESCE_RECEIPT",
+    "ONE_TIME_MIGRATION_AUTHORIZATION",
+    "MIGRATION_COMMIT_RECEIPT",
+    "COMPOSE_DEPLOYMENT_RECEIPT",
+    "POST_DEPLOY_RUNTIME_CONFIGURATION",
+    "POST_DEPLOY_IDENTITY",
+    "CROSS_ROLE_UAT_EXECUTION",
+    "PROMOTION_FINAL_RECEIPT",
+    "ROLLBACK_TO_UAT_EXECUTOR",
+    "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT"
+  ],
+  "initial_checkpoint": "PROMOTION_INTENT_AND_DURABLE_JOURNAL",
+  "adapters": [
+    {"operation": "BEGIN_UAT_PROMOTION", "status": "IMPLEMENTED", "checkpoints": ["CANDIDATE_SOURCE_SNAPSHOT", "ELIGIBLE_RELEASE_MANIFEST", "PRE_DEPLOY_RUNTIME_STABILITY", "PROMOTION_INTENT_AND_DURABLE_JOURNAL"]},
+    {"operation": "CAPTURE_UAT_PROMOTION_SNAPSHOT", "status": "NOT_IMPLEMENTED", "checkpoints": ["PROMOTION_BOUND_RECOVERABLE_SNAPSHOT"]},
+    {"operation": "QUIESCE_UAT_WRITERS", "status": "NOT_IMPLEMENTED", "checkpoints": ["WRITER_QUIESCE_RECEIPT"]},
+    {"operation": "RUN_UAT_PROMOTION_MIGRATION", "status": "NOT_IMPLEMENTED", "checkpoints": ["ONE_TIME_MIGRATION_AUTHORIZATION", "MIGRATION_COMMIT_RECEIPT"]},
+    {"operation": "DEPLOY_UAT_RELEASE", "status": "NOT_IMPLEMENTED", "checkpoints": ["COMPOSE_DEPLOYMENT_RECEIPT", "POST_DEPLOY_RUNTIME_CONFIGURATION", "POST_DEPLOY_IDENTITY", "CROSS_ROLE_UAT_EXECUTION", "PROMOTION_FINAL_RECEIPT"]},
+    {"operation": "ROLLBACK_UAT_RELEASE", "status": "NOT_IMPLEMENTED", "checkpoints": ["ROLLBACK_TO_UAT_EXECUTOR", "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT"]},
+    {"operation": "RECOVER_UAT_PROMOTION", "status": "IMPLEMENTED", "checkpoints": []}
+  ],
+  "journal": {
+    "initial_completed_checkpoint_count": 4,
+    "initial_status": "IN_PROGRESS",
+    "terminal_statuses": ["COMMITTED", "ROLLED_BACK", "QUARANTINED"],
+    "blocking_statuses": ["UNKNOWN", "PARTIAL", "QUARANTINED"],
+    "require_previous_receipt_sha256": true,
+    "require_same_candidate_database_snapshot_and_intent": true,
+    "allow_checkpoint_skip": false,
+    "allow_overwrite": false,
+    "quarantine_preservation": "FILES_LEFT_IN_PLACE_NO_AUTOMATIC_DELETE"
+  }
+}
