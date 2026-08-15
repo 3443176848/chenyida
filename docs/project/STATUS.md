@@ -2,16 +2,31 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68（执行中；先做仓库静态失败关闭审计）
+## SELFHOST-UAT-PROMOTION-TRANSACTION-JOURNAL-69（执行中；先建立内容寻址事务基座）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY STATIC AUDIT FIRST / RESOURCE STOP LINE ACTIVE / NO UAT OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；审计candidate、预部署、快照/备份、Migration、部署、postdeploy、业务UAT和回退后复核的逐检查点状态机 |
-| 严格起点 | PASS / CONTROLLED | `186e117cdebf2076619c75379edf4e36a1f7394a`/tree`c36d57a969afc720cf12ed032ffb025933617b50`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / REPOSITORY INPUTS READY | TASK53、TASK59—TASK60和TASK67分别固定release lifecycle、snapshot/reservation与跨岗证据合同；动态Compose/PostgreSQL验收尚未执行 |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap约860MiB/1GiB（超过80%）、根盘约13GiB、Load低；仅运行静态/轻量合成验证，不修改Swap或服务 |
+| 当前状态 | DOING / REPOSITORY TRANSACTION CONTROL FIRST / RESOURCE STOP LINE ACTIVE / NO UAT OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；建立promotion intent/history/receipt/current、一次性BEGIN/RECOVER、单调检查点与unknown/partial保全 |
+| 严格起点 | PASS / CONTROLLED | `1c70602282902c79066452d14fd836f868e94efb`/tree`46ec0e9a827b11d6d5d346b87f2eafab9f53ea96`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / MACHINE AUDIT READY | TASK68/D-144固定15检查点、5项SUPPORTED和10项阻断；TASK69只关闭最先决的durable journal，不执行真实适配器 |
+| 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap865MiB/1GiB（超过80%）、根盘13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不启动Compose/PostgreSQL，不连接数据库或执行UAT写/回滚；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
-| 系统是否可用 | NO | 无源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+| 系统是否可用 | NO | 无完整晋升执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+
+## SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68（完成；机器审计通过，执行器仍失败关闭）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / SOURCE-BOUND STATIC AUDIT VERIFIED / EXECUTOR BLOCKED FAIL-CLOSED / DYNAMIC VALIDATION SPLIT TO TASK70 / PRODUCTION NO-GO | TASK68技术审计已释放active slot；TASK69开始事务基座，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`79e4e80`/tree`a756b1b0`→monitor`84a2c78`/tree`4de5f247`→Supervisor`1c70602`/tree`46ec0e9a`；30/126文件manifest为`9c1e9052…5ac39`/`56009eb7…12b5`且重放一致 |
+| 审计 | PASS / SOURCE BOUND | 15检查点/15源码文件；artifact/source-manifest SHA-256为`c0a5a561…6f24d`/`eab97c64…de093`；5项SUPPORTED、10项阻断（P0=9、P1=1） |
+| 关键缺口 | BLOCKED / FAIL CLOSED | 19个Supervisor操作中7个必需晋升/回滚操作实现0个；restore TEST-only、Migration确认可重复、Compose无回执、人工UAT BLOCKED |
+| 拒绝门 | PASS / NOT READY | `assert-ready`退出1并精确返回`UAT_PROMOTION_EXECUTOR_NOT_READY`；旧回执、root手工命令或最终health不能绕过 |
+| 自动验证 | PASS / SCOPED APPLICABLE | 专项8/8、release合同29/29、Supervisor105/105、inventory256/232/24、credentials1734及diff门通过；旧政策摘要锚点首跑1/105失败后精确修复并全量重跑 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | available约1.9GiB、Swap865MiB/1GiB、根盘13GiB、Load`0.34/0.33/0.22`；四服务restart0/OOM false，临时容器0 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未运行build、Compose/PostgreSQL测试、Migration、镜像、快照、恢复、部署或业务写 |
+| 系统是否可用 | NO | 审计只证明当前缺口可检测；不证明真实晋升、回滚、恢复或人工UAT可执行 |
 
 ## SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67（完成；仓库合成合同通过，人工UAT待办）
 

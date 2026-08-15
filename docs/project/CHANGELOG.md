@@ -4,6 +4,17 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-PROMOTION-ROLLBACK-CHECKPOINT-AUDIT-68 - `test: audit UAT promotion rollback checkpoints` / `release: bind monitoring bundle to UAT audit source` / `release: bind supervisor bundle to UAT audit source` / `test: update UAT audit runtime policy anchor` / `release: rebind monitoring bundle after audit anchor fix` / `release: rebind supervisor bundle after audit anchor fix` / `docs: close promotion audit and start transaction journal`
+
+- 调度/范围：从TASK67最终Supervisor提交`186e117c`/tree`c36d57a9`启动唯一active task；只读审计candidate、预部署、快照/备份、Migration、Compose部署、postdeploy、业务UAT和回退后复核，不连接数据库或修改UAT/生产。
+- 机器审计：新增版本化policy、确定性generator、canonical artifact和人读报告，绑定15个有序检查点与15个权威源码文件。artifact/source-manifest SHA-256为`c0a5a561…6f24d`/`eab97c64…de093`。
+- 结论/失败关闭：当前只有5项SUPPORTED，10项阻断（P0=9、P1=1）；19个Supervisor操作中7个必需晋升/回滚操作实现0个。restore仍TEST-only、Migration授权仍为可重复环境确认、Compose digest override没有晋升回执、TASK67人工UAT仍BLOCKED；`assert-ready`精确返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+- 发布链：release inventory更新为256/232/24；最终source`79e4e80`/tree`a756b1b0`→monitor manifest-only`84a2c78`/tree`4de5f247`→Supervisor manifest-only`1c70602`/tree`46ec0e9a`形成30/126文件chain，manifest raw SHA-256为`9c1e9052…5ac39`/`56009eb7…12b5`且逐字节重放一致。早先`7257034→3795a15→dba6066`链因Python摘要锚点漂移只保留历史审计价值。
+- 验证：专项8/8、release gate+manifest合同29/29、Supervisor Python105/105、inventory verify、credentials 1,734文件及diff门通过。第一次完整Supervisor复跑诚实发现旧runtime-policy摘要锚点1/105失败，精确更新后原105项全部通过，未跳过或降低断言。
+- 资源/边界：起点available约1.9GiB、Swap863MiB/1GiB，收口约1.9GiB/865MiB，根盘13GiB、Load低；四服务restart0/OOM false，Web/PostgreSQL healthy，临时容器0。Swap持续超过80%，未运行build、全量Node/PostgreSQL、Docker数据库、typecheck、Migration、镜像、快照、恢复、部署或业务写。
+- 数据库/API：无Schema/Migration或业务API行为变化；新增审计和发布拒绝门，不声称缺失执行器已实现。动态Compose/隔离PostgreSQL验收已拆为TASK70`BLOCKED`。
+- 治理：新增D-144，TASK68转`DONE`；自动启动`SELFHOST-UAT-PROMOTION-TRANSACTION-JOURNAL-69`为唯一`DOING`，先闭合内容寻址promotion transaction journal和BEGIN/RECOVER，不触发任何真实适配器。
+
 ### SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67 - `test: lock cross-role UAT evidence contract` / `test: refresh supervisor runtime policy anchor` / `build: refresh monitoring host bundle` / `build: refresh release supervisor bundle` / `docs: close cross-role UAT evidence and start promotion rollback audit`
 
 - 调度/范围：从TASK66最终Supervisor提交`9b657f24`/tree`2f104665`启动唯一active task；只在仓库审计核心业务链、授权矩阵和既有测试，不创建/登录账号，不连接数据库或修改UAT/生产。

@@ -2767,6 +2767,41 @@
 - 拒绝用直接SQL删除/改写清理业务记录，用最终余额代替逐步增量，或只验证正常路径而跳过403、CSRF、幂等、CAS、半记录和审计。
 - 拒绝从HEAD临时生成未提交场景、容忍TASK66摘要漂移，或让旧候选/旧bundle的证据为当前源码背书。
 
+## D-144 UAT晋升必须由源码摘要审计与内容寻址事务链失败关闭
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / SOURCE-BOUND STATIC AUDIT VERIFIED / EXECUTOR INCOMPLETE / DYNAMIC VALIDATION BLOCKED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK68对release lifecycle、candidate snapshot/reservation、backup/restore、Migration、Compose、postdeploy、TASK67跨岗UAT和Supervisor操作面的只读审计及专项8/8、release29/29、Supervisor105/105验证
+- 确认边界：只接受仓库机器审计、失败关闭断言和后续实现顺序；不授权host、账号、凭据、备份恢复、UAT/生产、真实数据、Migration、Compose、部署或回滚
+
+### Context
+
+- 现有仓库分别具备candidate source snapshot、ELIGIBLE manifest、pre-deploy runtime guard、postdeploy runtime configuration与release identity，但这些独立证据不能证明同一晋升窗口中的备份、停写、Migration、部署、业务UAT和回退是一条可恢复事务。
+- `release-migration-authorization.ts`仍依赖可重复环境确认；`compose.release.yml`的digest override不是部署回执；backup入口要求writer已停止但不产生promotion-bound quiesce receipt；restore入口只允许可丢弃TEST目标，不能据此声称可回退UAT。
+- 直接允许root按手册串行执行会留下半完成、跨候选/跨代复用、旧证据冒充、unknown partial被覆盖及无法证明恢复目标等P0风险。
+
+### Decision
+
+1. 以版本化policy和确定性generator审计15个有序检查点及15个权威源码文件；artifact必须包含源码manifest、release inventory摘要、自摘要、观察事实和逐项finding。源码marker、操作集合、人工UAT状态或生成结果漂移一律失败关闭。
+2. 当前只有候选快照、ELIGIBLE manifest、预部署稳定性、postdeploy配置和postdeploy identity 5项`SUPPORTED`；其余10项保持阻断（P0=9、P1=1）。任何检查点不是`SUPPORTED`时，晋升断言必须返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+3. 不得用root手工Compose、可重复环境变量、旧TEST恢复回执、旧postdeploy receipt、最终health或文档签字绕过机器阻断。失败/unknown/partial不能推进后续步骤或整体成功，也不能覆盖前代证据。
+4. 环境级快照回滚必须绑定同一promotion、精确数据库与三个文件域、前代镜像/配置及回退后核验；业务更正继续使用追加式冲销/反向记录，禁止直接删表、改账或覆写已过账事实。
+5. 实施顺序固定为先完成TASK69内容寻址promotion intent/history/receipt/current、一次性BEGIN/RECOVER和保全式恢复，再逐项接入snapshot/quiesce/Migration/deploy/postdeploy/UAT/rollback adapter；每关闭一项必须更新机器审计而非仅改文档状态。
+6. 因Swap超过80%，Compose/隔离PostgreSQL动态验收从TASK68拆为TASK70并保持`BLOCKED`，直至资源门恢复且全部执行器依赖完成。静态/fake-root通过不构成A6、A7或生产授权。
+
+### Consequences
+
+- TASK68 artifact/source-manifest SHA-256为`c0a5a5619835bf82d478494ed63d2e2d68c54542634495aae93986090ad6f24d`/`eab97c64078d00ff75e0da55710e3c9b9b2b7780d996c35e5e6a7a093f9de093`；当前19个Supervisor操作中7个必需晋升/回滚操作实现0个。
+- 最终source`79e4e80412fc1d2ba7a4ae19e9902f98313594e7`/tree`a756b1b05ec5027ecc7c1f9184629d601e042bd7`→monitor`84a2c78e3e664033ce1bd08d6e30de49418e0025`/tree`4de5f2472d2989694a9d7bfda4e28e25cfbbb22f`→Supervisor`1c70602282902c79066452d14fd836f868e94efb`/tree`46ec0e9a827b11d6d5d346b87f2eafab9f53ea96`形成30/126文件canonical链；manifest SHA-256为`9c1e9052…5ac39`/`56009eb7…12b5`。
+- 专项8/8、release合同29/29、Supervisor105/105、inventory256/232/24和credentials 1,734文件通过；第一次完整Supervisor复跑发现旧runtime-policy摘要锚点1/105失败，精确修正后同一断言集全通过。
+- 未运行build、Compose/PostgreSQL测试、Migration、镜像、快照、恢复、部署或业务写。A1—A8仍全部未授权，系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝以运维手册、shell顺序、最终health、人工备注或环境变量确认代替耐久事务、一次性授权和逐步不可变回执。
+- 拒绝把TEST-only恢复器扩权解释为UAT回退已实现，也拒绝在缺少已验快照时声称“可回滚”。
+- 拒绝把静态审计、fake-root或合成测试标记为真实晋升/回滚PASS，或因资源停止线而跳过动态验证。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
