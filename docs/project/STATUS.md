@@ -2,17 +2,32 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-WRITER-QUIESCE-72（执行中；接入writer持续停写回执）
+## SELFHOST-UAT-MIGRATION-TRANSACTION-73（执行中；接入一次性Migration与提交回执）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / REPOSITORY CONTINUED-QUIESCENCE ADAPTER / RESOURCE STOP LINE ACTIVE / NO REAL CONTAINER OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；接入promotion checkpoint 6 quiesce adapter、回执和保全式恢复，只证明持续停写 |
-| 严格起点 | PASS / CONTROLLED | `bc339b6b1533acdd1123cebea818bc3302332440`/tree`f7fd37bd3a79d9f99ecbfc7b3151e13291710c7c`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / SNAPSHOT CHECKPOINT READY | TASK71/D-146固定三方v6 CAPTURE/RECOVER、V4 actual-offhost四域和8项剩余阻断；TASK72只关闭writer持续停写回执，不实际操控容器 |
+| 当前状态 | DOING / REPOSITORY MIGRATION AUTHORIZATION AND COMMIT RECEIPT / RESOURCE STOP LINE ACTIVE / NO REAL DATABASE OR UAT ACTION / PRODUCTION NO-GO | 唯一active task；接入promotion checkpoint 7/8一次性Migration授权、数据库连接围栏、提交回执和保全式恢复 |
+| 严格起点 | PASS / CONTROLLED | `ad98661b78e5f9fb989a7d56d78992c24592b27d`/tree`8912ce1005ebd22982fc65e0a1169ed68c4769a1`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / QUIESCE CHECKPOINT READY WITH EXPLICIT SCOPE | TASK72/D-147固定精确Compose writer持续停止，但明确不证明未标注容器或外部数据库client；TASK73必须用数据库级围栏关闭该边界 |
 | 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
 | 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap868MiB/1GiB（超过80%）、根盘13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不停止/启动容器，不启动backup/Compose/PostgreSQL，不连接数据库或执行UAT写/回滚；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不停止/启动容器，不启动backup/Compose/PostgreSQL，不连接数据库、修改CONNECT/role/ACL或执行Migration/UAT写；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
 | 系统是否可用 | NO | 无完整晋升执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+
+## SELFHOST-UAT-WRITER-QUIESCE-72（完成；精确Compose writer持续静默适配器通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY CONTINUED-QUIESCENCE ADAPTER VERIFIED / EXACT COMPOSE WRITERS ONLY / EXTERNAL DATABASE CLIENTS DEFERRED TO MIGRATION FENCE / PRODUCTION NO-GO | TASK72已释放active slot；TASK73接入Migration事务，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`8ab249e`/tree`af751336`→monitor`55c1b91`/tree`2f5005c0`→Supervisor`ad98661`/tree`8912ce10`；30/128文件manifest为`c369bc16…70eb`/`4704aad8…ab5`且重放一致 |
+| 依赖决策 | PASS / D-147 | checkpoint 6只覆盖精确Compose project/working directory成员；未标注容器、其他主机和数据库client转交Migration数据库连接围栏，禁止过度声称全局停写 |
+| quiesce合同 | PASS / FAIL CLOSED | 一次性QUIESCE、授权消费前intent、ordinal-5/snapshot/candidate/database/runtime绑定、原Web/Worker连续停止区间、replacement/extra同project writer拒绝及非零binding完整 |
+| 恢复 | PASS / PRESERVATION FIRST | 三个发布崩溃点可由新授权收敛；source替换、冲突、hardlink/symlink和未知状态保全并quarantine，不自动操控容器 |
+| 审计 | PASS / EXECUTOR STILL BLOCKED | artifact self SHA-256为`7085cd75…3fc`；8项SUPPORTED、7项阻断（P0=6、P1=1），4/7必需Supervisor operation实现，`assert-ready`继续精确拒绝 |
+| 自动验证 | PASS / SCOPED APPLICABLE | 受限Node62/62、Supervisor112/112、monitor manifest31/31、Supervisor manifest40/40、inventory257/233/24、生成物重放及diff/敏感门通过 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | 起点/收口available约1.9GiB、Swap868MiB/1GiB、根盘13GiB、Load未持续越线；四个项目容器restart0/OOM false，临时Node容器`--rm`，两个既有额外容器未触碰 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 当前四个UAT容器仍running；未运行build、backup、writer stop/start、Compose/PostgreSQL、Migration、镜像、部署、回滚或业务写 |
+| 系统是否可用 | NO | 仓库quiesce adapter不等于当前UAT停写或数据库全局围栏；仍缺7项adapter、真实恢复、正式门、业务批准、人工UAT和切换 |
 
 ## SELFHOST-UAT-PROMOTION-BOUND-SNAPSHOT-71（完成；promotion-bound四域快照适配器通过）
 

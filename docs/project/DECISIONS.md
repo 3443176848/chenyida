@@ -2872,6 +2872,41 @@
 - 拒绝只绑定PostgreSQL而遗漏三个文件域，或只比较最终readiness摘要而不绑定内层恢复、transfer、cluster/credential/tablespace和policy activation。
 - 拒绝因backup入口需要停写就静默换序、让snapshot adapter自行操控当前容器，或把采集时停写证明冒充Migration前持续停写回执。
 
+## D-147 writer持续静默只覆盖精确Compose成员，外部数据库写入方由Migration连接围栏关闭
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / EXACT COMPOSE WRITERS VERIFIED / EXTERNAL DATABASE CLIENTS DEFERRED / NO REAL WRITER OR DATABASE ACTION / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK72对Compose labels、backup fence、release runtime、Migration入口和当前Docker metadata的只读核对及受限Node62/62、Supervisor112/112验证
+- 确认边界：只接受仓库内quiesce adapter、一次性授权、内容寻址回执、fake-root证据和当前daemon精确metadata只读语法核验；不授权真实writer停止/启动、数据库、Migration、Compose、host或UAT/生产动作
+
+### Context
+
+- TASK71的checkpoint 5证明V4 snapshot采集时精确Web/Worker已停止，但snapshot adapter完成后只释放数据库CONNECT/read-only fence，且不会重启writer。进入Migration前必须重新证明原writer自采集结束后没有启动或被同project替换。
+- Docker/Compose metadata只能枚举当前daemon中带精确project、working directory、service和deployment labels的容器。它不能证明未标注容器、其他主机进程或直接数据库client不存在；把“精确Compose成员静默”表述为“所有业务writer静默”会制造错误安全结论。
+- 当前`migrate-postgres.ts`只有schema advisory lock，`release-migration-authorization.ts`仍接受可重复环境确认。advisory lock只串行Migration实例，不能排除其他业务写入连接，也不是一次性promotion授权或提交回执。
+
+### Decision
+
+1. checkpoint 6固定为`EXACT_COMPOSE_PROJECT_AND_WORKING_DIRECTORY_ONLY_EXTERNAL_CLIENTS_DEFERRED_TO_MIGRATION_FENCE`。它精确绑定ordinal-5 snapshot、promotion/candidate/database/runtime、Compose project/working directory和原Web/Worker完整容器/镜像身份。
+2. `QUIESCE_UAT_WRITERS`使用新的最长60分钟、requester/approver/executor互异的Supervisor v6一次性授权。quiesce intent在授权消费前持久化；source在prepare前、消费前和消费后按同一inode metadata与SHA-256重验。
+3. production probe固定`/usr/bin/docker`且不用shell，只接受单硬链接root-owned安全binary和有界、净化的只读metadata输出。原Web/Worker必须同ID/名称/镜像/runtime/Migration，处于stopped/exited 0、restart0/OOM false，且snapshot verify后没有重启；同project相同service出现额外或替代容器即拒绝。
+4. checkpoint 6的非零`writer_quiesce_binding_sha256`覆盖snapshot后连续停止区间、两容器身份、检查时点、范围限制和授权摘要；history/receipt/current保持内容寻址、单调、无覆盖发布。
+5. 恢复新授权精确绑定原已消费quiesce授权与intent。可证明partial才收敛；source替换、容器状态/身份漂移、冲突、hardlink/symlink或未知状态只保全/quarantine，不自动停止、启动或删除任何容器/证据。
+6. checkpoint 7/8必须另行取得一次性Migration授权和数据库级连接/写入围栏，只允许精确Migration会话并拒绝额外client/可连接未知LOGIN角色，才能关闭本决策留下的外部writer边界。TASK72完成不表示当前UAT已停写、数据库已围栏或A6已获授权。
+
+### Consequences
+
+- 机器审计由7项SUPPORTED/8项阻断收敛为8项SUPPORTED/7项阻断（P0=6、P1=1）；四个必需Supervisor操作实现，artifact self SHA-256为`7085cd75…3fc`，`assert-ready`继续返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+- source`8ab249e7d265112a6130e4ffd26e278f4c6e4aed`/tree`af751336d53f7e5eb9f18c4833147f7cee1da70e`→monitor`55c1b91be010e045af485fa045bd83ea712941ff`/tree`2f5005c07532bd48b0aa08ec068c31e81a3ffed8`→Supervisor`ad98661b78e5f9fb989a7d56d78992c24592b27d`/tree`8912ce1005ebd22982fc65e0a1169ed68c4769a1`形成30/128文件canonical链；manifest raw SHA-256为`c369bc16…70eb`/`4704aad8…ab5`。
+- 受限Node62/62、Supervisor112/112、monitor manifest31/31、Supervisor manifest40/40及inventory257/233/24通过；当前四个UAT容器仍running，未执行真实writer、数据库、Migration、Compose、镜像、部署、回滚或UAT写。
+- 下一P0为TASK73 checkpoint 7/8一次性Migration事务适配器；TASK70继续等待执行器完整和Swap停止线解除。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝把容器名、一次`running=false`、exit 0、restart 0或operator声明单独当作持续静默；也拒绝让quiesce adapter隐式执行stop/start/restart。
+- 拒绝把同project容器检查扩写成对未标注容器、其他Docker daemon、主机进程或数据库client的全局证明。
+- 拒绝用Migration advisory lock或可重复环境变量补写checkpoint 6范围；外部writer与一次性执行必须由后续数据库围栏和promotion-bound Migration回执独立证明。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

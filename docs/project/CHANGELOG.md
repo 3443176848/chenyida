@@ -4,6 +4,19 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-WRITER-QUIESCE-72 - `feat: add UAT writer quiesce checkpoint` / `chore: refresh monitoring delivery manifest` / `chore: refresh release supervisor manifest` / `docs: close writer quiesce and start migration transaction`
+
+- 调度/范围：从TASK71最终Supervisor提交`bc339b6`/tree`f7fd37bd`启动唯一active task；只实现仓库quiesce adapter和fake-root恢复，不停止/启动容器、不连接数据库、不读取备份/Volume或修改UAT/生产。
+- 边界决策：D-147只把同一Compose project/working directory内的原Web/Worker纳入持续静默证明。未标注容器、其他主机及外部数据库client不在checkpoint 6证明范围，必须由TASK73的数据库连接围栏关闭，禁止把容器metadata冒充全局停写。
+- Supervisor/事务：authorization v6新增`QUIESCE_UAT_WRITERS`；独立短时operation ID、三方actor和精确source metadata在prepare前、消费前、消费后重验。quiesce intent先于消费，checkpoint 6通过history→receipt→current发布非零writer binding，RECOVER精确绑定原已消费授权和intent。
+- 只读证据：production probe固定`/usr/bin/docker`、无shell、净化环境和有界输出，只读取精确容器metadata；要求snapshot绑定的Web/Worker同ID/名称/镜像/runtime/Migration、stopped/exited 0、restart0/OOM false、未在snapshot后重启且无同project替代writer。running/restarted/replaced/extra writer和身份漂移均失败关闭。
+- 审计/发布链：审计收敛为8项SUPPORTED、7项阻断（P0=6、P1=1），artifact self SHA-256`7085cd75…3fc`且`assert-ready`继续拒绝。source`8ab249e`/tree`af751336`→monitor`55c1b91`/tree`2f5005c0`→Supervisor`ad98661`/tree`8912ce10`形成30/128文件链，manifest为`c369bc16…70eb`/`4704aad8…ab5`。
+- 验证：受限Node专项合计62/62、Supervisor Python112/112、monitor manifest31/31、Supervisor manifest40/40、inventory257/233/24、cross-role/audit生成物重放、Python compile、Node syntax、只读Docker Go template及diff/敏感门通过；未跳过或降低断言。
+- 诚实失败：第一次只读Docker template验证使用了不完整的猜测容器ID，精确返回`No such container`且无副作用；改为只读列出完整ID后，对同一选定字段的template语法验证通过。`docker compose ps`没有重试或通过读取`.env`绕过既有插值保护。
+- 资源/边界：起点/收口available约1.9GiB、Swap868MiB/1GiB、根盘13GiB、Load未持续越线；四个项目容器restart0/OOM false，受限Node临时容器自动清理，两个既有额外容器未触碰。未运行build、全量Node/PostgreSQL、Docker数据库、typecheck、backup/restore、Migration、镜像、部署、回滚或业务写。
+- 数据库/API：无Schema、Migration或业务API行为变化；只扩展root Supervisor仓库控制面。真实A4/A6、writer、数据库、账号、UAT/生产和数据动作均未授权。
+- 治理：新增D-147，TASK72转`DONE`；自动启动`SELFHOST-UAT-MIGRATION-TRANSACTION-73`为唯一`DOING`，TASK70继续等待资源与执行器依赖。
+
 ### SELFHOST-UAT-PROMOTION-BOUND-SNAPSHOT-71 - `feat: bind promotion snapshot checkpoint` / `chore: refresh monitoring delivery manifest` / `chore: refresh release supervisor manifest` / `docs: close bound snapshot and start writer quiesce`
 
 - 调度/范围：从TASK69最终Supervisor提交`a3fbbfd`/tree`5e275be8`启动唯一active task；只实现仓库snapshot adapter和fake-root恢复，不停止writer、不连接数据库、不读取备份/Volume或修改UAT/生产。
