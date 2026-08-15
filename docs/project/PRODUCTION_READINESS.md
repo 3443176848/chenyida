@@ -7,7 +7,7 @@
 
 ## 1. 判定
 
-当前系统不能投入真实员工使用。公开非生产 UAT 在空闲状态健康，已有较完整的服务端权限、CSRF、幂等、审计和业务状态机基础，TASK59—TASK60已闭合A2独立detached候选快照及创建前target reservation，TASK61—TASK65也已闭合monitor host delivery、权威投影、V2 actual policy、内容寻址逐代激活及target-bound notifier egress的仓库生命周期；但TASK66的11角色机器矩阵仍在实施且业务批准pending，TASK57镜像已因后续Site变化失效且当前没有源码匹配候选，更没有真实异机可恢复数据锚点、外部不可变镜像锚点、installed Supervisor签发的正式发布门、真实数据迁移演练、完整跨岗位验收或正式切换回滚证据。
+当前系统不能投入真实员工使用。公开非生产 UAT 在空闲状态健康，已有较完整的服务端权限、CSRF、幂等、审计和业务状态机基础，TASK59—TASK65已闭合detached候选/reservation、monitor host delivery、权威投影、V2 actual policy/激活及target-bound notifier egress的仓库生命周期，TASK66也已完成11角色机器矩阵和漂移门；但A7d业务批准、跨岗位验收和员工试运行仍未完成，TASK57镜像已因后续Site变化失效且当前没有源码匹配候选，更没有真实异机可恢复数据锚点、外部不可变镜像锚点、installed Supervisor签发的正式发布门、真实数据迁移演练或正式切换回滚证据。
 
 本文件是失败关闭的准入基线，不是上线批准。只有对应证据实际完成后，单项状态才能从`FAIL`或`PARTIAL`更新；文档完成、页面可访问或历史测试通过不会自动解除任何门禁。
 
@@ -109,6 +109,10 @@
 
 2026-08-15 第四十九次增量：`SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66`从`7c69385c`/tree`7d19d1d9`启动为唯一`DOING`。范围固定为仓库内11角色、动态permission、Dashboard domain及全部self-hosted API method/path的canonical机器目录、ALLOW/DENY/data-domain矩阵和漂移负测；业务批准显式pending，不创建/修改账号、Session、PostgreSQL角色/ACL或连接数据库。Swap停止线继续有效，整体仍`PRODUCTION NO-GO`。
 
+2026-08-15 第五十次增量：TASK66按D-142完成11角色、158 permission、30 handler、56授权源码和186操作的机器矩阵；175条受保护操作均有允许证据，154条有拒绝，21条全员只读及2个legacy grant保持业务待处置。source`925f8a45`→monitor`c1f1d526`→Supervisor`9b657f24`形成30/126文件链；矩阵10/10、release20/20、manifest9/9、Supervisor36/36和inventory254/230/24通过。未创建账号或连接数据库；系统继续`PRODUCTION NO-GO`。
+
+2026-08-15 第五十一次增量：因Swap约860MiB/1GiB超过80%停止线，0017→0046合成PostgreSQL升级重任务暂不启动；从零`DOING`自动选择`SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67`为唯一active task，只建立引用TASK66矩阵的断网合成场景、预期数据库增量、审计/异常/回退和签字合同。不创建账号、不登录UAT、不连接数据库或执行业务写，整体仍`PRODUCTION NO-GO`。
+
 ## 2. 证据范围与未执行事项
 
 - 主智能体核验 Git、源码、Migration、Docker/Compose、systemd、health、运行镜像、UAT 数据库 Migration 元数据、备份目录元数据和服务器资源。
@@ -139,7 +143,7 @@
 
 | 证据项 | 当前事实 | 判定 |
 | --- | --- | --- |
-| 根仓库 | TASK65 source`05502fda0bcac7952d12374dfab78cccf8284bb3`/tree`3dcb05738561e16d866675f1349a9ba5d2cd7832`→monitor manifest-only`013e61fd16f679f453ab0a1abfeade65dbd9de7d`→Supervisor manifest-only`7c69385c5ee35d517e9611fe04f55ae17be4f194`形成30/126文件canonical链，manifest SHA-256`8260bed4…302`/`aab36e62…53a3`；未fetch/push | 本机内容寻址链`PASS`；异机源码锚点仍缺失 |
+| 根仓库 | TASK66 source`925f8a45edd19be7b27a845dadf621bf39883d8d`/tree`922221a6fbed0e03241852c85144755d078c4292`→monitor manifest-only`c1f1d5269e2ed88af8326e59177f7bb1a02eba25`→Supervisor manifest-only`9b657f2458427482f6ed28c0178999d3d62877f2`形成30/126文件canonical链，manifest SHA-256`3a9192af…b6f6`/`66a604fa…0da6`；未fetch/push | 本机内容寻址链`PASS`；异机源码锚点仍缺失 |
 | 私有源码锚点 | 本机最后已知跟踪引用为`recovery-private/main@1dcbf8d`；本任务未fetch、调用远端API或push，因此未声称其为远端实时状态，也未用本地提交差值冒充异机证明 | `FAIL`，当前完整历史未证明异机存在 |
 | 源码 | `0.1.0-alpha.47`，Migration46/head`0046_runtime_lock_privilege_boundary.sql`；0046 SQL/Snapshot SHA-256为`ad68aaa4…6d66b`/`c8fe259a…1f60d`，0001—0045未修改；D-134—D-140受控operator、snapshot/reservation、monitor delivery/projection及cluster policy activation已完成 | 仓库/合成隔离`PASS`；源码匹配镜像、外部锚点、正式证据、可消费授权及运行激活仍缺 |
 | 源码 Schema | 46 个 SQL、journal 和 snapshot 顺序一致；`db/schema.ts`与 0046 snapshot 为 233 张 public 表且列集合一致 | 静态及隔离Migration一致性`PASS` |
@@ -165,7 +169,7 @@
 | 隔离恢复 | `PARTIAL / DATA + CLUSTER SECURITY SYNTHETIC-ISOLATED PASS` | 从真实异机副本在新空隔离目标恢复四类数据及集群级对象，完成Migration、角色/ACL/默认权限/表空间/凭据正反权限、数量、摘要、库存和关键金额核对并记录真实RTO；现有合成密文双集群证据不替代真实数据 |
 | 真实数据试迁移 | `FAIL` | 只读源快照、逐行结果、重复/孤儿/单位/文件处置、库存/金额核对和可重跑报告通过 |
 | 核心服务端规则 | `PARTIAL` | 物料/BOM/采购/收货/IQC/库存/生产/销售/财务关键链及异常路径在同一候选通过自动与人工验收 |
-| 权限/会话/安全/审计 | `PARTIAL / TASK56 REPOSITORY COMPLETE / CURRENT UAT SUPERUSER` | Web锁、Backup、PG17 catalog、v2角色/ACL、五身份探针、session、secret、container、tablespace、受控operator及最终bundle已闭合；仍须实际角色/secret/Volume部署及同候选运行复核。随后还需批准岗位矩阵、职责分离与最小数据域；当前UAT共享superuser和环境秘密不满足投产要求 |
+| 权限/会话/安全/审计 | `PARTIAL / TASK56 RUNTIME PRIVILEGE + TASK66 APPLICATION MATRIX REPOSITORY COMPLETE / BUSINESS APPROVAL PENDING / CURRENT UAT SUPERUSER` | Web锁、Backup、PG17 catalog、v2角色/ACL、五身份探针、session、secret、container、tablespace、受控operator及11角色/186操作矩阵已闭合；仍须A7d批准职责分离/全员只读/legacy grant，实际部署独立角色/secret/Volume并在同候选复核。当前UAT共享superuser和环境秘密不满足投产要求 |
 | 强制发布测试门 | `PARTIAL / TASK60 SNAPSHOT RESERVATION CONTRACT PASS / CURRENT CANDIDATE ABSENT` | TASK56完整应用回归保持；TASK59—TASK60依次通过snapshot生命周期及reservation负测，最终snapshot23、Supervisor72并形成78文件bundle。TASK57镜像已失效，host supervisor未安装，正式provenance/SBOM/security evidence和同候选19步报告不存在 |
 | 监控/容量/告警/手册 | `PARTIAL / TASK61—TASK65 REPOSITORY CONTRACT VERIFIED / REAL HOST AND EGRESS NOT CONFIGURED` | 严格快照、阈值、状态机、pending/ACK、权威投影、恢复policy激活及target-bound egress已验；仍须专项授权后进行host安装/调度、真实渠道和值班升级演练，以及低资源负载/备份/恢复soak和升级/回滚演练 |
 | 真实员工受控试用 | `FAIL` | 少量真实岗位用户按脚本完成跨岗正常/异常流程并签字，问题闭环后重验 |
@@ -285,7 +289,7 @@
 3. G4的物料导入fallback仓库修复已由TASK43完成；运行面验证等待同候选与专项部署授权。
 4. TASK44/TASK45已完成会话绝对时限和health/Worker/storage/Migration真实性仓库修复；运行面验证等待同候选完整gate及专项部署授权。
 5. `SELFHOST-OPS-MONITORING-ALERTING-49`和TASK61—TASK65/D-137—D-141已完成监控评估、内容寻址host delivery、三身份notifier、配置/回执、权威投影、V2 policy激活、target-bound egress及远端ACK仓库合同；实际安装、真实target/credential/网络、外部投递、值班责任人和演练仍需A5a专项授权。
-6. TASK50、TASK53—TASK65已完成容器策略、发布生命周期、异机provenance、集群/运行权限、历史候选、授权输入刷新、detached snapshot、创建前reservation、monitor delivery/projection、recovery policy activation及notifier egress合同。当前唯一`DOING`为TASK66 11角色机器矩阵；之后仍有0017→0046合成升级、跨岗UAT模板和晋升/回滚执行器。候选须在最终相关源码变化后统一重建，完成前不能声称只剩外部授权。
+6. TASK50、TASK53—TASK66已完成容器策略、发布生命周期、异机provenance、集群/运行权限、历史候选、授权输入刷新、detached snapshot、创建前reservation、monitor delivery/projection、recovery policy activation、notifier egress及11角色机器矩阵合同。当前唯一`DOING`为TASK67跨岗位UAT证据合同；之后仍有0017→0046合成升级和晋升/回滚执行器。候选须在最终相关源码变化后统一重建，完成前不能声称只剩外部授权。
 
 以上任务可在仓库和隔离环境安全推进；实际异机数据、UAT部署/Migration、真实数据和真实员工动作不因本序列自动获权。
 

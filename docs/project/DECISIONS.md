@@ -2697,6 +2697,41 @@
 - 拒绝手工编辑unit/drop-in、只检查仓库模板、不核对loaded systemd、overwrite current、复用授权/activation ID或回退后复用generation。
 - 拒绝把HTTP 2xx、send返回、stdout/本机文件或legacy readiness当成远端已送达，也拒绝把合成fake-root结果描述为真实host/渠道已就绪。
 
+## D-142 应用授权采用源码摘要机器矩阵且全员可读范围必须业务批准
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY IMPLEMENTED / TECHNICAL GATE VERIFIED / BUSINESS APPROVAL PENDING / NO ACCOUNT OR DATABASE ACTION / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK66对11角色、动态permission、Dashboard domain、30个self-hosted handler及既有权限测试的只读审计和矩阵10/10、release20/20验证
+- 确认边界：只接受源码事实的机器证据和失败关闭漂移门；不批准岗位职责、数据可见域、账号映射、真实UAT写、数据库角色/ACL或部署
+
+### Context
+
+- 角色权限来自静态基表、多个动态组合、dispatcher的`material.read`前置、子handler细粒度检查和Dashboard domain裁剪；只审阅某一文件或手写角色表会遗漏实际调用链。
+- 当前若干角色测试只覆盖选定操作且历史上遗漏planning；新增handler、route、permission或Dashboard domain时没有一个统一门证明11角色对全部服务端操作的结果。
+- 当前有21条受保护读操作对11角色全部允许，另有`material.import.commit`和`sales.reverse`两项授权但当前dispatcher不可达。技术实现不能自行把这些范围认定为业务最小权限，也不能伪造一个拒绝角色让门变绿。
+
+### Decision
+
+1. 以`IDENTITY_ROLES`、`permissionsForRole`、导出的Dashboard role-domain源、`selfhost-api.ts` dispatcher、全部30个handler及其授权依赖作为机器权威；canonical route contract只描述经过源码摘要锁定的method/path、permission、data domain和安全期望。
+2. 每次生成固定11角色对每个操作的ALLOW/DENY、显式/通配原因、dispatcher前置permission、源码行和源码manifest。角色增删、通配扩散、handler集合、授权依赖、route literal/prefix、permission定义/使用或源码摘要漂移均失败关闭。
+3. 受保护操作必须有普通角色正向证据；admin通配不能成为唯一允许来源。受保护写必须有拒绝角色，并固定CSRF、幂等和事务审计合同。
+4. 当前没有拒绝角色的受保护操作只允许是安全读方法，并自动附`CURRENT_ALL_EMPLOYEE_READ_SCOPE_REQUIRES_BUSINESS_APPROVAL`；制品readiness保持`BLOCKED`，不得写成岗位已批准。业务若收窄或接受范围，必须形成A7d记录并重生成矩阵。
+5. 已授予但静态不可达的permission只能以精确分类、理由和责任人保留；不得被静默忽略。动态构造permission另以独立分类绑定源码。业务处置后删除或保留都必须修改源码和负向测试。
+6. 矩阵artifact使用canonical排序、自摘要和授权源码manifest，矩阵测试纳入正式release inventory及runtime policy；任何候选必须在同一源码快照重放一致。
+
+### Consequences
+
+- TASK66 source`925f8a45edd19be7b27a845dadf621bf39883d8d`→monitor manifest-only`c1f1d5269e2ed88af8326e59177f7bb1a02eba25`→Supervisor manifest-only`9b657f2458427482f6ed28c0178999d3d62877f2`形成30/126文件canonical链，manifest raw SHA-256为`3a9192af…b6f6`/`66a604fa…0da6`。
+- artifact固定11角色、158 permission、186操作、175受保护及110受保护写；154条有拒绝角色，21条全员只读和2个legacy grant保持业务阻断。artifact/source-manifest SHA-256为`741bb742…9a34`/`2c4870ca…1863`。
+- 矩阵10/10、release gate20/20、manifest contract9/9、Supervisor36/36及inventory254/230/24通过；这些证据只证明当前源码授权事实可追溯，不证明真实岗位合理或已被员工验收。
+- A7d仍须业务负责人逐项批准职责分离、财务/数据域、管理员/break-glass、账号生命周期和审计责任。批准前不得启用真实员工账号；系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝以页面菜单、Dashboard隐藏、角色名称、文档手填表或少量正向测试代替服务端调用链和逐角色负向证据。
+- 拒绝让admin通配成为唯一正向证据、让写操作对所有角色开放、用虚构拒绝角色掩盖全员读取，或把业务待批准字段改成`APPROVED`以通过测试。
+- 拒绝忽略未使用permission、动态字符串、prefix route、dispatcher前置权限或新增handler，也拒绝在候选构建时临时生成未提交矩阵。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

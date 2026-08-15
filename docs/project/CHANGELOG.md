@@ -4,6 +4,17 @@
 
 ## 2026-08-15
 
+### SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66 - `feat: lock application authorization matrix` / `build: refresh monitoring host bundle` / `build: refresh release supervisor bundle` / `docs: close role matrix and start cross-role UAT evidence`
+
+- 调度/范围：从TASK65最终Supervisor提交`7c69385c`/tree`7d19d1d9`启动唯一active task；只在仓库审计11角色、动态permission、Dashboard domain及全部self-hosted handler，不创建账号、连接数据库或修改UAT/生产。
+- 机器矩阵：新增canonical policy、186条route contract、确定性generator和artifact；固定158个授权permission、154个源码使用permission、30个dispatcher handler、56个授权源码文件、254个route literal及11角色逐操作决策。artifact/source-manifest SHA-256为`741bb742…9a34`/`2c4870ca…1863`。
+- 失败关闭：175条受保护操作均有允许证据；154条有明确拒绝，21条当前全员只读以业务待批准finding阻断，110条受保护写全部绑定CSRF、幂等和事务审计。admin是唯一通配但不是任何操作的唯一正向证据；2个legacy grant等待业务处置。
+- 发布链：release inventory更新为254/230/24并绑定矩阵测试；source`925f8a45`/tree`922221a6`→monitor manifest-only`c1f1d526`/tree`edc80361`→Supervisor manifest-only`9b657f24`/tree`2f104665`形成30/126文件链，manifest raw SHA-256为`3a9192af…b6f6`/`66a604fa…0da6`且逐字节重放一致。
+- 验证：授权矩阵10/10、release gate20/20、release manifest contract9/9、Supervisor Python36/36、inventory verify、源码阶段1,722文件credentials、治理收口1,723文件显式staged-tree credentials、10文件本地Markdown链接及`git diff --check`通过。首轮release计数锁真实失败已修复；BusyBox `flock`差异改用锁定Debian Node重跑同一断言通过，未跳过或降低断言。
+- 资源/边界：available约1.9GiB、Swap约860MiB/1GiB且持续超过80%、根盘13GiB、Load低于1；四服务restart0/OOM false，临时容器/扫描文件清零。未运行build、全量Node/PostgreSQL、typecheck、Migration、镜像或数据库任务，未读凭据、日志、业务行、备份/Volume正文或用户未跟踪报告。
+- 数据库/API：无Schema/Migration或服务端行为变化；仅把Dashboard role-domain常量导出给同一源码验证器，并新增授权证据与发布负向门。A7d岗位职责、21条全员只读和legacy grant处置仍为业务待批准，系统保持`PRODUCTION NO-GO`。
+- 治理：新增D-142，TASK66转`DONE`；因Swap停止线阻断0017→0046 PostgreSQL重任务，自动启动`SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67`，先建立断网、无账号/无数据库写的跨岗合成证据与签字合同。
+
 ### SELFHOST-OPS-MONITORING-HOST-DELIVERY-61 - `feat: add crash-safe monitoring host delivery` / `build: pin monitoring host delivery bundle` / `build: refresh release supervisor bundle` / `docs: close monitoring host delivery`
 
 - 交付：新增27文件内容寻址monitor bundle、Node 22.13—24内容寻址runtime、root collector/非特权evaluator/notifier、七个固定systemd unit/timer、严格private/evaluator/notifier配置view以及Release Supervisor的install/rollback/disable三项一次性授权入口。

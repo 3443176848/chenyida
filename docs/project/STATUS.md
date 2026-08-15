@@ -2,16 +2,29 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66（执行中；只做仓库机器权限矩阵）
+## SELFHOST-CROSS-ROLE-UAT-EVIDENCE-CONTRACT-67（执行中；只做仓库合成证据合同）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY AUTHORIZATION AUDIT AND LIGHTWEIGHT REPOSITORY IMPLEMENTATION / BUSINESS APPROVAL PENDING / RESOURCE STOP LINE ACTIVE / NO ACCOUNT OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；生成11角色→permission→API/data-domain矩阵和负向漂移合同，不把当前代码事实冒充业务批准 |
-| 严格起点 | PASS / CONTROLLED | `7c69385c5ee35d517e9611fe04f55ae17be4f194`/tree`7d19d1d9fa161dc273652ce21f1478708035d507`；用户未跟踪报告继续不读不改不提交 |
-| 起点审计 | IN PROGRESS | 源码固定11个员工角色，权限由静态基表和动态组合生成，Dashboard另有domain裁剪；约175处服务端permission调用尚无统一机器路由矩阵 |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap860MiB/1GiB（超过80%）、根盘13GiB、Load低于1；禁止新重任务，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不创建/修改账号、Session、PostgreSQL角色/ACL，不连接数据库；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
-| 系统是否可用 | NO | 岗位职责尚未获业务批准，且无源码匹配镜像、正式门、真实异机恢复/迁移、员工签字或切换 |
+| 当前状态 | DOING / REPOSITORY AND SYNTHETIC EVIDENCE CONTRACT ONLY / BUSINESS APPROVAL PENDING / RESOURCE STOP LINE ACTIVE / NO ACCOUNT OR UAT WRITE / PRODUCTION NO-GO | 唯一active task；建立引用TASK66矩阵的跨岗位合成场景、预期增量、审计/异常/回退和签字合同 |
+| 严格起点 | PASS / CONTROLLED | `9b657f2458427482f6ed28c0178999d3d62877f2`/tree`2f1046654d710d2af0bdba8abbef7601676a3f97`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / TECHNICAL SOURCE READY | TASK66矩阵固定11角色、158 permission、186操作和源码摘要；A7d业务批准仍pending，合成模板不得冒充批准或实际UAT |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap860MiB/1GiB（超过80%）、根盘13GiB、Load低于1；0017→0046 PostgreSQL/Migration重任务延后，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不创建/登录账号，不连接数据库或执行UAT写；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 系统是否可用 | NO | 无业务批准、源码匹配镜像、正式门、真实异机恢复/迁移、跨岗签字、员工试运行或切换 |
+
+## SELFHOST-AUTHORIZATION-ROLE-PERMISSION-MATRIX-66（完成；技术矩阵通过，业务批准待办）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / TECHNICAL MATRIX AND DRIFT GATE VERIFIED / BUSINESS APPROVAL PENDING / RESOURCE STOP LINE ACTIVE / NO ACCOUNT OR DATABASE ACTION / PRODUCTION NO-GO | TASK66技术范围已释放active slot；A7d岗位批准、21条全员只读和2个legacy grant处置保持开放 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`925f8a45`/tree`922221a6`→monitor manifest-only`c1f1d526`/tree`edc80361`→Supervisor manifest-only`9b657f24`/tree`2f104665`；30/126文件manifest为`3a9192af…b6f6`/`66a604fa…0da6`且重放一致 |
+| 矩阵 | PASS / SOURCE BOUND | 11角色、158 permission、30 handler、56授权源码、254 route literal和186操作；175受保护、110受保护写，154条有拒绝角色，21条全员只读显式待审批 |
+| 失败关闭 | PASS / BUSINESS BLOCKERS PRESERVED | 角色/通配、permission定义/使用、handler/route、method/path、Dashboard domain、允许/拒绝、写安全合同和制品摘要漂移均拒绝；`material.import.commit`/`sales.reverse`保持legacy处置阻断 |
+| 自动验证 | PASS / SCOPED APPLICABLE | 矩阵10/10、release gate20/20、manifest9/9、Supervisor36/36、inventory254/230/24、credentials1722及diff门通过；正式Debian Node重跑解决BusyBox `flock`工具差异，断言未降低 |
+| 资源/清理 | STOP LINE ACTIVE / NO OOM | 起点/收口available约1.9GiB、Swap约860MiB/1GiB、根盘13GiB、Load低于1；四服务restart0/OOM false，临时容器和扫描文件清零 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 无账号、Session、角色/ACL、数据库、UAT/生产、业务数据、host、网络、部署、Migration或Volume动作 |
+| 系统是否可用 | NO | 技术矩阵不等于岗位批准；仍无同候选门、真实异机恢复/迁移、跨岗/员工验收或正式切换 |
 
 ## SELFHOST-OPS-MONITORING-NOTIFIER-EGRESS-65（完成；仓库与合成fake-root通过，真实出口未激活）
 
