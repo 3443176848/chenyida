@@ -357,6 +357,7 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
     def test_bundle_manifest_generator_uses_literal_allowlist_and_exact_blob_bytes(self):
         launcher_raw = (Path(__file__).resolve().parents[1] / "scripts" / "release-supervisor-launcher.py").read_bytes()
         files = generator.parse_bundle_files(launcher_raw)
+        self.assertEqual(len(files), generator.MAX_BUNDLE_FILES)
         self.assertIn("chenyida_erp_site/scripts/release-migration-authorization.ts", files)
         self.assertIn("chenyida_erp_site/tests/test_release_supervisor_installer.py", files)
         self.assertEqual(files["chenyida_erp_site/tests/selfhost-postgresql-runtime-privilege-catalog-postgres.sh"], "0555")
@@ -425,6 +426,26 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
         manifest = {"schema_version": 1, "contract": installer.BUNDLE_CONTRACT, "bundle_version": 1, "source_commit": authorization["source_commit"], "source_tree": authorization["source_tree"], "launcher_sha256": authorization["launcher_sha256"], "files": entries}
         with patch.object(installer, "MAX_BUNDLE_BYTES", 3), patch.object(installer, "git_blob") as blob:
             with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_MANIFEST_TOTAL_BYTES_INVALID"):
+                installer.validate_bundle_payload(Path("/opt/erp"), authorization, installer.canonical_json(manifest))
+        blob.assert_not_called()
+
+    def test_bundle_file_count_is_rejected_before_any_blob_is_loaded(self):
+        authorization = self.authorization(datetime.now(timezone.utc))
+        entries = [
+            {"path": f"chenyida_erp_site/files/{index:03d}", "sha256": "1" * 64, "bytes": 1, "mode": "0444"}
+            for index in range(installer.MAX_BUNDLE_FILES + 1)
+        ]
+        manifest = {
+            "schema_version": 1,
+            "contract": installer.BUNDLE_CONTRACT,
+            "bundle_version": 1,
+            "source_commit": authorization["source_commit"],
+            "source_tree": authorization["source_tree"],
+            "launcher_sha256": authorization["launcher_sha256"],
+            "files": entries,
+        }
+        with patch.object(installer, "git_blob") as blob:
+            with self.assertRaisesRegex(installer.InstallError, "SUPERVISOR_INSTALL_MANIFEST_FILES_INVALID"):
                 installer.validate_bundle_payload(Path("/opt/erp"), authorization, installer.canonical_json(manifest))
         blob.assert_not_called()
 

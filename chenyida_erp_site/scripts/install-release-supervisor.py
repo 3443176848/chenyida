@@ -73,6 +73,7 @@ ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 MAX_JSON_BYTES = 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024
+MAX_BUNDLE_FILES = 130
 RECEIPT_CONTRACT = "chenyida-erp-release-supervisor-install-receipt/v2"
 JOURNAL_CONTRACT = "chenyida-erp-release-supervisor-install-journal/v2"
 
@@ -998,7 +999,7 @@ def validate_bundle_payload(repository: Path, authorization: dict[str, Any], man
     if manifest_raw != canonical_json(manifest) or manifest["source_commit"] != authorization["source_commit"] or manifest["source_tree"] != authorization["source_tree"] or manifest["launcher_sha256"] != authorization["launcher_sha256"]:
         reject("SUPERVISOR_INSTALL_MANIFEST_IDENTITY_MISMATCH")
     files = manifest.get("files")
-    if not isinstance(files, list) or len(files) < 1 or len(files) > 128:
+    if not isinstance(files, list) or len(files) < 1 or len(files) > MAX_BUNDLE_FILES:
         reject("SUPERVISOR_INSTALL_MANIFEST_FILES_INVALID")
     validated: list[dict[str, Any]] = []
     previous = ""
