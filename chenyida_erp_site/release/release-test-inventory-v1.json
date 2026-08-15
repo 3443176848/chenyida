@@ -4,8 +4,8 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 257,
-  "required_tests": 233,
+  "total_tests": 258,
+  "required_tests": 234,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
@@ -13,7 +13,7 @@
     "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
     "PURE_NODE": 130,
-    "RELEASE_CONTRACT": 6,
+    "RELEASE_CONTRACT": 7,
     "SPECIAL_HARNESS": 7
   },
   "tests": [
@@ -487,7 +487,7 @@
     },
     {
       "path": "tests/selfhost-database-runtime-identity.test.mjs",
-      "sha256": "f356fd3fe66570c6c5303d247bf73c93759108fec1253d1a97242da31d9e4406",
+      "sha256": "04072ddc0ff56a447a13ecb46b2e191d30ffd859400133daebba6aeab4423954",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1036,7 +1036,7 @@
     },
     {
       "path": "tests/selfhost-migration-tool.test.mjs",
-      "sha256": "1a904ea58d34099dca36a50d117451c0c9344d03185e1dc8216e7a2804d4ee5d",
+      "sha256": "4c9e7a0e3568607842f2f8c1c0724e608195ac3849c3ebbeb1f810b10986de67",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1891,7 +1891,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "7802d954ba3251cdf33ad90019f8264a62ff6b3421e7a7b962f38376159bb1d0",
+      "sha256": "ca094129c19072b5e626e70ac13ebba0e2ca63b1081633d02e8edb1b2830473d",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1927,7 +1927,7 @@
     },
     {
       "path": "tests/selfhost-release-migration-allowlist.test.mjs",
-      "sha256": "0029349dd08621d73e955f7c37d99c74b30c3447792a21425f95b7ed60fc06cd",
+      "sha256": "1a7228252c56963c1098c8d0a67547b9469c40560d40354d38f93f6e70e79326",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2295,8 +2295,17 @@
       "canonical_path": null
     },
     {
+      "path": "tests/selfhost-uat-promotion-migration-execution-contract.test.mjs",
+      "sha256": "ce529f23e7a3f82cdeaa482e0576d1fc1303fd802abd7d9d5c3acced8f5ad4c8",
+      "category": "RELEASE_CONTRACT",
+      "applicability": "REQUIRED",
+      "harness": "NODE_RELEASE_CONTRACT",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
       "path": "tests/selfhost-uat-promotion-rollback-audit.test.mjs",
-      "sha256": "e69aedb997c79a8a2bce56298b13d8afbd171859ee0a21de2788af2fea1d0825",
+      "sha256": "894049f939ce45e82573cf28cb01c6cca118dae1b9bc91b16a3d16d039982788",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -2305,7 +2314,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-transaction-journal.test.mjs",
-      "sha256": "8a7cae123224c825ae02abc6e5b5b354c4e29485120dc672a8bc83f154629483",
+      "sha256": "3a5ed7d1a992afc7b61dd572a5404eadb7a88e46b22b1a2329753e13a35811a9",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

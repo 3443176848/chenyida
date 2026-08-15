@@ -10,8 +10,8 @@ import { validateOfficialTestRuntimePolicy } from "./release-manifest-contract.m
 
 export const RELEASE_TEST_INVENTORY_CONTRACT = "chenyida-erp-release-test-inventory/v1";
 export const RELEASE_TEST_INVENTORY_REPOSITORY_PATH = "chenyida_erp_site/release/release-test-inventory-v1.json";
-export const RELEASE_TEST_INVENTORY_TOTAL = 257;
-export const RELEASE_TEST_INVENTORY_REQUIRED = 233;
+export const RELEASE_TEST_INVENTORY_TOTAL = 258;
+export const RELEASE_TEST_INVENTORY_REQUIRED = 234;
 export const RELEASE_TEST_INVENTORY_NOT_APPLICABLE = 24;
 export const RELEASE_TEST_MAX_BYTES = 1024 * 1024;
 export const RELEASE_TYPESCRIPT_CONFIGS = Object.freeze([
@@ -63,7 +63,7 @@ const OFFICIAL_CATEGORY_COUNTS = Object.freeze({
   POSTGRES: 84,
   POSTGRES_ALIAS: 2,
   PURE_NODE: 130,
-  RELEASE_CONTRACT: 6,
+  RELEASE_CONTRACT: 7,
   SPECIAL_HARNESS: 7,
 });
 const CATEGORY_POLICY = Object.freeze({
@@ -82,6 +82,7 @@ const RELEASE_CONTRACT_TESTS = new Set([
   "tests/selfhost-release-image-evidence-producer.test.mjs",
   "tests/selfhost-release-manifest-contract.test.mjs",
   "tests/selfhost-release-migration-allowlist.test.mjs",
+  "tests/selfhost-uat-promotion-migration-execution-contract.test.mjs",
 ]);
 const HISTORICAL_D1_SITES_TESTS = new Set([
   "tests/d1-migration-statements.test.mjs",

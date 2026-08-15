@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { constants, type Stats } from "node:fs";
+import { open, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -13,6 +14,10 @@ import {
   verifyMigrationFilesAgainstManifest,
 } from "./release-manifest-contract.mjs";
 import { CONTROLLED_MIGRATION_SEARCH_PATH } from "./postgresql-session-profile.ts";
+import {
+  canonicalMigrationExecutionJson,
+  validateUatPromotionMigrationGrant,
+} from "./uat-promotion-migration-execution-contract.mjs";
 
 const MIGRATION_FILE = /^\d{4}_[a-z0-9_]+\.sql$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -21,6 +26,8 @@ const DATABASE = /^[A-Za-z_][A-Za-z0-9_$-]{0,62}$/;
 const ROLE = /^[a-z_][a-z0-9_$-]{0,62}$/;
 const SYSTEM_IDENTIFIER = /^\d{10,24}$/;
 const OID = /^\d{1,10}$/;
+const MIGRATION_EXECUTION_GRANT_FILE = "/run/chenyida-erp-promotion/migration-execution-grant.json";
+const MAX_GRANT_BYTES = 512 * 1024;
 
 export type MigrationRuntimeConfig = {
   environment: string;
@@ -30,6 +37,7 @@ export type MigrationRuntimeConfig = {
 export type ReleaseAuthorization = {
   manifest: Awaited<ReturnType<typeof loadReleaseManifest>>;
   expectedCurrentHead: string;
+  grant: ReturnType<typeof validateUatPromotionMigrationGrant> | null;
   target: {
     deploymentClass: "UAT" | "PRODUCTION";
     deploymentId: string;
@@ -72,14 +80,54 @@ function required(name: string, pattern: RegExp, code: string): string {
   return value;
 }
 
-export async function loadReleaseAuthorization(config: MigrationRuntimeConfig, directory: string): Promise<ReleaseAuthorization | null> {
+function sameFileIdentity(left: Stats, right: Stats): boolean {
+  return left.dev === right.dev && left.ino === right.ino && left.mode === right.mode && left.nlink === right.nlink
+    && left.uid === right.uid && left.gid === right.gid && left.size === right.size
+    && left.mtimeMs === right.mtimeMs && left.ctimeMs === right.ctimeMs;
+}
+
+async function loadMigrationExecutionGrant(file: string, expectedSha256: string) {
+  let handle;
+  try { handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW); }
+  catch { reject("MIGRATION_EXECUTION_GRANT_INVALID"); }
+  try {
+    const before = await handle.stat();
+    if (!before.isFile() || before.isSymbolicLink() || before.uid !== 0 || before.gid !== 0
+      || before.nlink !== 1 || (before.mode & 0o7777) !== 0o440 || before.size < 2 || before.size > MAX_GRANT_BYTES) {
+      reject("MIGRATION_EXECUTION_GRANT_INVALID");
+    }
+    const raw = await handle.readFile();
+    const after = await handle.stat();
+    if (!sameFileIdentity(before, after) || sha256(raw) !== expectedSha256) reject("MIGRATION_EXECUTION_GRANT_INVALID");
+    let grant;
+    try { grant = validateUatPromotionMigrationGrant(parseStrictJson(raw.toString("utf8"), MAX_GRANT_BYTES)); }
+    catch { reject("MIGRATION_EXECUTION_GRANT_INVALID"); }
+    if (raw.toString("utf8") !== canonicalMigrationExecutionJson(grant)) reject("MIGRATION_EXECUTION_GRANT_INVALID");
+    const now = Date.now();
+    if (now < Date.parse(grant.created_at) - 5 * 1000 || now >= Date.parse(grant.expires_at)) {
+      reject("MIGRATION_EXECUTION_GRANT_EXPIRED");
+    }
+    return grant;
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
+}
+
+export async function loadReleaseAuthorization(
+  config: MigrationRuntimeConfig,
+  directory: string,
+  options: Readonly<{
+    testGrantFile?: string;
+    migrationEntries?: ReadonlyArray<Readonly<{ filename: string; sha256: string }>>;
+  }> = {},
+): Promise<ReleaseAuthorization | null> {
   const deploymentClass = config.deploymentClass.toUpperCase();
   const controlled = (["UAT", "PRODUCTION"] as const).includes(deploymentClass as "UAT" | "PRODUCTION");
   if (config.environment === "production" && !controlled) reject("MIGRATION_CONTROLLED_DEPLOYMENT_CLASS_REQUIRED");
   if (!controlled) return null;
   if (config.environment !== "production") reject("MIGRATION_CONTROLLED_ENVIRONMENT_REQUIRED");
   // Legacy variables may select and validate evidence, but never authorize SQL; runMigrationWorkflow
-  // remains fail-closed until the checkpoint-8 Supervisor execution adapter consumes a fenced grant.
+  // remains fail-closed unless the checkpoint-8 Supervisor execution adapter supplies a fenced grant.
   if (process.env.ERP_ALLOW_PRODUCTION_MIGRATION !== "YES") reject("MIGRATION_EXPLICIT_PRODUCTION_PERMISSION_REQUIRED");
   if (process.env.ERP_MIGRATION_CONFIRM !== "MIGRATE_EXACT_RELEASE_MANIFEST") reject("MIGRATION_EXACT_CONFIRMATION_REQUIRED");
   const manifestFile = process.env.ERP_RELEASE_MANIFEST_FILE || "";
@@ -107,8 +155,52 @@ export async function loadReleaseAuthorization(config: MigrationRuntimeConfig, d
   if (process.env.ERP_RELEASE_EXPECTED_GIT_COMMIT !== manifest.source.git_commit || process.env.ERP_RUNTIME_GIT_COMMIT !== manifest.source.git_commit) reject("MIGRATION_RELEASE_COMMIT_MISMATCH");
   if (process.env.ERP_RUNTIME_IMAGE_REFERENCE !== manifest.images.worker.image_reference) reject("MIGRATION_RELEASE_IMAGE_REFERENCE_MISMATCH");
   if (process.env.ERP_RUNTIME_IMAGE_CONFIG_DIGEST !== manifest.images.worker.image_digest) reject("MIGRATION_RELEASE_IMAGE_MISMATCH");
-  await verifyMigrationFilesAgainstManifest(manifest, directory);
-  return { manifest, expectedCurrentHead, target: { deploymentClass: deploymentClass as "UAT" | "PRODUCTION", deploymentId, databaseName, systemIdentifier, databaseOid, marker, migrationRole } };
+  if (options.migrationEntries) {
+    if (options.migrationEntries.length !== manifest.migrations.entries.length
+      || options.migrationEntries.some((entry, index) => entry.filename !== manifest.migrations.entries[index].filename
+        || entry.sha256 !== manifest.migrations.entries[index].sha256)) reject("MIGRATION_DIRECTORY_NOT_EXACT_RELEASE_ALLOWLIST");
+  } else {
+    await verifyMigrationFilesAgainstManifest(manifest, directory);
+  }
+  const target = {
+    deploymentClass: deploymentClass as "UAT" | "PRODUCTION", deploymentId, databaseName,
+    systemIdentifier, databaseOid, marker, migrationRole,
+  };
+  // Direct evidence inspection remains non-executing for compatibility. The production workflow always passes a
+  // stable source bundle and cannot reach a pool until the content-addressed execution grant below is valid.
+  if (!options.migrationEntries) return { manifest, expectedCurrentHead, grant: null, target };
+  const expectedGrantSha256 = required(
+    "ERP_UAT_PROMOTION_MIGRATION_GRANT_SHA256", SHA256, "MIGRATION_EXECUTION_GRANT_SHA256_INVALID",
+  );
+  const grantFile = options.testGrantFile ?? MIGRATION_EXECUTION_GRANT_FILE;
+  if (options.testGrantFile !== undefined && process.env.NODE_ENV !== "test") reject("MIGRATION_TEST_GRANT_PATH_FORBIDDEN");
+  if (options.testGrantFile === undefined && grantFile !== MIGRATION_EXECUTION_GRANT_FILE) reject("MIGRATION_EXECUTION_GRANT_PATH_INVALID");
+  const grant = await loadMigrationExecutionGrant(grantFile, expectedGrantSha256);
+  const executionAuthorizationSha256 = required(
+    "ERP_UAT_PROMOTION_MIGRATION_EXECUTION_AUTHORIZATION_SHA256", SHA256,
+    "MIGRATION_EXECUTION_AUTHORIZATION_SHA256_INVALID",
+  );
+  const supervisorBundleSha256 = required(
+    "ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256", SHA256, "MIGRATION_SUPERVISOR_BUNDLE_SHA256_INVALID",
+  );
+  if (grant.execution_authorization_sha256 !== executionAuthorizationSha256
+    || grant.supervisor_bundle_sha256 !== supervisorBundleSha256
+    || grant.release_manifest_sha256 !== manifestSha256
+    || grant.worker_image !== manifest.images.worker.image_reference
+    || grant.migration_manifest_sha256 !== manifest.migrations.allowlist_sha256
+    || grant.expected_current_head !== expectedCurrentHead
+    || grant.target_head !== manifest.migrations.head
+    || grant.database.deployment_class !== deploymentClass
+    || grant.database.deployment_id !== deploymentId
+    || grant.database.database_name !== databaseName
+    || grant.database.database_system_identifier !== systemIdentifier
+    || grant.database.database_oid !== databaseOid
+    || grant.database.database_marker !== marker
+    || grant.database.migration_role !== migrationRole) reject("MIGRATION_EXECUTION_GRANT_BINDING_INVALID");
+  return {
+    manifest, expectedCurrentHead, grant,
+    target,
+  };
 }
 
 export function loadIsolatedAuthorization(config: MigrationRuntimeConfig, databaseUrlValue: string): IsolatedAuthorization {
@@ -138,14 +230,30 @@ export type MigrationQueryClient = {
   query<T = Record<string, unknown>>(text: string, values?: unknown[]): Promise<{ rows: T[] }>;
 };
 
-export async function assertTargetIdentity(client: MigrationQueryClient, authorization: ReleaseAuthorization): Promise<void> {
+export type ReleaseMigrationFenceEvidence = {
+  database_name: string; system_identifier: string; database_oid: string; marker: string | null;
+  current_role_name: string; session_role_name: string; application_name: string;
+  database_default_transaction_read_only: string; database_setting_count: number;
+  database_allow_connections: boolean; database_connection_limit: number; other_backend_count: number;
+  managed_roles: string[]; login_roles: string[]; connect_roles: string[]; platform_superuser_roles: string[];
+  public_connect: boolean; public_temporary: boolean; unknown_connect_acl_count: number;
+  unknown_connect_login_count: number; prepared_transaction_count: number;
+  role_records: Array<Record<string, unknown>>; memberships: Array<Record<string, unknown>>;
+  non_owner_database_acl: Array<Record<string, unknown>>; database_owner_privileges: string[];
+};
+
+export async function assertTargetIdentity(
+  client: MigrationQueryClient,
+  authorization: ReleaseAuthorization,
+  databaseState: "RELEASED" | "MIGRATION_FENCED" = "RELEASED",
+): Promise<void> {
   const result = await client.query<{
     database_name: string; system_identifier: string; database_oid: string; marker: string | null;
     current_role_name: string; session_role_name: string; database_owner_matches: boolean; role_login: boolean;
     role_superuser: boolean; role_create_role: boolean; role_create_database: boolean; role_replication: boolean;
     role_bypass_rls: boolean; role_pg_monitor: boolean; role_memberships_absent: boolean; role_settings_absent: boolean;
     role_inherit: boolean; role_connection_limit: number; role_valid_until_absent: boolean;
-    database_settings_absent: boolean; search_path_exact: boolean;
+    database_settings_absent: boolean; database_read_only_fence_valid: boolean; search_path_exact: boolean;
     public_schema_owner_valid: boolean; public_schema_create_acl_valid: boolean;
   }>(`
     select pg_catalog.current_database()::text as database_name,
@@ -168,6 +276,8 @@ export async function assertTargetIdentity(client: MigrationQueryClient, authori
            not exists (select 1 from pg_catalog.pg_auth_members m where m.member=r.oid or m.roleid=r.oid) as role_memberships_absent,
            r.rolconfig is null and not exists (select 1 from pg_catalog.pg_db_role_setting s where s.setrole=r.oid) as role_settings_absent,
            not exists (select 1 from pg_catalog.pg_db_role_setting s where s.setdatabase=d.oid and s.setrole in (0,r.oid)) as database_settings_absent,
+           (select count(*)=1 and bool_and(s.setrole=0 and s.setconfig=ARRAY['default_transaction_read_only=on']::text[])
+              from pg_catalog.pg_db_role_setting s where s.setdatabase=d.oid) as database_read_only_fence_valid,
            pg_catalog.current_setting('search_path')=$1 as search_path_exact,
            exists (select 1 from pg_catalog.pg_namespace n where n.nspname='public' and n.nspowner=(select owner_role.oid from pg_catalog.pg_roles owner_role where owner_role.rolname='pg_database_owner')) as public_schema_owner_valid,
            not exists (
@@ -188,7 +298,11 @@ export async function assertTargetIdentity(client: MigrationQueryClient, authori
     || actual.role_superuser !== false || actual.role_create_role !== false || actual.role_create_database !== false || actual.role_replication !== false || actual.role_bypass_rls !== false || actual.role_pg_monitor !== false
     || actual.role_inherit !== false || actual.role_connection_limit !== 1 || actual.role_valid_until_absent !== true
     || actual.role_memberships_absent !== true || actual.role_settings_absent !== true) reject("MIGRATION_ROLE_IDENTITY_INVALID");
-  if (actual.database_settings_absent !== true || actual.search_path_exact !== true) reject("MIGRATION_DATABASE_SETTINGS_INVALID");
+  if (actual.search_path_exact !== true
+    || databaseState === "RELEASED" && actual.database_settings_absent !== true
+    || databaseState === "MIGRATION_FENCED" && (actual.database_settings_absent !== false || actual.database_read_only_fence_valid !== true)) {
+    reject("MIGRATION_DATABASE_SETTINGS_INVALID");
+  }
   if (actual.public_schema_owner_valid !== true || actual.public_schema_create_acl_valid !== true) reject("MIGRATION_PUBLIC_SCHEMA_PRIVILEGE_INVALID");
 }
 
@@ -311,8 +425,12 @@ async function assertNoUntrackedEmptyTargetState(client: MigrationQueryClient): 
   if (result.rows[0].present) reject("MIGRATION_EMPTY_TARGET_HAS_UNTRACKED_OBJECTS");
 }
 
-export async function assertReleaseDatabasePreflight(client: MigrationQueryClient, authorization: ReleaseAuthorization): Promise<void> {
-  await assertTargetIdentity(client, authorization);
+export async function assertReleaseDatabasePreflight(
+  client: MigrationQueryClient,
+  authorization: ReleaseAuthorization,
+  databaseState: "RELEASED" | "MIGRATION_FENCED" = "RELEASED",
+): Promise<void> {
+  await assertTargetIdentity(client, authorization, databaseState);
   const present = await migrationHistoryPresent(client);
   let rows: Array<{ version: string; checksum: string }> = [];
   if (authorization.expectedCurrentHead === "EMPTY") {
@@ -320,4 +438,126 @@ export async function assertReleaseDatabasePreflight(client: MigrationQueryClien
     await assertNoUntrackedEmptyTargetState(client);
   } else if (present) rows = await readPresentMigrationHistory(client);
   validateAppliedMigrationRows(rows, authorization.manifest.migrations.entries, authorization.expectedCurrentHead);
+}
+
+export async function assertReleaseMigrationFence(
+  client: MigrationQueryClient,
+  authorization: ReleaseAuthorization,
+): Promise<ReleaseMigrationFenceEvidence> {
+  const result = await client.query<ReleaseMigrationFenceEvidence>(`
+    with target as (
+      select d.oid,d.datacl,d.datdba from pg_catalog.pg_database d where d.datname=pg_catalog.current_database()
+    ), expected_roles as (
+      select unnest(ARRAY[
+        'chenyida_erp_admin','chenyida_erp_admin_priv','chenyida_erp_backup','chenyida_erp_backup_priv',
+        'chenyida_erp_owner','chenyida_erp_web','chenyida_erp_web_priv','chenyida_erp_worker','chenyida_erp_worker_priv'
+      ]::text[]) as rolname
+    ), expanded as (
+      select a.grantor,a.grantee,a.privilege_type,a.is_grantable from target t
+      cross join lateral pg_catalog.aclexplode(coalesce(t.datacl,pg_catalog.acldefault('d',t.datdba))) a
+    )
+    select pg_catalog.current_database()::text as database_name,
+           (select system_identifier::text from pg_catalog.pg_control_system()) as system_identifier,
+           t.oid::text as database_oid,
+           pg_catalog.shobj_description(t.oid,'pg_database') as marker,
+           current_user::text as current_role_name,
+           session_user::text as session_role_name,
+           pg_catalog.current_setting('application_name')::text as application_name,
+           t.datallowconn as database_allow_connections,
+           coalesce((select split_part(v,'=',2) from pg_catalog.pg_db_role_setting s
+             cross join lateral unnest(s.setconfig) v where s.setdatabase=t.oid and s.setrole=0
+             and v like 'default_transaction_read_only=%'), 'RESET')::text as database_default_transaction_read_only,
+           (select count(*)::integer from pg_catalog.pg_db_role_setting s
+             cross join lateral unnest(s.setconfig) value where s.setdatabase=t.oid) as database_setting_count,
+           (select d.datconnlimit::integer from pg_catalog.pg_database d where d.oid=t.oid) as database_connection_limit,
+           (select count(*)::integer from pg_catalog.pg_stat_activity a where a.datid=t.oid and a.pid<>pg_catalog.pg_backend_pid()) as other_backend_count,
+           (select pg_catalog.array_agg(r.rolname::text order by r.rolname) from pg_catalog.pg_roles r join expected_roles e on e.rolname=r.rolname) as managed_roles,
+           (select pg_catalog.array_agg(r.rolname::text order by r.rolname) from pg_catalog.pg_roles r join expected_roles e on e.rolname=r.rolname where r.rolcanlogin) as login_roles,
+           (select pg_catalog.array_agg(r.rolname::text order by r.rolname) from pg_catalog.pg_roles r join expected_roles e on e.rolname=r.rolname where r.rolcanlogin and pg_catalog.has_database_privilege(r.oid,t.oid,'CONNECT')) as connect_roles,
+           (select pg_catalog.array_agg(r.rolname::text order by r.rolname) from pg_catalog.pg_roles r where r.rolsuper) as platform_superuser_roles,
+           exists (select 1 from expanded e where e.grantee=0 and e.privilege_type='CONNECT') as public_connect,
+           exists (select 1 from expanded e where e.grantee=0 and e.privilege_type='TEMPORARY') as public_temporary,
+           (select count(*)::integer from expanded e where e.grantee<>0 and e.privilege_type='CONNECT'
+             and not exists (select 1 from pg_catalog.pg_roles r join expected_roles x on x.rolname=r.rolname where r.oid=e.grantee)) as unknown_connect_acl_count,
+           (select count(*)::integer from pg_catalog.pg_roles r where r.rolcanlogin and not r.rolsuper
+             and not exists (select 1 from expected_roles e where e.rolname=r.rolname)
+             and pg_catalog.has_database_privilege(r.oid,t.oid,'CONNECT')) as unknown_connect_login_count,
+           (select count(*)::integer from pg_catalog.pg_prepared_xacts x where x.database=pg_catalog.current_database()) as prepared_transaction_count
+           ,coalesce((select pg_catalog.json_agg(pg_catalog.json_build_object(
+             'role',r.rolname::text,'login',r.rolcanlogin,'inherit',r.rolinherit,
+             'connection_limit',r.rolconnlimit::integer,'superuser',r.rolsuper,'create_role',r.rolcreaterole,
+             'create_database',r.rolcreatedb,'replication',r.rolreplication,'bypass_rls',r.rolbypassrls,
+             'valid_until_absent',r.rolvaliduntil is null,
+             'settings_absent',r.rolconfig is null and not exists(
+               select 1 from pg_catalog.pg_db_role_setting s where s.setrole=r.oid
+             )) order by r.rolname) from pg_catalog.pg_roles r join expected_roles e on e.rolname=r.rolname),'[]'::json) as role_records
+           ,coalesce((select pg_catalog.json_agg(pg_catalog.json_build_object(
+             'role',granted.rolname::text,'member',member.rolname::text,'grantor',grantor.rolname::text,
+             'admin_option',m.admin_option,'inherit_option',m.inherit_option,'set_option',m.set_option
+           ) order by granted.rolname,member.rolname) from pg_catalog.pg_auth_members m
+             join pg_catalog.pg_roles granted on granted.oid=m.roleid
+             join pg_catalog.pg_roles member on member.oid=m.member
+             join pg_catalog.pg_roles grantor on grantor.oid=m.grantor
+             where granted.rolname in (select rolname from expected_roles)
+                or member.rolname in (select rolname from expected_roles)),'[]'::json) as memberships
+           ,coalesce((select pg_catalog.json_agg(pg_catalog.json_build_object(
+             'grantee',pg_catalog.pg_get_userbyid(e.grantee)::text,
+             'grantor',pg_catalog.pg_get_userbyid(e.grantor)::text,
+             'privilege',e.privilege_type::text,'grantable',e.is_grantable
+           ) order by pg_catalog.pg_get_userbyid(e.grantee),e.privilege_type)
+             from expanded e where e.grantee<>t.datdba and e.grantee<>0),'[]'::json) as non_owner_database_acl
+           ,array[
+             case when pg_catalog.has_database_privilege(t.datdba,t.oid,'CONNECT') then 'CONNECT' end,
+             case when pg_catalog.has_database_privilege(t.datdba,t.oid,'CREATE') then 'CREATE' end,
+             case when pg_catalog.has_database_privilege(t.datdba,t.oid,'TEMPORARY') then 'TEMPORARY' end
+           ]::text[] as database_owner_privileges
+      from target t
+  `);
+  if (result.rows.length !== 1) reject("MIGRATION_DATABASE_FENCE_INCOMPLETE");
+  const actual = result.rows[0];
+  const expected = authorization.target;
+  const managedRoles = [
+    "chenyida_erp_admin", "chenyida_erp_admin_priv", "chenyida_erp_backup", "chenyida_erp_backup_priv",
+    "chenyida_erp_owner", "chenyida_erp_web", "chenyida_erp_web_priv", "chenyida_erp_worker",
+    "chenyida_erp_worker_priv",
+  ];
+  const loginRoles = ["chenyida_erp_admin", "chenyida_erp_backup", "chenyida_erp_owner", "chenyida_erp_web", "chenyida_erp_worker"];
+  const roleRecords = [
+    { role: "chenyida_erp_admin", login: true, inherit: true, connection_limit: 1, superuser: false, create_role: false, create_database: false, replication: false, bypass_rls: false, valid_until_absent: true, settings_absent: true },
+    { role: "chenyida_erp_admin_priv", login: false, inherit: true, connection_limit: -1, superuser: false, create_role: false, create_database: false, replication: false, bypass_rls: false, valid_until_absent: true, settings_absent: true },
+    { role: "chenyida_erp_backup", login: true, inherit: true, connection_limit: 2, superuser: false, create_role: false, create_database: false, replication: false, bypass_rls: false, valid_until_absent: true, settings_absent: true },
+    { role: "chenyida_erp_backup_priv", login: false, inherit: true, connection_limit: -1, superuser: false, create_role: false, create_database: false, replication: false, bypass_rls: false, valid_until_absent: true, settings_absent: true },
+    { role: "chenyida_erp_owner", login: true, inherit: false, connection_limit: 1, superuser: false, create_role: false, create_database: false, replication: false, bypass_rls: false, valid_until_absent: true, settings_absent: true },
+    { role: "chenyida_erp_web", login: true, inherit: true, connection_limit: 12, superuser: false, create_role: false, create_database: false, replication: false, bypass_rls: false, valid_until_absent: true, settings_absent: true },
+    { role: "chenyida_erp_web_priv", login: false, inherit: true, connection_limit: -1, superuser: false, create_role: false, create_database: false, replication: false, bypass_rls: false, valid_until_absent: true, settings_absent: true },
+    { role: "chenyida_erp_worker", login: true, inherit: true, connection_limit: 6, superuser: false, create_role: false, create_database: false, replication: false, bypass_rls: false, valid_until_absent: true, settings_absent: true },
+    { role: "chenyida_erp_worker_priv", login: false, inherit: true, connection_limit: -1, superuser: false, create_role: false, create_database: false, replication: false, bypass_rls: false, valid_until_absent: true, settings_absent: true },
+  ];
+  const memberships = [
+    { role: "chenyida_erp_admin_priv", member: "chenyida_erp_admin", grantor: "postgres", admin_option: false, inherit_option: true, set_option: false },
+    { role: "chenyida_erp_backup_priv", member: "chenyida_erp_backup", grantor: "postgres", admin_option: false, inherit_option: true, set_option: false },
+    { role: "chenyida_erp_web_priv", member: "chenyida_erp_web", grantor: "postgres", admin_option: false, inherit_option: true, set_option: false },
+    { role: "chenyida_erp_worker_priv", member: "chenyida_erp_worker", grantor: "postgres", admin_option: false, inherit_option: true, set_option: false },
+  ];
+  if (actual.database_name !== expected.databaseName || actual.system_identifier !== expected.systemIdentifier
+    || actual.database_oid !== expected.databaseOid || actual.marker !== expected.marker
+    || actual.current_role_name !== expected.migrationRole || actual.session_role_name !== expected.migrationRole
+    || actual.application_name !== "chenyida-erp-migration"
+    || actual.database_allow_connections !== true
+    || actual.database_default_transaction_read_only !== "on" || actual.database_setting_count !== 1
+    || actual.database_connection_limit !== 1
+    || actual.other_backend_count !== 0 || JSON.stringify(actual.managed_roles) !== JSON.stringify(managedRoles)
+    || JSON.stringify(actual.login_roles) !== JSON.stringify(loginRoles)
+    || JSON.stringify(actual.connect_roles) !== JSON.stringify(["chenyida_erp_owner"])
+    || JSON.stringify(actual.platform_superuser_roles) !== JSON.stringify(["postgres"])
+    || actual.public_connect !== false || actual.public_temporary !== false
+    || actual.unknown_connect_acl_count !== 0 || actual.unknown_connect_login_count !== 0
+    || actual.prepared_transaction_count !== 0
+    || JSON.stringify(actual.role_records) !== JSON.stringify(roleRecords)
+    || JSON.stringify(actual.memberships) !== JSON.stringify(memberships)
+    || JSON.stringify(actual.non_owner_database_acl) !== JSON.stringify([])
+    || JSON.stringify(actual.database_owner_privileges) !== JSON.stringify(["CONNECT", "CREATE", "TEMPORARY"])) {
+    reject("MIGRATION_DATABASE_FENCE_INVALID");
+  }
+  return actual;
 }

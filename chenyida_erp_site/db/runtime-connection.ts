@@ -33,6 +33,8 @@ export type DatabaseRuntimePolicy = Readonly<{
   marker: string;
 }>;
 
+export type DatabaseRuntimeState = "RELEASED" | "MIGRATION_FENCED";
+
 type RuntimePolicyTemplate = Omit<DatabaseRuntimePolicy, "marker">;
 
 const POLICY_TEMPLATES: Readonly<Record<RuntimeServiceKind, RuntimePolicyTemplate>> = Object.freeze({
@@ -226,6 +228,8 @@ type IdentityRow = {
   search_path_exact: boolean;
   role_settings_absent: boolean;
   database_settings_absent: boolean;
+  database_read_only_fence_valid: boolean;
+  database_connection_limit: number;
   membership_valid: boolean;
   dangerous_membership_absent: boolean;
   owner_membership_absent: boolean;
@@ -269,9 +273,11 @@ function expectedCanaries(policy: DatabaseRuntimePolicy, row: IdentityRow): bool
 export async function assertDatabaseRuntimeIdentity(
   client: RuntimeIdentityQuery,
   policy: DatabaseRuntimePolicy,
+  databaseState: DatabaseRuntimeState = "RELEASED",
 ): Promise<void> {
   if (!IDENTIFIER.test(policy.role) || !IDENTIFIER.test(policy.ownerRole)
-    || (policy.privilegeGroup !== null && !IDENTIFIER.test(policy.privilegeGroup))) {
+    || (policy.privilegeGroup !== null && !IDENTIFIER.test(policy.privilegeGroup))
+    || (databaseState === "MIGRATION_FENCED" && policy.service !== "MIGRATION")) {
     reject("DATABASE_RUNTIME_POLICY_INVALID");
   }
   try {
@@ -307,6 +313,10 @@ export async function assertDatabaseRuntimeIdentity(
                select 1 from pg_catalog.pg_db_role_setting s
                 where s.setdatabase=d.oid and s.setrole in (0,r.oid)
              ) as database_settings_absent,
+             (select count(*)=1 and bool_and(s.setrole=0
+                 and s.setconfig=ARRAY['default_transaction_read_only=on']::text[])
+                from pg_catalog.pg_db_role_setting s where s.setdatabase=d.oid) as database_read_only_fence_valid,
+             d.datconnlimit::integer as database_connection_limit,
              case when $2::text is null then
                not exists (select 1 from pg_catalog.pg_auth_members m where m.member=r.oid or m.roleid=r.oid)
              else
@@ -365,7 +375,10 @@ export async function assertDatabaseRuntimeIdentity(
       || row.role_create_database !== false || row.role_replication !== false || row.role_bypass_rls !== false
       || row.role_inherit !== policy.roleInherit || row.role_connection_limit !== policy.roleConnectionLimit
       || row.role_valid_until_absent !== true
-      || row.search_path_exact !== true || row.role_settings_absent !== true || row.database_settings_absent !== true
+      || row.search_path_exact !== true || row.role_settings_absent !== true
+      || (databaseState === "RELEASED" ? row.database_settings_absent !== true
+        : row.database_settings_absent !== false || row.database_read_only_fence_valid !== true
+          || row.database_connection_limit !== 1)
       || row.membership_valid !== true
       || row.dangerous_membership_absent !== true || row.owner_membership_absent !== true
       || row.database_connect !== true || row.schema_usage !== true

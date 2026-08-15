@@ -19,6 +19,7 @@
     "CAPTURE_UAT_PROMOTION_SNAPSHOT",
     "QUIESCE_UAT_WRITERS",
     "AUTHORIZE_UAT_PROMOTION_MIGRATION",
+    "RUN_UAT_PROMOTION_MIGRATION",
     "RECOVER_UAT_PROMOTION"
   ],
   "required_checkpoint_order": [
@@ -85,15 +86,15 @@
       "id": "ONE_TIME_MIGRATION_AUTHORIZATION",
       "status": "SUPPORTED",
       "severity_if_incomplete": "P0",
-      "evidence": ["release-supervisor-launcher.py:AUTHORIZE_UAT_PROMOTION_MIGRATION", "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT", "migrate-postgres.ts:MIGRATION_SUPERVISOR_EXECUTION_ADAPTER_NOT_IMPLEMENTED"],
+      "evidence": ["release-supervisor-launcher.py:AUTHORIZE_UAT_PROMOTION_MIGRATION", "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT", "release-migration-authorization.ts:never authorize SQL"],
       "finding": null
     },
     {
       "id": "MIGRATION_COMMIT_RECEIPT",
-      "status": "MISSING",
+      "status": "SUPPORTED",
       "severity_if_incomplete": "P0",
-      "evidence": ["migrate-postgres.ts:schema_migrations"],
-      "finding": "Migration逐文件事务和最终数据库核对存在，但没有promotion-bound、不可覆盖的提交回执和partial/recover状态。"
+      "evidence": ["uat-promotion-migration-control.py:DATABASE_FENCE_AND_EXACT_ALLOWLIST_MIGRATION", "migrate-postgres.ts:MIGRATION_FENCED", "uat-promotion-transaction-journal.mjs:MIGRATION_COMMIT_RECEIPT", "uat-promotion-migration-execution-contract.mjs:UAT_PROMOTION_MIGRATION_RESULT_CONTRACT"],
+      "finding": null
     },
     {
       "id": "COMPOSE_DEPLOYMENT_RECEIPT",
@@ -146,13 +147,17 @@
     }
   ],
   "source_files": [
-    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
+    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
     {"path": "chenyida_erp_site/scripts/release-candidate-snapshot.py", "markers": ["VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT", "receipt_sha256"]},
     {"path": "chenyida_erp_site/scripts/release-manifest-contract.mjs", "markers": ["promotion_status", "RELEASE_NOT_ELIGIBLE"]},
     {"path": "chenyida_erp_site/scripts/release-lifecycle-contract.mjs", "markers": ["PRE_DEPLOY_EXISTING_RUNTIME_STABILITY", "POST_DEPLOY_CURRENT_RUNTIME_STRICT"]},
     {"path": "chenyida_erp_site/scripts/release-gate-runner.mjs", "markers": ["assertPreDeployRuntimeStable", "GATE_MIGRATION_ALLOWLIST_MISMATCH"]},
     {"path": "chenyida_erp_site/scripts/release-migration-authorization.ts", "markers": ["ERP_ALLOW_PRODUCTION_MIGRATION", "MIGRATE_EXACT_RELEASE_MANIFEST"]},
-    {"path": "chenyida_erp_site/scripts/migrate-postgres.ts", "markers": ["runMigrationTransaction", "schema_migrations", "MIGRATION_SUPERVISOR_EXECUTION_ADAPTER_NOT_IMPLEMENTED"]},
+    {"path": "chenyida_erp_site/scripts/migrate-postgres.ts", "markers": ["runMigrationTransaction", "schema_migrations", "MIGRATION_SUPERVISOR_EXECUTION_GRANT_REQUIRED", "MIGRATION_FENCED"]},
+    {"path": "chenyida_erp_site/scripts/uat-promotion-migration-control.py", "markers": ["DATABASE_FENCE_AND_EXACT_ALLOWLIST_MIGRATION", "MIGRATION_FENCED", "CONTAIN_EXACT_UAT_PROMOTION_MIGRATION_BEFORE_RECOVERY"]},
+    {"path": "chenyida_erp_site/scripts/uat-promotion-migration-execution-contract.mjs", "markers": ["UAT_PROMOTION_MIGRATION_GRANT_CONTRACT", "UAT_PROMOTION_MIGRATION_FENCE_CONTRACT", "UAT_PROMOTION_MIGRATION_RESULT_CONTRACT"]},
+    {"path": "chenyida_erp_site/db/index.ts", "markers": ["ERP_MIGRATION_DATABASE_STATE", "MIGRATION_FENCED", "ERP_UAT_PROMOTION_MIGRATION_GRANT_SHA256"]},
+    {"path": "chenyida_erp_site/db/runtime-connection.ts", "markers": ["DatabaseRuntimeState", "MIGRATION_FENCED", "policy.service !== \"MIGRATION\""]},
     {"path": "chenyida_erp_site/compose.yml", "markers": ["  migrate:", "service_completed_successfully"]},
     {"path": "chenyida_erp_site/compose.release.yml", "markers": ["ERP_WEB_IMAGE", "ERP_WORKER_IMAGE"]},
     {"path": "chenyida_erp_site/scripts/backup-selfhost.sh", "markers": ["UAT_BACKUP_V2_AUTHORIZED", "acquire_chenyida_release_gate_lock"]},
@@ -163,6 +168,6 @@
     {"path": "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs", "markers": ["buildReleaseIdentityFromPostDeployReceipt", "assertPostDeployReadinessStable"]},
     {"path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json", "markers": ["HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED", "\"status\": \"BLOCKED\""]},
     {"path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json", "markers": ["chenyida-erp-uat-promotion-transaction-policy/v1", "\"status\": \"NOT_IMPLEMENTED\""]},
-    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT", "probeDockerWriterQuiesce", "validateBackupRecoveryReadinessV4", "AFTER_MIGRATION_AUTHORIZATION_CURRENT", "runUatPromotionTransactionPhase"]}
+    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT", "MIGRATION_COMMIT_RECEIPT", "probeDockerWriterQuiesce", "validateBackupRecoveryReadinessV4", "AFTER_MIGRATION_AUTHORIZATION_CURRENT", "runUatPromotionTransactionPhase"]}
   ]
 }

@@ -7,6 +7,7 @@ import {
   databasePoolConfiguration,
   DatabaseRuntimeError,
   type DatabaseRuntimePolicy,
+  type DatabaseRuntimeState,
 } from "./runtime-connection.ts";
 
 let sharedPool: Pool | undefined;
@@ -50,17 +51,24 @@ type PoolConnectCallback = (
   done: (release?: unknown) => void,
 ) => void;
 
-export function createRuntimeVerifier(policy: DatabaseRuntimePolicy): RuntimeVerifier {
+export function createRuntimeVerifier(
+  policy: DatabaseRuntimePolicy,
+  databaseState: DatabaseRuntimeState = "RELEASED",
+): RuntimeVerifier {
   return (client, callback) => {
-    assertDatabaseRuntimeIdentity(client, policy)
+    assertDatabaseRuntimeIdentity(client, policy, databaseState)
       .then(() => callback())
       .catch(() => callback(new DatabaseRuntimeError("DATABASE_RUNTIME_IDENTITY_INVALID")));
   };
 }
 
-export function installRuntimeCheckoutVerification(pool: Pool, policy: DatabaseRuntimePolicy): Pool {
+export function installRuntimeCheckoutVerification(
+  pool: Pool,
+  policy: DatabaseRuntimePolicy,
+  databaseState: DatabaseRuntimeState = "RELEASED",
+): Pool {
   const acquire = pool.connect.bind(pool);
-  const verify = createRuntimeVerifier(policy);
+  const verify = createRuntimeVerifier(policy, databaseState);
   const guardedConnect = (callback?: PoolConnectCallback): Promise<PoolClient> | void => {
     if (callback) {
       acquire((error, client, done) => {
@@ -102,7 +110,20 @@ export function installRuntimeCheckoutVerification(pool: Pool, policy: DatabaseR
 function createPool(): Pool {
   const resolved = databasePoolConfiguration(runtimeConfig());
   const pool = new Pool({ ...resolved.pool } satisfies PoolConfig);
-  return resolved.policy ? installRuntimeCheckoutVerification(pool, resolved.policy) : pool;
+  if (!resolved.policy) return pool;
+  const requestedState = process.env.ERP_MIGRATION_DATABASE_STATE;
+  let databaseState: DatabaseRuntimeState = "RELEASED";
+  if (requestedState !== undefined) {
+    const digest = /^[0-9a-f]{64}$/;
+    if (requestedState !== "MIGRATION_FENCED" || resolved.policy.service !== "MIGRATION"
+      || !resolved.policy.marker.startsWith("chenyida-erp-deployment/v2:UAT:")
+      || !digest.test(process.env.ERP_UAT_PROMOTION_MIGRATION_GRANT_SHA256 || "")
+      || !digest.test(process.env.ERP_UAT_PROMOTION_MIGRATION_EXECUTION_AUTHORIZATION_SHA256 || "")) {
+      throw new DatabaseRuntimeError("DATABASE_RUNTIME_STATE_INVALID");
+    }
+    databaseState = "MIGRATION_FENCED";
+  }
+  return installRuntimeCheckoutVerification(pool, resolved.policy, databaseState);
 }
 
 export function getPool(): Pool {

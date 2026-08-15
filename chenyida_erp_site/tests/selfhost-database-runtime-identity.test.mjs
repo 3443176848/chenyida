@@ -49,20 +49,22 @@ function validWebRow(policy) {
     role_create_database: false,
     role_replication: false,
     role_bypass_rls: false,
-    role_inherit: true,
-    role_connection_limit: 12,
+    role_inherit: policy.roleInherit,
+    role_connection_limit: policy.roleConnectionLimit,
     role_valid_until_absent: true,
     search_path_exact: true,
     role_settings_absent: true,
     database_settings_absent: true,
+    database_read_only_fence_valid: false,
+    database_connection_limit: 64,
     membership_valid: true,
     dangerous_membership_absent: true,
     owner_membership_absent: true,
     database_connect: true,
-    database_create: false,
-    database_temporary: false,
+    database_create: policy.service === "MIGRATION",
+    database_temporary: policy.service === "MIGRATION",
     schema_usage: true,
-    schema_create: false,
+    schema_create: policy.service === "MIGRATION",
     migration_select: true,
     migration_insert: false,
     migration_update: false,
@@ -130,6 +132,23 @@ test("runtime database identity keeps the one-shot admin away from migration his
     assertDatabaseRuntimeIdentity(identityClient({ ...row, migration_select: true }), policy),
     runtimeError,
   );
+});
+
+test("only the migration service accepts the exact short-lived database fence", async () => {
+  const migration = servicePolicy("MIGRATION");
+  assert.ok(migration);
+  const fenced = {
+    ...validWebRow(migration),
+    database_settings_absent: false,
+    database_read_only_fence_valid: true,
+    database_connection_limit: 1,
+  };
+  await assert.doesNotReject(assertDatabaseRuntimeIdentity(identityClient(fenced), migration, "MIGRATION_FENCED"));
+  await assert.rejects(
+    assertDatabaseRuntimeIdentity(identityClient(fenced), webPolicy(), "MIGRATION_FENCED"),
+    (error) => error instanceof DatabaseRuntimeError && error.code === "DATABASE_RUNTIME_POLICY_INVALID",
+  );
+  await assert.rejects(assertDatabaseRuntimeIdentity(identityClient(fenced), migration), runtimeError);
 });
 
 test("runtime database identity rejects role swaps, dangerous capabilities and canary drift", async () => {

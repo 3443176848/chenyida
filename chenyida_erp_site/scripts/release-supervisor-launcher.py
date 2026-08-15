@@ -75,8 +75,9 @@ NOTIFIER_EGRESS_TEMPLATE_POLICY_SHA256 = "abaf585ec2c5c735e18418265a688f01f2b4d1
 NOTIFIER_EGRESS_BASE_UNIT_SHA256 = "22d8b4cfaf48821e5b2d2f28ad285cf549b207c30b13f9b4a50f202a031e3812"
 UAT_PROMOTION_STATE_ROOT = Path("/var/lib/chenyida-erp/uat-promotion-transactions-v1")
 UAT_PROMOTION_CURRENT_FILE = UAT_PROMOTION_STATE_ROOT / "current.json"
-UAT_PROMOTION_POLICY_FILE_SHA256 = "deb332eef0e4e4018de076ed27cee37b06adf8f82ff9f7a15c229b885c4d3705"
-UAT_PROMOTION_POLICY_SHA256 = "c0408305e61465c21068ccfd68f4919bd4feff67e5a55f43d604b60bc5dea08a"
+UAT_PROMOTION_ACTIVE_FENCES_ROOT = UAT_PROMOTION_STATE_ROOT / "active-fences"
+UAT_PROMOTION_POLICY_FILE_SHA256 = "756c1249776499d8096ec2ed8041bd68aa41ce253ce49ee9b5b46650f163b093"
+UAT_PROMOTION_POLICY_SHA256 = "9cebe0042445be8493a0e185f01cc8b40ab42bd14057ddbdd36bb23419279a50"
 UAT_PROMOTION_RECOVERY_READINESS_FILE = Path("/var/lib/chenyida-erp/backup-status/recovery-readiness.json")
 UAT_PROMOTION_CANDIDATE_RECEIPTS_ROOT = Path("/var/lib/chenyida-erp/release-candidate-snapshots/receipts")
 UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1"
@@ -192,6 +193,8 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/run-source-diff-check.sh": "0555",
     "chenyida_erp_site/scripts/write-release-identity.sh": "0555",
     "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs": "0444",
+    "chenyida_erp_site/scripts/uat-promotion-migration-execution-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/uat-promotion-migration-control.py": "0555",
     "chenyida_erp_site/tools/ops-monitoring/backup-projection.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/collector.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/components-projection.mjs": "0444",
@@ -329,6 +332,7 @@ UAT_PROMOTION_OPERATIONS = {
     "CAPTURE_UAT_PROMOTION_SNAPSHOT": "CAPTURE_SNAPSHOT",
     "QUIESCE_UAT_WRITERS": "QUIESCE_WRITERS",
     "AUTHORIZE_UAT_PROMOTION_MIGRATION": "MIGRATION_AUTHORIZATION",
+    "RUN_UAT_PROMOTION_MIGRATION": "MIGRATION_EXECUTION",
     "RECOVER_UAT_PROMOTION": "RECOVER",
 }
 
@@ -337,6 +341,7 @@ UAT_PROMOTION_CONFIRMATIONS = {
     "CAPTURE_UAT_PROMOTION_SNAPSHOT": "AUTHORIZE_CAPTURE_EXACT_UAT_PROMOTION_SNAPSHOT",
     "QUIESCE_UAT_WRITERS": "AUTHORIZE_CONTINUED_QUIESCE_OF_EXACT_UAT_WRITERS",
     "AUTHORIZE_UAT_PROMOTION_MIGRATION": "AUTHORIZE_EXACT_UAT_PROMOTION_MIGRATION_APPROVAL_ONLY_NO_SQL",
+    "RUN_UAT_PROMOTION_MIGRATION": "AUTHORIZE_RUN_EXACT_UAT_PROMOTION_MIGRATION",
     "RECOVER_UAT_PROMOTION": "AUTHORIZE_RECOVER_EXACT_UAT_PROMOTION",
 }
 
@@ -390,6 +395,23 @@ UAT_PROMOTION_MIGRATION_AUTHORIZATION_PARAMETER_FIELDS = {
     "database_oid", "database_system_identifier", "database_marker", "expected_current_migration_head",
     "target_migration_head", "migration_manifest_sha256", "migration_role", "authorization_created_at",
     "authorization_expires_at", "requester_identity_sha256", "approver_identity_sha256",
+    "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+}
+
+UAT_PROMOTION_MIGRATION_EXECUTION_PARAMETER_FIELDS = {
+    "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+    "promotion_intent_sha256", "promotion_original_authorization_sha256",
+    "migration_authorization_operation_id", "migration_authorization_intent_sha256",
+    "migration_authorization_intent_source", "migration_approval_authorization_sha256",
+    "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "current_checkpoint_source", "runtime_identity_source", "release_manifest", "release_manifest_sha256",
+    "release_manifest_source", "deployment_class", "deployment_id", "database_name", "database_oid",
+    "database_system_identifier", "database_marker", "expected_current_migration_head", "target_migration_head",
+    "migration_manifest_sha256", "migration_role", "control_role", "worker_image", "postgres_container",
+    "postgres_container_id", "postgres_image_digest", "backend_network", "execution_created_at",
+    "execution_expires_at", "requester_identity_sha256", "approver_identity_sha256",
     "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
 }
 
@@ -850,6 +872,41 @@ def verify_uat_promotion_migration_authorization_sources(parameters: dict[str, A
     return {
         name: verify_authorized_projection_source(
             source, "SUPERVISOR_UAT_PROMOTION_MIGRATION_AUTHORIZATION_SOURCE_CHANGED",
+        )
+        for name, source in sources.items()
+    }
+
+
+def verify_uat_promotion_migration_execution_sources(parameters: dict[str, Any]) -> dict[str, bytes]:
+    trusted_owned_directory(UAT_PROMOTION_STATE_ROOT, 0, 0, {0o700}, "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID")
+    trusted_owned_marker(
+        UAT_PROMOTION_STATE_ROOT / UAT_PROMOTION_STATE_MARKER, UAT_PROMOTION_STATE_MARKER_VALUE,
+        0, 0, {0o400}, "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+    )
+    trusted_owned_directory(
+        UAT_PROMOTION_STATE_ROOT / "intents", 0, 0, {0o700}, "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+    )
+    identity_gid = parameters["runtime_identity_source"]["gid"]
+    trusted_owned_directory(RELEASE_IDENTITY_ROOT, 0, identity_gid, {0o750}, "SUPERVISOR_UAT_PROMOTION_RUNTIME_ROOT_INVALID")
+    trusted_owned_marker(
+        RELEASE_IDENTITY_ROOT / RELEASE_IDENTITY_MARKER, RELEASE_IDENTITY_MARKER_VALUE,
+        0, identity_gid, {0o440}, "SUPERVISOR_UAT_PROMOTION_RUNTIME_ROOT_INVALID",
+    )
+    manifest_parent = Path(parameters["release_manifest_source"]["path"]).parent
+    trusted_owned_directory(manifest_parent, 0, 0, {0o750}, "SUPERVISOR_UAT_PROMOTION_MANIFEST_ROOT_INVALID")
+    trusted_owned_marker(
+        manifest_parent / RELEASE_ARTIFACT_MARKER, RELEASE_ARTIFACT_MARKER_VALUE,
+        0, 0, {0o440}, "SUPERVISOR_UAT_PROMOTION_MANIFEST_ROOT_INVALID",
+    )
+    sources = {
+        "current": parameters["current_checkpoint_source"],
+        "migration_authorization_intent": parameters["migration_authorization_intent_source"],
+        "runtime": parameters["runtime_identity_source"],
+        "manifest": parameters["release_manifest_source"],
+    }
+    return {
+        name: verify_authorized_projection_source(
+            source, "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_SOURCE_CHANGED",
         )
         for name, source in sources.items()
     }
@@ -1628,6 +1685,119 @@ def validate_uat_promotion_migration_authorization_parameters(
     return parameters
 
 
+def validate_uat_promotion_migration_execution_parameters(
+        parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    recovery = operation == "RECOVER_UAT_PROMOTION"
+    if recovery and (not isinstance(parameters, dict) or parameters.get("original_operation") != "MIGRATION_EXECUTION"):
+        reject("SUPERVISOR_UAT_PROMOTION_OPERATION_INVALID")
+    if not recovery and operation != "RUN_UAT_PROMOTION_MIGRATION":
+        reject("SUPERVISOR_UAT_PROMOTION_OPERATION_INVALID")
+    expected_fields = set(UAT_PROMOTION_MIGRATION_EXECUTION_PARAMETER_FIELDS)
+    if recovery:
+        expected_fields |= UAT_PROMOTION_RECOVERY_PARAMETER_FIELDS
+    parameters = exact_fields(
+        parameters, expected_fields, "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_PARAMETERS_INVALID",
+    )
+    if parameters["promotion_state_root"] != str(UAT_PROMOTION_STATE_ROOT):
+        reject("SUPERVISOR_UAT_PROMOTION_STATE_PATH_INVALID")
+    for field in ("promotion_id", "migration_authorization_operation_id"):
+        if not isinstance(parameters[field], str) or not IDENTIFIER.fullmatch(parameters[field]):
+            reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_IDENTIFIER_INVALID")
+    if parameters["promotion_id"] == parameters["migration_authorization_operation_id"]:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_IDENTIFIER_INVALID")
+    if not isinstance(parameters["promotion_generation"], int) or isinstance(parameters["promotion_generation"], bool) \
+            or not 1 <= parameters["promotion_generation"] <= 1_000_000:
+        reject("SUPERVISOR_UAT_PROMOTION_GENERATION_INVALID")
+    digest_fields = {
+        "previous_checkpoint_receipt_sha256", "promotion_intent_sha256",
+        "promotion_original_authorization_sha256", "migration_authorization_intent_sha256",
+        "migration_approval_authorization_sha256", "candidate_binding_sha256", "database_binding_sha256",
+        "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+        "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256", "release_manifest_sha256",
+        "migration_manifest_sha256", "postgres_container_id", "requester_identity_sha256",
+        "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+    }
+    if recovery:
+        digest_fields |= {"expected_intent_sha256", "original_authorization_sha256"}
+    for field in digest_fields:
+        if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]) \
+                or parameters[field] == "0" * 64:
+            reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_DIGEST_INVALID")
+    if parameters["policy_file_sha256"] != UAT_PROMOTION_POLICY_FILE_SHA256 \
+            or parameters["policy_sha256"] != UAT_PROMOTION_POLICY_SHA256:
+        reject("SUPERVISOR_UAT_PROMOTION_POLICY_INVALID")
+    actors = {
+        parameters["requester_identity_sha256"], parameters["approver_identity_sha256"],
+        parameters["executor_identity_sha256"],
+    }
+    if len(actors) != 3 or "0" * 64 in actors:
+        reject("SUPERVISOR_UAT_PROMOTION_ACTORS_INVALID")
+    if parameters["deployment_class"] != "UAT" or parameters["deployment_id"] != "chenyida-erp" \
+            or parameters["database_name"] != "chenyida_erp" \
+            or not isinstance(parameters["database_oid"], str) \
+            or not re.fullmatch(r"[1-9][0-9]{0,9}", parameters["database_oid"]) \
+            or not isinstance(parameters["database_system_identifier"], str) \
+            or not re.fullmatch(r"[1-9][0-9]{9,29}", parameters["database_system_identifier"]) \
+            or parameters["database_marker"] != "chenyida-erp-deployment/v2:UAT:chenyida-erp" \
+            or parameters["migration_role"] != "chenyida_erp_owner" or parameters["control_role"] != "postgres":
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_DATABASE_INVALID")
+    migration_file = r"[0-9]{4}_[a-z0-9_]+\.sql"
+    if not isinstance(parameters["expected_current_migration_head"], str) \
+            or not re.fullmatch(migration_file, parameters["expected_current_migration_head"]) \
+            or not isinstance(parameters["target_migration_head"], str) \
+            or not re.fullmatch(migration_file, parameters["target_migration_head"]) \
+            or not isinstance(parameters["worker_image"], str) or not IMAGE_REFERENCE.fullmatch(parameters["worker_image"]) \
+            or not isinstance(parameters["postgres_container"], str) \
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", parameters["postgres_container"]) \
+            or not isinstance(parameters["postgres_image_digest"], str) \
+            or not re.fullmatch(r"sha256:[0-9a-f]{64}", parameters["postgres_image_digest"]) \
+            or parameters["backend_network"] != "chenyida-erp_backend":
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_TARGET_INVALID")
+    created = parse_time(
+        parameters["execution_created_at"], "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_TIME_INVALID",
+    )
+    expires = parse_time(
+        parameters["execution_expires_at"], "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_TIME_INVALID",
+    )
+    if expires <= created or expires - created > timedelta(minutes=15):
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_TIME_INVALID")
+    manifest = Path(absolute_path(
+        parameters["release_manifest"], "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_PATH_INVALID",
+    ))
+    if manifest.name != "release-manifest.json" or manifest.parent.parent != RELEASE_ARTIFACT_ROOT_BASE:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_PATH_INVALID")
+    approval_intent_path = UAT_PROMOTION_STATE_ROOT / "intents" \
+        / f"{parameters['migration_authorization_operation_id']}.{parameters['migration_authorization_intent_sha256']}.json"
+    current = validate_uat_promotion_source(
+        parameters["current_checkpoint_source"], UAT_PROMOTION_CURRENT_FILE, {"0400"}, 0,
+        "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_CURRENT_SOURCE_INVALID",
+    )
+    approval = validate_uat_promotion_source(
+        parameters["migration_authorization_intent_source"], approval_intent_path, {"0400"}, 0,
+        "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_APPROVAL_SOURCE_INVALID",
+    )
+    runtime = validate_uat_promotion_source(
+        parameters["runtime_identity_source"], RELEASE_IDENTITY_FILE, {"0440"}, None,
+        "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_RUNTIME_SOURCE_INVALID",
+    )
+    release = validate_uat_promotion_source(
+        parameters["release_manifest_source"], manifest, {"0440"}, 0,
+        "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_MANIFEST_SOURCE_INVALID",
+    )
+    if runtime["sha256"] != parameters["runtime_binding_sha256"] \
+            or release["sha256"] != parameters["release_manifest_sha256"] \
+            or len({current["path"], approval["path"], runtime["path"], release["path"]}) != 4:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_SOURCE_BINDING_INVALID")
+    if recovery:
+        original_id = parameters["original_operation_id"]
+        if not isinstance(original_id, str) or not IDENTIFIER.fullmatch(original_id) \
+                or original_id in (
+                    parameters["promotion_id"], parameters["migration_authorization_operation_id"],
+                ):
+            reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_IDENTIFIER_INVALID")
+    return parameters
+
+
 def validate_uat_promotion_parameters(parameters: Any, operation: str | None = None) -> dict[str, Any]:
     if operation == "CAPTURE_UAT_PROMOTION_SNAPSHOT" \
             or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) and parameters.get("original_operation") == "CAPTURE_SNAPSHOT":
@@ -1638,6 +1808,9 @@ def validate_uat_promotion_parameters(parameters: Any, operation: str | None = N
     if operation == "AUTHORIZE_UAT_PROMOTION_MIGRATION" \
             or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) and parameters.get("original_operation") == "MIGRATION_AUTHORIZATION":
         return validate_uat_promotion_migration_authorization_parameters(parameters, operation)
+    if operation == "RUN_UAT_PROMOTION_MIGRATION" \
+            or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) and parameters.get("original_operation") == "MIGRATION_EXECUTION":
+        return validate_uat_promotion_migration_execution_parameters(parameters, operation)
     return validate_uat_promotion_begin_parameters(parameters, operation)
 
 
@@ -1888,15 +2061,19 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "QUIESCE_WRITERS"
         migration_authorization_operation = operation == "AUTHORIZE_UAT_PROMOTION_MIGRATION" \
             or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "MIGRATION_AUTHORIZATION"
+        migration_execution_operation = operation == "RUN_UAT_PROMOTION_MIGRATION" \
+            or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "MIGRATION_EXECUTION"
         window_created = parse_time(
             parameters["snapshot_created_at"] if snapshot_operation else parameters["quiesce_created_at"] if quiesce_operation
             else parameters["authorization_created_at"] if migration_authorization_operation
+            else parameters["execution_created_at"] if migration_execution_operation
             else parameters["promotion_created_at"],
             "SUPERVISOR_UAT_PROMOTION_TIME_INVALID",
         )
         window_expires = parse_time(
             parameters["snapshot_expires_at"] if snapshot_operation else parameters["quiesce_expires_at"] if quiesce_operation
             else parameters["authorization_expires_at"] if migration_authorization_operation
+            else parameters["execution_expires_at"] if migration_execution_operation
             else parameters["promotion_expires_at"],
             "SUPERVISOR_UAT_PROMOTION_TIME_INVALID",
         )
@@ -1921,6 +2098,12 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
         elif operation == "AUTHORIZE_UAT_PROMOTION_MIGRATION" and (value["authorization_id"] in (
                 parameters["promotion_id"], parameters["quiesce_operation_id"])
+                or abs(window_created - created) > timedelta(minutes=5)
+                or window_created > now + timedelta(minutes=5) or window_expires > expires):
+            reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
+        elif operation == "RUN_UAT_PROMOTION_MIGRATION" and (value["authorization_id"] in (
+                parameters["promotion_id"], parameters["migration_authorization_operation_id"])
+                or sha256(canonical_json(value)) == parameters["migration_approval_authorization_sha256"]
                 or abs(window_created - created) > timedelta(minutes=5)
                 or window_created > now + timedelta(minutes=5) or window_expires > expires):
             reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
@@ -2041,7 +2224,10 @@ def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
 
 
 def validate_runtime_secret_boundary(bundle_root: Path, operation: str) -> None:
-    if operation not in ("PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY", *RUNTIME_PRIVILEGE_OPERATIONS):
+    if operation not in (
+        "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY",
+        "RUN_UAT_PROMOTION_MIGRATION", *RUNTIME_PRIVILEGE_OPERATIONS,
+    ):
         return
     validator = bundle_root / "chenyida_erp_site/scripts/runtime-secret-file-policy.py"
     policy = bundle_root / "chenyida_erp_site/operations/runtime-secret-file-policy-v1.json"
@@ -2439,6 +2625,7 @@ def validate_original_uat_promotion_authorization_consumed(parameters: dict[str,
         "CAPTURE_SNAPSHOT": "CAPTURE_UAT_PROMOTION_SNAPSHOT",
         "QUIESCE_WRITERS": "QUIESCE_UAT_WRITERS",
         "MIGRATION_AUTHORIZATION": "AUTHORIZE_UAT_PROMOTION_MIGRATION",
+        "MIGRATION_EXECUTION": "RUN_UAT_PROMOTION_MIGRATION",
     }.get(parameters["original_operation"])
     if raw != canonical_json(value) or value["contract"] != UAT_PROMOTION_AUTHORIZATION_CONTRACT \
         or value["authorization_id"] != original_id or value["operation"] != expected_operation:
@@ -2447,6 +2634,7 @@ def validate_original_uat_promotion_authorization_consumed(parameters: dict[str,
     fields = UAT_PROMOTION_SNAPSHOT_PARAMETER_FIELDS if parameters["original_operation"] == "CAPTURE_SNAPSHOT" \
         else UAT_PROMOTION_QUIESCE_PARAMETER_FIELDS if parameters["original_operation"] == "QUIESCE_WRITERS" \
         else UAT_PROMOTION_MIGRATION_AUTHORIZATION_PARAMETER_FIELDS if parameters["original_operation"] == "MIGRATION_AUTHORIZATION" \
+        else UAT_PROMOTION_MIGRATION_EXECUTION_PARAMETER_FIELDS if parameters["original_operation"] == "MIGRATION_EXECUTION" \
         else UAT_PROMOTION_BASE_PARAMETER_FIELDS
     if any(original_parameters[field] != parameters[field] for field in fields):
         reject("SUPERVISOR_UAT_PROMOTION_ORIGINAL_AUTHORIZATION_INVALID")
@@ -2500,6 +2688,149 @@ def assert_no_runtime_privilege_interlock(bundle_root: Path) -> None:
         reject("SUPERVISOR_RUNTIME_PRIVILEGE_INTERLOCK_INVALID")
     if result.returncode != 0:
         reject("SUPERVISOR_RUNTIME_PRIVILEGE_RECOVERY_REQUIRED")
+
+
+def assert_no_uat_migration_execution_interlock(
+        authorization: dict[str, Any], authorization_digest: str | None = None) -> None:
+    try:
+        root_metadata = os.lstat(UAT_PROMOTION_STATE_ROOT)
+    except FileNotFoundError:
+        return
+    except OSError:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    if not stat.S_ISDIR(root_metadata.st_mode) or stat.S_ISLNK(root_metadata.st_mode) \
+            or root_metadata.st_uid != 0 or root_metadata.st_gid != 0 or stat.S_IMODE(root_metadata.st_mode) != 0o700:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    trusted_owned_marker(
+        UAT_PROMOTION_STATE_ROOT / UAT_PROMOTION_STATE_MARKER, UAT_PROMOTION_STATE_MARKER_VALUE,
+        0, 0, {0o400}, "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID",
+    )
+    active_records: list[dict[str, Any]] = []
+    try:
+        active_metadata = os.lstat(UAT_PROMOTION_ACTIVE_FENCES_ROOT)
+    except FileNotFoundError:
+        active_metadata = None
+    except OSError:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    if active_metadata is not None:
+        trusted_owned_directory(
+            UAT_PROMOTION_ACTIVE_FENCES_ROOT, 0, 0, {0o700},
+            "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID",
+        )
+        try:
+            active_names = sorted(os.listdir(UAT_PROMOTION_ACTIVE_FENCES_ROOT))
+        except OSError:
+            reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+        if len(active_names) > 20_000 or any(
+                not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json", name)
+                for name in active_names):
+            reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+        active_fields = {
+            "schema_version", "contract", "status", "promotion_id", "migration_operation_id",
+            "execution_authorization_sha256", "grant_sha256", "database_name",
+            "database_system_identifier", "database_oid", "database_marker",
+            "released_baseline_sha256", "fence_before_sha256", "activated_at", "active_fence_sha256",
+        }
+        for name in active_names:
+            raw, _ = trusted_regular_file(
+                UAT_PROMOTION_ACTIVE_FENCES_ROOT / name, 0o400,
+                code="SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID",
+            )
+            value = strict_json(raw, "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+            body = {key: item for key, item in value.items() if key != "active_fence_sha256"} \
+                if isinstance(value, dict) else {}
+            if not isinstance(value, dict) or set(value) != active_fields or raw != canonical_json(value) \
+                    or value.get("schema_version") != 1 \
+                    or value.get("contract") != "chenyida-erp-uat-promotion-active-migration-fence/v1" \
+                    or value.get("status") \
+                    != "ACTIVE_UNTIL_EXPLICIT_CHECKPOINT_9_TRANSFER_OR_QUARANTINE_RESOLUTION" \
+                    or value.get("database_name") != "chenyida_erp" \
+                    or value.get("database_marker") != "chenyida-erp-deployment/v2:UAT:chenyida-erp" \
+                    or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field])
+                           for field in ("execution_authorization_sha256", "grant_sha256",
+                                         "released_baseline_sha256", "fence_before_sha256",
+                                         "active_fence_sha256")) \
+                    or any(not isinstance(value.get(field), str) or not IDENTIFIER.fullmatch(value[field])
+                           for field in ("promotion_id", "migration_operation_id")) \
+                    or not isinstance(value.get("database_system_identifier"), str) \
+                    or not re.fullmatch(r"[1-9][0-9]{9,29}", value["database_system_identifier"]) \
+                    or not isinstance(value.get("database_oid"), str) \
+                    or not re.fullmatch(r"[1-9][0-9]{0,9}", value["database_oid"]) \
+                    or not isinstance(value.get("activated_at"), str) \
+                    or not ISO_UTC.fullmatch(value["activated_at"]) \
+                    or sha256(canonical_json(body)) != value["active_fence_sha256"] \
+                    or name != f"{value['migration_operation_id']}.{value['active_fence_sha256']}.json":
+                reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+            active_records.append(value)
+    if len(active_records) > 1:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    if active_records:
+        active = active_records[0]
+        active_parameters = authorization.get("parameters") if isinstance(authorization, dict) else None
+        active_recovery = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
+            and authorization.get("operation") == "RECOVER_UAT_PROMOTION" \
+            and isinstance(active_parameters, dict) \
+            and active_parameters.get("original_operation") == "MIGRATION_EXECUTION" \
+            and active_parameters.get("original_operation_id") == active["migration_operation_id"] \
+            and active_parameters.get("original_authorization_sha256") == active["execution_authorization_sha256"] \
+            and active_parameters.get("promotion_id") == active["promotion_id"]
+        if not active_recovery:
+            reject("SUPERVISOR_UAT_PROMOTION_ACTIVE_MIGRATION_FENCE_PRESENT")
+    intents_root = UAT_PROMOTION_STATE_ROOT / "intents"
+    trusted_owned_directory(intents_root, 0, 0, {0o700}, "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    try:
+        names = sorted(os.listdir(intents_root))
+    except OSError:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    if len(names) > 20_000 or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json", name) for name in names):
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    execution_intents: list[dict[str, Any]] = []
+    for name in names:
+        raw, _ = trusted_regular_file(
+            intents_root / name, 0o400, code="SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID",
+        )
+        value = strict_json(raw, "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+        if not isinstance(value, dict) or value.get("contract") != "chenyida-erp-uat-promotion-migration-execution-intent/v1":
+            continue
+        if raw != canonical_json(value) or value.get("schema_version") != 1 \
+                or not isinstance(value.get("migration_operation_id"), str) \
+                or not IDENTIFIER.fullmatch(value["migration_operation_id"]) \
+                or not isinstance(value.get("execution_authorization_sha256"), str) \
+                or not SHA256.fullmatch(value["execution_authorization_sha256"]) \
+                or name != f"{value['migration_operation_id']}.{value.get('migration_execution_intent_sha256')}.json":
+            reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+        execution_intents.append(value)
+    if not execution_intents:
+        return
+    try:
+        current_raw, _ = trusted_regular_file(
+            UAT_PROMOTION_CURRENT_FILE, 0o400, code="SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID",
+        )
+        current = strict_json(current_raw, "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    except SupervisorError:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    if current_raw != canonical_json(current) or not isinstance(current, dict) \
+            or not isinstance(current.get("authorization_sha256_chain"), list) \
+            or any(not isinstance(item, str) or not SHA256.fullmatch(item) for item in current["authorization_sha256_chain"]):
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+    pending = [
+        intent for intent in execution_intents
+        if intent["execution_authorization_sha256"] not in current["authorization_sha256_chain"]
+    ]
+    if not pending:
+        return
+    parameters = authorization.get("parameters") if isinstance(authorization, dict) else None
+    same_pending_run = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
+        and authorization.get("operation") == "RUN_UAT_PROMOTION_MIGRATION" and len(pending) == 1 \
+        and authorization.get("authorization_id") == pending[0]["migration_operation_id"] \
+        and authorization_digest == pending[0]["execution_authorization_sha256"]
+    recovery_allowed = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
+        and authorization.get("operation") == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) \
+        and parameters.get("original_operation") == "MIGRATION_EXECUTION" and len(pending) == 1 \
+        and parameters.get("original_operation_id") == pending[0]["migration_operation_id"] \
+        and parameters.get("original_authorization_sha256") == pending[0]["execution_authorization_sha256"]
+    if not same_pending_run and not recovery_allowed:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_REQUIRED")
 
 
 def _docker(arguments: list[str], *, timeout: int, stdout: int = subprocess.PIPE) -> subprocess.CompletedProcess[bytes]:
@@ -2776,9 +3107,12 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
         or recovery and parameters.get("original_operation") == "QUIESCE_WRITERS"
     migration_authorization = authorization["operation"] == "AUTHORIZE_UAT_PROMOTION_MIGRATION" \
         or recovery and parameters.get("original_operation") == "MIGRATION_AUTHORIZATION"
+    migration_execution = authorization["operation"] == "RUN_UAT_PROMOTION_MIGRATION" \
+        or recovery and parameters.get("original_operation") == "MIGRATION_EXECUTION"
     parameter_fields = UAT_PROMOTION_SNAPSHOT_PARAMETER_FIELDS if snapshot \
         else UAT_PROMOTION_QUIESCE_PARAMETER_FIELDS if quiesce \
         else UAT_PROMOTION_MIGRATION_AUTHORIZATION_PARAMETER_FIELDS if migration_authorization \
+        else UAT_PROMOTION_MIGRATION_EXECUTION_PARAMETER_FIELDS if migration_execution \
         else UAT_PROMOTION_BASE_PARAMETER_FIELDS
     promotion_parameters = {field: parameters[field] for field in parameter_fields}
     return {
@@ -2786,7 +3120,8 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
         "contract": "chenyida-erp-uat-promotion-transaction-context/v1",
         "operation_id": parameters["original_operation_id"] if recovery else authorization["authorization_id"],
         "operation": "CAPTURE_SNAPSHOT" if snapshot else "QUIESCE_WRITERS" if quiesce \
-            else "MIGRATION_AUTHORIZATION" if migration_authorization else "BEGIN",
+            else "MIGRATION_AUTHORIZATION" if migration_authorization \
+            else "MIGRATION_EXECUTION" if migration_execution else "BEGIN",
         "execution_mode": "RECOVERY" if recovery else "ORIGINAL",
         "execution_authorization_id": authorization["authorization_id"],
         "execution_authorization_sha256": authorization_digest,
@@ -2835,12 +3170,19 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
         reject("SUPERVISOR_UAT_PROMOTION_RUNNER_RESPONSE_INVALID")
     if phase == "prepare":
         expected_results = {"PREPARED", "ALREADY_PREPARED"}
-        expected_fields = {"result", "promotion_id", "intent_sha256", "receipt_sha256"}
-        digest_fields = {"intent_sha256", "receipt_sha256"}
+        if context["operation"] == "MIGRATION_EXECUTION":
+            expected_fields = {"result", "promotion_id", "intent_sha256", "grant_sha256"}
+            digest_fields = {"intent_sha256", "grant_sha256"}
+        else:
+            expected_fields = {"result", "promotion_id", "intent_sha256", "receipt_sha256"}
+            digest_fields = {"intent_sha256", "receipt_sha256"}
     elif phase == "execute":
         expected_results = {"COMMITTED", "ALREADY_COMMITTED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "receipt_sha256"}
         digest_fields = {"intent_sha256", "receipt_sha256"}
+        if context["operation"] == "MIGRATION_EXECUTION":
+            expected_fields.add("migration_result_sha256")
+            digest_fields.add("migration_result_sha256")
     elif phase == "recover-prepare":
         expected_results = {"RECOVERY_PREPARED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "recovery_sha256", "decision"}
@@ -2851,6 +3193,9 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
         expected_results = {"COMMITTED", "ALREADY_COMMITTED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "receipt_sha256", "recovery_sha256"}
         digest_fields = {"intent_sha256", "receipt_sha256", "recovery_sha256"}
+        if context["operation"] == "MIGRATION_EXECUTION":
+            expected_fields.add("migration_result_sha256")
+            digest_fields.add("migration_result_sha256")
     else:
         expected_results = {"QUARANTINED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "recovery_sha256", "quarantine_sha256"}
@@ -2859,6 +3204,123 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
         or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field]) or value[field] == "0" * 64 for field in digest_fields):
         reject("SUPERVISOR_UAT_PROMOTION_RUNNER_RESPONSE_INVALID")
     return value
+
+
+def run_uat_promotion_migration_control(bundle_root: Path, context: dict[str, Any], grant_sha256: str,
+                                        lock_descriptor: int) -> dict[str, Any]:
+    if context["operation"] != "MIGRATION_EXECUTION" or context["execution_mode"] != "ORIGINAL" \
+            or not isinstance(grant_sha256, str) or not SHA256.fullmatch(grant_sha256) \
+            or grant_sha256 == "0" * 64:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_CONTROL_INVALID")
+    executor = bundle_root / "chenyida_erp_site/scripts/uat-promotion-migration-control.py"
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+        "PYTHONDONTWRITEBYTECODE": "1", "PYTHONHASHSEED": "0",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+        "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": context["supervisor_bundle_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": context["execution_authorization_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES",
+        "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED": "NO",
+        "ERP_UAT_PROMOTION_MIGRATION_GRANT_SHA256": grant_sha256,
+    }
+    try:
+        result = subprocess.run(
+            ["/usr/bin/python3", str(executor), "execute", "EXACT_UAT_PROMOTION_MIGRATION_AFTER_AUTHORIZATION"],
+            env=environment, input=canonical_json(context), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=False, timeout=16 * 60, pass_fds=(lock_descriptor,),
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_CONTROL_FAILED")
+    if result.returncode != 0 or result.stderr != b"" or len(result.stdout) < 2 or len(result.stdout) > 64 * 1024:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_CONTROL_FAILED")
+    value = strict_json(result.stdout, "SUPERVISOR_UAT_PROMOTION_MIGRATION_CONTROL_RESPONSE_INVALID")
+    fields = {
+        "result", "promotion_id", "migration_operation_id", "grant_sha256", "migration_result_sha256",
+        "container_id", "container_name", "execution_artifact_sha256",
+    }
+    value = exact_fields(value, fields, "SUPERVISOR_UAT_PROMOTION_MIGRATION_CONTROL_RESPONSE_INVALID")
+    if result.stdout != canonical_json(value) or value["result"] != "MIGRATION_RESULT_PERSISTED" \
+            or value["promotion_id"] != context["parameters"]["promotion_id"] \
+            or value["migration_operation_id"] != context["operation_id"] \
+            or value["grant_sha256"] != grant_sha256 \
+            or any(not isinstance(value[field], str) or not SHA256.fullmatch(value[field]) for field in (
+                "migration_result_sha256", "execution_artifact_sha256", "container_id",
+            )) or not isinstance(value["container_name"], str) \
+            or not re.fullmatch(r"cyd-uat-migration-[0-9a-f]{24}", value["container_name"]):
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_CONTROL_RESPONSE_INVALID")
+    return value
+
+
+def run_uat_promotion_migration_recovery_control(bundle_root: Path, context: dict[str, Any],
+                                                 lock_descriptor: int) -> dict[str, Any]:
+    if context["operation"] != "MIGRATION_EXECUTION" or context["execution_mode"] != "RECOVERY" \
+            or not isinstance(context.get("expected_intent_sha256"), str) \
+            or not SHA256.fullmatch(context["expected_intent_sha256"]):
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_CONTROL_INVALID")
+    executor = bundle_root / "chenyida_erp_site/scripts/uat-promotion-migration-control.py"
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+        "PYTHONDONTWRITEBYTECODE": "1", "PYTHONHASHSEED": "0",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+        "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": context["supervisor_bundle_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": context["execution_authorization_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES",
+        "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED": "YES",
+    }
+    try:
+        result = subprocess.run(
+            ["/usr/bin/python3", str(executor), "recover",
+             "CONTAIN_EXACT_UAT_PROMOTION_MIGRATION_BEFORE_RECOVERY"],
+            env=environment, input=canonical_json(context), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=False, timeout=2 * 60, pass_fds=(lock_descriptor,),
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_CONTROL_FAILED")
+    if result.returncode != 0 or result.stderr != b"" or len(result.stdout) < 2 or len(result.stdout) > 64 * 1024:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_CONTROL_FAILED")
+    value = strict_json(result.stdout, "SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_CONTROL_RESPONSE_INVALID")
+    fields = {
+        "result", "promotion_id", "migration_operation_id", "recovery_authorization_sha256",
+        "active_fence_sha256", "database_fence_containment", "candidate_containment",
+        "recovery_containment_sha256",
+    }
+    value = exact_fields(value, fields, "SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_CONTROL_RESPONSE_INVALID")
+    allowed_candidate_status = {
+        "EXACT_CANDIDATE_STOPPED", "EXACT_CANDIDATE_ALREADY_ABSENT", "EXACT_CANDIDATE_NOT_CREATED",
+    }
+    if result.stdout != canonical_json(value) or value["result"] != "RECOVERY_CONTAINMENT_PERSISTED" \
+            or value["promotion_id"] != context["parameters"]["promotion_id"] \
+            or value["migration_operation_id"] != context["operation_id"] \
+            or value["recovery_authorization_sha256"] != context["execution_authorization_sha256"] \
+            or value["database_fence_containment"] != "SEALED_ZERO_CONNECTIONS" \
+            or value["candidate_containment"] not in allowed_candidate_status \
+            or any(not isinstance(value[field], str) or not SHA256.fullmatch(value[field]) for field in (
+                "active_fence_sha256", "recovery_containment_sha256",
+            )):
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_CONTROL_RESPONSE_INVALID")
+    return value
+
+
+def cleanup_uat_promotion_migration_container(control: dict[str, Any], context: dict[str, Any]) -> None:
+    template = "|".join([
+        "{{.Id}}", "{{.Name}}", '{{index .Config.Labels "chenyida.erp.uat-migration-operation"}}',
+        '{{index .Config.Labels "chenyida.erp.uat-migration-grant"}}', "{{.State.Status}}",
+        "{{.State.ExitCode}}", "{{.State.OOMKilled}}", "{{.RestartCount}}",
+    ])
+    inspected = _docker(["container", "inspect", "--format", template, control["container_id"]], timeout=20)
+    expected = "|".join([
+        control["container_id"], f"/{control['container_name']}", context["operation_id"],
+        control["grant_sha256"], "exited", "0", "false", "0",
+    ]) + "\n"
+    if inspected.returncode != 0 or inspected.stdout.decode("utf-8", errors="strict") != expected:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_CONTAINER_OWNERSHIP_INVALID")
+    removed = _docker(["container", "rm", control["container_id"]], timeout=45, stdout=subprocess.DEVNULL)
+    if removed.returncode != 0:
+        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_CONTAINER_CLEANUP_FAILED")
 
 
 def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path, authorization: dict[str, Any],
@@ -2872,6 +3334,7 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
         snapshot = authorization["operation"] == "CAPTURE_UAT_PROMOTION_SNAPSHOT"
         quiesce = authorization["operation"] == "QUIESCE_UAT_WRITERS"
         migration_authorization = authorization["operation"] == "AUTHORIZE_UAT_PROMOTION_MIGRATION"
+        migration_execution = authorization["operation"] == "RUN_UAT_PROMOTION_MIGRATION"
         if recovery:
             validate_original_uat_promotion_authorization_consumed(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -2882,19 +3345,25 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_quiesce_sources(authorization["parameters"])
         elif migration_authorization:
             verify_uat_promotion_migration_authorization_sources(authorization["parameters"])
+        elif migration_execution:
+            verify_uat_promotion_migration_execution_sources(authorization["parameters"])
         else:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
             )
-        runtime_root, node_path = prepare_runtime_privilege_node(authorization_digest)
         context = uat_promotion_context(authorization, authorization_digest)
-        run_uat_promotion_runner(node_path, bundle_root, context, "recover-prepare" if recovery else "prepare", lock_descriptor)
+        runtime_root, node_path = prepare_runtime_privilege_node(authorization_digest)
+        prepared = run_uat_promotion_runner(
+            node_path, bundle_root, context, "recover-prepare" if recovery else "prepare", lock_descriptor,
+        )
         if snapshot:
             verify_uat_promotion_snapshot_sources(authorization["parameters"])
         elif quiesce:
             verify_uat_promotion_quiesce_sources(authorization["parameters"])
         elif migration_authorization:
             verify_uat_promotion_migration_authorization_sources(authorization["parameters"])
+        elif migration_execution:
+            verify_uat_promotion_migration_execution_sources(authorization["parameters"])
         elif not recovery:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -2906,10 +3375,23 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_quiesce_sources(authorization["parameters"])
         elif migration_authorization:
             verify_uat_promotion_migration_authorization_sources(authorization["parameters"])
+        elif migration_execution:
+            verify_uat_promotion_migration_execution_sources(authorization["parameters"])
         elif not recovery:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
             )
+        if recovery and context["operation"] == "MIGRATION_EXECUTION":
+            run_uat_promotion_migration_recovery_control(bundle_root, context, lock_descriptor)
+        if migration_execution:
+            control = run_uat_promotion_migration_control(
+                bundle_root, context, prepared["grant_sha256"], lock_descriptor,
+            )
+            committed = run_uat_promotion_runner(node_path, bundle_root, context, "execute", lock_descriptor)
+            if committed.get("migration_result_sha256") != control["migration_result_sha256"]:
+                reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_RESULT_BINDING_INVALID")
+            cleanup_uat_promotion_migration_container(control, context)
+            return committed
         return run_uat_promotion_runner(
             node_path, bundle_root, context, "recover-execute" if recovery else "execute", lock_descriptor,
         )
@@ -3330,10 +3812,11 @@ def main() -> None:
     authorization, authorization_digest, _ = load_authorization(authorization_path, bundle_digest)
     lock_descriptor = acquire_global_release_lock()
     try:
+        assert_no_uat_migration_execution_interlock(authorization, authorization_digest)
         if not (authorization["contract"] == UAT_PROMOTION_AUTHORIZATION_CONTRACT
                 and authorization["operation"] in (
                     "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "RECOVER_UAT_PROMOTION",
-                    "AUTHORIZE_UAT_PROMOTION_MIGRATION",
+                    "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION",
                 )):
             verify_candidate(authorization["parameters"], bundle_root, lock_descriptor)
         validate_runtime_secret_boundary(bundle_root, authorization["operation"])

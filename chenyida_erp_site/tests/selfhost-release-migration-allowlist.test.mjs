@@ -4,8 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { assertReleaseDatabasePreflight, loadIsolatedAuthorization, loadReleaseAuthorization } from "../scripts/release-migration-authorization.ts";
+import { assertReleaseDatabasePreflight, assertReleaseMigrationFence, loadIsolatedAuthorization, loadReleaseAuthorization } from "../scripts/release-migration-authorization.ts";
 import { buildMigrationAllowlist, sha256, validateAppliedMigrationRows } from "../scripts/release-manifest-contract.mjs";
+import {
+  UAT_PROMOTION_MIGRATION_DATABASE_OWNER_PRIVILEGES,
+  UAT_PROMOTION_MIGRATION_MEMBERSHIPS,
+  UAT_PROMOTION_MIGRATION_ROLE_RECORDS,
+} from "../scripts/uat-promotion-migration-execution-contract.mjs";
 import { FIXTURE_GIT as git, FIXTURE_VERSION as version, FIXTURE_WORKER as workerImageDigest, buildEligibleReleaseFixture, initializeReleaseArtifactRoot } from "./release-gate-fixture.mjs";
 
 
@@ -20,5 +25,52 @@ test("migration allowlist is contiguous, ordered, checksummed and rejects unsafe
 test("applied migration history must be an exact allowlist prefix at the operator-declared head",async()=>{const f=await migrationFixture();try{const rows=f.entries.map(({filename:version,sha256:checksum})=>({version,checksum}));assert.equal(validateAppliedMigrationRows([],f.entries,"EMPTY"),"EMPTY");assert.equal(validateAppliedMigrationRows(rows.slice(0,1),f.entries,"0001_first.sql"),"0001_first.sql");assert.equal(validateAppliedMigrationRows(rows,f.entries,"0002_second.sql"),"0002_second.sql");assert.throws(()=>validateAppliedMigrationRows([{version:f.entries[0].filename,checksum:"e".repeat(64)}],f.entries,"0001_first.sql"),error=>error.code==="APPLIED_MIGRATION_CHECKSUM_MISMATCH");assert.throws(()=>validateAppliedMigrationRows([{version:f.entries[1].filename,checksum:f.entries[1].sha256}],f.entries,"0002_second.sql"),error=>error.code==="APPLIED_MIGRATION_NOT_ALLOWLIST_PREFIX");assert.throws(()=>validateAppliedMigrationRows(rows.slice(0,1),f.entries,"EMPTY"),error=>error.code==="MIGRATION_CURRENT_HEAD_MISMATCH");}finally{await rm(f.root,{recursive:true,force:true});}});
 
 test("UAT authorization binds the complete trusted bundle, dedicated role, exact target and current head before SQL",async()=>{const f=await migrationFixture(),saved={...process.env};try{const artifacts=path.join(f.root,"artifacts");await initializeReleaseArtifactRoot(artifacts);const fixture=await buildEligibleReleaseFixture({entries:f.entries,root:artifacts,releaseId:"migration-fixture",generatedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+59*60*1000).toISOString()}),file=path.join(artifacts,"release-manifest.json"),raw=await readFile(file,"utf8");Object.assign(process.env,{ERP_ALLOW_PRODUCTION_MIGRATION:"YES",ERP_MIGRATION_CONFIRM:"MIGRATE_EXACT_RELEASE_MANIFEST",ERP_RELEASE_MANIFEST_FILE:file,ERP_RELEASE_MANIFEST_SHA256:sha256(raw),ERP_RELEASE_EXPECTED_DEPLOYMENT_ID:"fixture-uat",ERP_MIGRATION_EXPECTED_DATABASE:"fixture_test",ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER:"1234567890123456789",ERP_MIGRATION_EXPECTED_DATABASE_OID:"16384",ERP_MIGRATION_EXPECTED_DATABASE_MARKER:"chenyida-erp-deployment/v2:UAT:fixture-uat",ERP_MIGRATION_EXPECTED_ROLE:"fixture_migrator",ERP_MIGRATION_EXPECTED_CURRENT_HEAD:"0001_first.sql",ERP_MIGRATION_EXPECTED_TARGET_HEAD:"0002_second.sql",ERP_RELEASE_EXPECTED_VERSION:version,ERP_RUNTIME_BUILD_VERSION:version,ERP_RELEASE_EXPECTED_GIT_COMMIT:git,ERP_RUNTIME_GIT_COMMIT:git,ERP_RUNTIME_IMAGE_REFERENCE:fixture.manifest.images.worker.image_reference,ERP_RUNTIME_IMAGE_CONFIG_DIGEST:workerImageDigest});const config={environment:"production",deploymentClass:"uat",databaseUrl:"postgresql://invalid",setupToken:"x".repeat(24),publicOrigin:null,allowUatLoopbackOrigin:false,uploadRoot:"/tmp/u",attachmentRoot:"/tmp/a",backupStatusFile:"/tmp/b",maxUploadBytes:1,workerPollMs:1,workerLeaseSeconds:1};const authorization=await loadReleaseAuthorization(config,f.directory);assert.equal(authorization.manifest.release_id,fixture.manifest.release_id);const reference=process.env.ERP_RUNTIME_IMAGE_REFERENCE;process.env.ERP_RUNTIME_IMAGE_REFERENCE=fixture.manifest.images.web.image_reference;await assert.rejects(loadReleaseAuthorization(config,f.directory),error=>error.code==="MIGRATION_RELEASE_IMAGE_REFERENCE_MISMATCH");process.env.ERP_RUNTIME_IMAGE_REFERENCE=reference;process.env.ERP_RUNTIME_IMAGE_CONFIG_DIGEST=`sha256:${"e".repeat(64)}`;await assert.rejects(loadReleaseAuthorization(config,f.directory),error=>error.code==="MIGRATION_RELEASE_IMAGE_MISMATCH");process.env.ERP_RUNTIME_IMAGE_CONFIG_DIGEST=workerImageDigest;const exactIdentity={database_name:"fixture_test",system_identifier:"1234567890123456789",database_oid:"16384",marker:"chenyida-erp-deployment/v2:UAT:fixture-uat",current_role_name:"fixture_migrator",session_role_name:"fixture_migrator",database_owner_matches:true,role_login:true,role_superuser:false,role_create_role:false,role_create_database:false,role_replication:false,role_bypass_rls:false,role_pg_monitor:false,role_memberships_absent:true,role_settings_absent:true,role_inherit:false,role_connection_limit:1,role_valid_until_absent:true,database_settings_absent:true,search_path_exact:true,public_schema_owner_valid:true,public_schema_create_acl_valid:true};const queries=[];const client={async query(text){queries.push(text);if(text.includes("pg_control_system"))return{rows:[exactIdentity]};if(text.includes("to_regclass"))return{rows:[{present:true}]};if(text.includes("c.relkind='r'"))return{rows:[{valid:true}]};if(text.includes("select version::text"))return{rows:[{version:f.entries[0].filename,checksum:f.entries[0].sha256}]};throw new Error("unexpected query");}};await assertReleaseDatabasePreflight(client,authorization);assert.equal(queries.length,4);assert.ok(queries.every((query)=>/^\s*select/i.test(query)));client.query=async(text)=>text.includes("pg_control_system")?{rows:[{...exactIdentity,current_role_name:"postgres",role_superuser:true}]}:{rows:[]};await assert.rejects(assertReleaseDatabasePreflight(client,authorization),error=>error.code==="MIGRATION_ROLE_IDENTITY_INVALID");client.query=async(text)=>text.includes("pg_control_system")?{rows:[{...exactIdentity,role_memberships_absent:false}]}:{rows:[]};await assert.rejects(assertReleaseDatabasePreflight(client,authorization),error=>error.code==="MIGRATION_ROLE_IDENTITY_INVALID");client.query=async(text)=>text.includes("pg_control_system")?{rows:[{...exactIdentity,public_schema_create_acl_valid:false}]}:{rows:[]};await assert.rejects(assertReleaseDatabasePreflight(client,authorization),error=>error.code==="MIGRATION_PUBLIC_SCHEMA_PRIVILEGE_INVALID");client.query=async(text)=>text.includes("pg_control_system")?{rows:[{...exactIdentity,database_name:"wrong"}]}:{rows:[]};await assert.rejects(assertReleaseDatabasePreflight(client,authorization),error=>error.code==="MIGRATION_TARGET_IDENTITY_MISMATCH");}finally{process.env={...saved};await rm(f.root,{recursive:true,force:true});}});
+
+test("migration fence requires the complete role, membership and database ACL baseline", async () => {
+  const target = {
+    databaseName: "chenyida_erp",
+    systemIdentifier: "1234567890123456789",
+    databaseOid: "16384",
+    marker: "chenyida-erp-deployment/v2:UAT:chenyida-erp",
+    migrationRole: "chenyida_erp_owner",
+  };
+  const roleRecords = UAT_PROMOTION_MIGRATION_ROLE_RECORDS;
+  const evidence = {
+    database_name: target.databaseName,
+    system_identifier: target.systemIdentifier,
+    database_oid: target.databaseOid,
+    marker: target.marker,
+    current_role_name: target.migrationRole,
+    session_role_name: target.migrationRole,
+    application_name: "chenyida-erp-migration",
+    database_default_transaction_read_only: "on",
+    database_setting_count: 1,
+    database_allow_connections: true,
+    database_connection_limit: 1,
+    other_backend_count: 0,
+    managed_roles: roleRecords.map((entry) => entry.role),
+    login_roles: roleRecords.filter((entry) => entry.login).map((entry) => entry.role),
+    connect_roles: ["chenyida_erp_owner"],
+    platform_superuser_roles: ["postgres"],
+    public_connect: false,
+    public_temporary: false,
+    unknown_connect_acl_count: 0,
+    unknown_connect_login_count: 0,
+    prepared_transaction_count: 0,
+    role_records: roleRecords,
+    memberships: UAT_PROMOTION_MIGRATION_MEMBERSHIPS,
+    non_owner_database_acl: [],
+    database_owner_privileges: UAT_PROMOTION_MIGRATION_DATABASE_OWNER_PRIVILEGES,
+  };
+  let observedSql = "";
+  const client = { async query(sql) { observedSql = sql; return { rows: [evidence] }; } };
+  assert.equal(await assertReleaseMigrationFence(client, { target }), evidence);
+  assert.match(observedSql, /select a\.grantor,a\.grantee,a\.privilege_type,a\.is_grantable/);
+  assert.match(observedSql, /non_owner_database_acl/);
+  await assert.rejects(
+    assertReleaseMigrationFence({ async query() { return { rows: [{ ...evidence, database_allow_connections: false }] }; } }, { target }),
+    (error) => error.code === "MIGRATION_DATABASE_FENCE_INVALID",
+  );
+});
 
 test("isolated authorization requires an exact named harness, local socket test identity and production release evidence",async()=>{const f=await migrationFixture(),saved={...process.env};try{for(const key of Object.keys(process.env))if(key.startsWith("ERP_MIGRATION_")||key.startsWith("ERP_RELEASE_")||key==="ERP_ALLOW_ISOLATED_MIGRATION")delete process.env[key];const base={environment:"test",deploymentClass:"test",publicOrigin:null,allowUatLoopbackOrigin:false,uploadRoot:"/tmp/u",attachmentRoot:"/tmp/a",backupStatusFile:"/tmp/b",maxUploadBytes:1,workerPollMs:1,workerLeaseSeconds:1};const releaseUrl="postgresql://postgres@/cyd_fixture_release_test?host=/tmp/cyd-release-migration-postgres.ABC123/socket";assert.equal(await loadReleaseAuthorization(base,f.directory),null);Object.assign(process.env,{ERP_ALLOW_ISOLATED_MIGRATION:"YES",ERP_RELEASE_TEST_MODE:"YES",ERP_MIGRATION_TEST_HARNESS:"RELEASE_MIGRATION",ERP_MIGRATION_CONFIRM:"MIGRATE_EXACT_ISOLATED_TEST_DATABASE",ERP_MIGRATION_TEST_RUN_ID:"fixture-run",ERP_MIGRATION_EXPECTED_DATABASE:"cyd_fixture_release_test",ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER:"1234567890123456789",ERP_MIGRATION_EXPECTED_DATABASE_OID:"16384",ERP_MIGRATION_EXPECTED_DATABASE_MARKER:"chenyida-erp-isolated-migration-test/v1:fixture-run"});assert.equal(loadIsolatedAuthorization(base,releaseUrl).harness,"RELEASE_MIGRATION");assert.equal(loadIsolatedAuthorization(base,releaseUrl).target.databaseName,"cyd_fixture_release_test");assert.throws(()=>loadIsolatedAuthorization(base,"postgresql://postgres@example.invalid/cyd_fixture_release_test"),error=>error.code==="MIGRATION_DATABASE_URL_TARGET_MISMATCH");process.env.ERP_MIGRATION_TEST_HARNESS="BACKUP_RECOVERY";assert.throws(()=>loadIsolatedAuthorization(base,releaseUrl),error=>error.code==="MIGRATION_TEST_DATABASE_NAME_REQUIRED");Object.assign(process.env,{ERP_MIGRATION_EXPECTED_DATABASE:"cyd_backup_dashboard_test_release_test",ERP_MIGRATION_EXPECTED_DATABASE_MARKER:"chenyida-erp-isolated-migration-test/v1:fixture-run"});const backupUrl="postgresql://postgres@/cyd_backup_dashboard_test_release_test?host=/tmp/cyd-backup-v2-postgres.ABC123/target-socket";assert.equal(loadIsolatedAuthorization(base,backupUrl).harness,"BACKUP_RECOVERY");delete process.env.ERP_MIGRATION_TEST_HARNESS;assert.throws(()=>loadIsolatedAuthorization(base,releaseUrl),error=>error.code==="MIGRATION_TEST_HARNESS_INVALID");assert.throws(()=>loadIsolatedAuthorization({...base,deploymentClass:"development"},releaseUrl),error=>error.code==="MIGRATION_RELEASE_AUTHORIZATION_REQUIRED");await assert.rejects(loadReleaseAuthorization({...base,environment:"production",deploymentClass:"test"},f.directory),error=>error.code==="MIGRATION_CONTROLLED_DEPLOYMENT_CLASS_REQUIRED");delete process.env.ERP_ALLOW_PRODUCTION_MIGRATION;await assert.rejects(loadReleaseAuthorization({...base,environment:"production",deploymentClass:"uat"},f.directory),error=>error.code==="MIGRATION_EXPLICIT_PRODUCTION_PERMISSION_REQUIRED");}finally{process.env={...saved};await rm(f.root,{recursive:true,force:true});}});

@@ -314,6 +314,89 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
         }
 
+    def migration_execution_parameters(self, recovery=False):
+        promotion_id = "promotion-supervisor-fixture"
+        approval_id = "promotion-supervisor-migration-authorization"
+        approval_intent_sha256 = "d" * 64
+        approval_intent = (
+            f"{supervisor.UAT_PROMOTION_STATE_ROOT}/intents/"
+            f"{approval_id}.{approval_intent_sha256}.json"
+        )
+        manifest = "/var/lib/chenyida-erp/release-artifacts/promotion-supervisor/release-manifest.json"
+        value = {
+            "promotion_state_root": str(supervisor.UAT_PROMOTION_STATE_ROOT),
+            "promotion_id": promotion_id,
+            "promotion_generation": 1,
+            "previous_checkpoint_receipt_sha256": "1" * 64,
+            "promotion_intent_sha256": "2" * 64,
+            "promotion_original_authorization_sha256": "3" * 64,
+            "migration_authorization_operation_id": approval_id,
+            "migration_authorization_intent_sha256": approval_intent_sha256,
+            "migration_authorization_intent_source": self.source(approval_intent, seed="e"),
+            "migration_approval_authorization_sha256": "f" * 64,
+            "candidate_binding_sha256": "4" * 64,
+            "database_binding_sha256": "5" * 64,
+            "runtime_binding_sha256": "6" * 64,
+            "preupgrade_recovery_binding_sha256": "7" * 64,
+            "promotion_snapshot_binding_sha256": "8" * 64,
+            "writer_quiesce_binding_sha256": "9" * 64,
+            "migration_authorization_binding_sha256": "a" * 64,
+            "current_checkpoint_source": self.source(str(supervisor.UAT_PROMOTION_CURRENT_FILE), seed="b"),
+            "runtime_identity_source": self.source(
+                str(supervisor.RELEASE_IDENTITY_FILE), mode="0440", gid=1234, seed="6",
+            ),
+            "release_manifest": manifest,
+            "release_manifest_sha256": "c" * 64,
+            "release_manifest_source": self.source(manifest, mode="0440", seed="c"),
+            "deployment_class": "UAT",
+            "deployment_id": "chenyida-erp",
+            "database_name": "chenyida_erp",
+            "database_oid": "16384",
+            "database_system_identifier": "7612345678901234567",
+            "database_marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp",
+            "expected_current_migration_head": "0040_runtime_contract.sql",
+            "target_migration_head": "0046_runtime_lock_privilege_boundary.sql",
+            "migration_manifest_sha256": "d" * 64,
+            "migration_role": "chenyida_erp_owner",
+            "control_role": "postgres",
+            "worker_image": f"registry.example.invalid/chenyida/worker@sha256:{'4' * 64}",
+            "postgres_container": "chenyida-erp-postgres-1",
+            "postgres_container_id": "e" * 64,
+            "postgres_image_digest": f"sha256:{'f' * 64}",
+            "backend_network": "chenyida-erp_backend",
+            "execution_created_at": "2026-08-15T01:40:00.000Z",
+            "execution_expires_at": "2026-08-15T01:42:00.000Z",
+            "requester_identity_sha256": "7" * 64,
+            "approver_identity_sha256": "8" * 64,
+            "executor_identity_sha256": "9" * 64,
+            "policy_file_sha256": supervisor.UAT_PROMOTION_POLICY_FILE_SHA256,
+            "policy_sha256": supervisor.UAT_PROMOTION_POLICY_SHA256,
+        }
+        if recovery:
+            value.update({
+                "expected_intent_sha256": "a" * 64,
+                "original_authorization_sha256": "b" * 64,
+                "original_operation": "MIGRATION_EXECUTION",
+                "original_operation_id": "promotion-supervisor-migration-execution",
+            })
+        return value
+
+    def migration_execution_authorization(self, bundle_digest, now, recovery=False):
+        operation = "RECOVER_UAT_PROMOTION" if recovery else "RUN_UAT_PROMOTION_MIGRATION"
+        return {
+            "schema_version": 6,
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "authorization_id": "promotion-supervisor-migration-execution-recovery" if recovery
+            else "promotion-supervisor-migration-execution",
+            "created_at": utc(now),
+            "expires_at": utc(now + timedelta(minutes=2)),
+            "supervisor_bundle_sha256": bundle_digest,
+            "operation": operation,
+            "parameters": self.migration_execution_parameters(recovery),
+            "nonce": "f" * 64,
+            "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
+        }
+
     def test_v6_authorization_is_exact_and_recovery_binds_the_original_intent(self):
         bundle = "f" * 64
         original_now = datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc)
@@ -628,6 +711,232 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
         self.assertEqual(events, [
             "migration-authorization-sources", "node", "prepare", "migration-authorization-sources",
             "consume", "migration-authorization-sources", "execute", "cleanup",
+        ])
+
+    def test_migration_execution_authorization_is_separate_exact_and_recoverable(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 40, tzinfo=timezone.utc)
+        authorization = self.migration_execution_authorization(bundle, now)
+        self.assertEqual(supervisor.validate_authorization(authorization, bundle, now), authorization)
+        context = supervisor.uat_promotion_context(authorization, "1" * 64)
+        self.assertEqual(context["operation"], "MIGRATION_EXECUTION")
+        self.assertEqual(set(context["parameters"]), supervisor.UAT_PROMOTION_MIGRATION_EXECUTION_PARAMETER_FIELDS)
+        self.assertNotEqual(
+            supervisor.sha256(supervisor.canonical_json(authorization)),
+            authorization["parameters"]["migration_approval_authorization_sha256"],
+        )
+
+        recovery_now = datetime(2026, 8, 15, 1, 41, tzinfo=timezone.utc)
+        recovery = self.migration_execution_authorization(bundle, recovery_now, recovery=True)
+        self.assertEqual(supervisor.validate_authorization(recovery, bundle, recovery_now), recovery)
+        recovery_context = supervisor.uat_promotion_context(recovery, "2" * 64)
+        self.assertEqual(recovery_context["operation"], "MIGRATION_EXECUTION")
+        self.assertEqual(recovery_context["operation_id"], "promotion-supervisor-migration-execution")
+        self.assertEqual(recovery_context["expected_intent_sha256"], "a" * 64)
+
+        reused_approval_id = {
+            **authorization,
+            "authorization_id": authorization["parameters"]["migration_authorization_operation_id"],
+        }
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_TIME_INVALID"):
+            supervisor.validate_authorization(reused_approval_id, bundle, now)
+        wrong_network = {
+            **authorization,
+            "parameters": {**authorization["parameters"], "backend_network": "other_backend"},
+        }
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_TARGET_INVALID"):
+            supervisor.validate_authorization(wrong_network, bundle, now)
+
+    def test_migration_execution_consumes_before_control_and_publishes_before_container_cleanup(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 40, tzinfo=timezone.utc)
+        authorization = self.migration_execution_authorization(bundle, now)
+        events = []
+        migration_result_sha256 = "7" * 64
+
+        def runner(_node, _bundle, _context, phase, _lock):
+            events.append(phase)
+            if phase == "prepare":
+                return {"result": "PREPARED", "grant_sha256": "6" * 64}
+            return {"result": "COMMITTED", "migration_result_sha256": migration_result_sha256}
+
+        control = {
+            "migration_result_sha256": migration_result_sha256,
+            "grant_sha256": "6" * 64,
+            "container_id": "8" * 64,
+            "container_name": "cyd-uat-migration-" + "9" * 24,
+        }
+        patches = [
+            patch.object(
+                supervisor, "verify_uat_promotion_migration_execution_sources",
+                side_effect=lambda *_: events.append("migration-execution-sources"),
+            ),
+            patch.object(
+                supervisor, "prepare_runtime_privilege_node",
+                side_effect=lambda *_: (
+                    events.append("node") or (Path("/tmp/runtime"), Path("/tmp/runtime/node"))
+                ),
+            ),
+            patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner),
+            patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")),
+            patch.object(
+                supervisor, "run_uat_promotion_migration_control",
+                side_effect=lambda *_: (events.append("control") or control),
+            ),
+            patch.object(
+                supervisor, "cleanup_uat_promotion_migration_container",
+                side_effect=lambda *_: events.append("container-cleanup"),
+            ),
+            patch.object(
+                supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup"),
+            ),
+        ]
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6]:
+            result = supervisor.run_uat_promotion_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/migration-execution.json"),
+                authorization, "1" * 64, lock_descriptor=51,
+            )
+        self.assertEqual(result["migration_result_sha256"], migration_result_sha256)
+        self.assertEqual(events, [
+            "migration-execution-sources", "node", "prepare", "migration-execution-sources",
+            "consume", "migration-execution-sources", "control", "execute", "container-cleanup", "cleanup",
+        ])
+
+    def test_pending_migration_execution_blocks_everything_except_its_exact_recovery(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 41, tzinfo=timezone.utc)
+        recovery = self.migration_execution_authorization(bundle, now, recovery=True)
+        recovery["parameters"]["original_authorization_sha256"] = "d" * 64
+        unrelated = self.authorization(bundle, datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc))
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-migration-interlock-") as temporary:
+            root = Path(temporary) / "state"
+            intents = root / "intents"
+            intents.mkdir(parents=True, mode=0o700)
+            root.chmod(0o700)
+            intents.chmod(0o700)
+            marker = root / supervisor.UAT_PROMOTION_STATE_MARKER
+            marker.write_bytes(supervisor.UAT_PROMOTION_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            intent = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-uat-promotion-migration-execution-intent/v1",
+                "migration_operation_id": "promotion-supervisor-migration-execution",
+                "execution_authorization_sha256": "d" * 64,
+                "migration_execution_intent_sha256": "a" * 64,
+            }
+            intent_file = intents / (
+                f"{intent['migration_operation_id']}.{intent['migration_execution_intent_sha256']}.json"
+            )
+            intent_file.write_bytes(supervisor.canonical_json(intent))
+            intent_file.chmod(0o400)
+            current_file = root / "current.json"
+            current_file.write_bytes(supervisor.canonical_json({"authorization_sha256_chain": ["c" * 64]}))
+            current_file.chmod(0o400)
+            with patch.object(supervisor, "UAT_PROMOTION_STATE_ROOT", root), \
+                    patch.object(supervisor, "UAT_PROMOTION_CURRENT_FILE", current_file):
+                with self.assertRaisesRegex(
+                        supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_REQUIRED"):
+                    supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+                supervisor.assert_no_uat_migration_execution_interlock(recovery)
+                current_file.chmod(0o600)
+                current_file.write_bytes(supervisor.canonical_json({"authorization_sha256_chain": ["d" * 64]}))
+                current_file.chmod(0o400)
+                supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+
+    def test_active_migration_fence_blocks_everything_except_its_exact_recovery(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 41, tzinfo=timezone.utc)
+        recovery = self.migration_execution_authorization(bundle, now, recovery=True)
+        recovery["parameters"]["original_authorization_sha256"] = "d" * 64
+        unrelated = self.authorization(bundle, datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc))
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-active-fence-") as temporary:
+            root = Path(temporary) / "state"
+            intents = root / "intents"
+            active_root = root / "active-fences"
+            intents.mkdir(parents=True, mode=0o700)
+            active_root.mkdir(mode=0o700)
+            root.chmod(0o700)
+            intents.chmod(0o700)
+            active_root.chmod(0o700)
+            marker = root / supervisor.UAT_PROMOTION_STATE_MARKER
+            marker.write_bytes(supervisor.UAT_PROMOTION_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            active_body = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-uat-promotion-active-migration-fence/v1",
+                "status": "ACTIVE_UNTIL_EXPLICIT_CHECKPOINT_9_TRANSFER_OR_QUARANTINE_RESOLUTION",
+                "promotion_id": recovery["parameters"]["promotion_id"],
+                "migration_operation_id": recovery["parameters"]["original_operation_id"],
+                "execution_authorization_sha256": recovery["parameters"]["original_authorization_sha256"],
+                "grant_sha256": "1" * 64,
+                "database_name": "chenyida_erp",
+                "database_system_identifier": recovery["parameters"]["database_system_identifier"],
+                "database_oid": recovery["parameters"]["database_oid"],
+                "database_marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp",
+                "released_baseline_sha256": "2" * 64,
+                "fence_before_sha256": "3" * 64,
+                "activated_at": "2026-08-15T01:40:00.000Z",
+            }
+            active = {
+                **active_body,
+                "active_fence_sha256": supervisor.sha256(supervisor.canonical_json(active_body)),
+            }
+            active_file = active_root / (
+                f"{active['migration_operation_id']}.{active['active_fence_sha256']}.json"
+            )
+            active_file.write_bytes(supervisor.canonical_json(active))
+            active_file.chmod(0o400)
+            with patch.object(supervisor, "UAT_PROMOTION_STATE_ROOT", root), \
+                    patch.object(supervisor, "UAT_PROMOTION_ACTIVE_FENCES_ROOT", active_root):
+                with self.assertRaisesRegex(
+                        supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_ACTIVE_MIGRATION_FENCE_PRESENT"):
+                    supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+                supervisor.assert_no_uat_migration_execution_interlock(recovery)
+                active_file.chmod(0o600)
+                active_file.write_bytes(active_file.read_bytes() + b" ")
+                active_file.chmod(0o400)
+                with self.assertRaisesRegex(
+                        supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID"):
+                    supervisor.assert_no_uat_migration_execution_interlock(recovery)
+
+    def test_migration_recovery_contains_after_consumption_before_journal_execution(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 41, tzinfo=timezone.utc)
+        authorization = self.migration_execution_authorization(bundle, now, recovery=True)
+        events = []
+        patches = [
+            patch.object(
+                supervisor, "validate_original_uat_promotion_authorization_consumed",
+                side_effect=lambda *_: events.append("original-consumed"),
+            ),
+            patch.object(
+                supervisor, "prepare_runtime_privilege_node",
+                side_effect=lambda *_: (events.append("node") or (Path("/tmp/runtime"), Path("/tmp/runtime/node"))),
+            ),
+            patch.object(
+                supervisor, "run_uat_promotion_runner",
+                side_effect=lambda _node, _bundle, _context, phase, _lock: (
+                    events.append(phase) or {"result": "RECOVERED"}
+                ),
+            ),
+            patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")),
+            patch.object(
+                supervisor, "run_uat_promotion_migration_recovery_control",
+                side_effect=lambda *_: events.append("recovery-control"),
+            ),
+            patch.object(
+                supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup"),
+            ),
+        ]
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            supervisor.run_uat_promotion_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/recovery.json"),
+                authorization, "1" * 64, lock_descriptor=51,
+            )
+        self.assertEqual(events, [
+            "original-consumed", "node", "recover-prepare", "consume", "recovery-control",
+            "recover-execute", "cleanup",
         ])
 
 

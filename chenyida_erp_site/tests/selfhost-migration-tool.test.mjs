@@ -16,6 +16,8 @@ import { executeDryRun, executionInputDigest } from "../tools/selfhost-migration
 import { buildSafeReport } from "../tools/selfhost-migration/report.mjs";
 import {
   assertControlledMigrationExecutionAdapterReady,
+  assertMigrationGrantDeadline,
+  assertMigrationSqlTransactionBoundary,
   closeMigrationRuntime,
   runMigrationWorkflow,
   runMigrationTransaction,
@@ -140,7 +142,9 @@ test("migration transaction and cleanup preserve the primary failure without lea
     runMigrationTransaction(transactionClient, async () => { throw primary; }),
     (error) => error === primary,
   );
-  assert.deepEqual(queries, ["BEGIN", "ROLLBACK"]);
+  assert.equal(queries[0], "BEGIN");
+  assert.match(queries[1], /^SAVEPOINT "cyd_migration_boundary_[0-9a-f]{32}"$/);
+  assert.equal(queries.at(-1), "ROLLBACK");
   assert.equal(safeMigrationErrorCode(primary), "MIGRATION_INTERNAL_ERROR");
   assert.equal(safeMigrationErrorCode({ code: "22012", detail: sentinel }), "MIGRATION_DATABASE_22012");
   assert.equal(safeMigrationErrorCode({ code: "57P03", detail: sentinel }), "MIGRATION_DATABASE_SERVER_UNAVAILABLE");
@@ -154,6 +158,58 @@ test("migration transaction and cleanup preserve the primary failure without lea
   }, true, async () => { closed += 1; throw Object.assign(new Error(sentinel), { password: sentinel }); }));
   assert.equal(released, 1);
   assert.equal(closed, 1);
+});
+
+test("migration transaction boundary rejects embedded transaction control and rechecks before commit", async () => {
+  assert.doesNotThrow(() => assertMigrationSqlTransactionBoundary(`
+    select 'COMMIT; ROLLBACK';
+    do $body$ begin perform 1; end $body$;
+    /* nested /* SAVEPOINT hidden */ comment */ select "BEGIN" from public.fixture;
+  `));
+  for (const sql of [
+    "BEGIN; select 1", "COMMIT", "END", "ROLLBACK", "ABORT", "SAVEPOINT unsafe",
+    "RELEASE SAVEPOINT unsafe", "START TRANSACTION", "PREPARE TRANSACTION 'unsafe'",
+    "SET TRANSACTION READ WRITE", "SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE",
+  ]) {
+    assert.throws(
+      () => assertMigrationSqlTransactionBoundary(sql),
+      { code: "MIGRATION_SOURCE_TRANSACTION_CONTROL_FORBIDDEN" },
+    );
+  }
+  assert.throws(
+    () => assertMigrationSqlTransactionBoundary("select 'unterminated"),
+    { code: "MIGRATION_SOURCE_SQL_LEXICAL_INVALID" },
+  );
+
+  const events = [];
+  const client = { async query(sql) { events.push(sql); return { rows: [] }; } };
+  const value = await runMigrationTransaction(
+    client,
+    async () => { events.push("WORK"); return "done"; },
+    async () => { events.push("FENCE_AND_DEADLINE_RECHECK"); },
+  );
+  assert.equal(value, "done");
+  assert.equal(events[0], "BEGIN");
+  assert.match(events[1], /^SAVEPOINT "cyd_migration_boundary_[0-9a-f]{32}"$/);
+  assert.equal(events[2], "WORK");
+  assert.match(events[3], /^RELEASE SAVEPOINT "cyd_migration_boundary_[0-9a-f]{32}"$/);
+  assert.deepEqual(events.slice(-2), ["FENCE_AND_DEADLINE_RECHECK", "COMMIT"]);
+});
+
+test("migration grant deadline reserves a final commit margin", () => {
+  const now = Date.parse("2026-08-15T01:00:00.000Z");
+  assert.equal(
+    assertMigrationGrantDeadline({ expires_at: "2026-08-15T01:00:15.000Z" }, now),
+    5_000,
+  );
+  assert.throws(
+    () => assertMigrationGrantDeadline({ expires_at: "2026-08-15T01:00:10.000Z" }, now),
+    { code: "MIGRATION_EXECUTION_GRANT_EXPIRED" },
+  );
+  assert.throws(
+    () => assertMigrationGrantDeadline({ expires_at: "invalid" }, now),
+    { code: "MIGRATION_EXECUTION_GRANT_EXPIRED" },
+  );
 });
 
 test("controlled migration workflow rejects environment secrets before opening a pool", async () => {
@@ -180,10 +236,10 @@ test("controlled migration workflow rejects environment secrets before opening a
   }
 });
 
-test("controlled release evidence cannot become SQL execution before the Supervisor fence adapter exists", () => {
+test("controlled release evidence cannot become SQL execution without a Supervisor execution grant", () => {
   assert.doesNotThrow(() => assertControlledMigrationExecutionAdapterReady(null));
   assert.throws(
     () => assertControlledMigrationExecutionAdapterReady({}),
-    { code: "MIGRATION_SUPERVISOR_EXECUTION_ADAPTER_NOT_IMPLEMENTED" },
+    { code: "MIGRATION_SUPERVISOR_EXECUTION_GRANT_REQUIRED" },
   );
 });

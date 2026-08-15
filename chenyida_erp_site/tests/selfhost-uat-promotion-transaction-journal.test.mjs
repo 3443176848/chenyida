@@ -18,8 +18,18 @@ import { createClusterRecoveryPolicyActivationReceipt } from "../scripts/postgre
 import { readinessPolicySha256 } from "../scripts/postgresql-cluster-recovery-policy-v2-contract.mjs";
 import { activateClusterRecoveryPolicyV2 } from "../scripts/postgresql-cluster-recovery-policy-v2.mjs";
 import {
+  canonicalMigrationExecutionJson,
+  createUatPromotionMigrationEngineResult,
+  createUatPromotionMigrationFence,
+  createUatPromotionMigrationResult,
+  UAT_PROMOTION_MIGRATION_DATABASE_OWNER_PRIVILEGES,
+  UAT_PROMOTION_MIGRATION_MEMBERSHIPS,
+  UAT_PROMOTION_MIGRATION_ROLE_RECORDS,
+} from "../scripts/uat-promotion-migration-execution-contract.mjs";
+import {
   UAT_PROMOTION_CURRENT_FILE,
   UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT,
+  UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT,
   UAT_PROMOTION_POLICY_FILE_SHA256,
   UAT_PROMOTION_POLICY_SHA256,
   UAT_PROMOTION_QUIESCE_INTENT_CONTRACT,
@@ -50,6 +60,10 @@ const clusterActivationPath = "/var/lib/chenyida-erp/postgresql-cluster-recovery
 const clusterPolicyTemplate = JSON.parse(await readFile(new URL("../operations/postgresql-cluster-recovery-policy-v2.json", import.meta.url), "utf8"));
 
 function digest(label) { return createHash("sha256").update(label).digest("hex"); }
+function artifactMatches(name, operationId) {
+  const matched = /^(.+)\.([0-9a-f]{64})\.json$/u.exec(name);
+  return matched !== null && matched[1] === operationId;
+}
 function physical(root, logical) { return path.join(root, logical.slice(1)); }
 
 async function directory(root, logical, mode = 0o755) {
@@ -712,13 +726,194 @@ function migrationAuthorizationRecoveryContext(original, intentSha256, suffix = 
   };
 }
 
+async function migrationExecutionFixture({ promotionId = "promotion-migration-execution-001", operationId = null } = {}) {
+  const base = await migrationAuthorizationFixture({ promotionId });
+  await run(base.context, "prepare", base.root);
+  await run(base.context, "execute", base.root);
+  const current = validateUatPromotionCheckpointReceipt(
+    JSON.parse(await readFile(physical(base.root, UAT_PROMOTION_CURRENT_FILE), "utf8")),
+  );
+  const approvalIntentFile = await intentPath(base.root, base.context.operation_id);
+  const approvalIntent = JSON.parse(await readFile(approvalIntentFile, "utf8"));
+  const identity = JSON.parse(await readFile(physical(base.root, identityPath), "utf8"));
+  const executionOperationId = operationId ?? `${promotionId}-migration-execution`;
+  const parameters = {
+    promotion_state_root: UAT_PROMOTION_STATE_ROOT,
+    promotion_id: promotionId,
+    promotion_generation: current.promotion_generation,
+    previous_checkpoint_receipt_sha256: current.receipt_sha256,
+    promotion_intent_sha256: current.intent_sha256,
+    promotion_original_authorization_sha256: current.original_authorization_sha256,
+    migration_authorization_operation_id: base.context.operation_id,
+    migration_authorization_intent_sha256: approvalIntent.migration_authorization_intent_sha256,
+    migration_authorization_intent_source: await source(
+      base.root, `${UAT_PROMOTION_STATE_ROOT}/intents/${path.basename(approvalIntentFile)}`,
+    ),
+    migration_approval_authorization_sha256: base.context.original_authorization_sha256,
+    candidate_binding_sha256: current.candidate_binding_sha256,
+    database_binding_sha256: current.database_binding_sha256,
+    runtime_binding_sha256: current.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: current.recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: current.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: current.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: current.migration_authorization_binding_sha256,
+    current_checkpoint_source: await source(base.root, UAT_PROMOTION_CURRENT_FILE),
+    runtime_identity_source: await source(base.root, identityPath),
+    release_manifest: manifestPath,
+    release_manifest_sha256: (await source(base.root, manifestPath)).sha256,
+    release_manifest_source: await source(base.root, manifestPath),
+    deployment_class: "UAT",
+    deployment_id: "chenyida-erp",
+    database_name: "chenyida_erp",
+    database_oid: databaseOid,
+    database_system_identifier: databaseSystemIdentifier,
+    database_marker: databaseMarker,
+    expected_current_migration_head: identity.migration_head,
+    target_migration_head: migrations().at(-1).filename,
+    migration_manifest_sha256: migrationAllowlistDigest(migrations()),
+    migration_role: "chenyida_erp_owner",
+    control_role: "postgres",
+    worker_image: workerImage,
+    postgres_container: "chenyida-erp-postgres-1",
+    postgres_container_id: identity.postgres_container_id,
+    postgres_image_digest: identity.postgres_image_digest,
+    backend_network: "chenyida-erp_backend",
+    execution_created_at: "2026-08-15T01:40:00.000Z",
+    execution_expires_at: "2026-08-15T01:42:00.000Z",
+    requester_identity_sha256: digest("migration-execution-requester"),
+    approver_identity_sha256: digest("migration-execution-approver"),
+    executor_identity_sha256: digest("migration-execution-executor"),
+    policy_file_sha256: UAT_PROMOTION_POLICY_FILE_SHA256,
+    policy_sha256: UAT_PROMOTION_POLICY_SHA256,
+  };
+  const authorization = digest(`authorization-${executionOperationId}`);
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: executionOperationId,
+    operation: "MIGRATION_EXECUTION",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: executionOperationId,
+    execution_authorization_sha256: authorization,
+    execution_created_at: parameters.execution_created_at,
+    original_authorization_sha256: authorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  return { ...base, context, approvalIntent };
+}
+
+function migrationExecutionRecoveryContext(original, intentSha256, suffix = "recovery") {
+  const executionId = `${original.operation_id}-${suffix}`;
+  return {
+    ...original,
+    execution_mode: "RECOVERY",
+    execution_authorization_id: executionId,
+    execution_authorization_sha256: digest(`authorization-${executionId}`),
+    execution_created_at: "2026-08-15T01:41:30.000Z",
+    expected_intent_sha256: intentSha256,
+  };
+}
+
+async function writeMigrationExecutionResult(root, context) {
+  const grantDirectory = physical(root, `${UAT_PROMOTION_STATE_ROOT}/grants`);
+  const [grantName] = (await readdir(grantDirectory)).filter((name) => artifactMatches(name, context.operation_id));
+  const grant = JSON.parse(await readFile(path.join(grantDirectory, grantName), "utf8"));
+  const entries = migrations();
+  const fileResults = entries.map((entry) => ({
+    filename: entry.filename,
+    sha256: entry.sha256,
+    outcome: entry.filename <= grant.expected_current_head ? "ALREADY_APPLIED" : "APPLIED",
+  }));
+  const engineResult = createUatPromotionMigrationEngineResult({
+    promotion_id: grant.promotion_id,
+    migration_operation_id: grant.migration_operation_id,
+    execution_authorization_sha256: grant.execution_authorization_sha256,
+    grant_sha256: grant.grant_sha256,
+    database_name: grant.database.database_name,
+    database_system_identifier: grant.database.database_system_identifier,
+    database_oid: grant.database.database_oid,
+    database_marker: grant.database.database_marker,
+    migration_role: grant.database.migration_role,
+    application_name: "chenyida-erp-migration",
+    current_head_before: grant.expected_current_head,
+    target_head: grant.target_head,
+    started_at: "2026-08-15T01:40:20.000Z",
+    completed_at: "2026-08-15T01:41:00.000Z",
+    files: fileResults,
+    final_migration_rows_sha256: clusterSha256(entries.map((entry) => ({
+      version: entry.filename, checksum: entry.sha256,
+    }))),
+    final_migration_rows_count: entries.length,
+    other_backend_count_before: 0,
+    other_backend_count_after: 0,
+    database_default_transaction_read_only: "on",
+    migration_transaction_read_only: "off",
+  });
+  const fence = (phase, observedAt) => createUatPromotionMigrationFence({
+    phase,
+    promotion_id: grant.promotion_id,
+    migration_operation_id: grant.migration_operation_id,
+    execution_authorization_sha256: grant.execution_authorization_sha256,
+    database_name: grant.database.database_name,
+    database_system_identifier: grant.database.database_system_identifier,
+    database_oid: grant.database.database_oid,
+    database_marker: grant.database.database_marker,
+    control_role: grant.database.control_role,
+    control_superuser: true,
+    database_allow_connections: phase === "BEFORE",
+    default_transaction_read_only: "on",
+    database_setting_count: 1,
+    database_connection_limit: phase === "BEFORE" ? 1 : 0,
+    other_backend_count: 0,
+    managed_roles: [
+      "chenyida_erp_admin", "chenyida_erp_admin_priv", "chenyida_erp_backup", "chenyida_erp_backup_priv",
+      "chenyida_erp_owner", "chenyida_erp_web", "chenyida_erp_web_priv", "chenyida_erp_worker",
+      "chenyida_erp_worker_priv",
+    ],
+    login_roles: [
+      "chenyida_erp_admin", "chenyida_erp_backup", "chenyida_erp_owner", "chenyida_erp_web", "chenyida_erp_worker",
+    ],
+    connect_roles: ["chenyida_erp_owner"],
+    platform_superuser_roles: ["postgres"],
+    public_connect: false,
+    public_temporary: false,
+    unknown_connect_acl_count: 0,
+    unknown_connect_login_count: 0,
+    prepared_transaction_count: 0,
+    role_records: UAT_PROMOTION_MIGRATION_ROLE_RECORDS,
+    memberships: UAT_PROMOTION_MIGRATION_MEMBERSHIPS,
+    non_owner_database_acl: [],
+    database_owner_privileges: UAT_PROMOTION_MIGRATION_DATABASE_OWNER_PRIVILEGES,
+    observed_at: observedAt,
+  });
+  const result = createUatPromotionMigrationResult({
+    promotion_id: grant.promotion_id,
+    migration_operation_id: grant.migration_operation_id,
+    execution_authorization_sha256: grant.execution_authorization_sha256,
+    grant_sha256: grant.grant_sha256,
+    migration_approval_receipt_sha256: grant.migration_approval_receipt_sha256,
+    migration_authorization_binding_sha256: grant.migration_authorization_binding_sha256,
+    fence_before: fence("BEFORE", "2026-08-15T01:40:10.000Z"),
+    engine_result: engineResult,
+    fence_after: fence("AFTER", "2026-08-15T01:41:10.000Z"),
+    committed_at: "2026-08-15T01:41:11.000Z",
+  });
+  const resultDirectory = physical(root, `${UAT_PROMOTION_STATE_ROOT}/results`);
+  const resultFile = path.join(resultDirectory, `${context.operation_id}.${result.result_sha256}.json`);
+  await writeFile(resultFile, canonicalMigrationExecutionJson(result), { mode: 0o400, flag: "wx" });
+  await chmod(resultFile, 0o400);
+  return { grant, result, resultFile };
+}
+
 async function run(context, phase, root, options = {}) {
   return runUatPromotionTransactionPhase(context, phase, { filesystemRoot: root, siteRoot, allowTestRoot: true, ...options });
 }
 
 async function intentPath(root, promotionId) {
   const directoryPath = physical(root, `${UAT_PROMOTION_STATE_ROOT}/intents`);
-  const [name] = (await readdir(directoryPath)).filter((entry) => entry.startsWith(`${promotionId}.`));
+  const [name] = (await readdir(directoryPath)).filter((entry) => artifactMatches(entry, promotionId));
   return path.join(directoryPath, name);
 }
 
@@ -771,6 +966,8 @@ test("checkpoint contract rejects skip, cross-binding, authorization reuse and U
     promotion_snapshot_binding_sha256: digest("promotion-snapshot"),
     writer_quiesce_binding_sha256: ZERO_SHA256,
     migration_authorization_binding_sha256: ZERO_SHA256,
+    migration_fence_binding_sha256: ZERO_SHA256,
+    migration_result_binding_sha256: ZERO_SHA256,
   };
   const next = createNextUatPromotionCheckpointReceipt(previous, base);
   assert.equal(next.previous_checkpoint_receipt_sha256, previous.receipt_sha256);
@@ -1165,6 +1362,135 @@ test("linked migration approval intents are never followed and are quarantined",
     assert.equal((await run(recovery, "recover-prepare", fixtureValue.root)).decision, "QUARANTINE");
     assert.equal((await run(recovery, "recover-execute", fixtureValue.root)).result, "QUARANTINED");
   }
+});
+
+test("migration execution persists a separate grant and publishes checkpoint 8 only from a complete result", async (t) => {
+  const fixtureValue = await migrationExecutionFixture();
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+  assert.equal(prepared.result, "PREPARED");
+  assert.notEqual(
+    fixtureValue.context.original_authorization_sha256,
+    fixtureValue.context.parameters.migration_approval_authorization_sha256,
+  );
+  const storedIntent = JSON.parse(await readFile(await intentPath(
+    fixtureValue.root, fixtureValue.context.operation_id,
+  ), "utf8"));
+  assert.equal(storedIntent.contract, UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT);
+  assert.equal(storedIntent.grant_sha256, prepared.grant_sha256);
+  const grantName = (await readdir(physical(
+    fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/grants`,
+  ))).find((name) => artifactMatches(name, fixtureValue.context.operation_id));
+  assert.ok(grantName.endsWith(`.${prepared.grant_sha256}.json`));
+  assert.equal((await lstat(path.join(physical(
+    fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/grants`,
+  ), grantName))).mode & 0o7777, 0o440);
+  await assert.rejects(
+    run(fixtureValue.context, "execute", fixtureValue.root),
+    (error) => error.code === "UAT_PROMOTION_MIGRATION_RESULT_MISSING",
+  );
+  const { result } = await writeMigrationExecutionResult(fixtureValue.root, fixtureValue.context);
+  const committed = await run(fixtureValue.context, "execute", fixtureValue.root);
+  assert.equal(committed.result, "COMMITTED");
+  assert.equal(committed.migration_result_sha256, result.result_sha256);
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  assert.equal(current.checkpoint_id, "MIGRATION_COMMIT_RECEIPT");
+  assert.equal(current.checkpoint_ordinal, 8);
+  assert.equal(current.checkpoint_evidence_sha256, result.result_sha256);
+  assert.equal(current.migration_fence_binding_sha256, result.database_fence_binding_sha256);
+  assert.equal(current.migration_result_binding_sha256, result.migration_result_binding_sha256);
+});
+
+test("dotted migration operation ids do not collide with longer artifact prefixes", async (t) => {
+  const operationId = "promotion.migration.execution";
+  const fixtureValue = await migrationExecutionFixture({
+    promotionId: "promotion-migration-dotted-id",
+    operationId,
+  });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const unrelatedId = `${operationId}.other`;
+  const unrelatedDigest = digest("unrelated-dotted-operation");
+  for (const [directoryName, mode] of [["intents", 0o400], ["grants", 0o440]]) {
+    const directoryPath = physical(fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/${directoryName}`);
+    const artifact = path.join(directoryPath, `${unrelatedId}.${unrelatedDigest}.json`);
+    await writeFile(artifact, "{}\n", { mode });
+    await chmod(artifact, mode);
+  }
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+  assert.equal(prepared.result, "PREPARED");
+  const intentNames = await readdir(physical(fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/intents`));
+  assert.equal(intentNames.filter((name) => artifactMatches(name, operationId)).length, 1);
+  assert.equal(intentNames.filter((name) => artifactMatches(name, unrelatedId)).length, 1);
+});
+
+test("migration execution publication crashes resume from the immutable result without rerunning SQL", async (t) => {
+  const failpoints = [
+    "AFTER_MIGRATION_EXECUTION_HISTORY",
+    "AFTER_MIGRATION_EXECUTION_RECEIPT",
+    "AFTER_MIGRATION_EXECUTION_CURRENT",
+  ];
+  for (const [index, failpoint] of failpoints.entries()) {
+    const fixtureValue = await migrationExecutionFixture({
+      promotionId: `promotion-migration-execution-crash-${index}`,
+    });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+    const { result, resultFile } = await writeMigrationExecutionResult(fixtureValue.root, fixtureValue.context);
+    const resultRaw = await readFile(resultFile);
+    await assert.rejects(
+      run(fixtureValue.context, "execute", fixtureValue.root, {
+        fault: async (point) => { if (point === failpoint) throw new Error(`CRASH:${point}`); },
+      }),
+      new RegExp(`CRASH:${failpoint}`),
+    );
+    const recovery = migrationExecutionRecoveryContext(
+      fixtureValue.context, prepared.intent_sha256, `recovery-${index}`,
+    );
+    const planned = await run(recovery, "recover-prepare", fixtureValue.root);
+    assert.ok(["RESUME_PUBLICATION", "ALREADY_COMMITTED"].includes(planned.decision));
+    const recovered = await run(recovery, "recover-execute", fixtureValue.root);
+    assert.ok(["COMMITTED", "ALREADY_COMMITTED"].includes(recovered.result));
+    assert.equal(recovered.migration_result_sha256, result.result_sha256);
+    assert.deepEqual(await readFile(resultFile), resultRaw);
+  }
+});
+
+test("migration execution recovery quarantines missing or invalid results and never synthesizes one", async (t) => {
+  for (const variant of ["missing", "invalid"]) {
+    const fixtureValue = await migrationExecutionFixture({
+      promotionId: `promotion-migration-execution-${variant}`,
+    });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+    if (variant === "invalid") {
+      const { resultFile } = await writeMigrationExecutionResult(fixtureValue.root, fixtureValue.context);
+      const parsed = JSON.parse(await readFile(resultFile, "utf8"));
+      parsed.status = "MIGRATION_FAILED";
+      await chmod(resultFile, 0o600);
+      await writeFile(resultFile, canonicalMigrationExecutionJson(parsed));
+      await chmod(resultFile, 0o400);
+    }
+    const recovery = migrationExecutionRecoveryContext(
+      fixtureValue.context, prepared.intent_sha256, `recovery-${variant}`,
+    );
+    assert.equal((await run(recovery, "recover-prepare", fixtureValue.root)).decision, "QUARANTINE");
+    assert.equal((await run(recovery, "recover-execute", fixtureValue.root)).result, "QUARANTINED");
+    const resultNames = await readdir(physical(fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/results`));
+    assert.equal(resultNames.length, variant === "missing" ? 0 : 1);
+  }
+});
+
+test("migration execution cannot outlive the checkpoint 7 approval window", async (t) => {
+  const fixtureValue = await migrationExecutionFixture({ promotionId: "promotion-migration-execution-expired" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const changed = structuredClone(fixtureValue.context);
+  changed.parameters.execution_expires_at = "2026-08-15T01:44:00.000Z";
+  await assert.rejects(
+    run(changed, "prepare", fixtureValue.root),
+    (error) => error.code === "UAT_PROMOTION_MIGRATION_EXECUTION_APPROVAL_EXPIRED",
+  );
 });
 
 test("fake root requires an explicit test-only option and a symlinked state root fails closed", async (t) => {
