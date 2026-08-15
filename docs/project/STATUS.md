@@ -2,23 +2,38 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-POSTDEPLOY-TRANSACTION-76（执行中；把checkpoint 10/11接入promotion不可变事务）
+## SELFHOST-UAT-CROSS-ROLE-TRANSACTION-77（执行中；把跨岗验收接入checkpoint 12不可变事务）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / POSTDEPLOY TRANSACTION INTEGRATION / RESOURCE STOP LINE ACTIVE / NO REAL DEPLOYMENT OR DATABASE ACTION / PRODUCTION NO-GO | 唯一active task；把runtime configuration与strict postdeploy identity分别接入promotion checkpoint 10/11独立授权、不可变journal和保全式恢复 |
-| 严格代码起点 | PASS / CONTROLLED | `86be6d4b139e6626067a6a1782a3636d076f058a`/tree`006c230976d8dd985394b59a7b0965f90b2e1a51`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / CHECKPOINT 9 REPOSITORY ADAPTER READY WITHOUT ACTUAL DEPLOYMENT | TASK75/D-150已固定deployment result+active-fence transfer；现有postdeploy工具虽被静态审计列为SUPPORTED，但promotion journal尚不能由Supervisor推进checkpoint 10/11 |
+| 当前状态 | DOING / CROSS-ROLE CHECKPOINT 12 ADAPTER / HUMAN EXECUTION BLOCKED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；把TASK67跨岗合同、TASK66权限矩阵、checkpoint 11、逐步证据及三方签字接入独立授权、不可变journal和保全恢复 |
+| 严格代码起点 | PASS / CONTROLLED | `694f485cad3a6e9fbdc499c10cc801f0de77cafe`/tree`45007b67fb606bd423043d769efefd12acc67ab7`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / CHECKPOINT 10/11 REPOSITORY ADAPTER READY WITHOUT ACTUAL POSTDEPLOY | TASK76/D-151已固定两个postdeploy授权、发布前control binding及checkpoint 10/11；真实员工账号、范围、窗口和签字仍未授权/提供 |
 | 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap881MiB/1GiB（超过80%）、根盘约13GiB、Load低；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不运行postdeploy/Compose、pull/build/recreate/start/stop，不连接数据库或读取active fence/env/log/Volume；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap889MiB/1GiB（超过80%）、根盘约13GiB；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不创建账号、不执行员工业务写，不运行postdeploy/Compose、pull/build/recreate/start/stop，不连接数据库或读取env/log/Volume；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
 | 系统是否可用 | NO | 无完整晋升/rollback执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+
+## SELFHOST-UAT-POSTDEPLOY-TRANSACTION-76（完成；checkpoint 10/11事务和发布前control binding通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY POSTDEPLOY CHECKPOINT 10/11 TRANSACTION VERIFIED / PREPUBLICATION CONTROL BINDING VERIFIED / NO REAL DEPLOYMENT OR DATABASE ACTION / PRODUCTION NO-GO | TASK76已释放active slot；TASK77接入checkpoint 12，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`8c7d51c`/tree`49ac3a2c`→binding fix`2309927`/tree`ddae0954`→Supervisor`694f485`/tree`45007b67`；134文件manifest raw SHA-256为`ccb0e462…f03d`且重放一致 |
+| 事务合同 | PASS / FAIL CLOSED | checkpoint 10/11使用不同授权与消费前intent；精确绑定checkpoint 9 receipt/result/transfer、manifest、Compose、四服务、runtime policy和三方actor |
+| 发布前绑定 | PASS / SINGLE IMMUTABLE BINDING | 仅原始postdeploy execute接收外部control digest；journal先持久化自摘要单一binding再发布结果/history/receipt/current，缺失、不匹配、重复或不同binding均拒绝或quarantine |
+| runtime/恢复 | PASS / PRESERVATION FIRST | Supervisor受信Node、process group TERM→30s→KILL、阶段化containment/anomaly和全局interlock通过；`.publish.tmp`及未知partial保全，不猜测重跑或删除证据 |
+| 审计 | PASS / EXECUTOR STILL BLOCKED | 11项SUPPORTED、4项阻断；checkpoint 12、final 13和rollback 14/15仍开放，`assert-ready`继续精确拒绝；只读复核无P0/P1/P2 |
+| 自动验证 | PASS / SCOPED APPLICABLE | journal40/40、Python37/37、postdeploy17/17、audit/cross-role18/18、release/manifest29/29、installer/generator18/18、inventory258/234/24及语法/凭据/diff门通过 |
+| 资源/清理 | STOP LINE ACTIVE / CONTAINER OOM NONE | 收口available约1.9GiB、Swap889/1024MiB、根盘约13GiB、Load`2.76/1.38/0.73`；四服务restart0/OOM false，任务临时Node目录已精确清理 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未运行build、backup、Compose/PostgreSQL、Migration、镜像、postdeploy、部署、回滚或业务写；四个受保护Volume未触碰 |
+| 系统是否可用 | NO | 仓库checkpoint 10/11不等于actual postdeploy；仍缺人工checkpoint 12、final、rollback、真实恢复、正式门、业务批准和切换 |
 
 ## SELFHOST-UAT-COMPOSE-DEPLOY-75（完成；checkpoint 9精确Compose部署回执仓库适配器通过）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / REPOSITORY COMPOSE DEPLOYMENT RECEIPT VERIFIED / DYNAMIC VALIDATION DEFERRED / NO REAL DEPLOYMENT OR DATABASE ACTION / PRODUCTION NO-GO | TASK75已释放active slot；TASK76接入postdeploy checkpoint 10/11，TASK70保持受阻 |
+| 当前状态 | DONE / REPOSITORY COMPOSE DEPLOYMENT RECEIPT VERIFIED / DYNAMIC VALIDATION DEFERRED / NO REAL DEPLOYMENT OR DATABASE ACTION / PRODUCTION NO-GO | TASK75已释放active slot；后续TASK76已闭合postdeploy checkpoint 10/11，TASK70保持受阻 |
 | 不可变链 | PASS / CONTENT ADDRESSED | source`d383c10`/tree`d900fd6b`→cap fix`c6c4864`/tree`2627d383`→Supervisor`86be6d4`/tree`006c2309`；132文件manifest raw SHA-256为`249d28fe…3071`且重放一致 |
 | 依赖决策 | PASS / D-150 | checkpoint 9只替换精确Web/Worker；数据库handoff只有在两服务身份、digest、启动、health及runtime configuration通过后发生，unknown/partial保持seal并保全 |
 | 执行合同 | PASS / FAIL CLOSED | deployment intent与计划先于授权消费；production固定`--no-build --pull never --force-recreate --no-deps`，Caddy/PostgreSQL/网络/四卷及Compose身份必须不变 |

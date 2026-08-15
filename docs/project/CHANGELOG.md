@@ -4,6 +4,19 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-POSTDEPLOY-TRANSACTION-76 - `feat: integrate postdeploy promotion checkpoints` / `fix: bind postdeploy results before publication` / `build: refresh release supervisor bundle manifest` / `docs: close postdeploy transaction and start cross-role checkpoint`
+
+- 调度/范围：从TASK75最终Supervisor提交`86be6d4`/tree`006c2309`启动唯一active task；只在仓库、fake-root、受限Node与可注入postdeploy adapter中实现checkpoint 10/11，不运行真实postdeploy、Compose、数据库或修改UAT/生产。
+- 边界决策：D-151固定runtime configuration与strict identity使用两个不同的一次性Supervisor v6授权；消费前intent绑定同一promotion、checkpoint 9 receipt/result/transfer、manifest、Compose、四服务、runtime policy及三方actor，checkpoint 11后journal仍为IN_PROGRESS。
+- Supervisor/runtime：postdeploy统一使用Supervisor受信Node，子进程进入独立process group并按TERM→最多30秒→KILL收敛；阶段化containment/anomaly、全局interlock和trusted-root/partial分类覆盖失败与恢复。
+- 发布前绑定：只有原始postdeploy execute接收外部control digest。journal在任何result/history/receipt/current发布前持久化单一、不可变、自摘要的`postdeploy-control-bindings`并复核；缺失、不匹配、重复、不同binding、source替换、runtime漂移和`.publish.tmp`均失败关闭或保全/quarantine。
+- 回执/恢复：checkpoint 10/11按history→receipt→current无覆盖发布，保持完整授权摘要链；恢复只从同一精确binding和完整result继续，不猜测重跑postdeploy、不删除容器/证据或修改数据库。
+- 审计/发布链：机器审计保持11项SUPPORTED、4项阻断并继续拒绝；独立只读复核未发现P0/P1/P2。source`8c7d51c`/tree`49ac3a2c`→binding fix`2309927`/tree`ddae0954`→Supervisor`694f485`/tree`45007b67`形成134文件链，manifest raw SHA-256为`ccb0e462…f03d`。
+- 验证：journal40/40、Python launcher/UAT37/37、postdeploy17/17、audit/cross-role18/18、release gate/manifest29/29、installer/generator18/18、inventory258/234/24，以及Python/Node/shell语法、bundle重放、高置信凭据和diff门通过；未跳过或降低断言。
+- 资源/边界：Swap持续高于80%，未运行typecheck、全量测试、Docker build、Compose/PostgreSQL、backup/restore、Migration、镜像、部署、回滚或业务写。收口available约1.9GiB、Swap889/1024MiB、根盘约13GiB、Load`2.76/1.38/0.73`；四服务restart0/OOM false，精确临时Node目录已清理。
+- 数据库/API：无Schema或Migration文件变化，不改变普通业务API；只扩展root Supervisor、promotion journal和postdeploy控制边界。真实A4/A6、账号、员工UAT、数据库和生产动作均未授权。
+- 治理：新增D-151，TASK76转`DONE`；自动启动`SELFHOST-UAT-CROSS-ROLE-TRANSACTION-77`为唯一`DOING`，先把跨岗证据合同接入checkpoint 12，真实员工执行仍受外部输入/授权阻塞，TASK70继续等待资源与执行器依赖。
+
 ### SELFHOST-UAT-COMPOSE-DEPLOY-75 - `feat: add fenced UAT compose deployment checkpoint` / `fix: expand supervisor bundle for deployment controls` / `build: bind compose deployment supervisor bundle` / `docs: close compose deployment and start postdeploy transaction`
 
 - 调度/范围：从TASK74最终Supervisor提交`52242f8`/tree`6a20ec8f`启动唯一active task；只在仓库、fake-root、可注入Compose/database adapter和当前daemon只读metadata中实现checkpoint 9，不运行真实Compose、连接数据库或修改UAT/生产。

@@ -3013,6 +3013,40 @@
 - 拒绝在任一新服务身份/health未知时释放数据库、把一次health或退出0当作checkpoint 9，或在partial后盲目重跑Compose。
 - 拒绝把fake-root回执描述为实际UAT已部署、数据库已交接或回滚能力已存在。
 
+## D-151 checkpoint 10/11在发布前持久绑定Supervisor外部控制摘要且未知postdeploy状态只保全
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY POSTDEPLOY CHECKPOINT 10/11 TRANSACTION VERIFIED / PREPUBLICATION CONTROL BINDING VERIFIED / NO REAL DEPLOYMENT OR DATABASE ACTION / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK76对checkpoint 9 result/transfer、runtime configuration probe、strict postdeploy identity、promotion journal、Supervisor runtime和partial恢复责任的源码核对，以及Node/Python轻量专项与只读攻击复核
+- 确认边界：只接受仓库内postdeploy intent、独立一次性授权、Supervisor受信runtime、不可变control binding、内容寻址result/checkpoint 10/11回执和fake-root证据；不授权真实Compose、数据库、容器、postdeploy、host或UAT/生产动作
+
+### Context
+
+- TASK75完成checkpoint 9后，两个独立postdeploy工具虽能生成runtime configuration和runtime identity证据，但未进入同一promotion授权摘要链；独立成功不能证明其使用相同deployment result、active-fence transfer、manifest和四服务身份。
+- 若Supervisor只在postdeploy工具完成并发布结果后再比较外部期望摘要，结果发布与journal消费之间存在不可接受的交叉核对窗口；恢复还可能在缺失或多份binding时猜测应采用哪个结果。
+- legacy shell wrapper选择宿主Node且子进程不属于Supervisor统一process group，无法为超时、失败containment和进程清理提供单一责任边界；`.publish.tmp`若被视为普通临时文件也会掩盖identity部分发布。
+
+### Decision
+
+1. checkpoint 10和11分别使用`VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION`与`VERIFY_UAT_POSTDEPLOY_IDENTITY`两个不同的Supervisor v6一次性授权。各自intent在消费前落盘，并绑定同一promotion、精确前代、checkpoint 9 receipt/result/transfer、manifest、Compose身份、四服务/runtime policy和三方actor。
+2. postdeploy执行只使用Supervisor持有的受信Node runtime；子进程进入独立process group，失败或超时按TERM→最多30秒→KILL收敛，并写入阶段化containment/anomaly与全局interlock。
+3. 只有Supervisor发起的原始postdeploy execute可以接收外部control digest。journal在任何history/receipt/current发布之前必须持久化单一、不可变、自摘要的`postdeploy-control-bindings`并复核结果；缺失、不匹配、重复或不同binding全部失败关闭并在恢复时保全/quarantine。
+4. checkpoint 10/11均按history→receipt→current无覆盖发布并保持完整授权摘要链；checkpoint 11完成后promotion仍为`IN_PROGRESS`，不得越过未执行的checkpoint 12人工跨岗UAT。
+5. source替换、过期、链接异常、跨promotion/deployment、runtime漂移、未知result和`.publish.tmp`均按partial处理。失败保全checkpoint 9 result/transfer、postdeploy结果和事故证据，不猜测重跑、删除容器、修改数据库或伪造成功。
+
+### Consequences
+
+- feature source`8c7d51c09b058d66ebd509338f8f325d6ed7fb73`/tree`49ac3a2cc347dc92690f1c3d4f6ca48c0e48f10e`→prepublication binding fix`2309927b9354a1449fb298119df6611574668cab`/tree`ddae09547b1740c313bf9de6eee96b6d731297a1`→Supervisor manifest-only`694f485cad3a6e9fbdc499c10cc801f0de77cafe`/tree`45007b67fb606bd423043d769efefd12acc67ab7`形成134文件canonical链；manifest raw SHA-256为`ccb0e462…f03d`。
+- promotion journal40/40、Python launcher/UAT37/37、postdeploy17/17、audit/cross-role18/18、release gate/manifest29/29、installer/generator18/18及inventory258/234/24通过；最终只读复核未发现仍可复现的P0/P1/P2。
+- 机器审计仍为11项SUPPORTED、4项阻断：人工checkpoint 12、final checkpoint 13和rollback 14/15；`assert-ready`继续拒绝。下一安全前置为TASK77把跨岗证据合同接入checkpoint 12事务，实际员工执行仍需专项授权和业务输入。
+- Swap持续超过80%，未运行build、全量测试、Compose/PostgreSQL、Migration、backup/restore、镜像、部署或回滚。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝让checkpoint 10/11复用同一授权、让工具自行选择Node/runtime，或以退出0、路径名、旧probe、单次health和operator声明代替精确promotion binding。
+- 拒绝在结果发布后才首次比较外部摘要、允许多份binding择一、用current存在推断前置binding已提交，或在未知partial时自动重跑postdeploy。
+- 拒绝把fake-root结果、checkpoint 11仓库回执或静态SUPPORTED描述为actual postdeploy、人工UAT、final receipt或可投产结论。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
