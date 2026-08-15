@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "e4aa3687d08902a8bfb0a7846f45b7ee160db630570898f7223461bc26e5e2fc",
+  "artifact_sha256": "881ca1cf43aa4fa9c1e14dd2e40c5cca49c7c5077601692513788f93860c7119",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -101,14 +101,15 @@
     },
     {
       "evidence": [
-        "compose.release.yml:ERP_WEB_IMAGE",
-        "compose.release.yml:ERP_WORKER_IMAGE"
+        "uat-promotion-compose-deployment-control.mjs:runUatPromotionComposeDeploymentControl",
+        "uat-promotion-transaction-journal.mjs:COMPOSE_DEPLOYMENT_RECEIPT",
+        "release-supervisor-launcher.py:DEPLOY_UAT_RELEASE"
       ],
-      "finding": "镜像digest override存在，但没有一次性授权的Compose部署执行器、前后容器身份回执或未知partial恢复。",
+      "finding": null,
       "id": "COMPOSE_DEPLOYMENT_RECEIPT",
       "ordinal": 9,
       "severity_if_incomplete": "P0",
-      "status": "MISSING"
+      "status": "SUPPORTED"
     },
     {
       "evidence": [
@@ -175,21 +176,15 @@
   "deployment_class": "UAT",
   "execution_class": "AUDIT_ONLY_NOT_AUTHORIZED",
   "execution_readiness": {
-    "blocking_checkpoint_count": 5,
+    "blocking_checkpoint_count": 4,
     "code": "UAT_PROMOTION_EXECUTOR_NOT_READY",
     "may_start": false,
-    "p0_blocker_count": 4,
+    "p0_blocker_count": 3,
     "p1_blocker_count": 1,
     "statement": "当前只允许继续仓库实施和隔离验证；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
     "status": "BLOCKED"
   },
   "findings": [
-    {
-      "finding": "镜像digest override存在，但没有一次性授权的Compose部署执行器、前后容器身份回执或未知partial恢复。",
-      "id": "COMPOSE_DEPLOYMENT_RECEIPT",
-      "severity": "P0",
-      "status": "MISSING"
-    },
     {
       "finding": "TASK67只提供BLOCKED合成合同；没有事前批准、账号映射、真实执行回执或三方签字。",
       "id": "CROSS_ROLE_UAT_EXECUTION",
@@ -218,17 +213,17 @@
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "8081f522d416e3a6d44960af07e59d2ade1668389c3e25de088de59272fc56b9"
+      "sha256": "f4868660963f46ea61ddb2b7f3a60945ce557d58775ba4dd1091e8f522bd5b49"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
-      "sha256": "442b61811ccea367e0c33f787083c3d153246e509d24ba7a8673fe555d42b148"
+      "sha256": "599143aa1007a79e03660c33dd6fdd146facd93d24c972e39eb655d3782fe494"
     },
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 234,
-      "sha256": "5f2fdff02838d05f42fa4fca768737c63d9bf57bc445aad9a0ea333bb2baa91f",
+      "sha256": "d691a90783762ff95e91e4ad9ae3b5c0a92156797654322bb3c36dc41a8022f0",
       "total_tests": 258
     },
     "source_manifest": {
@@ -239,7 +234,7 @@
             "ERP_WORKER_IMAGE"
           ],
           "path": "chenyida_erp_site/compose.release.yml",
-          "sha256": "1f921685f73efd592700a2ad3db1ee0abe709a1564c96f576a24d19fea25ff57"
+          "sha256": "ca8aefc35ed30f7d4c2af9424b3cdf5606b7b2166ef0648fbf545be52ed18661"
         },
         {
           "markers": [
@@ -273,15 +268,15 @@
             "\"status\": \"BLOCKED\""
           ],
           "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
-          "sha256": "51c92819078a1ffb29c616e14bb169a3efdfdf611bccb26a2098b2fe863ee95c"
+          "sha256": "cbfb1c3ded5466773f4697f410f7342672319e105da01f0717074762085636fd"
         },
         {
           "markers": [
             "chenyida-erp-uat-promotion-transaction-policy/v1",
-            "\"status\": \"NOT_IMPLEMENTED\""
+            "\"operation\": \"DEPLOY_UAT_RELEASE\", \"status\": \"PARTIAL\""
           ],
           "path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json",
-          "sha256": "756c1249776499d8096ec2ed8041bd68aa41ce253ce49ee9b5b46650f163b093"
+          "sha256": "16c998ddea1b94010bb605c03c18ecc3e2f7dfeab913a3d8cc1c01f70b069585"
         },
         {
           "markers": [
@@ -364,7 +359,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "95ee3ca43a93d7aeaa2029069439bd0875b94631ffa1be2a8c256385b348370b"
+          "sha256": "b0650eec3059b69f78556b1e9d79008fa1cb978a9f1b4b4059adaece748a9fc7"
         },
         {
           "markers": [
@@ -381,11 +376,12 @@
             "QUIESCE_UAT_WRITERS",
             "AUTHORIZE_UAT_PROMOTION_MIGRATION",
             "RUN_UAT_PROMOTION_MIGRATION",
+            "DEPLOY_UAT_RELEASE",
             "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION",
             "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
           ],
           "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
-          "sha256": "eba153081614ac4ad893242086aea066df2bdc78414104d2b86d2dca47e8295f"
+          "sha256": "8b74e37c6977923320cccc3e22839a13c50b59233132284a420386b4f7abbb86"
         },
         {
           "markers": [
@@ -394,6 +390,24 @@
           ],
           "path": "chenyida_erp_site/scripts/restore-selfhost.sh",
           "sha256": "c648db054afdcec661ffc293eec71f3087315412aa222078aabea3a4de102b22"
+        },
+        {
+          "markers": [
+            "UAT_PROMOTION_COMPOSE_DEPLOYMENT_RESULT_CONTRACT",
+            "UAT_PROMOTION_DATABASE_HANDOFF_CONTRACT",
+            "UAT_PROMOTION_ACTIVE_FENCE_TRANSFER_CONTRACT"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-compose-deployment-contract.mjs",
+          "sha256": "7769e7a3cc7009c3268f4edc0ccd1258ddf5fa2ebc6843512d90153b35365094"
+        },
+        {
+          "markers": [
+            "runUatPromotionComposeDeploymentControl",
+            "COMPOSE_DEPLOYMENT_RESULT_PERSISTED",
+            "CONTAINED_FOR_JOURNAL_QUARANTINE"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs",
+          "sha256": "d61a94e0413eb8738f6f90a34aee3af2334fa16f14f49cb43b16c045a15aac5d"
         },
         {
           "markers": [
@@ -420,21 +434,23 @@
             "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT",
             "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT",
             "UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT",
+            "UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT",
             "MIGRATION_COMMIT_RECEIPT",
+            "COMPOSE_DEPLOYMENT_RECEIPT",
             "probeDockerWriterQuiesce",
             "validateBackupRecoveryReadinessV4",
-            "AFTER_MIGRATION_AUTHORIZATION_CURRENT",
+            "AFTER_COMPOSE_DEPLOYMENT_CURRENT",
             "runUatPromotionTransactionPhase"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs",
-          "sha256": "49ab4a3b670144b56a30b75ebde4d71789fe044339274778e74eae0d881e2390"
+          "sha256": "77a80c48404817535399d12a08c25de05077f6c753a98655082fc6d0af51e2bc"
         }
       ],
-      "sha256": "53a1515a315efbba8a3054cc6b042be1c65dbda71a95de5c8a1673d9533f4239"
+      "sha256": "b6f01c11d547d85a8bfd11da72342e913557475b3525be4fe4f2617851eaa98c"
     }
   },
   "observations": {
-    "compose_release_image_binding": "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT",
+    "compose_release_image_binding": "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT",
     "cross_role_uat_readiness": "BLOCKED",
     "implemented_required_promotion_operations": [
       "BEGIN_UAT_PROMOTION",
@@ -442,16 +458,16 @@
       "QUIESCE_UAT_WRITERS",
       "AUTHORIZE_UAT_PROMOTION_MIGRATION",
       "RUN_UAT_PROMOTION_MIGRATION",
+      "DEPLOY_UAT_RELEASE",
       "RECOVER_UAT_PROMOTION"
     ],
     "migration_authorization": "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED",
     "missing_required_promotion_operations": [
-      "DEPLOY_UAT_RELEASE",
       "ROLLBACK_UAT_RELEASE"
     ],
     "required_promotion_operation_count": 8,
     "restore_target_policy": "TEST_ONLY",
-    "supervisor_operation_count": 25,
+    "supervisor_operation_count": 26,
     "supervisor_operations": [
       "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1",
       "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
@@ -461,6 +477,7 @@
       "CAPTURE_UAT_PROMOTION_SNAPSHOT",
       "CREATE_IMAGE_EVIDENCE",
       "CREATE_RELEASE_MANIFEST",
+      "DEPLOY_UAT_RELEASE",
       "DISABLE_MONITORING_HOST_DELIVERY",
       "INSTALL_MONITORING_HOST_DELIVERY",
       "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION",

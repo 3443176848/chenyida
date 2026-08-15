@@ -30,6 +30,7 @@
     "quiesce_operation": "QUIESCE_UAT_WRITERS",
     "migration_authorization_operation": "AUTHORIZE_UAT_PROMOTION_MIGRATION",
     "migration_execution_operation": "RUN_UAT_PROMOTION_MIGRATION",
+    "compose_deployment_operation": "DEPLOY_UAT_RELEASE",
     "recovery_operation": "RECOVER_UAT_PROMOTION"
   },
   "required_intent_bindings": [
@@ -83,7 +84,7 @@
     {"operation": "QUIESCE_UAT_WRITERS", "status": "IMPLEMENTED", "checkpoints": ["WRITER_QUIESCE_RECEIPT"]},
     {"operation": "AUTHORIZE_UAT_PROMOTION_MIGRATION", "status": "IMPLEMENTED", "checkpoints": ["ONE_TIME_MIGRATION_AUTHORIZATION"]},
     {"operation": "RUN_UAT_PROMOTION_MIGRATION", "status": "IMPLEMENTED", "checkpoints": ["MIGRATION_COMMIT_RECEIPT"]},
-    {"operation": "DEPLOY_UAT_RELEASE", "status": "NOT_IMPLEMENTED", "checkpoints": ["COMPOSE_DEPLOYMENT_RECEIPT", "POST_DEPLOY_RUNTIME_CONFIGURATION", "POST_DEPLOY_IDENTITY", "CROSS_ROLE_UAT_EXECUTION", "PROMOTION_FINAL_RECEIPT"]},
+    {"operation": "DEPLOY_UAT_RELEASE", "status": "PARTIAL", "checkpoints": ["COMPOSE_DEPLOYMENT_RECEIPT", "POST_DEPLOY_RUNTIME_CONFIGURATION", "POST_DEPLOY_IDENTITY", "CROSS_ROLE_UAT_EXECUTION", "PROMOTION_FINAL_RECEIPT"]},
     {"operation": "ROLLBACK_UAT_RELEASE", "status": "NOT_IMPLEMENTED", "checkpoints": ["ROLLBACK_TO_UAT_EXECUTOR", "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT"]},
     {"operation": "RECOVER_UAT_PROMOTION", "status": "IMPLEMENTED", "checkpoints": []}
   ],

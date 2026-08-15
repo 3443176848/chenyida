@@ -27,6 +27,12 @@ import {
   UAT_PROMOTION_MIGRATION_ROLE_RECORDS,
 } from "../scripts/uat-promotion-migration-execution-contract.mjs";
 import {
+  createUatPromotionActiveFenceTransfer,
+  createUatPromotionComposeDeploymentResult,
+  createUatPromotionDatabaseHandoff,
+} from "../scripts/uat-promotion-compose-deployment-contract.mjs";
+import { runUatPromotionComposeDeploymentControl } from "../scripts/uat-promotion-compose-deployment-control.mjs";
+import {
   UAT_PROMOTION_CURRENT_FILE,
   UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT,
   UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT,
@@ -58,6 +64,9 @@ const readinessPath = "/var/lib/chenyida-erp/backup-status/recovery-readiness.js
 const clusterPolicyPath = "/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json";
 const clusterActivationPath = "/var/lib/chenyida-erp/postgresql-cluster-recovery-policy-v2/current.json";
 const clusterPolicyTemplate = JSON.parse(await readFile(new URL("../operations/postgresql-cluster-recovery-policy-v2.json", import.meta.url), "utf8"));
+const composeRaw = "services:\n  web:\n    image: fixture\n";
+const releaseComposeRaw = "services:\n  web:\n    image: ${ERP_WEB_IMAGE}\n";
+const deploymentEnvironmentRaw = "ERP_DEPLOYMENT_CLASS=uat\n";
 
 function digest(label) { return createHash("sha256").update(label).digest("hex"); }
 function artifactMatches(name, operationId) {
@@ -138,8 +147,10 @@ function manifest(entries) {
     source: {
       git_commit: gitCommit, git_tree: gitTree, worktree_clean: true, package_path: "chenyida_erp_site/package.json",
       package_version: version, package_sha256: digest("package"), dockerfile_path: "chenyida_erp_site/Dockerfile",
-      dockerfile_sha256: digest("dockerfile"), compose_path: "chenyida_erp_site/compose.yml", compose_sha256: digest("compose"),
-      release_compose_path: "chenyida_erp_site/compose.release.yml", release_compose_sha256: digest("release-compose"),
+      dockerfile_sha256: digest("dockerfile"), compose_path: "chenyida_erp_site/compose.yml",
+      compose_sha256: createHash("sha256").update(composeRaw).digest("hex"),
+      release_compose_path: "chenyida_erp_site/compose.release.yml",
+      release_compose_sha256: createHash("sha256").update(releaseComposeRaw).digest("hex"),
     },
     images: {
       web: image("web", webImage, `sha256:${"c".repeat(64)}`),
@@ -907,6 +918,249 @@ async function writeMigrationExecutionResult(root, context) {
   return { grant, result, resultFile };
 }
 
+async function composeDeploymentFixture({
+  promotionId = "promotion-compose-deployment-001", operationId = null,
+} = {}) {
+  const migration = await migrationExecutionFixture({
+    promotionId, operationId: `${promotionId}-migration-execution`,
+  });
+  const migrationPrepared = await run(migration.context, "prepare", migration.root);
+  const { grant, result: migrationResult, resultFile } = await writeMigrationExecutionResult(
+    migration.root, migration.context,
+  );
+  const activeBody = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-active-migration-fence/v1",
+    status: "ACTIVE_UNTIL_EXPLICIT_CHECKPOINT_9_TRANSFER_OR_QUARANTINE_RESOLUTION",
+    promotion_id: promotionId,
+    migration_operation_id: migration.context.operation_id,
+    execution_authorization_sha256: migration.context.execution_authorization_sha256,
+    grant_sha256: grant.grant_sha256,
+    database_name: "chenyida_erp",
+    database_system_identifier: databaseSystemIdentifier,
+    database_oid: databaseOid,
+    database_marker: databaseMarker,
+    released_baseline_sha256: digest(`released-baseline-${promotionId}`),
+    fence_before_sha256: migrationResult.fence_before.fence_sha256,
+    activated_at: migrationResult.fence_before.observed_at,
+  };
+  const activeFence = { ...activeBody, active_fence_sha256: clusterSha256(activeBody) };
+  const activeFenceLogical = `${UAT_PROMOTION_STATE_ROOT}/active-fences/${migration.context.operation_id}.${activeFence.active_fence_sha256}.json`;
+  await canonicalFile(migration.root, activeFenceLogical, activeFence, 0o400);
+  await run(migration.context, "execute", migration.root);
+
+  const composeProjectRoot = "/srv/chenyida-erp";
+  await directory(migration.root, "/srv", 0o755);
+  await directory(migration.root, composeProjectRoot, 0o755);
+  await rawFile(migration.root, `${composeProjectRoot}/compose.yml`, composeRaw, 0o444);
+  await rawFile(migration.root, `${composeProjectRoot}/compose.release.yml`, releaseComposeRaw, 0o444);
+  const deploymentEnvironment = "/etc/chenyida-erp/uat-deployment.env";
+  await directory(migration.root, "/etc", 0o755);
+  await directory(migration.root, "/etc/chenyida-erp", 0o700);
+  await rawFile(migration.root, deploymentEnvironment, deploymentEnvironmentRaw, 0o400);
+  const identity = releaseIdentity(migrationAllowlistDigest(migrations()));
+  const migrationIntentLogical = `${UAT_PROMOTION_STATE_ROOT}/intents/${migration.context.operation_id}.${migrationPrepared.intent_sha256}.json`;
+  const deploymentOperationId = operationId || `${promotionId}-compose-deployment`;
+  const parameters = {
+    promotion_state_root: UAT_PROMOTION_STATE_ROOT,
+    promotion_id: promotionId,
+    promotion_generation: 1,
+    previous_checkpoint_receipt_sha256: JSON.parse(await readFile(
+      physical(migration.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+    )).receipt_sha256,
+    promotion_intent_sha256: migration.context.parameters.promotion_intent_sha256,
+    promotion_original_authorization_sha256: migration.context.parameters.promotion_original_authorization_sha256,
+    migration_operation_id: migration.context.operation_id,
+    migration_execution_intent_sha256: migrationPrepared.intent_sha256,
+    migration_execution_intent_source: await source(migration.root, migrationIntentLogical),
+    migration_execution_authorization_sha256: migration.context.execution_authorization_sha256,
+    migration_grant_sha256: grant.grant_sha256,
+    migration_result_sha256: migrationResult.result_sha256,
+    migration_result_source: await source(
+      migration.root, `${UAT_PROMOTION_STATE_ROOT}/results/${path.basename(resultFile)}`,
+    ),
+    active_migration_fence_sha256: activeFence.active_fence_sha256,
+    active_migration_fence_source: await source(migration.root, activeFenceLogical),
+    candidate_binding_sha256: migration.context.parameters.candidate_binding_sha256,
+    database_binding_sha256: migration.context.parameters.database_binding_sha256,
+    runtime_binding_sha256: migration.context.parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: migration.context.parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: migration.context.parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: migration.context.parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: migration.context.parameters.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: migrationResult.database_fence_binding_sha256,
+    migration_result_binding_sha256: migrationResult.migration_result_binding_sha256,
+    current_checkpoint_source: await source(migration.root, UAT_PROMOTION_CURRENT_FILE),
+    runtime_identity_source: await source(migration.root, identityPath),
+    release_manifest: manifestPath,
+    release_manifest_sha256: (await source(migration.root, manifestPath)).sha256,
+    release_manifest_source: await source(migration.root, manifestPath),
+    deployment_class: "UAT",
+    deployment_id: "chenyida-erp",
+    compose_project: "chenyida-erp",
+    compose_project_root: composeProjectRoot,
+    compose_file_source: await source(migration.root, `${composeProjectRoot}/compose.yml`),
+    compose_release_file_source: await source(migration.root, `${composeProjectRoot}/compose.release.yml`),
+    deployment_environment: deploymentEnvironment,
+    deployment_environment_sha256: (await source(migration.root, deploymentEnvironment)).sha256,
+    deployment_environment_source: await source(migration.root, deploymentEnvironment),
+    web_image: webImage,
+    worker_image: workerImage,
+    web_container: "chenyida-erp-web-1",
+    old_web_container_id: identity.web_container_id,
+    old_web_image_digest: identity.web_image_digest,
+    worker_container: "chenyida-erp-worker-1",
+    old_worker_container_id: identity.worker_container_id,
+    old_worker_image_digest: identity.worker_image_digest,
+    postgres_container: "chenyida-erp-postgres-1",
+    postgres_container_id: identity.postgres_container_id,
+    postgres_image_digest: identity.postgres_image_digest,
+    caddy_container: "chenyida-erp-caddy-1",
+    caddy_container_id: identity.caddy_container_id,
+    caddy_image_digest: identity.caddy_image_digest,
+    backend_network: "chenyida-erp_backend",
+    edge_network: "chenyida-erp_edge",
+    reader_gid: 1000,
+    database_name: "chenyida_erp",
+    database_oid: databaseOid,
+    database_system_identifier: databaseSystemIdentifier,
+    database_marker: databaseMarker,
+    control_role: "postgres",
+    deployment_created_at: "2026-08-15T01:41:20.000Z",
+    deployment_expires_at: "2026-08-15T01:44:00.000Z",
+    requester_identity_sha256: digest(`deployment-requester-${promotionId}`),
+    approver_identity_sha256: digest(`deployment-approver-${promotionId}`),
+    executor_identity_sha256: digest(`deployment-executor-${promotionId}`),
+    policy_file_sha256: UAT_PROMOTION_POLICY_FILE_SHA256,
+    policy_sha256: UAT_PROMOTION_POLICY_SHA256,
+  };
+  const authorization = digest(`authorization-${deploymentOperationId}`);
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: deploymentOperationId,
+    operation: "COMPOSE_DEPLOYMENT",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: deploymentOperationId,
+    execution_authorization_sha256: authorization,
+    execution_created_at: parameters.deployment_created_at,
+    original_authorization_sha256: authorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  return { ...migration, context, activeFence, migrationResult };
+}
+
+function composeDeploymentRecoveryContext(original, intentSha256, suffix = "recovery") {
+  const executionId = `${original.operation_id}-${suffix}`;
+  return {
+    ...original,
+    execution_mode: "RECOVERY",
+    execution_authorization_id: executionId,
+    execution_authorization_sha256: digest(`authorization-${executionId}`),
+    execution_created_at: "2026-08-15T01:43:30.000Z",
+    expected_intent_sha256: intentSha256,
+  };
+}
+
+async function writeComposeDeploymentCompletion(root, context, intent) {
+  const handoff = createUatPromotionDatabaseHandoff({
+    promotion_id: context.parameters.promotion_id,
+    deployment_operation_id: context.operation_id,
+    database_name: context.parameters.database_name,
+    database_system_identifier: context.parameters.database_system_identifier,
+    database_oid: context.parameters.database_oid,
+    database_marker: context.parameters.database_marker,
+    active_fence_sha256: context.parameters.active_migration_fence_sha256,
+    released_baseline_sha256: intent.released_baseline_sha256,
+    sealed_probe_sha256: intent.sealed_database_fence_sha256,
+    runtime_probe_sha256: digest("runtime-probe"),
+    database_allow_connections: true,
+    database_connection_limit: 64,
+    default_transaction_read_only: "RESET",
+    connect_roles: [
+      "chenyida_erp_admin", "chenyida_erp_backup", "chenyida_erp_owner", "chenyida_erp_web",
+      "chenyida_erp_worker",
+    ],
+    unknown_connect_login_count: 0,
+    prepared_transaction_count: 0,
+    handed_off_at: "2026-08-15T01:41:30.000Z",
+  });
+  const service = (name, id, imageId, imageReference) => ({
+    service: name, container_id: id, container_name: `chenyida-erp-${name}-1`, image_id: imageId,
+    image_reference: imageReference, compose_config_sha256: digest(`${name}-compose-config`),
+    running: true, health: "healthy", restart_count: 0, oom_killed: false,
+  });
+  const unchanged = (name, id, imageId, imageReference, health) => {
+    const identitySha256 = digest(`${name}-stable-runtime`);
+    return {
+      service: name, container_id: id, container_name: `chenyida-erp-${name}-1`, image_id: imageId,
+      image_reference: imageReference, compose_config_sha256: digest(`${name}-compose-config`),
+      pre_identity_sha256: identitySha256, post_identity_sha256: identitySha256,
+      restart_count: 0, oom_killed: false, running: true, health,
+    };
+  };
+  const protectedSha256 = digest("protected-runtime");
+  const result = createUatPromotionComposeDeploymentResult({
+    promotion_id: intent.promotion_id,
+    deployment_operation_id: intent.deployment_operation_id,
+    execution_authorization_sha256: intent.execution_authorization_sha256,
+    supervisor_bundle_sha256: intent.supervisor_bundle_sha256,
+    release_manifest_sha256: context.parameters.release_manifest_sha256,
+    migration_operation_id: intent.migration_operation_id,
+    migration_execution_authorization_sha256: intent.migration_execution_authorization_sha256,
+    migration_grant_sha256: intent.migration_grant_sha256,
+    migration_result_sha256: intent.migration_result_sha256,
+    active_fence_sha256: intent.active_migration_fence_sha256,
+    migration_fence_binding_sha256: intent.migration_fence_binding_sha256,
+    migration_result_binding_sha256: intent.migration_result_binding_sha256,
+    deployment_plan_sha256: intent.deployment_plan_sha256,
+    compose_project: context.parameters.compose_project,
+    compose_project_root: context.parameters.compose_project_root,
+    old_runtime_sha256: digest("old-runtime"),
+    created_runtime_sha256: digest("created-runtime"),
+    committed_runtime_sha256: digest("committed-runtime"),
+    protected_resources_before_sha256: protectedSha256,
+    protected_resources_after_sha256: protectedSha256,
+    runtime_configuration_sha256: digest("runtime-configuration"),
+    readiness_sha256: digest("readiness"),
+    database_handoff: handoff,
+    services: [
+      service("web", "5".repeat(64), `sha256:${"c".repeat(64)}`, webImage),
+      service("worker", "6".repeat(64), `sha256:${"d".repeat(64)}`, workerImage),
+    ],
+    unchanged_services: [
+      unchanged("caddy", "1".repeat(64), `sha256:${"1".repeat(64)}`,
+        `docker.io/library/caddy@sha256:${"1".repeat(64)}`, "none"),
+      unchanged("postgres", "2".repeat(64), `sha256:${"2".repeat(64)}`,
+        `docker.io/library/postgres@sha256:${"2".repeat(64)}`, "healthy"),
+    ],
+    started_at: "2026-08-15T01:41:21.000Z",
+    completed_at: "2026-08-15T01:42:00.000Z",
+  });
+  const transfer = createUatPromotionActiveFenceTransfer({
+    promotion_id: intent.promotion_id,
+    migration_operation_id: intent.migration_operation_id,
+    deployment_operation_id: intent.deployment_operation_id,
+    migration_execution_authorization_sha256: intent.migration_execution_authorization_sha256,
+    deployment_authorization_sha256: intent.execution_authorization_sha256,
+    active_fence_sha256: intent.active_migration_fence_sha256,
+    migration_result_sha256: intent.migration_result_sha256,
+    deployment_result_sha256: result.result_sha256,
+    database_handoff_sha256: handoff.handoff_sha256,
+    runtime_configuration_sha256: result.runtime_configuration_sha256,
+    transferred_at: "2026-08-15T01:42:01.000Z",
+  });
+  await canonicalFile(
+    root, `${UAT_PROMOTION_STATE_ROOT}/results/${context.operation_id}.${result.result_sha256}.json`, result, 0o400,
+  );
+  await canonicalFile(
+    root, `${UAT_PROMOTION_STATE_ROOT}/fence-transfers/${context.operation_id}.${transfer.transfer_sha256}.json`, transfer, 0o400,
+  );
+  return { result, transfer };
+}
+
 async function run(context, phase, root, options = {}) {
   return runUatPromotionTransactionPhase(context, phase, { filesystemRoot: root, siteRoot, allowTestRoot: true, ...options });
 }
@@ -968,6 +1222,7 @@ test("checkpoint contract rejects skip, cross-binding, authorization reuse and U
     migration_authorization_binding_sha256: ZERO_SHA256,
     migration_fence_binding_sha256: ZERO_SHA256,
     migration_result_binding_sha256: ZERO_SHA256,
+    compose_deployment_binding_sha256: ZERO_SHA256,
   };
   const next = createNextUatPromotionCheckpointReceipt(previous, base);
   assert.equal(next.previous_checkpoint_receipt_sha256, previous.receipt_sha256);
@@ -1491,6 +1746,228 @@ test("migration execution cannot outlive the checkpoint 7 approval window", asyn
     run(changed, "prepare", fixtureValue.root),
     (error) => error.code === "UAT_PROMOTION_MIGRATION_EXECUTION_APPROVAL_EXPIRED",
   );
+});
+
+test("compose deployment publishes checkpoint 9 only from a bound result and active-fence transfer", async (t) => {
+  const fixtureValue = await composeDeploymentFixture();
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+  assert.equal(prepared.result, "PREPARED");
+  const intent = JSON.parse(await readFile(await intentPath(
+    fixtureValue.root, fixtureValue.context.operation_id,
+  ), "utf8"));
+  assert.equal(intent.deployment_plan_sha256, prepared.deployment_plan_sha256);
+  assert.equal(intent.released_baseline_sha256, fixtureValue.activeFence.released_baseline_sha256);
+  await assert.rejects(
+    run(fixtureValue.context, "execute", fixtureValue.root),
+    (error) => error.code === "UAT_PROMOTION_COMPOSE_DEPLOYMENT_RESULT_MISSING",
+  );
+  const { result, transfer } = await writeComposeDeploymentCompletion(
+    fixtureValue.root, fixtureValue.context, intent,
+  );
+  const committed = await run(fixtureValue.context, "execute", fixtureValue.root);
+  assert.equal(committed.result, "COMMITTED");
+  assert.equal(committed.deployment_result_sha256, result.result_sha256);
+  assert.equal(committed.fence_transfer_sha256, transfer.transfer_sha256);
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  assert.equal(current.checkpoint_id, "COMPOSE_DEPLOYMENT_RECEIPT");
+  assert.equal(current.checkpoint_ordinal, 9);
+  assert.equal(current.checkpoint_evidence_sha256, result.result_sha256);
+  assert.equal(current.compose_deployment_binding_sha256, clusterSha256({
+    deployment_result_sha256: result.result_sha256,
+    fence_transfer_sha256: transfer.transfer_sha256,
+  }));
+});
+
+test("compose deployment publication crashes resume from immutable result and transfer", async (t) => {
+  const failpoints = [
+    "AFTER_COMPOSE_DEPLOYMENT_HISTORY",
+    "AFTER_COMPOSE_DEPLOYMENT_RECEIPT",
+    "AFTER_COMPOSE_DEPLOYMENT_CURRENT",
+  ];
+  for (const [index, failpoint] of failpoints.entries()) {
+    const fixtureValue = await composeDeploymentFixture({
+      promotionId: `promotion-compose-publication-crash-${index}`,
+    });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+    const intent = JSON.parse(await readFile(await intentPath(
+      fixtureValue.root, fixtureValue.context.operation_id,
+    ), "utf8"));
+    const completion = await writeComposeDeploymentCompletion(
+      fixtureValue.root, fixtureValue.context, intent,
+    );
+    await assert.rejects(
+      run(fixtureValue.context, "execute", fixtureValue.root, {
+        fault: async (point) => { if (point === failpoint) throw new Error(`CRASH:${point}`); },
+      }),
+      new RegExp(`CRASH:${failpoint}`),
+    );
+    const recovery = composeDeploymentRecoveryContext(
+      fixtureValue.context, prepared.intent_sha256, `recovery-${index}`,
+    );
+    const planned = await run(recovery, "recover-prepare", fixtureValue.root);
+    assert.ok(["RESUME_PUBLICATION", "ALREADY_COMMITTED"].includes(planned.decision));
+    const recovered = await run(recovery, "recover-execute", fixtureValue.root);
+    assert.ok(["COMMITTED", "ALREADY_COMMITTED"].includes(recovered.result));
+    assert.equal(recovered.deployment_result_sha256, completion.result.result_sha256);
+    assert.equal(recovered.fence_transfer_sha256, completion.transfer.transfer_sha256);
+  }
+});
+
+test("compose deployment controller contains protected-runtime drift and recovery quarantines without guessing", async (t) => {
+  const fixtureValue = await composeDeploymentFixture({ promotionId: "promotion-compose-controller-drift" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+  const intent = JSON.parse(await readFile(await intentPath(
+    fixtureValue.root, fixtureValue.context.operation_id,
+  ), "utf8"));
+  const completion = await writeComposeDeploymentCompletion(fixtureValue.root, fixtureValue.context, intent);
+  const resultFile = physical(
+    fixtureValue.root,
+    `${UAT_PROMOTION_STATE_ROOT}/results/${fixtureValue.context.operation_id}.${completion.result.result_sha256}.json`,
+  );
+  const transferFile = physical(
+    fixtureValue.root,
+    `${UAT_PROMOTION_STATE_ROOT}/fence-transfers/${fixtureValue.context.operation_id}.${completion.transfer.transfer_sha256}.json`,
+  );
+  await rm(resultFile); await rm(transferFile);
+  let containmentCalls = 0;
+  const before = {
+    old_runtime_sha256: completion.result.old_runtime_sha256,
+    protected_resources_before_sha256: completion.result.protected_resources_before_sha256,
+  };
+  const created = {
+    selectors: { web: "5".repeat(64), worker: "6".repeat(64) },
+    created_runtime_sha256: completion.result.created_runtime_sha256,
+  };
+  const committed = {
+    services: completion.result.services,
+    unchanged_services: completion.result.unchanged_services,
+    created_runtime_sha256: completion.result.created_runtime_sha256,
+    committed_runtime_sha256: completion.result.committed_runtime_sha256,
+    protected_resources_after_sha256: digest("unexpected-protected-runtime"),
+    runtime_configuration_sha256: completion.result.runtime_configuration_sha256,
+    readiness_sha256: completion.result.readiness_sha256,
+    completed_at: completion.result.completed_at,
+  };
+  const adapter = {
+    captureBefore: async () => before,
+    handoffDatabase: async () => completion.result.database_handoff,
+    createRuntime: async () => created,
+    verifyRuntime: async () => committed,
+    emergencyContainment: async () => {
+      containmentCalls += 1;
+      return { database_sealed: true, stopped_container_ids: ["5".repeat(64), "6".repeat(64)] };
+    },
+  };
+  await assert.rejects(
+    runUatPromotionComposeDeploymentControl(fixtureValue.context, "execute", {
+      filesystemRoot: fixtureValue.root, allowTestRoot: true, intent,
+      expectedIntentSha256: prepared.intent_sha256, adapter,
+      now: () => new Date("2026-08-15T01:41:21.000Z"),
+    }),
+    (error) => error.code === "COMPOSE_DEPLOYMENT_CONTROL_PROTECTED_RUNTIME_CHANGED",
+  );
+  assert.equal(containmentCalls, 1);
+  const recovery = composeDeploymentRecoveryContext(fixtureValue.context, prepared.intent_sha256, "controller");
+  assert.equal((await run(recovery, "recover-prepare", fixtureValue.root)).decision, "QUARANTINE");
+  const contained = await runUatPromotionComposeDeploymentControl(recovery, "recover", {
+    filesystemRoot: fixtureValue.root, allowTestRoot: true, intent,
+    expectedIntentSha256: prepared.intent_sha256, adapter,
+    now: () => new Date("2026-08-15T01:43:31.000Z"),
+  });
+  assert.equal(contained.result, "CONTAINED_FOR_JOURNAL_QUARANTINE");
+  assert.equal(containmentCalls, 2);
+  assert.equal((await run(recovery, "recover-execute", fixtureValue.root)).result, "QUARANTINED");
+});
+
+test("compose deployment recovery contains malformed completion artifacts", async (t) => {
+  const fixtureValue = await composeDeploymentFixture({ promotionId: "promotion-compose-controller-malformed" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+  const intent = JSON.parse(await readFile(await intentPath(
+    fixtureValue.root, fixtureValue.context.operation_id,
+  ), "utf8"));
+  const malformedResult = physical(
+    fixtureValue.root,
+    `${UAT_PROMOTION_STATE_ROOT}/results/${fixtureValue.context.operation_id}.${"1".repeat(64)}.json`,
+  );
+  const malformedTransfer = physical(
+    fixtureValue.root,
+    `${UAT_PROMOTION_STATE_ROOT}/fence-transfers/${fixtureValue.context.operation_id}.${"2".repeat(64)}.json`,
+  );
+  await writeFile(malformedResult, canonicalClusterJson({}), { mode: 0o400 });
+  await writeFile(malformedTransfer, canonicalClusterJson({}), { mode: 0o400 });
+  let containmentCalls = 0;
+  const recovery = composeDeploymentRecoveryContext(fixtureValue.context, prepared.intent_sha256, "malformed");
+  const contained = await runUatPromotionComposeDeploymentControl(recovery, "recover", {
+    filesystemRoot: fixtureValue.root, allowTestRoot: true, intent,
+    expectedIntentSha256: prepared.intent_sha256,
+    adapter: {
+      emergencyContainment: async () => {
+        containmentCalls += 1;
+        return { database_sealed: true, stopped_container_ids: [] };
+      },
+    },
+    now: () => new Date("2026-08-15T01:43:31.000Z"),
+  });
+  assert.equal(contained.result, "CONTAINED_FOR_JOURNAL_QUARANTINE");
+  assert.equal(containmentCalls, 1);
+});
+
+test("compose deployment controller persists exact completion for checkpoint 9", async (t) => {
+  const fixtureValue = await composeDeploymentFixture({ promotionId: "promotion-compose-controller-success" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+  const intent = JSON.parse(await readFile(await intentPath(
+    fixtureValue.root, fixtureValue.context.operation_id,
+  ), "utf8"));
+  const completion = await writeComposeDeploymentCompletion(fixtureValue.root, fixtureValue.context, intent);
+  await rm(physical(
+    fixtureValue.root,
+    `${UAT_PROMOTION_STATE_ROOT}/results/${fixtureValue.context.operation_id}.${completion.result.result_sha256}.json`,
+  ));
+  await rm(physical(
+    fixtureValue.root,
+    `${UAT_PROMOTION_STATE_ROOT}/fence-transfers/${fixtureValue.context.operation_id}.${completion.transfer.transfer_sha256}.json`,
+  ));
+  let containmentCalls = 0;
+  const adapter = {
+    captureBefore: async () => ({
+      old_runtime_sha256: completion.result.old_runtime_sha256,
+      protected_resources_before_sha256: completion.result.protected_resources_before_sha256,
+    }),
+    handoffDatabase: async () => completion.result.database_handoff,
+    createRuntime: async () => ({
+      selectors: { web: "5".repeat(64), worker: "6".repeat(64) },
+      created_runtime_sha256: completion.result.created_runtime_sha256,
+    }),
+    verifyRuntime: async () => ({
+      services: completion.result.services,
+      unchanged_services: completion.result.unchanged_services,
+      created_runtime_sha256: completion.result.created_runtime_sha256,
+      committed_runtime_sha256: completion.result.committed_runtime_sha256,
+      protected_resources_after_sha256: completion.result.protected_resources_after_sha256,
+      runtime_configuration_sha256: completion.result.runtime_configuration_sha256,
+      readiness_sha256: completion.result.readiness_sha256,
+      completed_at: completion.result.completed_at,
+    }),
+    emergencyContainment: async () => { containmentCalls += 1; return { database_sealed: true, stopped_container_ids: [] }; },
+  };
+  const times = [new Date("2026-08-15T01:41:21.000Z"), new Date("2026-08-15T01:42:01.000Z")];
+  const control = await runUatPromotionComposeDeploymentControl(fixtureValue.context, "execute", {
+    filesystemRoot: fixtureValue.root, allowTestRoot: true, intent,
+    expectedIntentSha256: prepared.intent_sha256, adapter,
+    now: () => times.shift(),
+  });
+  assert.equal(control.result, "COMPOSE_DEPLOYMENT_RESULT_PERSISTED");
+  assert.equal(containmentCalls, 0);
+  const committed = await run(fixtureValue.context, "execute", fixtureValue.root);
+  assert.equal(committed.deployment_result_sha256, control.deployment_result_sha256);
+  assert.equal(committed.fence_transfer_sha256, control.fence_transfer_sha256);
 });
 
 test("fake root requires an explicit test-only option and a symlinked state root fails closed", async (t) => {

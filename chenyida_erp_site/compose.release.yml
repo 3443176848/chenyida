@@ -12,6 +12,9 @@ services:
     environment:
       ERP_RUNTIME_IMAGE_REFERENCE: ${ERP_WEB_IMAGE:?ERP_WEB_IMAGE registry digest is required}
       ERP_RUNTIME_IMAGE_CONFIG_DIGEST: ${ERP_WEB_IMAGE_CONFIG_DIGEST:?ERP_WEB_IMAGE_CONFIG_DIGEST is required}
+    labels:
+      chenyida.erp.uat-deployment-operation: ${ERP_UAT_DEPLOYMENT_OPERATION_ID:-not-uat-promotion}
+      chenyida.erp.uat-deployment-authorization: ${ERP_UAT_DEPLOYMENT_AUTHORIZATION_SHA256:-not-uat-promotion}
 
   worker:
     image: ${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE registry digest is required}
@@ -19,6 +22,9 @@ services:
     environment:
       ERP_RUNTIME_IMAGE_REFERENCE: ${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE registry digest is required}
       ERP_RUNTIME_IMAGE_CONFIG_DIGEST: ${ERP_WORKER_IMAGE_CONFIG_DIGEST:?ERP_WORKER_IMAGE_CONFIG_DIGEST is required}
+    labels:
+      chenyida.erp.uat-deployment-operation: ${ERP_UAT_DEPLOYMENT_OPERATION_ID:-not-uat-promotion}
+      chenyida.erp.uat-deployment-authorization: ${ERP_UAT_DEPLOYMENT_AUTHORIZATION_SHA256:-not-uat-promotion}
 
   admin:
     image: ${ERP_WORKER_IMAGE:?ERP_WORKER_IMAGE registry digest is required}

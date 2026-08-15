@@ -25,7 +25,7 @@ const REQUIRED_STATUS = Object.freeze({
   WRITER_QUIESCE_RECEIPT: "SUPPORTED",
   ONE_TIME_MIGRATION_AUTHORIZATION: "SUPPORTED",
   MIGRATION_COMMIT_RECEIPT: "SUPPORTED",
-  COMPOSE_DEPLOYMENT_RECEIPT: "MISSING",
+  COMPOSE_DEPLOYMENT_RECEIPT: "SUPPORTED",
   POST_DEPLOY_RUNTIME_CONFIGURATION: "SUPPORTED",
   POST_DEPLOY_IDENTITY: "SUPPORTED",
   CROSS_ROLE_UAT_EXECUTION: "CONTRACT_ONLY",
@@ -153,6 +153,8 @@ function inspectRepository(policy, sourceBodies, errors) {
   const migrationRunner = sourceBodies.get("chenyida_erp_site/scripts/migrate-postgres.ts") ?? "";
   const migrationControl = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-migration-control.py") ?? "";
   const migrationExecutionContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-migration-execution-contract.mjs") ?? "";
+  const deploymentContract = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-compose-deployment-contract.mjs") ?? "";
+  const deploymentControl = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs") ?? "";
   const promotionJournal = sourceBodies.get("chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs") ?? "";
   const compose = sourceBodies.get("chenyida_erp_site/compose.release.yml") ?? "";
   const crossRole = JSON.parse(sourceBodies.get("chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json") ?? "null");
@@ -175,14 +177,24 @@ function inspectRepository(policy, sourceBodies, errors) {
       && migrationControl.includes("CONTAIN_EXACT_UAT_PROMOTION_MIGRATION_BEFORE_RECOVERY")
       && migrationExecutionContract.includes("UAT_PROMOTION_MIGRATION_RESULT_CONTRACT")
       ? "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED" : "UNKNOWN",
-    compose_release_image_binding: compose.includes("ERP_WEB_IMAGE") && compose.includes("ERP_WORKER_IMAGE") ? "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT" : "UNKNOWN",
+    compose_release_image_binding: launcher.includes('"DEPLOY_UAT_RELEASE": "COMPOSE_DEPLOYMENT"')
+      && deploymentContract.includes("UAT_PROMOTION_COMPOSE_DEPLOYMENT_RESULT_CONTRACT")
+      && deploymentContract.includes("UAT_PROMOTION_ACTIVE_FENCE_TRANSFER_CONTRACT")
+      && deploymentControl.includes("runUatPromotionComposeDeploymentControl")
+      && deploymentControl.includes("CONTAINED_FOR_JOURNAL_QUARANTINE")
+      && promotionJournal.includes("COMPOSE_DEPLOYMENT_RECEIPT")
+      && promotionJournal.includes("AFTER_COMPOSE_DEPLOYMENT_CURRENT")
+      && compose.includes("ERP_WEB_IMAGE") && compose.includes("ERP_WORKER_IMAGE")
+      && compose.includes("chenyida.erp.uat-deployment-operation")
+      && compose.includes("chenyida.erp.uat-deployment-authorization")
+      ? "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT" : "UNKNOWN",
     cross_role_uat_readiness: crossRole?.readiness?.status ?? "UNKNOWN",
   };
   if (!Array.isArray(expectedImplemented) || expectedImplemented.some((item) => !IDENTIFIER.test(item))
     || !exactSet(implementedRequired, expectedImplemented)) error(errors, "AUDIT_IMPLEMENTED_OPERATION_DRIFT", implementedRequired.join(","));
   if (observations.restore_target_policy !== "TEST_ONLY") error(errors, "AUDIT_RESTORE_BOUNDARY_DRIFT");
   if (observations.migration_authorization !== "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED") error(errors, "AUDIT_MIGRATION_AUTHORIZATION_DRIFT");
-  if (observations.compose_release_image_binding !== "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT") error(errors, "AUDIT_COMPOSE_BINDING_DRIFT");
+  if (observations.compose_release_image_binding !== "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT") error(errors, "AUDIT_COMPOSE_BINDING_DRIFT");
   if (observations.cross_role_uat_readiness !== "BLOCKED") error(errors, "AUDIT_CROSS_ROLE_UAT_BOUNDARY_DRIFT");
   return observations;
 }
@@ -272,7 +284,7 @@ export function renderMarkdown(artifact) {
     `- 执行判定：\`${artifact.execution_readiness.code}\`；P0=${artifact.execution_readiness.p0_blocker_count}，P1=${artifact.execution_readiness.p1_blocker_count}，may_start=\`${artifact.execution_readiness.may_start}\`。`,
     `- ${artifact.execution_readiness.statement}`,
     "",
-    "仓库已有候选source snapshot、ELIGIBLE manifest、pre-deploy runtime guard、promotion intent/journal、promotion-bound actual-offhost snapshot验收、同一Compose Web/Worker持续静默回执、一次性Migration数据库围栏与提交回执、postdeploy probe和runtime identity；但尚未把Compose部署、业务UAT和回退适配器全部接入同一耐久逐检查点事务。",
+    "仓库已有候选source snapshot、ELIGIBLE manifest、pre-deploy runtime guard、promotion intent/journal、promotion-bound actual-offhost snapshot验收、同一Compose Web/Worker持续静默回执、一次性Migration数据库围栏与提交回执，以及仅替换Web/Worker的checkpoint 9受控Compose部署回执；但postdeploy配置/身份尚未接入同一事务，业务UAT、终态提交和回退适配器仍未闭合。",
     "",
     "## 2. Supervisor操作面",
     "",
@@ -292,7 +304,7 @@ export function renderMarkdown(artifact) {
     "",
     `- UAT恢复目标：\`${artifact.observations.restore_target_policy}\`；当前恢复器只能写不同cluster上的可丢弃TEST目标。`,
     `- Migration授权：\`${artifact.observations.migration_authorization}\`；checkpoint 7与独立checkpoint 8授权、数据库围栏、逐文件事务、最终核对和不可覆盖提交回执已形成同一内容寻址链。`,
-    `- Compose发布：\`${artifact.observations.compose_release_image_binding}\`；digest override不等于受控部署回执。`,
+    `- Compose发布：\`${artifact.observations.compose_release_image_binding}\`；checkpoint 9绑定精确digest、受保护资源身份、数据库围栏交接和unknown/partial保全，但不代表后续postdeploy与业务UAT检查点已提交。`,
     "- Writer静默回执只覆盖精确Compose项目与working directory；checkpoint 8在SQL前重验静默并以数据库级围栏拒绝未标记或外部业务客户端，围栏保持至后续部署或保全恢复接管。",
     `- TASK67人工UAT状态：\`${artifact.observations.cross_role_uat_readiness}\`。`,
     "",
@@ -300,7 +312,7 @@ export function renderMarkdown(artifact) {
     "",
     "任何工具、手册或operator在本artifact仍为BLOCKED时调用晋升断言，必须得到`UAT_PROMOTION_EXECUTOR_NOT_READY`。不得用root手工Compose、可重复环境变量、TEST恢复回执、旧postdeploy receipt或最终health页面绕过缺失检查点。",
     "",
-    "下一实现必须接入独立的一次性Compose部署执行授权、精确digest容器替换回执和unknown/partial恢复，并继续沿用内容寻址history/receipts/current、每步一次性授权、精确前代回退及unknown/partial保全；执行器完整后才可在合成Compose和隔离PostgreSQL做动态验证。",
+    "下一实现必须把postdeploy runtime configuration与identity接入checkpoint 10/11的同一内容寻址事务，再补齐人工UAT、promotion终态提交和精确前代回退；执行器完整后才可在合成Compose和隔离PostgreSQL做动态验证。",
     "",
     "## 6. 源码manifest",
     "",

@@ -397,6 +397,112 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
         }
 
+    def compose_deployment_parameters(self):
+        promotion_id = "promotion-supervisor-fixture"
+        migration_id = "promotion-supervisor-migration-execution"
+        migration_intent_sha256 = "1" * 64
+        migration_result_sha256 = "2" * 64
+        active_fence_sha256 = "3" * 64
+        manifest = "/var/lib/chenyida-erp/release-artifacts/promotion-supervisor/release-manifest.json"
+        compose_root = "/opt/erp/chenyida_erp_site"
+        environment = "/run/chenyida-erp/release-supervisor/uat-deployment.env"
+        return {
+            "promotion_state_root": str(supervisor.UAT_PROMOTION_STATE_ROOT),
+            "promotion_id": promotion_id,
+            "promotion_generation": 1,
+            "previous_checkpoint_receipt_sha256": "4" * 64,
+            "promotion_intent_sha256": "5" * 64,
+            "promotion_original_authorization_sha256": "6" * 64,
+            "migration_operation_id": migration_id,
+            "migration_execution_intent_sha256": migration_intent_sha256,
+            "migration_execution_intent_source": self.source(
+                f"{supervisor.UAT_PROMOTION_STATE_ROOT}/intents/{migration_id}.{migration_intent_sha256}.json",
+                seed="7",
+            ),
+            "migration_execution_authorization_sha256": "8" * 64,
+            "migration_grant_sha256": "9" * 64,
+            "migration_result_sha256": migration_result_sha256,
+            "migration_result_source": self.source(
+                f"{supervisor.UAT_PROMOTION_STATE_ROOT}/results/{migration_id}.{migration_result_sha256}.json",
+                seed="a",
+            ),
+            "active_migration_fence_sha256": active_fence_sha256,
+            "active_migration_fence_source": self.source(
+                f"{supervisor.UAT_PROMOTION_ACTIVE_FENCES_ROOT}/{migration_id}.{active_fence_sha256}.json",
+                seed="b",
+            ),
+            "candidate_binding_sha256": "c" * 64,
+            "database_binding_sha256": "d" * 64,
+            "runtime_binding_sha256": "e" * 64,
+            "preupgrade_recovery_binding_sha256": "f" * 64,
+            "promotion_snapshot_binding_sha256": "1" * 64,
+            "writer_quiesce_binding_sha256": "2" * 64,
+            "migration_authorization_binding_sha256": "3" * 64,
+            "migration_fence_binding_sha256": "4" * 64,
+            "migration_result_binding_sha256": "5" * 64,
+            "current_checkpoint_source": self.source(str(supervisor.UAT_PROMOTION_CURRENT_FILE), seed="6"),
+            "runtime_identity_source": self.source(
+                str(supervisor.RELEASE_IDENTITY_FILE), mode="0440", gid=1234, seed="e",
+            ),
+            "release_manifest": manifest,
+            "release_manifest_sha256": "7" * 64,
+            "release_manifest_source": self.source(manifest, mode="0440", seed="7"),
+            "deployment_class": "UAT",
+            "deployment_id": "chenyida-erp",
+            "compose_project": "chenyida-erp",
+            "compose_project_root": compose_root,
+            "compose_file_source": self.source(f"{compose_root}/compose.yml", mode="0444", seed="8"),
+            "compose_release_file_source": self.source(
+                f"{compose_root}/compose.release.yml", mode="0444", seed="9",
+            ),
+            "deployment_environment": environment,
+            "deployment_environment_sha256": "a" * 64,
+            "deployment_environment_source": self.source(environment, seed="a"),
+            "web_image": f"registry.example.invalid/chenyida/web@sha256:{'b' * 64}",
+            "worker_image": f"registry.example.invalid/chenyida/worker@sha256:{'c' * 64}",
+            "web_container": "chenyida-erp-web-1",
+            "old_web_container_id": "d" * 64,
+            "old_web_image_digest": f"sha256:{'e' * 64}",
+            "worker_container": "chenyida-erp-worker-1",
+            "old_worker_container_id": "f" * 64,
+            "old_worker_image_digest": f"sha256:{'1' * 64}",
+            "postgres_container": "chenyida-erp-postgres-1",
+            "postgres_container_id": "2" * 64,
+            "postgres_image_digest": f"sha256:{'3' * 64}",
+            "caddy_container": "chenyida-erp-caddy-1",
+            "caddy_container_id": "4" * 64,
+            "caddy_image_digest": f"sha256:{'5' * 64}",
+            "backend_network": "chenyida-erp_backend",
+            "edge_network": "chenyida-erp_edge",
+            "reader_gid": 1234,
+            "database_name": "chenyida_erp",
+            "database_oid": "16384",
+            "database_system_identifier": "7612345678901234567",
+            "database_marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp",
+            "control_role": "postgres",
+            "deployment_created_at": "2026-08-15T01:42:00.000Z",
+            "deployment_expires_at": "2026-08-15T01:50:00.000Z",
+            "requester_identity_sha256": "6" * 64,
+            "approver_identity_sha256": "7" * 64,
+            "executor_identity_sha256": "8" * 64,
+            "policy_file_sha256": supervisor.UAT_PROMOTION_POLICY_FILE_SHA256,
+            "policy_sha256": supervisor.UAT_PROMOTION_POLICY_SHA256,
+        }
+
+    def compose_deployment_authorization(self, bundle_digest, now):
+        return {
+            "schema_version": 6,
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "authorization_id": "promotion-supervisor-compose-deployment",
+            "created_at": utc(now),
+            "expires_at": utc(now + timedelta(minutes=8)),
+            "supervisor_bundle_sha256": bundle_digest,
+            "operation": "DEPLOY_UAT_RELEASE",
+            "parameters": self.compose_deployment_parameters(),
+            "nonce": "f" * 64,
+            "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS["DEPLOY_UAT_RELEASE"],
+        }
+
     def test_v6_authorization_is_exact_and_recovery_binds_the_original_intent(self):
         bundle = "f" * 64
         original_now = datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc)
@@ -747,6 +853,95 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
         with self.assertRaisesRegex(
                 supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_MIGRATION_EXECUTION_TARGET_INVALID"):
             supervisor.validate_authorization(wrong_network, bundle, now)
+
+    def test_compose_deployment_authorization_is_exact_and_source_bound(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 42, tzinfo=timezone.utc)
+        authorization = self.compose_deployment_authorization(bundle, now)
+        self.assertEqual(supervisor.validate_authorization(authorization, bundle, now), authorization)
+        context = supervisor.uat_promotion_context(authorization, "9" * 64)
+        self.assertEqual(context["operation"], "COMPOSE_DEPLOYMENT")
+        self.assertEqual(
+            set(context["parameters"]), supervisor.UAT_PROMOTION_COMPOSE_DEPLOYMENT_PARAMETER_FIELDS,
+        )
+        self.assertIn("WEB_WORKER_ONLY", authorization["confirmation"])
+
+        crossed_environment = {
+            **authorization,
+            "parameters": {
+                **authorization["parameters"],
+                "deployment_environment_sha256": "b" * 64,
+            },
+        }
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError,
+                "SUPERVISOR_UAT_PROMOTION_COMPOSE_DEPLOYMENT_SOURCE_BINDING_INVALID"):
+            supervisor.validate_authorization(crossed_environment, bundle, now)
+
+        protected_container = {
+            **authorization,
+            "parameters": {**authorization["parameters"], "postgres_container": "other-postgres"},
+        }
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError,
+                "SUPERVISOR_UAT_PROMOTION_COMPOSE_DEPLOYMENT_TARGET_INVALID"):
+            supervisor.validate_authorization(protected_container, bundle, now)
+
+    def test_compose_deployment_consumes_before_control_and_binds_checkpoint_result(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 42, tzinfo=timezone.utc)
+        authorization = self.compose_deployment_authorization(bundle, now)
+        events = []
+        result_sha256 = "d" * 64
+        transfer_sha256 = "e" * 64
+
+        def runner(_node, _bundle, _context, phase, _lock):
+            events.append(phase)
+            if phase == "prepare":
+                return {"result": "PREPARED", "intent_sha256": "c" * 64}
+            return {
+                "result": "COMMITTED",
+                "deployment_result_sha256": result_sha256,
+                "fence_transfer_sha256": transfer_sha256,
+            }
+
+        control = {
+            "result": "COMPOSE_DEPLOYMENT_RESULT_PERSISTED",
+            "promotion_id": authorization["parameters"]["promotion_id"],
+            "deployment_result_sha256": result_sha256,
+            "fence_transfer_sha256": transfer_sha256,
+        }
+        patches = [
+            patch.object(
+                supervisor, "verify_uat_promotion_compose_deployment_sources",
+                side_effect=lambda *_: events.append("compose-deployment-sources"),
+            ),
+            patch.object(
+                supervisor, "prepare_runtime_privilege_node",
+                side_effect=lambda *_: (
+                    events.append("node") or (Path("/tmp/runtime"), Path("/tmp/runtime/node"))
+                ),
+            ),
+            patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner),
+            patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")),
+            patch.object(
+                supervisor, "run_uat_promotion_compose_deployment_control",
+                side_effect=lambda *_: (events.append("control") or control),
+            ),
+            patch.object(
+                supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup"),
+            ),
+        ]
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            result = supervisor.run_uat_promotion_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/compose-deployment.json"),
+                authorization, "9" * 64, lock_descriptor=51,
+            )
+        self.assertEqual(result["deployment_result_sha256"], result_sha256)
+        self.assertEqual(events, [
+            "compose-deployment-sources", "node", "prepare", "compose-deployment-sources",
+            "consume", "compose-deployment-sources", "control", "execute", "cleanup",
+        ])
 
     def test_migration_execution_consumes_before_control_and_publishes_before_container_cleanup(self):
         bundle = "f" * 64
