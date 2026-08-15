@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-cross-role-uat-evidence-policy/v1",
+  "authority": "REPOSITORY_SYNTHETIC_EVIDENCE_ONLY",
+  "execution_class": "NOT_AUTHORIZED",
+  "reviewed_authorization_matrix": {
+    "path": "chenyida_erp_site/operations/application-authorization-matrix-v1.json",
+    "artifact_sha256": "741bb74249fe9a88468a70c6d1f05b18cf6989ea7a6a7d10dd38b0b7ceb29a34",
+    "source_manifest_sha256": "2c4870ca99fc93627f487962182a00c0a530bcdc6df7db8750c4db10af1a1863"
+  },
+  "reviewed_evidence_source_manifest_sha256": "a79005537170e95854598908f75c044dbe58bd5578585da75429ca9e523d70fc",
+  "synthetic_fixture": {
+    "fixture_id": "UAT67-SYNTHETIC-V1",
+    "data_class": "SYNTHETIC_ONLY",
+    "currency": "CNY",
+    "planned_quantity": "10.000000",
+    "first_batch_quantity": "4.000000",
+    "second_batch_quantity": "6.000000",
+    "supplier_lot": "UAT67-SUPPLIER-LOT-001",
+    "forbidden_real_data": [
+      "真实客户或供应商名称",
+      "真实料号或批号",
+      "密码、Token、Cookie或Session",
+      "真实银行账号或个人信息"
+    ]
+  },
+  "approval_gate": {
+    "status": "BLOCKED",
+    "business_role_matrix_approval_id": null,
+    "uat_account_mapping_approval_id": null,
+    "allowed_write_scope": null,
+    "execution_window_start": null,
+    "execution_window_end": null,
+    "stop_authority_person": null,
+    "rollback_owner_person": null,
+    "required_rule": "全部字段必须由项目负责人专项授权后填写；仓库模板不得自行把状态改为READY"
+  },
+  "actor_slots": {
+    "purchase_executor": { "role": "purchase", "person_name": null, "account_username": null },
+    "warehouse_executor": { "role": "warehouse", "person_name": null, "account_username": null },
+    "quality_inspector": { "role": "quality", "person_name": null, "account_username": null },
+    "quality_dispositioner": { "role": "quality", "person_name": null, "account_username": null },
+    "production_executor": { "role": "production", "person_name": null, "account_username": null },
+    "sales_executor": { "role": "sales", "person_name": null, "account_username": null },
+    "finance_executor": { "role": "finance", "person_name": null, "account_username": null },
+    "operations_observer": { "role": "operations", "person_name": null, "account_username": null },
+    "business_acceptor": { "role": "manager", "person_name": null, "account_username": null },
+    "rollback_owner": { "role": "operations", "person_name": null, "account_username": null }
+  },
+  "separation_rules": [
+    { "left": "quality_inspector", "right": "quality_dispositioner", "reason": "检验创建人与处置人必须分离" },
+    { "left": "operations_observer", "right": "business_acceptor", "reason": "技术观察人与业务验收人必须分离" },
+    { "left": "operations_observer", "right": "rollback_owner", "reason": "观察与回退执行责任必须分离" },
+    { "left": "business_acceptor", "right": "rollback_owner", "reason": "业务放行与回退责任必须分离" }
+  ],
+  "request_evidence_contract": {
+    "required_request_headers": ["Origin", "Content-Type", "X-Request-ID", "X-CSRF-Token", "Idempotency-Key"],
+    "required_response_fields": ["http_status", "X-Request-ID", "body.request_id", "body_digest_sha256"],
+    "required_server_evidence": ["audit_log", "idempotency_keys", "before_after_db_delta"],
+    "forbidden_capture": ["Authorization", "Cookie", "Set-Cookie", "X-CSRF-Token正文", "密码或Session正文"]
+  },
+  "required_control_kinds": [
+    "UNAUTHORIZED_403",
+    "CSRF_403",
+    "IDEMPOTENCY_REPLAY",
+    "IDEMPOTENCY_CONFLICT",
+    "CAS_CONFLICT",
+    "ATOMIC_FAILURE_ZERO_HALF_RECORD",
+    "APPEND_ONLY_REVERSAL",
+    "AUDIT_REQUEST_ID"
+  ],
+  "stop_conditions": [
+    "授权编号、账号映射、允许写范围、执行窗口、停止权或回退责任任一为空",
+    "当前提交、镜像、Migration或UAT部署身份与获批执行包不一致",
+    "发现非UAT67合成对象、真实业务值或范围外数据变化",
+    "越权、CSRF、幂等、CAS、审计或请求编号任一门禁不符合预期",
+    "任一失败留下半记录，或无法解释表计数、库存、金额差异",
+    "资源保护线触发、容器失去健康、OOM或数据库失联",
+    "业务冲销被下游引用阻塞且没有新的专项处置授权"
+  ],
+  "rollback_policy": {
+    "mode": "BUSINESS_REVERSAL_FIRST",
+    "direct_sql_delete_or_update": "FORBIDDEN",
+    "snapshot_restore": "SEPARATE_EXPLICIT_AUTHORIZATION_REQUIRED",
+    "downstream_blocked_action": "STOP_PRESERVE_EVIDENCE_ESCALATE",
+    "required_post_rollback_checks": ["对象计数", "库存数量与版本", "应收应付与收付款", "Audit与request ID", "Idempotency记录", "UAT健康状态"]
+  },
+  "evidence_sources": [
+    { "path": "chenyida_erp_site/app/lib/procurement-fulfillment-selfhost/handler.ts", "markers": ["procurement.receiving.receive", "DELIVERY_PLAN_RECEIVED"] },
+    { "path": "chenyida_erp_site/app/lib/procurement-fulfillment-selfhost/service.ts", "markers": ["after_receipt_allocation", "RECEIPT_REVERSAL_BLOCKED_BY_AP"] },
+    { "path": "chenyida_erp_site/tests/selfhost-procurement-fulfillment-postgres.test.mjs", "markers": ["receipt date, evidence, CAS, CSRF, role, legacy-entry and rate gates reject without half records", "IDEMPOTENCY_CONFLICT"] },
+    { "path": "chenyida_erp_site/app/lib/quality-selfhost/handler.ts", "markers": ["quality.disposition", "QUALITY_INSPECTION_DISPOSITIONED"] },
+    { "path": "chenyida_erp_site/app/lib/quality-selfhost/service.ts", "markers": ["QUALITY_DUTY_SEPARATION_REQUIRED", "after_quality_disposition"] },
+    { "path": "chenyida_erp_site/tests/selfhost-supplier-receipt-lot-iqc-postgres.test.mjs", "markers": ["QUALITY_DUTY_SEPARATION_REQUIRED", "RECEIPT_REVERSAL_BLOCKED_BY_IQC"] },
+    { "path": "chenyida_erp_site/app/lib/production-selfhost/handler.ts", "markers": ["production.complete.reverse", "PRODUCTION_COMPLETION_REVERSED"] },
+    { "path": "chenyida_erp_site/app/lib/production-operation-selfhost/service.ts", "markers": ["after_operation_report_facts", "after_operation_reversal_facts"] },
+    { "path": "chenyida_erp_site/tests/selfhost-production-postgres.test.mjs", "markers": ["inventory fault and audit fault roll back every production, ledger, balance, audit and idempotency write", "PRODUCTION_ISSUE_OVER_REQUIREMENT"] },
+    { "path": "chenyida_erp_site/tests/selfhost-production-operation-quality-gate-postgres.test.mjs", "markers": ["QUALITY_DUTY_SEPARATION_REQUIRED", "final_output_available_qty"] },
+    { "path": "chenyida_erp_site/app/lib/sales-selfhost/handler.ts", "markers": ["sales.delivery.execute", "SALES_SHIPMENT_REVERSED"] },
+    { "path": "chenyida_erp_site/tests/selfhost-sales-postgres.test.mjs", "markers": ["permissions, references, concurrency and cross-domain rollback fail closed", "IDEMPOTENCY_CONFLICT"] },
+    { "path": "chenyida_erp_site/app/lib/finance-selfhost/handler.ts", "markers": ["finance.reverse", "FINANCE_SETTLEMENT_REVERSED"] },
+    { "path": "chenyida_erp_site/tests/selfhost-finance-postgres.test.mjs", "markers": ["posted facts are immutable, upstream reversal is blocked and transaction failures roll back", "after_finance_document_create"] },
+    { "path": "docs/tasks/SELFHOST-UAT-AUDIT-34.md", "markers": ["UNAUTHORIZED UAT PO WRITE CONFIRMED", "无法把成功请求绑定到明确的浏览器/任务授权链"] },
+    { "path": "docs/tasks/SELFHOST-UAT-DECISION-35.md", "markers": ["不追溯性授权", "每个后续写阶段仍需独立明确授权"] }
+  ],
+  "workflows": [
+    {
+      "id": "PROCURE_RECEIVE_IQC_AP",
+      "title": "采购转单→收货/IQC→库存/AP",
+      "preconditions": ["合成Award已获选且预览可转换", "合成物料、Supplier、Quote、库存位置和单位均有效", "Receipt/IQC/Ledger/AP起始计数已取证"],
+      "steps": [
+        {
+          "id": "P01", "title": "采购执行人按预览确认值转换Award为PO", "operation_id": "fulfillment.convert", "actor_slot": "purchase_executor", "denied_probe_role": "warehouse", "method": "POST", "path": "/api/procurement/awards/{award_id}/purchase-orders", "expected_status": 201,
+          "body_template": { "expected_award_version": "$ref.conversion_preview.confirmation.expected_award_version", "expected_quote_version": "$ref.conversion_preview.confirmation.expected_quote_version", "expected_snapshot_digest": "$ref.conversion_preview.confirmation.expected_snapshot_digest", "remark": "UAT67合成采购转单" },
+          "cas_fields": ["expected_award_version", "expected_quote_version", "expected_snapshot_digest"],
+          "expected_db_delta": [ { "table": "purchase_orders", "delta": "+1", "assertion": "source_type=SOURCING_AWARD" }, { "table": "purchase_delivery_plans", "delta": "+N", "assertion": "逐PO Line建立计划" }, { "table": "audit_log", "delta": "+1", "assertion": "action=SOURCING_AWARD_CONVERTED且request_id一致" } ]
+        },
+        {
+          "id": "P02", "title": "仓库执行人按收货预览确认值登记合成收货", "operation_id": "fulfillment.receive", "actor_slot": "warehouse_executor", "denied_probe_role": "purchase", "method": "POST", "path": "/api/procurement/delivery-plans/{delivery_plan_id}/receipts", "expected_status": 201,
+          "body_template": { "quantity": "10.000000", "expected_version": "$ref.receipt_preview.confirmation.expected_version", "expected_purchase_order_line_version": "$ref.receipt_preview.confirmation.expected_purchase_order_line_version", "expected_balance_version": "$ref.receipt_preview.confirmation.expected_balance_version", "evidence_document_date": "$ref.execution_date", "supplier_lot": "UAT67-SUPPLIER-LOT-001", "reason": "UAT67合成收货" },
+          "cas_fields": ["expected_version", "expected_purchase_order_line_version", "expected_balance_version"],
+          "expected_db_delta": [ { "table": "purchase_receipts", "delta": "+1", "assertion": "NORMAL收货事实" }, { "table": "inventory_adjustments,inventory_ledger_entries,inventory_lots", "delta": "+1 each", "assertion": "库存冻结并保留supplier lot谱系" }, { "table": "purchase_financial_source_entries", "delta": "+1", "assertion": "AP来源金额来自收货事实" } ]
+        },
+        {
+          "id": "P03", "title": "品质检验人创建IQC", "operation_id": "quality.inspect", "actor_slot": "quality_inspector", "denied_probe_role": "sales", "method": "POST", "path": "/api/quality-inspections", "expected_status": 201,
+          "body_template": { "inspection_type": "IQC", "purchase_receipt_line_id": "$ref.P02.purchase_receipt_line_id", "inspected_qty": "10.000000", "passed_qty": "10.000000", "failed_qty": "0.000000", "responsible_stage": "IQC", "results": [ { "characteristic": "UAT67综合检验", "result": "PASS" } ] },
+          "cas_fields": [],
+          "expected_db_delta": [ { "table": "quality_inspections", "delta": "+1", "assertion": "OPEN/PENDING IQC" }, { "table": "quality_inspection_events", "delta": "+1", "assertion": "CREATED且request_id一致" } ]
+        },
+        {
+          "id": "P04", "title": "独立品质处置人放行IQC", "operation_id": "quality.disposition", "actor_slot": "quality_dispositioner", "denied_probe_role": "purchase", "method": "POST", "path": "/api/quality-inspections/{iqc_inspection_id}/dispositions", "expected_status": 200,
+          "body_template": { "expected_version": 1, "disposition_code": "RELEASE", "release_qty": "10.000000", "expected_lot_version": "$ref.P02.inventory_lot_version", "expected_balance_version": "$ref.P02.inventory_balance_version", "reason": "UAT67 IQC独立放行" },
+          "cas_fields": ["expected_version", "expected_lot_version", "expected_balance_version"],
+          "expected_db_delta": [ { "table": "quality_inspection_events", "delta": "+1", "assertion": "DISPOSITIONED" }, { "table": "inventory_stock_balances", "delta": "frozen_qty -10", "assertion": "可用量增加且版本+1" } ]
+        },
+        {
+          "id": "P05", "title": "品质检验人关闭已处置IQC", "operation_id": "quality.close", "actor_slot": "quality_inspector", "denied_probe_role": "warehouse", "method": "POST", "path": "/api/quality-inspections/{iqc_inspection_id}/close", "expected_status": 200,
+          "body_template": { "expected_version": 2, "reason": "UAT67 IQC关闭" }, "cas_fields": ["expected_version"],
+          "expected_db_delta": [ { "table": "quality_inspection_events", "delta": "+1", "assertion": "CLOSED" }, { "table": "quality_inspections", "delta": "version +1", "assertion": "lifecycle_status=CLOSED" } ]
+        },
+        {
+          "id": "P06", "title": "财务执行人从收货来源生成AP", "operation_id": "finance.post-document", "actor_slot": "finance_executor", "denied_probe_role": "purchase", "method": "POST", "path": "/api/finance/documents", "expected_status": 201,
+          "body_template": { "doc_type": "AP", "purchase_source_entry_id": "$ref.P02.purchase_financial_source_entry_id", "accounting_date": "$ref.execution_date" }, "cas_fields": [],
+          "expected_db_delta": [ { "table": "finance_documents", "delta": "+1", "assertion": "AP金额和币种精确继承收货来源" }, { "table": "finance_document_events", "delta": "+1", "assertion": "CREATED" } ]
+        },
+        {
+          "id": "P07", "title": "隔离检查点冲销收货（必须在IQC/AP前单独执行）", "operation_id": "fulfillment.reverse", "actor_slot": "warehouse_executor", "denied_probe_role": "purchase", "method": "POST", "path": "/api/procurement/fulfillment/receipts/{receipt_id}/reversal", "expected_status": 201, "branch_from_checkpoint": "AFTER_P02_BEFORE_P03_P06",
+          "body_template": { "reason": "UAT67合成收货回退演练", "expected_plan_version": "$ref.P02.delivery_plan_version", "expected_line_versions": "$ref.P02.line_versions", "expected_balance_versions": "$ref.P02.balance_versions", "expected_lot_version": "$ref.P02.inventory_lot_version" },
+          "cas_fields": ["expected_plan_version", "expected_line_versions", "expected_balance_versions", "expected_lot_version"],
+          "expected_db_delta": [ { "table": "purchase_receipts", "delta": "+1 REVERSAL", "assertion": "原收货行不删除不覆盖" }, { "table": "inventory_adjustments,inventory_ledger_entries", "delta": "+1 reversal each", "assertion": "数量反向且保留原事实" }, { "table": "purchase_receipt_events", "delta": "+1", "assertion": "REVERSED" } ]
+        }
+      ],
+      "controls": [
+        { "kind": "UNAUTHORIZED_403", "target_step": "P02", "expected": "purchase角色返回403且所有业务表delta=0" },
+        { "kind": "CSRF_403", "target_step": "P02", "expected": "缺失或错误CSRF返回403且delta=0" },
+        { "kind": "IDEMPOTENCY_REPLAY", "target_step": "P02", "expected": "同Key同正文返回原结果且Idempotency-Replayed=true" },
+        { "kind": "IDEMPOTENCY_CONFLICT", "target_step": "P02", "expected": "同Key异正文返回IDEMPOTENCY_CONFLICT且delta=0" },
+        { "kind": "CAS_CONFLICT", "target_step": "P02", "expected": "陈旧版本返回DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT且delta=0" },
+        { "kind": "ATOMIC_FAILURE_ZERO_HALF_RECORD", "target_step": "P02", "expected": "故障注入证据证明receipt/allocation/ledger/audit/idempotency均无半记录" },
+        { "kind": "APPEND_ONLY_REVERSAL", "target_step": "P07", "expected": "只新增REVERSAL事实；IQC或AP已存在时阻塞并保留证据" },
+        { "kind": "AUDIT_REQUEST_ID", "target_step": "ALL_STEPS", "expected": "响应头、正文、业务行、事件、Audit使用同一request ID" }
+      ],
+      "signoff": { "executor_slots": ["purchase_executor", "warehouse_executor", "quality_inspector", "quality_dispositioner", "finance_executor"], "observer_slot": "operations_observer", "business_acceptor_slot": "business_acceptor", "executor_signed_at": null, "observer_signed_at": null, "business_accepted_at": null, "result": null }
+    },
+    {
+      "id": "PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE",
+      "title": "生产领退料→工序/IPQC→正式报工/完工",
+      "preconditions": ["合成工单已Release并绑定已发布BOM与Routing快照", "原料库存及CAS版本已取证", "末工序启用IPQC gate"],
+      "steps": [
+        { "id": "M01", "title": "仓库领料", "operation_id": "production.issue", "actor_slot": "warehouse_executor", "denied_probe_role": "production", "method": "POST", "path": "/api/production/material-issues", "expected_status": 201, "body_template": { "work_order_id": "$ref.work_order_id", "reason": "UAT67合成领料", "lines": [ { "requirement_id": "$ref.requirement_id", "quantity": "10.000000", "expected_requirement_version": "$ref.requirement_version", "expected_balance_version": "$ref.raw_balance_version" } ] }, "cas_fields": ["lines[].expected_requirement_version", "lines[].expected_balance_version"], "expected_db_delta": [ { "table": "production_material_issues,production_material_issue_lines", "delta": "+1", "assertion": "领料事实" }, { "table": "inventory_ledger_entries", "delta": "+1", "assertion": "原料出库" } ] },
+        { "id": "M02", "title": "隔离分支仓库退料", "operation_id": "production.issue", "actor_slot": "warehouse_executor", "denied_probe_role": "production", "method": "POST", "path": "/api/production/material-returns", "expected_status": 201, "branch_from_checkpoint": "AFTER_M01_BEFORE_M03", "body_template": { "work_order_id": "$ref.work_order_id", "reason": "UAT67合成退料", "lines": [ { "requirement_id": "$ref.requirement_id", "quantity": "4.000000", "expected_requirement_version": "$ref.after_M01.requirement_version", "expected_balance_version": "$ref.after_M01.balance_version" } ] }, "cas_fields": ["lines[].expected_requirement_version", "lines[].expected_balance_version"], "expected_db_delta": [ { "table": "production_material_returns,production_material_return_lines", "delta": "+1", "assertion": "退料为新增事实" }, { "table": "inventory_ledger_entries", "delta": "+1", "assertion": "原料反向入库" } ] },
+        { "id": "M03", "title": "生产派工", "operation_id": "operation.dispatch", "actor_slot": "production_executor", "denied_probe_role": "sales", "method": "POST", "path": "/api/production/operation-execution/dispatch", "expected_status": 201, "body_template": { "snapshot_operation_id": "$ref.snapshot_operation_id", "quantity": "10.000000", "assigned_operator": "$ref.production_executor.account_username", "expected_operation_version": "$ref.operation_version" }, "cas_fields": ["expected_operation_version"], "expected_db_delta": [ { "table": "production_operation_runs", "delta": "+1", "assertion": "READY派工批次" }, { "table": "production_operation_run_events", "delta": "+1", "assertion": "DISPATCHED" } ] },
+        { "id": "M04", "title": "生产开工", "operation_id": "operation.execute", "actor_slot": "production_executor", "denied_probe_role": "warehouse", "method": "POST", "path": "/api/production/operation-runs/{operation_run_id}/start", "expected_status": 200, "body_template": { "expected_version": "$ref.M03.run_version" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "production_operation_run_events", "delta": "+1", "assertion": "STARTED" }, { "table": "production_operation_runs", "delta": "version +1", "assertion": "IN_PROGRESS" } ] },
+        { "id": "M05", "title": "生产工序报工", "operation_id": "operation.execute", "actor_slot": "production_executor", "denied_probe_role": "warehouse", "method": "POST", "path": "/api/production/operation-runs/{operation_run_id}/reports", "expected_status": 201, "body_template": { "expected_version": "$ref.M04.run_version", "processed_qty": "10.000000", "good_qty": "10.000000", "scrap_qty": "0.000000", "remark": "UAT67合成工序报工" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "production_operation_run_reports", "delta": "+1", "assertion": "正式工序报工事实" }, { "table": "production_operation_run_events", "delta": "+1", "assertion": "REPORTED" } ] },
+        { "id": "M06", "title": "品质检验人创建IPQC", "operation_id": "quality.inspect", "actor_slot": "quality_inspector", "denied_probe_role": "production", "method": "POST", "path": "/api/quality-inspections", "expected_status": 201, "body_template": { "inspection_type": "IPQC", "production_operation_run_report_id": "$ref.M05.operation_run_report_id", "inspected_qty": "10.000000", "passed_qty": "10.000000", "failed_qty": "0.000000", "results": [ { "characteristic": "UAT67工序质量", "result": "PASS" } ] }, "cas_fields": [], "expected_db_delta": [ { "table": "quality_inspections", "delta": "+1", "assertion": "IPQC OPEN/PENDING" }, { "table": "quality_inspection_events", "delta": "+1", "assertion": "CREATED" } ] },
+        { "id": "M07", "title": "独立品质处置人放行IPQC", "operation_id": "quality.disposition", "actor_slot": "quality_dispositioner", "denied_probe_role": "production", "method": "POST", "path": "/api/quality-inspections/{ipqc_inspection_id}/dispositions", "expected_status": 200, "body_template": { "expected_version": 1, "disposition_code": "RELEASE", "release_qty": "10.000000", "reason": "UAT67 IPQC独立放行" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "quality_inspection_events", "delta": "+1", "assertion": "DISPOSITIONED" }, { "table": "production_operation_quality_projections", "delta": "projection refresh", "assertion": "末工序输出可正式报工" } ] },
+        { "id": "M08", "title": "品质关闭IPQC", "operation_id": "quality.close", "actor_slot": "quality_inspector", "denied_probe_role": "warehouse", "method": "POST", "path": "/api/quality-inspections/{ipqc_inspection_id}/close", "expected_status": 200, "body_template": { "expected_version": 2, "reason": "UAT67 IPQC关闭" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "quality_inspection_events", "delta": "+1", "assertion": "CLOSED" } ] },
+        { "id": "M09", "title": "生产从末工序输出创建正式报工", "operation_id": "production.report", "actor_slot": "production_executor", "denied_probe_role": "warehouse", "method": "POST", "path": "/api/production/reports", "expected_status": 201, "body_template": { "work_order_id": "$ref.work_order_id", "expected_work_order_version": "$ref.work_order_version", "expected_final_output_version": "$ref.final_output_version", "final_output_allocations": [ { "operation_run_report_id": "$ref.M05.operation_run_report_id", "quantity": "10.000000" } ], "reported_qty": "10.000000", "good_qty": "10.000000", "scrap_qty": "0.000000", "process_stage": "UAT67末工序" }, "cas_fields": ["expected_work_order_version", "expected_final_output_version"], "expected_db_delta": [ { "table": "production_reports,production_final_output_allocations", "delta": "+1", "assertion": "来源绑定末工序报工" }, { "table": "production_report_events", "delta": "+1", "assertion": "CREATED" } ] },
+        { "id": "M10", "title": "仓库按正式报工完工入库", "operation_id": "production.complete", "actor_slot": "warehouse_executor", "denied_probe_role": "production", "method": "POST", "path": "/api/production/completions", "expected_status": 201, "body_template": { "work_order_id": "$ref.work_order_id", "expected_version": "$ref.after_M09.work_order_version", "expected_balance_version": "$ref.finished_balance_version", "reason": "UAT67合成完工", "allocations": [ { "report_id": "$ref.M09.production_report_id", "quantity": "10.000000", "expected_report_version": "$ref.M09.report_version" } ] }, "cas_fields": ["expected_version", "expected_balance_version", "allocations[].expected_report_version"], "expected_db_delta": [ { "table": "production_completions,production_completion_lines", "delta": "+1", "assertion": "完工事实" }, { "table": "inventory_adjustments,inventory_ledger_entries", "delta": "+1", "assertion": "成品入库" } ] },
+        { "id": "M11", "title": "隔离检查点冲销完工（必须在FQC/销售下游前）", "operation_id": "production.complete-reverse", "actor_slot": "warehouse_executor", "denied_probe_role": "production", "method": "POST", "path": "/api/production/completions/{completion_id}/reverse", "expected_status": 201, "branch_from_checkpoint": "AFTER_M10_BEFORE_FQC_SALES", "body_template": { "expected_completion_version": "$ref.M10.completion_version", "expected_work_order_version": "$ref.M10.work_order_version", "expected_balance_versions": "$ref.M10.balance_versions", "reason": "UAT67合成完工冲销" }, "cas_fields": ["expected_completion_version", "expected_work_order_version", "expected_balance_versions"], "expected_db_delta": [ { "table": "production_completion_reversals", "delta": "+1", "assertion": "原完工不删除不改写" }, { "table": "inventory_adjustments,inventory_ledger_entries", "delta": "+1 reversal each", "assertion": "成品库存反向" }, { "table": "production_completion_events", "delta": "+1", "assertion": "REVERSED" } ] }
+      ],
+      "controls": [
+        { "kind": "UNAUTHORIZED_403", "target_step": "M03", "expected": "sales角色返回403且delta=0" }, { "kind": "CSRF_403", "target_step": "M03", "expected": "错误CSRF返回403且delta=0" }, { "kind": "IDEMPOTENCY_REPLAY", "target_step": "M03", "expected": "同Key同正文重放原派工" }, { "kind": "IDEMPOTENCY_CONFLICT", "target_step": "M03", "expected": "同Key异正文返回IDEMPOTENCY_CONFLICT" }, { "kind": "CAS_CONFLICT", "target_step": "M03", "expected": "陈旧expected_operation_version返回版本冲突且delta=0" }, { "kind": "ATOMIC_FAILURE_ZERO_HALF_RECORD", "target_step": "M10", "expected": "故障注入证明生产、库存、ledger、audit、idempotency均无半记录" }, { "kind": "APPEND_ONLY_REVERSAL", "target_step": "M11", "expected": "只新增冲销事实；存在FQC/发货下游时停止并保留" }, { "kind": "AUDIT_REQUEST_ID", "target_step": "ALL_STEPS", "expected": "跨领料、工序、品质、报工、完工的request ID闭合" }
+      ],
+      "signoff": { "executor_slots": ["warehouse_executor", "production_executor", "quality_inspector", "quality_dispositioner"], "observer_slot": "operations_observer", "business_acceptor_slot": "business_acceptor", "executor_signed_at": null, "observer_signed_at": null, "business_accepted_at": null, "result": null }
+    },
+    {
+      "id": "SALES_FQC_SHIPMENT_AR",
+      "title": "销售分配→FQC→出货/AR",
+      "preconditions": ["合成销售订单已确认", "合成完工行有可分配数量", "成品库存、订单行、完工行CAS版本已取证"],
+      "steps": [
+        { "id": "S01", "title": "销售分配完工成品到订单行", "operation_id": "quality.allocation-create", "actor_slot": "sales_executor", "denied_probe_role": "quality", "method": "POST", "path": "/api/quality/finished-goods-allocations", "expected_status": 201, "body_template": { "completion_line_id": "$ref.completion_line_id", "sales_order_line_id": "$ref.sales_order_line_id", "quantity": "10.000000", "expected_completion_version": "$ref.completion_line_version", "expected_sales_order_line_version": "$ref.sales_order_line_version" }, "cas_fields": ["expected_completion_version", "expected_sales_order_line_version"], "expected_db_delta": [ { "table": "finished_goods_allocations", "delta": "+1", "assertion": "ACTIVE分配" } ] },
+        { "id": "S02", "title": "品质检验人创建FQC", "operation_id": "quality.inspect", "actor_slot": "quality_inspector", "denied_probe_role": "sales", "method": "POST", "path": "/api/quality-inspections", "expected_status": 201, "body_template": { "inspection_type": "FQC", "allocation_id": "$ref.S01.allocation_id", "inspected_qty": "10.000000", "passed_qty": "10.000000", "failed_qty": "0.000000", "results": [ { "characteristic": "UAT67出货质量", "result": "PASS" } ] }, "cas_fields": [], "expected_db_delta": [ { "table": "quality_inspections,quality_inspection_events", "delta": "+1 each", "assertion": "FQC OPEN/PENDING" } ] },
+        { "id": "S03", "title": "独立品质处置人放行FQC", "operation_id": "quality.disposition", "actor_slot": "quality_dispositioner", "denied_probe_role": "sales", "method": "POST", "path": "/api/quality-inspections/{fqc_inspection_id}/dispositions", "expected_status": 200, "body_template": { "expected_version": 1, "disposition_code": "RELEASE", "release_qty": "10.000000", "reason": "UAT67 FQC独立放行" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "quality_inspection_events", "delta": "+1", "assertion": "DISPOSITIONED" } ] },
+        { "id": "S04", "title": "品质关闭FQC", "operation_id": "quality.close", "actor_slot": "quality_inspector", "denied_probe_role": "warehouse", "method": "POST", "path": "/api/quality-inspections/{fqc_inspection_id}/close", "expected_status": 200, "body_template": { "expected_version": 2, "reason": "UAT67 FQC关闭" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "quality_inspection_events", "delta": "+1", "assertion": "CLOSED" } ] },
+        { "id": "S05", "title": "销售创建出货指令", "operation_id": "sales.delivery-create", "actor_slot": "sales_executor", "denied_probe_role": "warehouse", "method": "POST", "path": "/api/delivery-instructions", "expected_status": 201, "body_template": { "sales_order_id": "$ref.sales_order_id", "expected_order_version": "$ref.sales_order_version", "receiver_name": "UAT67合成收货人", "receiver_phone": "00000000000", "shipping_address": "UAT67合成地址", "lines": [ { "sales_order_line_id": "$ref.sales_order_line_id", "quantity": "10.000000", "expected_line_version": "$ref.sales_order_line_version" } ] }, "cas_fields": ["expected_order_version", "lines[].expected_line_version"], "expected_db_delta": [ { "table": "sales_delivery_instructions,sales_delivery_instruction_lines", "delta": "+1", "assertion": "DRAFT出货指令" } ] },
+        { "id": "S06", "title": "销售提交出货指令", "operation_id": "sales.delivery-submit", "actor_slot": "sales_executor", "denied_probe_role": "warehouse", "method": "POST", "path": "/api/delivery-instructions/{delivery_instruction_id}/submit", "expected_status": 200, "body_template": { "expected_version": "$ref.S05.instruction_version", "reason": "UAT67提交" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "sales_delivery_instruction_events", "delta": "+1", "assertion": "SUBMITTED" } ] },
+        { "id": "S07", "title": "仓库接受出货指令", "operation_id": "sales.delivery-accept", "actor_slot": "warehouse_executor", "denied_probe_role": "sales", "method": "POST", "path": "/api/delivery-instructions/{delivery_instruction_id}/accept", "expected_status": 200, "body_template": { "expected_version": "$ref.S06.instruction_version", "reason": "UAT67仓库接受" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "sales_delivery_instruction_events", "delta": "+1", "assertion": "ACCEPTED" } ] },
+        { "id": "S08", "title": "仓库执行出货", "operation_id": "sales.delivery-execute", "actor_slot": "warehouse_executor", "denied_probe_role": "sales", "method": "POST", "path": "/api/delivery-instructions/{delivery_instruction_id}/execute", "expected_status": 201, "body_template": { "expected_instruction_version": "$ref.S07.instruction_version", "expected_sales_order_version": "$ref.sales_order_version", "ship_date": "$ref.execution_date", "reason": "UAT67合成出货", "lines": [ { "instruction_line_id": "$ref.S05.instruction_line_id", "inventory_lot_id": "$ref.finished_inventory_lot_id", "quantity": "10.000000", "expected_line_version": "$ref.S05.line_version", "expected_sales_order_line_version": "$ref.sales_order_line_version", "expected_balance_version": "$ref.finished_balance_version", "expected_lot_version": "$ref.finished_lot_version" } ] }, "cas_fields": ["expected_instruction_version", "expected_sales_order_version", "lines[].expected_line_version", "lines[].expected_sales_order_line_version", "lines[].expected_balance_version", "lines[].expected_lot_version"], "expected_db_delta": [ { "table": "sales_shipments,sales_shipment_lines", "delta": "+1", "assertion": "NORMAL出货事实" }, { "table": "inventory_ledger_entries", "delta": "+1", "assertion": "成品出库" }, { "table": "sales_financial_source_entries", "delta": "+1", "assertion": "AR来源" } ] },
+        { "id": "S09", "title": "财务从出货来源生成AR", "operation_id": "finance.post-document", "actor_slot": "finance_executor", "denied_probe_role": "sales", "method": "POST", "path": "/api/finance/documents", "expected_status": 201, "body_template": { "doc_type": "AR", "sales_source_entry_id": "$ref.S08.sales_financial_source_entry_id", "accounting_date": "$ref.execution_date" }, "cas_fields": [], "expected_db_delta": [ { "table": "finance_documents,finance_document_events", "delta": "+1 each", "assertion": "AR精确继承出货来源" } ] },
+        { "id": "S10", "title": "隔离检查点冲销出货（必须在AR前）", "operation_id": "sales.delivery-reverse", "actor_slot": "warehouse_executor", "denied_probe_role": "sales", "method": "POST", "path": "/api/shipments/{shipment_id}/reversal", "expected_status": 201, "branch_from_checkpoint": "AFTER_S08_BEFORE_S09", "body_template": { "reason": "UAT67合成出货冲销", "expected_balance_versions": "$ref.S08.balance_versions", "expected_lot_versions": "$ref.S08.lot_versions" }, "cas_fields": ["expected_balance_versions", "expected_lot_versions"], "expected_db_delta": [ { "table": "sales_shipments", "delta": "+1 REVERSAL", "assertion": "原出货不删除不覆盖" }, { "table": "inventory_ledger_entries,sales_financial_source_entries", "delta": "+1 reversal each", "assertion": "库存、FQC额度与来源反向" } ] }
+      ],
+      "controls": [
+        { "kind": "UNAUTHORIZED_403", "target_step": "S08", "expected": "sales角色执行出货返回403且delta=0" }, { "kind": "CSRF_403", "target_step": "S08", "expected": "错误CSRF返回403且delta=0" }, { "kind": "IDEMPOTENCY_REPLAY", "target_step": "S08", "expected": "同Key同正文重放原Shipment" }, { "kind": "IDEMPOTENCY_CONFLICT", "target_step": "S08", "expected": "同Key异正文返回IDEMPOTENCY_CONFLICT" }, { "kind": "CAS_CONFLICT", "target_step": "S08", "expected": "陈旧指令或库存版本返回DELIVERY_INSTRUCTION_VERSION_OR_STATE_CONFLICT" }, { "kind": "ATOMIC_FAILURE_ZERO_HALF_RECORD", "target_step": "S08", "expected": "故障注入证明shipment/inventory/FQC/source/audit/idempotency均无半记录" }, { "kind": "APPEND_ONLY_REVERSAL", "target_step": "S10", "expected": "只新增冲销事实；AR存在时阻塞并保留" }, { "kind": "AUDIT_REQUEST_ID", "target_step": "ALL_STEPS", "expected": "分配、FQC、指令、Shipment、AR的request ID闭合" }
+      ],
+      "signoff": { "executor_slots": ["sales_executor", "quality_inspector", "quality_dispositioner", "warehouse_executor", "finance_executor"], "observer_slot": "operations_observer", "business_acceptor_slot": "business_acceptor", "executor_signed_at": null, "observer_signed_at": null, "business_accepted_at": null, "result": null }
+    },
+    {
+      "id": "FINANCE_PAYMENT_REVERSAL",
+      "title": "客户收款/供应商付款→逐笔冲销",
+      "preconditions": ["P06 AP与S09 AR已由可信来源生成", "财务单据版本、余额和收付款计数已取证", "仅使用合成账户名称"],
+      "steps": [
+        { "id": "F01", "title": "财务登记AR客户收款", "operation_id": "finance.settle", "actor_slot": "finance_executor", "denied_probe_role": "sales", "method": "POST", "path": "/api/finance/settlements", "expected_status": 201, "body_template": { "document_id": "$ref.S09.ar_document_id", "expected_version": "$ref.S09.document_version", "settlement_type": "RECEIPT", "amount": "4.000000", "accounting_date": "$ref.execution_date", "account_name": "UAT67合成账户", "reason": "UAT67合成客户收款" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "finance_settlements", "delta": "+1", "assertion": "RECEIPT正向事实" }, { "table": "finance_document_events", "delta": "+1", "assertion": "SETTLED" } ] },
+        { "id": "F02", "title": "财务冲销AR收款", "operation_id": "finance.reverse", "actor_slot": "finance_executor", "denied_probe_role": "sales", "method": "POST", "path": "/api/finance-settlements/{ar_settlement_id}/reversal", "expected_status": 201, "branch_from_checkpoint": "AFTER_F01_AR_RECEIPT", "body_template": { "expected_version": "$ref.F01.document_version", "accounting_date": "$ref.execution_date", "reason": "UAT67客户收款冲销" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "finance_settlements", "delta": "+1 negative reversal", "assertion": "original_settlement_id绑定F01，原记录不改写" }, { "table": "finance_document_events", "delta": "+1", "assertion": "SETTLEMENT_REVERSED" } ] },
+        { "id": "F03", "title": "财务登记AP供应商付款", "operation_id": "finance.settle", "actor_slot": "finance_executor", "denied_probe_role": "purchase", "method": "POST", "path": "/api/finance/settlements", "expected_status": 201, "body_template": { "document_id": "$ref.P06.ap_document_id", "expected_version": "$ref.P06.document_version", "settlement_type": "PAYMENT", "amount": "6.000000", "accounting_date": "$ref.execution_date", "account_name": "UAT67合成账户", "reason": "UAT67合成供应商付款" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "finance_settlements", "delta": "+1", "assertion": "PAYMENT正向事实" }, { "table": "finance_document_events", "delta": "+1", "assertion": "SETTLED" } ] },
+        { "id": "F04", "title": "财务冲销AP付款", "operation_id": "finance.reverse", "actor_slot": "finance_executor", "denied_probe_role": "purchase", "method": "POST", "path": "/api/finance-settlements/{ap_settlement_id}/reversal", "expected_status": 201, "branch_from_checkpoint": "AFTER_F03_AP_PAYMENT", "body_template": { "expected_version": "$ref.F03.document_version", "accounting_date": "$ref.execution_date", "reason": "UAT67供应商付款冲销" }, "cas_fields": ["expected_version"], "expected_db_delta": [ { "table": "finance_settlements", "delta": "+1 negative reversal", "assertion": "original_settlement_id绑定F03，原记录不改写" }, { "table": "finance_document_events", "delta": "+1", "assertion": "SETTLEMENT_REVERSED" } ] }
+      ],
+      "controls": [
+        { "kind": "UNAUTHORIZED_403", "target_step": "F01", "expected": "sales角色登记收款返回403且delta=0" }, { "kind": "CSRF_403", "target_step": "F01", "expected": "错误CSRF返回403且delta=0" }, { "kind": "IDEMPOTENCY_REPLAY", "target_step": "F01", "expected": "同Key同正文重放原Settlement" }, { "kind": "IDEMPOTENCY_CONFLICT", "target_step": "F01", "expected": "同Key异正文返回IDEMPOTENCY_CONFLICT" }, { "kind": "CAS_CONFLICT", "target_step": "F01", "expected": "陈旧expected_version返回FINANCE_VERSION_CONFLICT" }, { "kind": "ATOMIC_FAILURE_ZERO_HALF_RECORD", "target_step": "F02", "expected": "Audit故障时文档余额、冲销记录、事件和幂等均不变" }, { "kind": "APPEND_ONLY_REVERSAL", "target_step": "F02", "expected": "新增负数冲销记录并引用原Settlement，不改写原收款" }, { "kind": "AUDIT_REQUEST_ID", "target_step": "ALL_STEPS", "expected": "单据、Settlement、Event、Audit的request ID闭合" }
+      ],
+      "signoff": { "executor_slots": ["finance_executor"], "observer_slot": "operations_observer", "business_acceptor_slot": "business_acceptor", "executor_signed_at": null, "observer_signed_at": null, "business_accepted_at": null, "result": null }
+    }
+  ]
+}

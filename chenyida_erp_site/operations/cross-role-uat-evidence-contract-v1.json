@@ -1,0 +1,3146 @@
+{
+  "actor_slots": {
+    "business_acceptor": {
+      "account_username": null,
+      "person_name": null,
+      "role": "manager"
+    },
+    "finance_executor": {
+      "account_username": null,
+      "person_name": null,
+      "role": "finance"
+    },
+    "operations_observer": {
+      "account_username": null,
+      "person_name": null,
+      "role": "operations"
+    },
+    "production_executor": {
+      "account_username": null,
+      "person_name": null,
+      "role": "production"
+    },
+    "purchase_executor": {
+      "account_username": null,
+      "person_name": null,
+      "role": "purchase"
+    },
+    "quality_dispositioner": {
+      "account_username": null,
+      "person_name": null,
+      "role": "quality"
+    },
+    "quality_inspector": {
+      "account_username": null,
+      "person_name": null,
+      "role": "quality"
+    },
+    "rollback_owner": {
+      "account_username": null,
+      "person_name": null,
+      "role": "operations"
+    },
+    "sales_executor": {
+      "account_username": null,
+      "person_name": null,
+      "role": "sales"
+    },
+    "warehouse_executor": {
+      "account_username": null,
+      "person_name": null,
+      "role": "warehouse"
+    }
+  },
+  "approval_gate": {
+    "allowed_write_scope": null,
+    "business_role_matrix_approval_id": null,
+    "execution_window_end": null,
+    "execution_window_start": null,
+    "required_rule": "全部字段必须由项目负责人专项授权后填写；仓库模板不得自行把状态改为READY",
+    "rollback_owner_person": null,
+    "status": "BLOCKED",
+    "stop_authority_person": null,
+    "uat_account_mapping_approval_id": null
+  },
+  "artifact_sha256": "0068b8aa9226830f6ebc357fd28a02b18c00d9280def8393a7188115c64946f5",
+  "authority": "REPOSITORY_SYNTHETIC_EVIDENCE_ONLY",
+  "contract": "chenyida-erp-cross-role-uat-evidence-contract/v1",
+  "coverage": {
+    "branch_reversal_step_count": 6,
+    "control_assertion_count": 32,
+    "evidence_source_count": 16,
+    "operation_count": 21,
+    "role_count": 8,
+    "step_count": 32,
+    "workflow_count": 4
+  },
+  "execution_class": "NOT_AUTHORIZED",
+  "generated_from": {
+    "authorization_matrix": {
+      "artifact_sha256": "741bb74249fe9a88468a70c6d1f05b18cf6989ea7a6a7d10dd38b0b7ceb29a34",
+      "file_sha256": "79c40cec8db4a614d07a5667ddb1d81021bd0b57918103104e5e16a2d63106b5",
+      "path": "chenyida_erp_site/operations/application-authorization-matrix-v1.json",
+      "source_manifest_sha256": "2c4870ca99fc93627f487962182a00c0a530bcdc6df7db8750c4db10af1a1863"
+    },
+    "evidence_source_manifest": {
+      "files": [
+        {
+          "markers": [
+            "finance.reverse",
+            "FINANCE_SETTLEMENT_REVERSED"
+          ],
+          "path": "chenyida_erp_site/app/lib/finance-selfhost/handler.ts",
+          "sha256": "ce773a2affae2461642da2a97f6923cfe36ef3ae7ed9dd0a2f45107e60444e0e"
+        },
+        {
+          "markers": [
+            "procurement.receiving.receive",
+            "DELIVERY_PLAN_RECEIVED"
+          ],
+          "path": "chenyida_erp_site/app/lib/procurement-fulfillment-selfhost/handler.ts",
+          "sha256": "c24daca6a80325bad66f302734a47bddacb0c2b7a779c6b8613accda9f09a1de"
+        },
+        {
+          "markers": [
+            "after_receipt_allocation",
+            "RECEIPT_REVERSAL_BLOCKED_BY_AP"
+          ],
+          "path": "chenyida_erp_site/app/lib/procurement-fulfillment-selfhost/service.ts",
+          "sha256": "efcd31be3e758897493224606c3ba4ef022960fab30b4403e928cb9ff3c7d49e"
+        },
+        {
+          "markers": [
+            "after_operation_report_facts",
+            "after_operation_reversal_facts"
+          ],
+          "path": "chenyida_erp_site/app/lib/production-operation-selfhost/service.ts",
+          "sha256": "9c3fc2a0a96ea57ecf9bc19b1ffdf5641c43870b1d8132b5b9bfdc0e01b71513"
+        },
+        {
+          "markers": [
+            "production.complete.reverse",
+            "PRODUCTION_COMPLETION_REVERSED"
+          ],
+          "path": "chenyida_erp_site/app/lib/production-selfhost/handler.ts",
+          "sha256": "6a763e8f142d4364e19aac8ea63d2da01b6424283d8e93e5435c389656bcf9b4"
+        },
+        {
+          "markers": [
+            "quality.disposition",
+            "QUALITY_INSPECTION_DISPOSITIONED"
+          ],
+          "path": "chenyida_erp_site/app/lib/quality-selfhost/handler.ts",
+          "sha256": "1181e581c70907c19d4024cf0af86bb2c2043dbe3311e57664c91a9c9fff0075"
+        },
+        {
+          "markers": [
+            "QUALITY_DUTY_SEPARATION_REQUIRED",
+            "after_quality_disposition"
+          ],
+          "path": "chenyida_erp_site/app/lib/quality-selfhost/service.ts",
+          "sha256": "e681610a8726d33b43dbf5f37d660ac9e490a6037a298015ed88c9d6cfe6901f"
+        },
+        {
+          "markers": [
+            "sales.delivery.execute",
+            "SALES_SHIPMENT_REVERSED"
+          ],
+          "path": "chenyida_erp_site/app/lib/sales-selfhost/handler.ts",
+          "sha256": "f669d4680b53e0a450ed8390f158157d99b8749a863e3f50ef307c6d1d840769"
+        },
+        {
+          "markers": [
+            "posted facts are immutable, upstream reversal is blocked and transaction failures roll back",
+            "after_finance_document_create"
+          ],
+          "path": "chenyida_erp_site/tests/selfhost-finance-postgres.test.mjs",
+          "sha256": "21bf0163446e9a5d6345628c186a80d61c41be84297479014284d25b45d8d697"
+        },
+        {
+          "markers": [
+            "receipt date, evidence, CAS, CSRF, role, legacy-entry and rate gates reject without half records",
+            "IDEMPOTENCY_CONFLICT"
+          ],
+          "path": "chenyida_erp_site/tests/selfhost-procurement-fulfillment-postgres.test.mjs",
+          "sha256": "d6874a3d50392eef485527ba09f097abd686aade9d3e05ab3b0a95448bf799e2"
+        },
+        {
+          "markers": [
+            "QUALITY_DUTY_SEPARATION_REQUIRED",
+            "final_output_available_qty"
+          ],
+          "path": "chenyida_erp_site/tests/selfhost-production-operation-quality-gate-postgres.test.mjs",
+          "sha256": "42d59adc10952bf2a822ff93cc6e313057745f55a55c32164a2351d75fb19ccd"
+        },
+        {
+          "markers": [
+            "inventory fault and audit fault roll back every production, ledger, balance, audit and idempotency write",
+            "PRODUCTION_ISSUE_OVER_REQUIREMENT"
+          ],
+          "path": "chenyida_erp_site/tests/selfhost-production-postgres.test.mjs",
+          "sha256": "2acd509dda26ea1292c55e3b1adcf5d0296934ebff78ba41cb2b8f2160c42551"
+        },
+        {
+          "markers": [
+            "permissions, references, concurrency and cross-domain rollback fail closed",
+            "IDEMPOTENCY_CONFLICT"
+          ],
+          "path": "chenyida_erp_site/tests/selfhost-sales-postgres.test.mjs",
+          "sha256": "67a0f71c3433c70fd57773f9672c71b8eb2ba5337a251f8b67a587eed0024153"
+        },
+        {
+          "markers": [
+            "QUALITY_DUTY_SEPARATION_REQUIRED",
+            "RECEIPT_REVERSAL_BLOCKED_BY_IQC"
+          ],
+          "path": "chenyida_erp_site/tests/selfhost-supplier-receipt-lot-iqc-postgres.test.mjs",
+          "sha256": "af67ae321cf14339fb23da89c9f4142aa6cc9946540b0c137b8fedc5da9ce717"
+        },
+        {
+          "markers": [
+            "UNAUTHORIZED UAT PO WRITE CONFIRMED",
+            "无法把成功请求绑定到明确的浏览器/任务授权链"
+          ],
+          "path": "docs/tasks/SELFHOST-UAT-AUDIT-34.md",
+          "sha256": "35f66907100b20a9fec38ed647f6883e4e0e128ca904ed7656d2ace65b43809a"
+        },
+        {
+          "markers": [
+            "不追溯性授权",
+            "每个后续写阶段仍需独立明确授权"
+          ],
+          "path": "docs/tasks/SELFHOST-UAT-DECISION-35.md",
+          "sha256": "2a6ad714621462e5dd827511b01253898e3358250b04f4121e7e38e8bdde8c58"
+        }
+      ],
+      "sha256": "a79005537170e95854598908f75c044dbe58bd5578585da75429ca9e523d70fc"
+    },
+    "generator": {
+      "path": "chenyida_erp_site/scripts/cross-role-uat-evidence-contract.mjs",
+      "sha256": "3fb7e12319b7a6304fe8d44b48e62cdbe04a3e71958081a45803adc10827f904"
+    },
+    "policy": {
+      "path": "chenyida_erp_site/operations/cross-role-uat-evidence-policy-v1.json",
+      "sha256": "e1ec9293d85175d181eac1be966213200a09776fb189bc8f6d69cfe21c13dc22"
+    },
+    "release_test_inventory": {
+      "not_applicable_tests": 24,
+      "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
+      "required_tests": 231,
+      "sha256": "cb7005489265ab2ee6b165f0db98aec1b5a52e2e42388d149b8c98b5448f07ad",
+      "total_tests": 255
+    }
+  },
+  "readiness": {
+    "blockers": [
+      "BUSINESS_ROLE_MATRIX_APPROVAL_PENDING",
+      "UAT_ACCOUNT_MAPPING_APPROVAL_PENDING",
+      "UAT_WRITE_SCOPE_AND_WINDOW_NOT_AUTHORIZED",
+      "STOP_AND_ROLLBACK_OWNERS_NOT_ASSIGNED",
+      "EXECUTOR_OBSERVER_BUSINESS_SIGNOFF_EMPTY",
+      "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED"
+    ],
+    "statement": "该制品只定义合成执行与证据合同，不授权登录、写入、迁移、部署或生产操作。",
+    "status": "BLOCKED"
+  },
+  "request_evidence_contract": {
+    "forbidden_capture": [
+      "Authorization",
+      "Cookie",
+      "Set-Cookie",
+      "X-CSRF-Token正文",
+      "密码或Session正文"
+    ],
+    "required_request_headers": [
+      "Origin",
+      "Content-Type",
+      "X-Request-ID",
+      "X-CSRF-Token",
+      "Idempotency-Key"
+    ],
+    "required_response_fields": [
+      "http_status",
+      "X-Request-ID",
+      "body.request_id",
+      "body_digest_sha256"
+    ],
+    "required_server_evidence": [
+      "audit_log",
+      "idempotency_keys",
+      "before_after_db_delta"
+    ]
+  },
+  "required_control_kinds": [
+    "UNAUTHORIZED_403",
+    "CSRF_403",
+    "IDEMPOTENCY_REPLAY",
+    "IDEMPOTENCY_CONFLICT",
+    "CAS_CONFLICT",
+    "ATOMIC_FAILURE_ZERO_HALF_RECORD",
+    "APPEND_ONLY_REVERSAL",
+    "AUDIT_REQUEST_ID"
+  ],
+  "rollback_policy": {
+    "direct_sql_delete_or_update": "FORBIDDEN",
+    "downstream_blocked_action": "STOP_PRESERVE_EVIDENCE_ESCALATE",
+    "mode": "BUSINESS_REVERSAL_FIRST",
+    "required_post_rollback_checks": [
+      "对象计数",
+      "库存数量与版本",
+      "应收应付与收付款",
+      "Audit与request ID",
+      "Idempotency记录",
+      "UAT健康状态"
+    ],
+    "snapshot_restore": "SEPARATE_EXPLICIT_AUTHORIZATION_REQUIRED"
+  },
+  "schema_version": 1,
+  "separation_rules": [
+    {
+      "left": "quality_inspector",
+      "reason": "检验创建人与处置人必须分离",
+      "right": "quality_dispositioner"
+    },
+    {
+      "left": "operations_observer",
+      "reason": "技术观察人与业务验收人必须分离",
+      "right": "business_acceptor"
+    },
+    {
+      "left": "operations_observer",
+      "reason": "观察与回退执行责任必须分离",
+      "right": "rollback_owner"
+    },
+    {
+      "left": "business_acceptor",
+      "reason": "业务放行与回退责任必须分离",
+      "right": "rollback_owner"
+    }
+  ],
+  "stop_conditions": [
+    "授权编号、账号映射、允许写范围、执行窗口、停止权或回退责任任一为空",
+    "当前提交、镜像、Migration或UAT部署身份与获批执行包不一致",
+    "发现非UAT67合成对象、真实业务值或范围外数据变化",
+    "越权、CSRF、幂等、CAS、审计或请求编号任一门禁不符合预期",
+    "任一失败留下半记录，或无法解释表计数、库存、金额差异",
+    "资源保护线触发、容器失去健康、OOM或数据库失联",
+    "业务冲销被下游引用阻塞且没有新的专项处置授权"
+  ],
+  "synthetic_fixture": {
+    "currency": "CNY",
+    "data_class": "SYNTHETIC_ONLY",
+    "first_batch_quantity": "4.000000",
+    "fixture_id": "UAT67-SYNTHETIC-V1",
+    "forbidden_real_data": [
+      "真实客户或供应商名称",
+      "真实料号或批号",
+      "密码、Token、Cookie或Session",
+      "真实银行账号或个人信息"
+    ],
+    "planned_quantity": "10.000000",
+    "second_batch_quantity": "6.000000",
+    "supplier_lot": "UAT67-SUPPLIER-LOT-001"
+  },
+  "validation": {
+    "errors": [],
+    "result": "PASS"
+  },
+  "workflows": [
+    {
+      "controls": [
+        {
+          "expected": "purchase角色返回403且所有业务表delta=0",
+          "kind": "UNAUTHORIZED_403",
+          "target_step": "P02"
+        },
+        {
+          "expected": "缺失或错误CSRF返回403且delta=0",
+          "kind": "CSRF_403",
+          "target_step": "P02"
+        },
+        {
+          "expected": "同Key同正文返回原结果且Idempotency-Replayed=true",
+          "kind": "IDEMPOTENCY_REPLAY",
+          "target_step": "P02"
+        },
+        {
+          "expected": "同Key异正文返回IDEMPOTENCY_CONFLICT且delta=0",
+          "kind": "IDEMPOTENCY_CONFLICT",
+          "target_step": "P02"
+        },
+        {
+          "expected": "陈旧版本返回DELIVERY_PLAN_VERSION_OR_STATE_CONFLICT且delta=0",
+          "kind": "CAS_CONFLICT",
+          "target_step": "P02"
+        },
+        {
+          "expected": "故障注入证据证明receipt/allocation/ledger/audit/idempotency均无半记录",
+          "kind": "ATOMIC_FAILURE_ZERO_HALF_RECORD",
+          "target_step": "P02"
+        },
+        {
+          "expected": "只新增REVERSAL事实；IQC或AP已存在时阻塞并保留证据",
+          "kind": "APPEND_ONLY_REVERSAL",
+          "target_step": "P07"
+        },
+        {
+          "expected": "响应头、正文、业务行、事件、Audit使用同一request ID",
+          "kind": "AUDIT_REQUEST_ID",
+          "target_step": "ALL_STEPS"
+        }
+      ],
+      "id": "PROCURE_RECEIVE_IQC_AP",
+      "preconditions": [
+        "合成Award已获选且预览可转换",
+        "合成物料、Supplier、Quote、库存位置和单位均有效",
+        "Receipt/IQC/Ledger/AP起始计数已取证"
+      ],
+      "signoff": {
+        "business_accepted_at": null,
+        "business_acceptor_slot": "business_acceptor",
+        "executor_signed_at": null,
+        "executor_slots": [
+          "purchase_executor",
+          "warehouse_executor",
+          "quality_inspector",
+          "quality_dispositioner",
+          "finance_executor"
+        ],
+        "observer_signed_at": null,
+        "observer_slot": "operations_observer",
+        "result": null
+      },
+      "steps": [
+        {
+          "actor_slot": "purchase_executor",
+          "authorization": {
+            "actor_role": "purchase",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "purchase"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "warehouse",
+            "idempotency": "REQUIRED",
+            "operation_id": "fulfillment.convert",
+            "permissions_all": [
+              "procurement.award.convert"
+            ],
+            "route_pattern": "^/api/procurement/awards/[1-9][0-9]*/purchase-orders$",
+            "source": "app/lib/procurement-fulfillment-selfhost/handler.ts",
+            "source_line": 31
+          },
+          "body_template": {
+            "expected_award_version": "$ref.conversion_preview.confirmation.expected_award_version",
+            "expected_quote_version": "$ref.conversion_preview.confirmation.expected_quote_version",
+            "expected_snapshot_digest": "$ref.conversion_preview.confirmation.expected_snapshot_digest",
+            "remark": "UAT67合成采购转单"
+          },
+          "cas_fields": [
+            "expected_award_version",
+            "expected_quote_version",
+            "expected_snapshot_digest"
+          ],
+          "denied_probe_role": "warehouse",
+          "expected_db_delta": [
+            {
+              "assertion": "source_type=SOURCING_AWARD",
+              "delta": "+1",
+              "table": "purchase_orders"
+            },
+            {
+              "assertion": "逐PO Line建立计划",
+              "delta": "+N",
+              "table": "purchase_delivery_plans"
+            },
+            {
+              "assertion": "action=SOURCING_AWARD_CONVERTED且request_id一致",
+              "delta": "+1",
+              "table": "audit_log"
+            }
+          ],
+          "expected_status": 201,
+          "id": "P01",
+          "method": "POST",
+          "operation_id": "fulfillment.convert",
+          "path": "/api/procurement/awards/{award_id}/purchase-orders",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-procure_receive_iqc_ap-p01-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PROCURE_RECEIVE_IQC_AP-P01-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "采购执行人按预览确认值转换Award为PO"
+        },
+        {
+          "actor_slot": "warehouse_executor",
+          "authorization": {
+            "actor_role": "warehouse",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "warehouse"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "purchase",
+            "idempotency": "REQUIRED",
+            "operation_id": "fulfillment.receive",
+            "permissions_all": [
+              "procurement.receiving.receive"
+            ],
+            "route_pattern": "^/api/procurement/delivery-plans/[1-9][0-9]*/receipts$",
+            "source": "app/lib/procurement-fulfillment-selfhost/handler.ts",
+            "source_line": 33
+          },
+          "body_template": {
+            "evidence_document_date": "$ref.execution_date",
+            "expected_balance_version": "$ref.receipt_preview.confirmation.expected_balance_version",
+            "expected_purchase_order_line_version": "$ref.receipt_preview.confirmation.expected_purchase_order_line_version",
+            "expected_version": "$ref.receipt_preview.confirmation.expected_version",
+            "quantity": "10.000000",
+            "reason": "UAT67合成收货",
+            "supplier_lot": "UAT67-SUPPLIER-LOT-001"
+          },
+          "cas_fields": [
+            "expected_version",
+            "expected_purchase_order_line_version",
+            "expected_balance_version"
+          ],
+          "denied_probe_role": "purchase",
+          "expected_db_delta": [
+            {
+              "assertion": "NORMAL收货事实",
+              "delta": "+1",
+              "table": "purchase_receipts"
+            },
+            {
+              "assertion": "库存冻结并保留supplier lot谱系",
+              "delta": "+1 each",
+              "table": "inventory_adjustments,inventory_ledger_entries,inventory_lots"
+            },
+            {
+              "assertion": "AP来源金额来自收货事实",
+              "delta": "+1",
+              "table": "purchase_financial_source_entries"
+            }
+          ],
+          "expected_status": 201,
+          "id": "P02",
+          "method": "POST",
+          "operation_id": "fulfillment.receive",
+          "path": "/api/procurement/delivery-plans/{delivery_plan_id}/receipts",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-procure_receive_iqc_ap-p02-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PROCURE_RECEIVE_IQC_AP-P02-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "仓库执行人按收货预览确认值登记合成收货"
+        },
+        {
+          "actor_slot": "quality_inspector",
+          "authorization": {
+            "actor_role": "quality",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "quality"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.inspect",
+            "permissions_all": [
+              "quality.inspect"
+            ],
+            "route_pattern": "^/api/quality-inspections$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 28
+          },
+          "body_template": {
+            "failed_qty": "0.000000",
+            "inspected_qty": "10.000000",
+            "inspection_type": "IQC",
+            "passed_qty": "10.000000",
+            "purchase_receipt_line_id": "$ref.P02.purchase_receipt_line_id",
+            "responsible_stage": "IQC",
+            "results": [
+              {
+                "characteristic": "UAT67综合检验",
+                "result": "PASS"
+              }
+            ]
+          },
+          "cas_fields": [],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "OPEN/PENDING IQC",
+              "delta": "+1",
+              "table": "quality_inspections"
+            },
+            {
+              "assertion": "CREATED且request_id一致",
+              "delta": "+1",
+              "table": "quality_inspection_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "P03",
+          "method": "POST",
+          "operation_id": "quality.inspect",
+          "path": "/api/quality-inspections",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-procure_receive_iqc_ap-p03-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PROCURE_RECEIVE_IQC_AP-P03-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "品质检验人创建IQC"
+        },
+        {
+          "actor_slot": "quality_dispositioner",
+          "authorization": {
+            "actor_role": "quality",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "quality"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "purchase",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.disposition",
+            "permissions_all": [
+              "quality.disposition"
+            ],
+            "route_pattern": "^/api/quality-inspections/[1-9][0-9]*/dispositions$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 30
+          },
+          "body_template": {
+            "disposition_code": "RELEASE",
+            "expected_balance_version": "$ref.P02.inventory_balance_version",
+            "expected_lot_version": "$ref.P02.inventory_lot_version",
+            "expected_version": 1,
+            "reason": "UAT67 IQC独立放行",
+            "release_qty": "10.000000"
+          },
+          "cas_fields": [
+            "expected_version",
+            "expected_lot_version",
+            "expected_balance_version"
+          ],
+          "denied_probe_role": "purchase",
+          "expected_db_delta": [
+            {
+              "assertion": "DISPOSITIONED",
+              "delta": "+1",
+              "table": "quality_inspection_events"
+            },
+            {
+              "assertion": "可用量增加且版本+1",
+              "delta": "frozen_qty -10",
+              "table": "inventory_stock_balances"
+            }
+          ],
+          "expected_status": 200,
+          "id": "P04",
+          "method": "POST",
+          "operation_id": "quality.disposition",
+          "path": "/api/quality-inspections/{iqc_inspection_id}/dispositions",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-procure_receive_iqc_ap-p04-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PROCURE_RECEIVE_IQC_AP-P04-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "独立品质处置人放行IQC"
+        },
+        {
+          "actor_slot": "quality_inspector",
+          "authorization": {
+            "actor_role": "quality",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "quality"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "warehouse",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.close",
+            "permissions_all": [
+              "quality.close"
+            ],
+            "route_pattern": "^/api/quality-inspections/[1-9][0-9]*/close$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 31
+          },
+          "body_template": {
+            "expected_version": 2,
+            "reason": "UAT67 IQC关闭"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "warehouse",
+          "expected_db_delta": [
+            {
+              "assertion": "CLOSED",
+              "delta": "+1",
+              "table": "quality_inspection_events"
+            },
+            {
+              "assertion": "lifecycle_status=CLOSED",
+              "delta": "version +1",
+              "table": "quality_inspections"
+            }
+          ],
+          "expected_status": 200,
+          "id": "P05",
+          "method": "POST",
+          "operation_id": "quality.close",
+          "path": "/api/quality-inspections/{iqc_inspection_id}/close",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-procure_receive_iqc_ap-p05-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PROCURE_RECEIVE_IQC_AP-P05-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "品质检验人关闭已处置IQC"
+        },
+        {
+          "actor_slot": "finance_executor",
+          "authorization": {
+            "actor_role": "finance",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "finance"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "purchase",
+            "idempotency": "REQUIRED",
+            "operation_id": "finance.post-document",
+            "permissions_all": [
+              "finance.post"
+            ],
+            "route_pattern": "^/api/(?:finance/documents|financial-documents/from-(?:source|sales-order|purchase-order))$",
+            "source": "app/lib/finance-selfhost/handler.ts",
+            "source_line": 35
+          },
+          "body_template": {
+            "accounting_date": "$ref.execution_date",
+            "doc_type": "AP",
+            "purchase_source_entry_id": "$ref.P02.purchase_financial_source_entry_id"
+          },
+          "cas_fields": [],
+          "denied_probe_role": "purchase",
+          "expected_db_delta": [
+            {
+              "assertion": "AP金额和币种精确继承收货来源",
+              "delta": "+1",
+              "table": "finance_documents"
+            },
+            {
+              "assertion": "CREATED",
+              "delta": "+1",
+              "table": "finance_document_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "P06",
+          "method": "POST",
+          "operation_id": "finance.post-document",
+          "path": "/api/finance/documents",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-procure_receive_iqc_ap-p06-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PROCURE_RECEIVE_IQC_AP-P06-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "财务执行人从收货来源生成AP"
+        },
+        {
+          "actor_slot": "warehouse_executor",
+          "authorization": {
+            "actor_role": "warehouse",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "warehouse"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "purchase",
+            "idempotency": "REQUIRED",
+            "operation_id": "fulfillment.reverse",
+            "permissions_all": [
+              "procurement.receiving.reverse"
+            ],
+            "route_pattern": "^/api/procurement/fulfillment/receipts/[1-9][0-9]*/reversal$",
+            "source": "app/lib/procurement-fulfillment-selfhost/handler.ts",
+            "source_line": 42
+          },
+          "body_template": {
+            "expected_balance_versions": "$ref.P02.balance_versions",
+            "expected_line_versions": "$ref.P02.line_versions",
+            "expected_lot_version": "$ref.P02.inventory_lot_version",
+            "expected_plan_version": "$ref.P02.delivery_plan_version",
+            "reason": "UAT67合成收货回退演练"
+          },
+          "branch_from_checkpoint": "AFTER_P02_BEFORE_P03_P06",
+          "cas_fields": [
+            "expected_plan_version",
+            "expected_line_versions",
+            "expected_balance_versions",
+            "expected_lot_version"
+          ],
+          "denied_probe_role": "purchase",
+          "expected_db_delta": [
+            {
+              "assertion": "原收货行不删除不覆盖",
+              "delta": "+1 REVERSAL",
+              "table": "purchase_receipts"
+            },
+            {
+              "assertion": "数量反向且保留原事实",
+              "delta": "+1 reversal each",
+              "table": "inventory_adjustments,inventory_ledger_entries"
+            },
+            {
+              "assertion": "REVERSED",
+              "delta": "+1",
+              "table": "purchase_receipt_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "P07",
+          "method": "POST",
+          "operation_id": "fulfillment.reverse",
+          "path": "/api/procurement/fulfillment/receipts/{receipt_id}/reversal",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-procure_receive_iqc_ap-p07-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PROCURE_RECEIVE_IQC_AP-P07-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "隔离检查点冲销收货（必须在IQC/AP前单独执行）"
+        }
+      ],
+      "title": "采购转单→收货/IQC→库存/AP"
+    },
+    {
+      "controls": [
+        {
+          "expected": "sales角色返回403且delta=0",
+          "kind": "UNAUTHORIZED_403",
+          "target_step": "M03"
+        },
+        {
+          "expected": "错误CSRF返回403且delta=0",
+          "kind": "CSRF_403",
+          "target_step": "M03"
+        },
+        {
+          "expected": "同Key同正文重放原派工",
+          "kind": "IDEMPOTENCY_REPLAY",
+          "target_step": "M03"
+        },
+        {
+          "expected": "同Key异正文返回IDEMPOTENCY_CONFLICT",
+          "kind": "IDEMPOTENCY_CONFLICT",
+          "target_step": "M03"
+        },
+        {
+          "expected": "陈旧expected_operation_version返回版本冲突且delta=0",
+          "kind": "CAS_CONFLICT",
+          "target_step": "M03"
+        },
+        {
+          "expected": "故障注入证明生产、库存、ledger、audit、idempotency均无半记录",
+          "kind": "ATOMIC_FAILURE_ZERO_HALF_RECORD",
+          "target_step": "M10"
+        },
+        {
+          "expected": "只新增冲销事实；存在FQC/发货下游时停止并保留",
+          "kind": "APPEND_ONLY_REVERSAL",
+          "target_step": "M11"
+        },
+        {
+          "expected": "跨领料、工序、品质、报工、完工的request ID闭合",
+          "kind": "AUDIT_REQUEST_ID",
+          "target_step": "ALL_STEPS"
+        }
+      ],
+      "id": "PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE",
+      "preconditions": [
+        "合成工单已Release并绑定已发布BOM与Routing快照",
+        "原料库存及CAS版本已取证",
+        "末工序启用IPQC gate"
+      ],
+      "signoff": {
+        "business_accepted_at": null,
+        "business_acceptor_slot": "business_acceptor",
+        "executor_signed_at": null,
+        "executor_slots": [
+          "warehouse_executor",
+          "production_executor",
+          "quality_inspector",
+          "quality_dispositioner"
+        ],
+        "observer_signed_at": null,
+        "observer_slot": "operations_observer",
+        "result": null
+      },
+      "steps": [
+        {
+          "actor_slot": "warehouse_executor",
+          "authorization": {
+            "actor_role": "warehouse",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "warehouse"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "production",
+            "idempotency": "REQUIRED",
+            "operation_id": "production.issue",
+            "permissions_all": [
+              "production.issue"
+            ],
+            "route_pattern": "^/api/(?:production/material-(?:issues|returns)|work-orders/issue-materials)$",
+            "source": "app/lib/production-selfhost/handler.ts",
+            "source_line": 54
+          },
+          "body_template": {
+            "lines": [
+              {
+                "expected_balance_version": "$ref.raw_balance_version",
+                "expected_requirement_version": "$ref.requirement_version",
+                "quantity": "10.000000",
+                "requirement_id": "$ref.requirement_id"
+              }
+            ],
+            "reason": "UAT67合成领料",
+            "work_order_id": "$ref.work_order_id"
+          },
+          "cas_fields": [
+            "lines[].expected_requirement_version",
+            "lines[].expected_balance_version"
+          ],
+          "denied_probe_role": "production",
+          "expected_db_delta": [
+            {
+              "assertion": "领料事实",
+              "delta": "+1",
+              "table": "production_material_issues,production_material_issue_lines"
+            },
+            {
+              "assertion": "原料出库",
+              "delta": "+1",
+              "table": "inventory_ledger_entries"
+            }
+          ],
+          "expected_status": 201,
+          "id": "M01",
+          "method": "POST",
+          "operation_id": "production.issue",
+          "path": "/api/production/material-issues",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m01-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M01-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "仓库领料"
+        },
+        {
+          "actor_slot": "warehouse_executor",
+          "authorization": {
+            "actor_role": "warehouse",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "warehouse"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "production",
+            "idempotency": "REQUIRED",
+            "operation_id": "production.issue",
+            "permissions_all": [
+              "production.issue"
+            ],
+            "route_pattern": "^/api/(?:production/material-(?:issues|returns)|work-orders/issue-materials)$",
+            "source": "app/lib/production-selfhost/handler.ts",
+            "source_line": 54
+          },
+          "body_template": {
+            "lines": [
+              {
+                "expected_balance_version": "$ref.after_M01.balance_version",
+                "expected_requirement_version": "$ref.after_M01.requirement_version",
+                "quantity": "4.000000",
+                "requirement_id": "$ref.requirement_id"
+              }
+            ],
+            "reason": "UAT67合成退料",
+            "work_order_id": "$ref.work_order_id"
+          },
+          "branch_from_checkpoint": "AFTER_M01_BEFORE_M03",
+          "cas_fields": [
+            "lines[].expected_requirement_version",
+            "lines[].expected_balance_version"
+          ],
+          "denied_probe_role": "production",
+          "expected_db_delta": [
+            {
+              "assertion": "退料为新增事实",
+              "delta": "+1",
+              "table": "production_material_returns,production_material_return_lines"
+            },
+            {
+              "assertion": "原料反向入库",
+              "delta": "+1",
+              "table": "inventory_ledger_entries"
+            }
+          ],
+          "expected_status": 201,
+          "id": "M02",
+          "method": "POST",
+          "operation_id": "production.issue",
+          "path": "/api/production/material-returns",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m02-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M02-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "隔离分支仓库退料"
+        },
+        {
+          "actor_slot": "production_executor",
+          "authorization": {
+            "actor_role": "production",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "production"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "operation.dispatch",
+            "permissions_all": [
+              "production.dispatch"
+            ],
+            "route_pattern": "^/api/production/(?:operation-execution/dispatch|operation-runs/[1-9][0-9]*/cancel|rework-requests/[1-9][0-9]*/dispatch)$",
+            "source": "app/lib/production-operation-selfhost/handler.ts",
+            "source_line": 23
+          },
+          "body_template": {
+            "assigned_operator": "$ref.production_executor.account_username",
+            "expected_operation_version": "$ref.operation_version",
+            "quantity": "10.000000",
+            "snapshot_operation_id": "$ref.snapshot_operation_id"
+          },
+          "cas_fields": [
+            "expected_operation_version"
+          ],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "READY派工批次",
+              "delta": "+1",
+              "table": "production_operation_runs"
+            },
+            {
+              "assertion": "DISPATCHED",
+              "delta": "+1",
+              "table": "production_operation_run_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "M03",
+          "method": "POST",
+          "operation_id": "operation.dispatch",
+          "path": "/api/production/operation-execution/dispatch",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m03-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M03-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "生产派工"
+        },
+        {
+          "actor_slot": "production_executor",
+          "authorization": {
+            "actor_role": "production",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "production"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "warehouse",
+            "idempotency": "REQUIRED",
+            "operation_id": "operation.execute",
+            "permissions_all": [
+              "production.execute"
+            ],
+            "route_pattern": "^/api/production/operation-runs/[1-9][0-9]*/(?:start|reports)$",
+            "source": "app/lib/production-operation-selfhost/handler.ts",
+            "source_line": 25
+          },
+          "body_template": {
+            "expected_version": "$ref.M03.run_version"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "warehouse",
+          "expected_db_delta": [
+            {
+              "assertion": "STARTED",
+              "delta": "+1",
+              "table": "production_operation_run_events"
+            },
+            {
+              "assertion": "IN_PROGRESS",
+              "delta": "version +1",
+              "table": "production_operation_runs"
+            }
+          ],
+          "expected_status": 200,
+          "id": "M04",
+          "method": "POST",
+          "operation_id": "operation.execute",
+          "path": "/api/production/operation-runs/{operation_run_id}/start",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m04-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M04-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "生产开工"
+        },
+        {
+          "actor_slot": "production_executor",
+          "authorization": {
+            "actor_role": "production",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "production"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "warehouse",
+            "idempotency": "REQUIRED",
+            "operation_id": "operation.execute",
+            "permissions_all": [
+              "production.execute"
+            ],
+            "route_pattern": "^/api/production/operation-runs/[1-9][0-9]*/(?:start|reports)$",
+            "source": "app/lib/production-operation-selfhost/handler.ts",
+            "source_line": 25
+          },
+          "body_template": {
+            "expected_version": "$ref.M04.run_version",
+            "good_qty": "10.000000",
+            "processed_qty": "10.000000",
+            "remark": "UAT67合成工序报工",
+            "scrap_qty": "0.000000"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "warehouse",
+          "expected_db_delta": [
+            {
+              "assertion": "正式工序报工事实",
+              "delta": "+1",
+              "table": "production_operation_run_reports"
+            },
+            {
+              "assertion": "REPORTED",
+              "delta": "+1",
+              "table": "production_operation_run_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "M05",
+          "method": "POST",
+          "operation_id": "operation.execute",
+          "path": "/api/production/operation-runs/{operation_run_id}/reports",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m05-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M05-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "生产工序报工"
+        },
+        {
+          "actor_slot": "quality_inspector",
+          "authorization": {
+            "actor_role": "quality",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "quality"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "production",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.inspect",
+            "permissions_all": [
+              "quality.inspect"
+            ],
+            "route_pattern": "^/api/quality-inspections$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 28
+          },
+          "body_template": {
+            "failed_qty": "0.000000",
+            "inspected_qty": "10.000000",
+            "inspection_type": "IPQC",
+            "passed_qty": "10.000000",
+            "production_operation_run_report_id": "$ref.M05.operation_run_report_id",
+            "results": [
+              {
+                "characteristic": "UAT67工序质量",
+                "result": "PASS"
+              }
+            ]
+          },
+          "cas_fields": [],
+          "denied_probe_role": "production",
+          "expected_db_delta": [
+            {
+              "assertion": "IPQC OPEN/PENDING",
+              "delta": "+1",
+              "table": "quality_inspections"
+            },
+            {
+              "assertion": "CREATED",
+              "delta": "+1",
+              "table": "quality_inspection_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "M06",
+          "method": "POST",
+          "operation_id": "quality.inspect",
+          "path": "/api/quality-inspections",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m06-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M06-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "品质检验人创建IPQC"
+        },
+        {
+          "actor_slot": "quality_dispositioner",
+          "authorization": {
+            "actor_role": "quality",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "quality"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "production",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.disposition",
+            "permissions_all": [
+              "quality.disposition"
+            ],
+            "route_pattern": "^/api/quality-inspections/[1-9][0-9]*/dispositions$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 30
+          },
+          "body_template": {
+            "disposition_code": "RELEASE",
+            "expected_version": 1,
+            "reason": "UAT67 IPQC独立放行",
+            "release_qty": "10.000000"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "production",
+          "expected_db_delta": [
+            {
+              "assertion": "DISPOSITIONED",
+              "delta": "+1",
+              "table": "quality_inspection_events"
+            },
+            {
+              "assertion": "末工序输出可正式报工",
+              "delta": "projection refresh",
+              "table": "production_operation_quality_projections"
+            }
+          ],
+          "expected_status": 200,
+          "id": "M07",
+          "method": "POST",
+          "operation_id": "quality.disposition",
+          "path": "/api/quality-inspections/{ipqc_inspection_id}/dispositions",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m07-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M07-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "独立品质处置人放行IPQC"
+        },
+        {
+          "actor_slot": "quality_inspector",
+          "authorization": {
+            "actor_role": "quality",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "quality"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "warehouse",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.close",
+            "permissions_all": [
+              "quality.close"
+            ],
+            "route_pattern": "^/api/quality-inspections/[1-9][0-9]*/close$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 31
+          },
+          "body_template": {
+            "expected_version": 2,
+            "reason": "UAT67 IPQC关闭"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "warehouse",
+          "expected_db_delta": [
+            {
+              "assertion": "CLOSED",
+              "delta": "+1",
+              "table": "quality_inspection_events"
+            }
+          ],
+          "expected_status": 200,
+          "id": "M08",
+          "method": "POST",
+          "operation_id": "quality.close",
+          "path": "/api/quality-inspections/{ipqc_inspection_id}/close",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m08-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M08-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "品质关闭IPQC"
+        },
+        {
+          "actor_slot": "production_executor",
+          "authorization": {
+            "actor_role": "production",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "production"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "warehouse",
+            "idempotency": "REQUIRED",
+            "operation_id": "production.report",
+            "permissions_all": [
+              "production.report"
+            ],
+            "route_pattern": "^/api/production/reports$",
+            "source": "app/lib/production-selfhost/handler.ts",
+            "source_line": 57
+          },
+          "body_template": {
+            "expected_final_output_version": "$ref.final_output_version",
+            "expected_work_order_version": "$ref.work_order_version",
+            "final_output_allocations": [
+              {
+                "operation_run_report_id": "$ref.M05.operation_run_report_id",
+                "quantity": "10.000000"
+              }
+            ],
+            "good_qty": "10.000000",
+            "process_stage": "UAT67末工序",
+            "reported_qty": "10.000000",
+            "scrap_qty": "0.000000",
+            "work_order_id": "$ref.work_order_id"
+          },
+          "cas_fields": [
+            "expected_work_order_version",
+            "expected_final_output_version"
+          ],
+          "denied_probe_role": "warehouse",
+          "expected_db_delta": [
+            {
+              "assertion": "来源绑定末工序报工",
+              "delta": "+1",
+              "table": "production_reports,production_final_output_allocations"
+            },
+            {
+              "assertion": "CREATED",
+              "delta": "+1",
+              "table": "production_report_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "M09",
+          "method": "POST",
+          "operation_id": "production.report",
+          "path": "/api/production/reports",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m09-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M09-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "生产从末工序输出创建正式报工"
+        },
+        {
+          "actor_slot": "warehouse_executor",
+          "authorization": {
+            "actor_role": "warehouse",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "warehouse"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "production",
+            "idempotency": "REQUIRED",
+            "operation_id": "production.complete",
+            "permissions_all": [
+              "production.complete"
+            ],
+            "route_pattern": "^/api/production/completions$",
+            "source": "app/lib/production-selfhost/handler.ts",
+            "source_line": 58
+          },
+          "body_template": {
+            "allocations": [
+              {
+                "expected_report_version": "$ref.M09.report_version",
+                "quantity": "10.000000",
+                "report_id": "$ref.M09.production_report_id"
+              }
+            ],
+            "expected_balance_version": "$ref.finished_balance_version",
+            "expected_version": "$ref.after_M09.work_order_version",
+            "reason": "UAT67合成完工",
+            "work_order_id": "$ref.work_order_id"
+          },
+          "cas_fields": [
+            "expected_version",
+            "expected_balance_version",
+            "allocations[].expected_report_version"
+          ],
+          "denied_probe_role": "production",
+          "expected_db_delta": [
+            {
+              "assertion": "完工事实",
+              "delta": "+1",
+              "table": "production_completions,production_completion_lines"
+            },
+            {
+              "assertion": "成品入库",
+              "delta": "+1",
+              "table": "inventory_adjustments,inventory_ledger_entries"
+            }
+          ],
+          "expected_status": 201,
+          "id": "M10",
+          "method": "POST",
+          "operation_id": "production.complete",
+          "path": "/api/production/completions",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m10-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M10-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "仓库按正式报工完工入库"
+        },
+        {
+          "actor_slot": "warehouse_executor",
+          "authorization": {
+            "actor_role": "warehouse",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "warehouse"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "production",
+            "idempotency": "REQUIRED",
+            "operation_id": "production.complete-reverse",
+            "permissions_all": [
+              "production.complete.reverse"
+            ],
+            "route_pattern": "^/api/production/completions/[1-9][0-9]*/reverse$",
+            "source": "app/lib/production-selfhost/handler.ts",
+            "source_line": 60
+          },
+          "body_template": {
+            "expected_balance_versions": "$ref.M10.balance_versions",
+            "expected_completion_version": "$ref.M10.completion_version",
+            "expected_work_order_version": "$ref.M10.work_order_version",
+            "reason": "UAT67合成完工冲销"
+          },
+          "branch_from_checkpoint": "AFTER_M10_BEFORE_FQC_SALES",
+          "cas_fields": [
+            "expected_completion_version",
+            "expected_work_order_version",
+            "expected_balance_versions"
+          ],
+          "denied_probe_role": "production",
+          "expected_db_delta": [
+            {
+              "assertion": "原完工不删除不改写",
+              "delta": "+1",
+              "table": "production_completion_reversals"
+            },
+            {
+              "assertion": "成品库存反向",
+              "delta": "+1 reversal each",
+              "table": "inventory_adjustments,inventory_ledger_entries"
+            },
+            {
+              "assertion": "REVERSED",
+              "delta": "+1",
+              "table": "production_completion_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "M11",
+          "method": "POST",
+          "operation_id": "production.complete-reverse",
+          "path": "/api/production/completions/{completion_id}/reverse",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-production_issue_return_ipqc_complete-m11-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-PRODUCTION_ISSUE_RETURN_IPQC_COMPLETE-M11-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "隔离检查点冲销完工（必须在FQC/销售下游前）"
+        }
+      ],
+      "title": "生产领退料→工序/IPQC→正式报工/完工"
+    },
+    {
+      "controls": [
+        {
+          "expected": "sales角色执行出货返回403且delta=0",
+          "kind": "UNAUTHORIZED_403",
+          "target_step": "S08"
+        },
+        {
+          "expected": "错误CSRF返回403且delta=0",
+          "kind": "CSRF_403",
+          "target_step": "S08"
+        },
+        {
+          "expected": "同Key同正文重放原Shipment",
+          "kind": "IDEMPOTENCY_REPLAY",
+          "target_step": "S08"
+        },
+        {
+          "expected": "同Key异正文返回IDEMPOTENCY_CONFLICT",
+          "kind": "IDEMPOTENCY_CONFLICT",
+          "target_step": "S08"
+        },
+        {
+          "expected": "陈旧指令或库存版本返回DELIVERY_INSTRUCTION_VERSION_OR_STATE_CONFLICT",
+          "kind": "CAS_CONFLICT",
+          "target_step": "S08"
+        },
+        {
+          "expected": "故障注入证明shipment/inventory/FQC/source/audit/idempotency均无半记录",
+          "kind": "ATOMIC_FAILURE_ZERO_HALF_RECORD",
+          "target_step": "S08"
+        },
+        {
+          "expected": "只新增冲销事实；AR存在时阻塞并保留",
+          "kind": "APPEND_ONLY_REVERSAL",
+          "target_step": "S10"
+        },
+        {
+          "expected": "分配、FQC、指令、Shipment、AR的request ID闭合",
+          "kind": "AUDIT_REQUEST_ID",
+          "target_step": "ALL_STEPS"
+        }
+      ],
+      "id": "SALES_FQC_SHIPMENT_AR",
+      "preconditions": [
+        "合成销售订单已确认",
+        "合成完工行有可分配数量",
+        "成品库存、订单行、完工行CAS版本已取证"
+      ],
+      "signoff": {
+        "business_accepted_at": null,
+        "business_acceptor_slot": "business_acceptor",
+        "executor_signed_at": null,
+        "executor_slots": [
+          "sales_executor",
+          "quality_inspector",
+          "quality_dispositioner",
+          "warehouse_executor",
+          "finance_executor"
+        ],
+        "observer_signed_at": null,
+        "observer_slot": "operations_observer",
+        "result": null
+      },
+      "steps": [
+        {
+          "actor_slot": "sales_executor",
+          "authorization": {
+            "actor_role": "sales",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "sales"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "quality",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.allocation-create",
+            "permissions_all": [
+              "quality.finished_goods_allocation.create"
+            ],
+            "route_pattern": "^/api/quality/finished-goods-allocations$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 24
+          },
+          "body_template": {
+            "completion_line_id": "$ref.completion_line_id",
+            "expected_completion_version": "$ref.completion_line_version",
+            "expected_sales_order_line_version": "$ref.sales_order_line_version",
+            "quantity": "10.000000",
+            "sales_order_line_id": "$ref.sales_order_line_id"
+          },
+          "cas_fields": [
+            "expected_completion_version",
+            "expected_sales_order_line_version"
+          ],
+          "denied_probe_role": "quality",
+          "expected_db_delta": [
+            {
+              "assertion": "ACTIVE分配",
+              "delta": "+1",
+              "table": "finished_goods_allocations"
+            }
+          ],
+          "expected_status": 201,
+          "id": "S01",
+          "method": "POST",
+          "operation_id": "quality.allocation-create",
+          "path": "/api/quality/finished-goods-allocations",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s01-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S01-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "销售分配完工成品到订单行"
+        },
+        {
+          "actor_slot": "quality_inspector",
+          "authorization": {
+            "actor_role": "quality",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "quality"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.inspect",
+            "permissions_all": [
+              "quality.inspect"
+            ],
+            "route_pattern": "^/api/quality-inspections$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 28
+          },
+          "body_template": {
+            "allocation_id": "$ref.S01.allocation_id",
+            "failed_qty": "0.000000",
+            "inspected_qty": "10.000000",
+            "inspection_type": "FQC",
+            "passed_qty": "10.000000",
+            "results": [
+              {
+                "characteristic": "UAT67出货质量",
+                "result": "PASS"
+              }
+            ]
+          },
+          "cas_fields": [],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "FQC OPEN/PENDING",
+              "delta": "+1 each",
+              "table": "quality_inspections,quality_inspection_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "S02",
+          "method": "POST",
+          "operation_id": "quality.inspect",
+          "path": "/api/quality-inspections",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s02-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S02-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "品质检验人创建FQC"
+        },
+        {
+          "actor_slot": "quality_dispositioner",
+          "authorization": {
+            "actor_role": "quality",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "quality"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.disposition",
+            "permissions_all": [
+              "quality.disposition"
+            ],
+            "route_pattern": "^/api/quality-inspections/[1-9][0-9]*/dispositions$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 30
+          },
+          "body_template": {
+            "disposition_code": "RELEASE",
+            "expected_version": 1,
+            "reason": "UAT67 FQC独立放行",
+            "release_qty": "10.000000"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "DISPOSITIONED",
+              "delta": "+1",
+              "table": "quality_inspection_events"
+            }
+          ],
+          "expected_status": 200,
+          "id": "S03",
+          "method": "POST",
+          "operation_id": "quality.disposition",
+          "path": "/api/quality-inspections/{fqc_inspection_id}/dispositions",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s03-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S03-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "独立品质处置人放行FQC"
+        },
+        {
+          "actor_slot": "quality_inspector",
+          "authorization": {
+            "actor_role": "quality",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "quality"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "warehouse",
+            "idempotency": "REQUIRED",
+            "operation_id": "quality.close",
+            "permissions_all": [
+              "quality.close"
+            ],
+            "route_pattern": "^/api/quality-inspections/[1-9][0-9]*/close$",
+            "source": "app/lib/quality-selfhost/handler.ts",
+            "source_line": 31
+          },
+          "body_template": {
+            "expected_version": 2,
+            "reason": "UAT67 FQC关闭"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "warehouse",
+          "expected_db_delta": [
+            {
+              "assertion": "CLOSED",
+              "delta": "+1",
+              "table": "quality_inspection_events"
+            }
+          ],
+          "expected_status": 200,
+          "id": "S04",
+          "method": "POST",
+          "operation_id": "quality.close",
+          "path": "/api/quality-inspections/{fqc_inspection_id}/close",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s04-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S04-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "品质关闭FQC"
+        },
+        {
+          "actor_slot": "sales_executor",
+          "authorization": {
+            "actor_role": "sales",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "sales"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "warehouse",
+            "idempotency": "REQUIRED",
+            "operation_id": "sales.delivery-create",
+            "permissions_all": [
+              "sales.delivery.create"
+            ],
+            "route_pattern": "^/api/delivery-instructions$",
+            "source": "app/lib/sales-selfhost/handler.ts",
+            "source_line": 66
+          },
+          "body_template": {
+            "expected_order_version": "$ref.sales_order_version",
+            "lines": [
+              {
+                "expected_line_version": "$ref.sales_order_line_version",
+                "quantity": "10.000000",
+                "sales_order_line_id": "$ref.sales_order_line_id"
+              }
+            ],
+            "receiver_name": "UAT67合成收货人",
+            "receiver_phone": "00000000000",
+            "sales_order_id": "$ref.sales_order_id",
+            "shipping_address": "UAT67合成地址"
+          },
+          "cas_fields": [
+            "expected_order_version",
+            "lines[].expected_line_version"
+          ],
+          "denied_probe_role": "warehouse",
+          "expected_db_delta": [
+            {
+              "assertion": "DRAFT出货指令",
+              "delta": "+1",
+              "table": "sales_delivery_instructions,sales_delivery_instruction_lines"
+            }
+          ],
+          "expected_status": 201,
+          "id": "S05",
+          "method": "POST",
+          "operation_id": "sales.delivery-create",
+          "path": "/api/delivery-instructions",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s05-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S05-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "销售创建出货指令"
+        },
+        {
+          "actor_slot": "sales_executor",
+          "authorization": {
+            "actor_role": "sales",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "sales"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "warehouse",
+            "idempotency": "REQUIRED",
+            "operation_id": "sales.delivery-submit",
+            "permissions_all": [
+              "sales.delivery.submit"
+            ],
+            "route_pattern": "^/api/delivery-instructions/[1-9][0-9]*/submit$",
+            "source": "app/lib/sales-selfhost/handler.ts",
+            "source_line": 67
+          },
+          "body_template": {
+            "expected_version": "$ref.S05.instruction_version",
+            "reason": "UAT67提交"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "warehouse",
+          "expected_db_delta": [
+            {
+              "assertion": "SUBMITTED",
+              "delta": "+1",
+              "table": "sales_delivery_instruction_events"
+            }
+          ],
+          "expected_status": 200,
+          "id": "S06",
+          "method": "POST",
+          "operation_id": "sales.delivery-submit",
+          "path": "/api/delivery-instructions/{delivery_instruction_id}/submit",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s06-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S06-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "销售提交出货指令"
+        },
+        {
+          "actor_slot": "warehouse_executor",
+          "authorization": {
+            "actor_role": "warehouse",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "warehouse"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "sales.delivery-accept",
+            "permissions_all": [
+              "sales.delivery.accept"
+            ],
+            "route_pattern": "^/api/delivery-instructions/[1-9][0-9]*/accept$",
+            "source": "app/lib/sales-selfhost/handler.ts",
+            "source_line": 67
+          },
+          "body_template": {
+            "expected_version": "$ref.S06.instruction_version",
+            "reason": "UAT67仓库接受"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "ACCEPTED",
+              "delta": "+1",
+              "table": "sales_delivery_instruction_events"
+            }
+          ],
+          "expected_status": 200,
+          "id": "S07",
+          "method": "POST",
+          "operation_id": "sales.delivery-accept",
+          "path": "/api/delivery-instructions/{delivery_instruction_id}/accept",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s07-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S07-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "仓库接受出货指令"
+        },
+        {
+          "actor_slot": "warehouse_executor",
+          "authorization": {
+            "actor_role": "warehouse",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "warehouse"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "sales.delivery-execute",
+            "permissions_all": [
+              "sales.delivery.execute"
+            ],
+            "route_pattern": "^/api/(?:delivery-instructions/[1-9][0-9]*/execute|shipments)$",
+            "source": "app/lib/sales-selfhost/handler.ts",
+            "source_line": 67
+          },
+          "body_template": {
+            "expected_instruction_version": "$ref.S07.instruction_version",
+            "expected_sales_order_version": "$ref.sales_order_version",
+            "lines": [
+              {
+                "expected_balance_version": "$ref.finished_balance_version",
+                "expected_line_version": "$ref.S05.line_version",
+                "expected_lot_version": "$ref.finished_lot_version",
+                "expected_sales_order_line_version": "$ref.sales_order_line_version",
+                "instruction_line_id": "$ref.S05.instruction_line_id",
+                "inventory_lot_id": "$ref.finished_inventory_lot_id",
+                "quantity": "10.000000"
+              }
+            ],
+            "reason": "UAT67合成出货",
+            "ship_date": "$ref.execution_date"
+          },
+          "cas_fields": [
+            "expected_instruction_version",
+            "expected_sales_order_version",
+            "lines[].expected_line_version",
+            "lines[].expected_sales_order_line_version",
+            "lines[].expected_balance_version",
+            "lines[].expected_lot_version"
+          ],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "NORMAL出货事实",
+              "delta": "+1",
+              "table": "sales_shipments,sales_shipment_lines"
+            },
+            {
+              "assertion": "成品出库",
+              "delta": "+1",
+              "table": "inventory_ledger_entries"
+            },
+            {
+              "assertion": "AR来源",
+              "delta": "+1",
+              "table": "sales_financial_source_entries"
+            }
+          ],
+          "expected_status": 201,
+          "id": "S08",
+          "method": "POST",
+          "operation_id": "sales.delivery-execute",
+          "path": "/api/delivery-instructions/{delivery_instruction_id}/execute",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s08-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S08-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "仓库执行出货"
+        },
+        {
+          "actor_slot": "finance_executor",
+          "authorization": {
+            "actor_role": "finance",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "finance"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "finance.post-document",
+            "permissions_all": [
+              "finance.post"
+            ],
+            "route_pattern": "^/api/(?:finance/documents|financial-documents/from-(?:source|sales-order|purchase-order))$",
+            "source": "app/lib/finance-selfhost/handler.ts",
+            "source_line": 35
+          },
+          "body_template": {
+            "accounting_date": "$ref.execution_date",
+            "doc_type": "AR",
+            "sales_source_entry_id": "$ref.S08.sales_financial_source_entry_id"
+          },
+          "cas_fields": [],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "AR精确继承出货来源",
+              "delta": "+1 each",
+              "table": "finance_documents,finance_document_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "S09",
+          "method": "POST",
+          "operation_id": "finance.post-document",
+          "path": "/api/finance/documents",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s09-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S09-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "财务从出货来源生成AR"
+        },
+        {
+          "actor_slot": "warehouse_executor",
+          "authorization": {
+            "actor_role": "warehouse",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "warehouse"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "sales.delivery-reverse",
+            "permissions_all": [
+              "sales.delivery.reverse"
+            ],
+            "route_pattern": "^/api/shipments/[1-9][0-9]*/reversal$",
+            "source": "app/lib/sales-selfhost/handler.ts",
+            "source_line": 70
+          },
+          "body_template": {
+            "expected_balance_versions": "$ref.S08.balance_versions",
+            "expected_lot_versions": "$ref.S08.lot_versions",
+            "reason": "UAT67合成出货冲销"
+          },
+          "branch_from_checkpoint": "AFTER_S08_BEFORE_S09",
+          "cas_fields": [
+            "expected_balance_versions",
+            "expected_lot_versions"
+          ],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "原出货不删除不覆盖",
+              "delta": "+1 REVERSAL",
+              "table": "sales_shipments"
+            },
+            {
+              "assertion": "库存、FQC额度与来源反向",
+              "delta": "+1 reversal each",
+              "table": "inventory_ledger_entries,sales_financial_source_entries"
+            }
+          ],
+          "expected_status": 201,
+          "id": "S10",
+          "method": "POST",
+          "operation_id": "sales.delivery-reverse",
+          "path": "/api/shipments/{shipment_id}/reversal",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-sales_fqc_shipment_ar-s10-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-SALES_FQC_SHIPMENT_AR-S10-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "隔离检查点冲销出货（必须在AR前）"
+        }
+      ],
+      "title": "销售分配→FQC→出货/AR"
+    },
+    {
+      "controls": [
+        {
+          "expected": "sales角色登记收款返回403且delta=0",
+          "kind": "UNAUTHORIZED_403",
+          "target_step": "F01"
+        },
+        {
+          "expected": "错误CSRF返回403且delta=0",
+          "kind": "CSRF_403",
+          "target_step": "F01"
+        },
+        {
+          "expected": "同Key同正文重放原Settlement",
+          "kind": "IDEMPOTENCY_REPLAY",
+          "target_step": "F01"
+        },
+        {
+          "expected": "同Key异正文返回IDEMPOTENCY_CONFLICT",
+          "kind": "IDEMPOTENCY_CONFLICT",
+          "target_step": "F01"
+        },
+        {
+          "expected": "陈旧expected_version返回FINANCE_VERSION_CONFLICT",
+          "kind": "CAS_CONFLICT",
+          "target_step": "F01"
+        },
+        {
+          "expected": "Audit故障时文档余额、冲销记录、事件和幂等均不变",
+          "kind": "ATOMIC_FAILURE_ZERO_HALF_RECORD",
+          "target_step": "F02"
+        },
+        {
+          "expected": "新增负数冲销记录并引用原Settlement，不改写原收款",
+          "kind": "APPEND_ONLY_REVERSAL",
+          "target_step": "F02"
+        },
+        {
+          "expected": "单据、Settlement、Event、Audit的request ID闭合",
+          "kind": "AUDIT_REQUEST_ID",
+          "target_step": "ALL_STEPS"
+        }
+      ],
+      "id": "FINANCE_PAYMENT_REVERSAL",
+      "preconditions": [
+        "P06 AP与S09 AR已由可信来源生成",
+        "财务单据版本、余额和收付款计数已取证",
+        "仅使用合成账户名称"
+      ],
+      "signoff": {
+        "business_accepted_at": null,
+        "business_acceptor_slot": "business_acceptor",
+        "executor_signed_at": null,
+        "executor_slots": [
+          "finance_executor"
+        ],
+        "observer_signed_at": null,
+        "observer_slot": "operations_observer",
+        "result": null
+      },
+      "steps": [
+        {
+          "actor_slot": "finance_executor",
+          "authorization": {
+            "actor_role": "finance",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "finance"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "finance.settle",
+            "permissions_all": [
+              "finance.pay"
+            ],
+            "route_pattern": "^/api/(?:financial-payments|finance/settlements|financial-documents/[1-9][0-9]*/settlements)$",
+            "source": "app/lib/finance-selfhost/handler.ts",
+            "source_line": 36
+          },
+          "body_template": {
+            "account_name": "UAT67合成账户",
+            "accounting_date": "$ref.execution_date",
+            "amount": "4.000000",
+            "document_id": "$ref.S09.ar_document_id",
+            "expected_version": "$ref.S09.document_version",
+            "reason": "UAT67合成客户收款",
+            "settlement_type": "RECEIPT"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "RECEIPT正向事实",
+              "delta": "+1",
+              "table": "finance_settlements"
+            },
+            {
+              "assertion": "SETTLED",
+              "delta": "+1",
+              "table": "finance_document_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "F01",
+          "method": "POST",
+          "operation_id": "finance.settle",
+          "path": "/api/finance/settlements",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-finance_payment_reversal-f01-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-FINANCE_PAYMENT_REVERSAL-F01-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "财务登记AR客户收款"
+        },
+        {
+          "actor_slot": "finance_executor",
+          "authorization": {
+            "actor_role": "finance",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "finance"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "sales",
+            "idempotency": "REQUIRED",
+            "operation_id": "finance.reverse",
+            "permissions_all": [
+              "finance.reverse"
+            ],
+            "route_pattern": "^/api/(?:financial-payments|finance-settlements)/[1-9][0-9]*/reversal$",
+            "source": "app/lib/finance-selfhost/handler.ts",
+            "source_line": 37
+          },
+          "body_template": {
+            "accounting_date": "$ref.execution_date",
+            "expected_version": "$ref.F01.document_version",
+            "reason": "UAT67客户收款冲销"
+          },
+          "branch_from_checkpoint": "AFTER_F01_AR_RECEIPT",
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "sales",
+          "expected_db_delta": [
+            {
+              "assertion": "original_settlement_id绑定F01，原记录不改写",
+              "delta": "+1 negative reversal",
+              "table": "finance_settlements"
+            },
+            {
+              "assertion": "SETTLEMENT_REVERSED",
+              "delta": "+1",
+              "table": "finance_document_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "F02",
+          "method": "POST",
+          "operation_id": "finance.reverse",
+          "path": "/api/finance-settlements/{ar_settlement_id}/reversal",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-finance_payment_reversal-f02-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-FINANCE_PAYMENT_REVERSAL-F02-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "财务冲销AR收款"
+        },
+        {
+          "actor_slot": "finance_executor",
+          "authorization": {
+            "actor_role": "finance",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "finance"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "purchase",
+            "idempotency": "REQUIRED",
+            "operation_id": "finance.settle",
+            "permissions_all": [
+              "finance.pay"
+            ],
+            "route_pattern": "^/api/(?:financial-payments|finance/settlements|financial-documents/[1-9][0-9]*/settlements)$",
+            "source": "app/lib/finance-selfhost/handler.ts",
+            "source_line": 36
+          },
+          "body_template": {
+            "account_name": "UAT67合成账户",
+            "accounting_date": "$ref.execution_date",
+            "amount": "6.000000",
+            "document_id": "$ref.P06.ap_document_id",
+            "expected_version": "$ref.P06.document_version",
+            "reason": "UAT67合成供应商付款",
+            "settlement_type": "PAYMENT"
+          },
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "purchase",
+          "expected_db_delta": [
+            {
+              "assertion": "PAYMENT正向事实",
+              "delta": "+1",
+              "table": "finance_settlements"
+            },
+            {
+              "assertion": "SETTLED",
+              "delta": "+1",
+              "table": "finance_document_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "F03",
+          "method": "POST",
+          "operation_id": "finance.settle",
+          "path": "/api/finance/settlements",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-finance_payment_reversal-f03-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-FINANCE_PAYMENT_REVERSAL-F03-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "财务登记AP供应商付款"
+        },
+        {
+          "actor_slot": "finance_executor",
+          "authorization": {
+            "actor_role": "finance",
+            "allowed_roles": [
+              "admin",
+              "manager",
+              "finance"
+            ],
+            "audit": "REQUIRED_TRANSACTIONAL",
+            "csrf": "REQUIRED",
+            "denied_probe_role": "purchase",
+            "idempotency": "REQUIRED",
+            "operation_id": "finance.reverse",
+            "permissions_all": [
+              "finance.reverse"
+            ],
+            "route_pattern": "^/api/(?:financial-payments|finance-settlements)/[1-9][0-9]*/reversal$",
+            "source": "app/lib/finance-selfhost/handler.ts",
+            "source_line": 37
+          },
+          "body_template": {
+            "accounting_date": "$ref.execution_date",
+            "expected_version": "$ref.F03.document_version",
+            "reason": "UAT67供应商付款冲销"
+          },
+          "branch_from_checkpoint": "AFTER_F03_AP_PAYMENT",
+          "cas_fields": [
+            "expected_version"
+          ],
+          "denied_probe_role": "purchase",
+          "expected_db_delta": [
+            {
+              "assertion": "original_settlement_id绑定F03，原记录不改写",
+              "delta": "+1 negative reversal",
+              "table": "finance_settlements"
+            },
+            {
+              "assertion": "SETTLEMENT_REVERSED",
+              "delta": "+1",
+              "table": "finance_document_events"
+            }
+          ],
+          "expected_status": 201,
+          "id": "F04",
+          "method": "POST",
+          "operation_id": "finance.reverse",
+          "path": "/api/finance-settlements/{ap_settlement_id}/reversal",
+          "request_evidence": {
+            "forbidden_capture": [
+              "Authorization",
+              "Cookie",
+              "Set-Cookie",
+              "X-CSRF-Token正文"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "Idempotency-Key": "uat67-finance_payment_reversal-f04-{attempt}",
+              "Origin": "{approved_uat_origin}",
+              "X-CSRF-Token": "{redacted_capture_only_presence_and_result}",
+              "X-Request-ID": "UAT67-FINANCE_PAYMENT_REVERSAL-F04-{uuid}"
+            }
+          },
+          "response_evidence": [
+            "http_status",
+            "X-Request-ID",
+            "body.request_id",
+            "body_digest_sha256",
+            "Idempotency-Replayed when replay"
+          ],
+          "server_evidence": [
+            "before/after relation counts and selected non-sensitive projections",
+            "audit_log action/object/result/request_id",
+            "idempotency_keys result/request digest without key plaintext"
+          ],
+          "title": "财务冲销AP付款"
+        }
+      ],
+      "title": "客户收款/供应商付款→逐笔冲销"
+    }
+  ]
+}
