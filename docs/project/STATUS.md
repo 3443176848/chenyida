@@ -2,17 +2,32 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-ROLLBACK-EXECUTOR-79（执行中；实现checkpoint 14/15精确前代回退）
+## SELFHOST-UAT-PROMOTION-ROLLBACK-RUNTIME-ADAPTER-80（执行中；建立受信回退运行时适配器）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / ROLLBACK CHECKPOINT 14/15 EXECUTOR / ACTUAL ROLLBACK NOT AUTHORIZED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；实现精确前代四域/镜像/运行配置回退、分阶段结果、回退后严格核验和ROLLED_BACK终态 |
-| 严格代码起点 | PASS / CONTROLLED | `1baa01a829e9475f21ed01493d4bbbde2a318955`/tree`e3e6b435703fcdc16466444b6cbb91fe1c840698`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / CHECKPOINT 13 REPOSITORY ADAPTER READY WITHOUT ACTUAL HUMAN UAT | TASK78/D-153已固定完整链聚合、独立finalization授权、双重联锁及checkpoint 13；真实员工UAT和实际晋升均未授权/执行 |
-| 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
-| 资源 | STOP LINE ACTIVE | available约1.8GiB、Swap858MiB/1GiB（超过80%）、根盘约13GiB；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
+| 当前状态 | DOING / TRUSTED ROLLBACK RUNTIME ADAPTER / REPOSITORY AND FAKE-ROOT ONLY / REAL ROLLBACK NOT AUTHORIZED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；核对既有恢复/部署/probe边界并实现固定binary/argv、最小权限、阶段化执行/contain/probe和unknown不重跑协议 |
+| 严格代码起点 | PASS / CONTROLLED | `cd9c9dee3bcf6aa859f177c699b754a129e2c54f`/tree`e6f035b180ab4be8f1613268b3f5e745ced05cac`；141文件bundle`e635792d…4645d`，用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / CONTROL PLANE COMPLETE WITHOUT RUNTIME | TASK79/D-154已固定checkpoint 14/15双授权、九阶段、十三检查、终态和恢复；生产runtime adapter、隔离演练及人工UAT仍缺失 |
+| 动态验收 | BLOCKED / TASK70 | Swap超过80%且受信adapter尚未完成；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
+| 资源 | STOP LINE ACTIVE | available约1.6GiB、Swap870MiB/1GiB（超过80%）、根盘约12GiB；仅运行仓库静态、Python、受限Node及fake-root轻量验证，不修改Swap或服务 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不运行restore/rollback/Compose、pull/build/recreate/start/stop，不连接数据库或读取env/log/Volume/备份；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
-| 系统是否可用 | NO | rollback 14/15、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
+| 系统是否可用 | NO | runtime adapter/动态回退、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
+
+## SELFHOST-UAT-PROMOTION-ROLLBACK-EXECUTOR-79（完成；checkpoint 14/15控制平面通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY ROLLBACK CHECKPOINT 14/15 CONTROL PLANE VERIFIED / RUNTIME ADAPTER AND REAL ROLLBACK ABSENT / PRODUCTION NO-GO | TASK79已释放active slot；TASK80接入受信runtime adapter，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`1015b53`/tree`d8dc52cb`→Supervisor`cd9c9de`/tree`e6f035b1`；141文件manifest raw SHA-256为`e635792d…4645d`且重放一致 |
+| 执行包/授权 | PASS / EXACT PREDECESSOR | checkpoint 14/15使用不同授权；execution package绑定checkpoint 13、四域snapshot、精确前代数据库/镜像/Compose/runtime、三方actor和执行期限，preflight先于授权消费 |
+| 事务/联锁 | PASS / FAIL CLOSED | 九阶段与十三检查均先intent后typed result，source每次复核；history→receipt→current无覆盖发布，checkpoint 15前全局及installer bundle-switch联锁持续阻断 |
+| 恢复 | PASS / PRESERVATION FIRST | intent-only、partial、source漂移、结果冲突或journal quarantine只contain并保全；即使typed result完整也不得越过journal决定，未知阶段绝不自动重跑 |
+| 审计 | PASS / DYNAMIC EXECUTION BLOCKED | 15/15 checkpoint均SUPPORTED；runtime adapter缺失、隔离回退演练缺失、人工UAT缺失形成2项P0+1项P1，`assert-ready`继续拒绝 |
+| 自动验证 | PASS / SCOPED APPLICABLE | journal52/52、release83/83、审计/跨岗21/21、Python71/71、manifest9/9、inventory260/236/24、syntax/compile/diff/敏感门通过；ESLint因192MiB V8 heap OOM未验证且未提高heap |
+| 资源/清理 | STOP LINE ACTIVE / CONTAINER OOM NONE | 收口available约1.6GiB、Swap870/1024MiB、根盘约12GiB、Load`0.20/0.51/0.36`；四服务restart0/OOM false，宿主`oom_kill=2`无增量，无任务临时容器/manifest temp残留 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未运行build、backup、Compose/PostgreSQL、Migration、镜像、部署、真实员工UAT、恢复、回滚或业务写；四个受保护Volume未触碰 |
+| 系统是否可用 | NO | 仓库15/15静态SUPPORTED和fake-root结果不等于actual回退；仍缺runtime adapter、真实恢复、正式门、业务批准、试运行和切换 |
 
 ## SELFHOST-UAT-PROMOTION-FINAL-RECEIPT-78（完成；checkpoint 13单调终态回执通过）
 

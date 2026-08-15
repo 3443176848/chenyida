@@ -3116,6 +3116,40 @@
 - 拒绝把预签名subject、静态TASK67模板、fake-root fixture或仓库checkpoint 13描述为真实员工验收或actual UAT晋升。
 - 拒绝用宽泛目录白名单恢复partial、覆盖current、删除未知证据或在恢复中重跑UAT/Migration/Compose/postdeploy；也拒绝让bundle切换绕过pending finalization。
 
+## D-154 checkpoint 14/15采用精确前代分阶段回退、独立postverify授权且unknown永不自动重跑
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY ROLLBACK CHECKPOINT 14/15 CONTROL PLANE VERIFIED / RUNTIME ADAPTER AND REAL ROLLBACK ABSENT / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK79对checkpoint 13、promotion-bound四域快照、前代镜像/运行配置、数据库围栏、postdeploy identity、TEST-only恢复器和Supervisor授权/恢复边界的源码核对，以及Node/Python轻量专项与只读团队复核
+- 确认边界：只接受仓库/fake-root/可注入无副作用adapter中的内容寻址回退控制平面；不授权或声称真实数据库、Volume、Compose、UAT/生产回退、数据恢复或业务冲销已发生
+
+### Context
+
+- checkpoint 13的`COMMITTED`只证明仓库final receipt事务完成，不能自动赋予回退权；数据库、uploads、attachments、backup_status、前代Web/Worker和运行配置必须共同回到同一个promotion前代，任一对象漂移都不能发布成功。
+- 外部restore或切换发生后若进程在result落盘前崩溃，自动重跑可能重复rename、覆盖目标、再次切换卷或容器；仅凭最终对象看似正确也不能反推出第一次动作的授权、输入和结果。
+- 生产runtime adapter尚无受信实现。若先消费授权再发现工具缺失，就会把一次性授权耗尽在没有任何可执行路径的事务中，也可能诱使operator绕过Supervisor手工回退。
+
+### Decision
+
+1. checkpoint 14使用独立短时`ROLLBACK_UAT_RELEASE`授权，checkpoint 15使用另一份`VERIFY_AND_FINALIZE_UAT_ROLLBACK`授权；两者不得复用checkpoint 13、人工UAT或彼此的授权。execution package绑定promotion/generation、checkpoint 13、精确前代、四域snapshot、数据库、Web/Worker digest、Compose、运行配置、三方actor和最多2小时执行期限。
+2. checkpoint 14固定九个有序阶段。每阶段必须先耐久写入canonical intent、复核全部immutable source，再调用唯一adapter并落盘typed result；数据库策略限定为staging恢复后受控rename且保留candidate quarantine，文件域限定新命名volume/目标后切换，Web/Worker限定精确前代digest。禁止down SQL、直接删表改账或自动业务冲销。
+3. 生产adapter preflight必须在授权消费前成功；当前adapter文件故意不存在，因此真实入口失败且授权保持pending。只有fake-root测试可注入无副作用adapter，不能将该路径解释为UAT能力。
+4. checkpoint 15固定十三项postverify，重新绑定数据库/四域摘要、Migration head、Caddy/PostgreSQL/Web/Worker身份、runtime configuration、strict identity、health和保护对象。全部typed check result精确闭合后才按history→receipt→current提交`ROLLED_BACK`，不得复用旧postdeploy/finalization回执。
+5. 任一stage/check处于intent-only、结果不完整、source替换、摘要冲突或journal要求`QUARANTINE`时，RECOVER只能调用containment并保全证据；即使外部对象看似完成，也不得自动重跑或发布成功。全局pending-intent与installer bundle-switch在checkpoint 15前持续阻断。
+
+### Consequences
+
+- feature source`1015b53ec1e0c90cc1ed4e9761255c204ad866f4`/tree`d8dc52cb0b88a1c4f3cdad505a3131924b99afa1`→manifest-only`cd9c9dee3bcf6aa859f177c699b754a129e2c54f`/tree`e6f035b180ab4be8f1613268b3f5e745ced05cac`形成141文件canonical链；manifest raw SHA-256为`e635792db65107d165d443325b1b70c15b325a499fb145dc404df07e2ce4645d`。
+- 机器审计15项checkpoint全部`SUPPORTED`，但执行仍被runtime adapter缺失、隔离UAT回退演练缺失和人工跨岗UAT缺失三项条件阻断（P0=2、P1=1）；artifact/source-manifest SHA-256为`cc12d613…56187`/`74893a76…39605`，`assert-ready`继续返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+- journal52/52、release contract83/83、审计/跨岗21/21、Python Supervisor71/71、manifest9/9及inventory260/236/24通过。定向ESLint在192MiB V8 heap下退出134，未提高heap；内核`oom_kill`仍为2，四服务restart0/OOMKilled false。
+- 下一P0为TASK80受信rollback runtime adapter；TASK70继续等待该adapter完成及Swap≤80%后才能运行合成Compose/隔离PostgreSQL动态验收。没有真实UAT、数据库、Volume、备份恢复、部署或回滚动作，系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝用root手工命令、TEST-only恢复器、旧备份路径、最终health或operator声明代替受信adapter、逐阶段result和精确postverify。
+- 拒绝在授权消费后才做runtime preflight、让checkpoint 14/15共用授权，或以同一stage/check名称覆盖旧结果。
+- 拒绝在unknown/partial时猜测重跑、删除证据、直接回退Migration或改写已过账业务事实；也拒绝把15/15静态SUPPORTED描述为真实回退已验或可投产。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

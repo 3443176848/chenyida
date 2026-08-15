@@ -4,6 +4,19 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-PROMOTION-ROLLBACK-EXECUTOR-79 - `feat: add recoverable UAT rollback checkpoints` / `build: bind UAT rollback supervisor bundle` / `docs: close rollback checkpoints and start runtime adapter`
+
+- 调度/范围：从TASK78最终Supervisor提交`1baa01a`/tree`e3e6b435`启动唯一active task；只在仓库、fake-root和可注入无副作用adapter中实现checkpoint 14/15，不连接真实数据库、不读取Volume/备份、不运行Compose或UAT/生产回退。
+- 边界决策：D-154固定checkpoint 14/15使用两个独立短时授权。execution package绑定同promotion/generation、checkpoint 13、精确前代数据库/四域snapshot/Web/Worker/Compose/runtime、三方actor和执行期限；禁止down SQL、直接改账或自动业务冲销。
+- Supervisor/事务：新增`ROLLBACK_UAT_RELEASE`与`VERIFY_AND_FINALIZE_UAT_ROLLBACK`，九个rollback stage和十三个postverify check均先写canonical intent、复核immutable source，再接收typed result。preflight先于授权消费，history→receipt→current无覆盖发布，checkpoint 15只提交`ROLLED_BACK`。
+- 恢复/联锁：stage/check intent-only、partial、source替换、结果冲突或journal quarantine只调用containment并保全；即使typed result完整也不得越过journal决定，unknown永不自动重跑。全局pending-intent及installer bundle-switch在checkpoint 15前持续阻断。
+- 运行时边界：生产adapter故意不进入bundle并在授权消费前失败，fake-root测试才允许注入无副作用adapter。机器审计15项checkpoint全部SUPPORTED，但runtime adapter、隔离回退演练和人工UAT三项动态条件继续阻断（P0=2、P1=1）。
+- 审计/发布链：artifact/source-manifest SHA-256为`cc12d613…56187`/`74893a76…39605`；source`1015b53`/tree`d8dc52cb`→Supervisor`cd9c9de`/tree`e6f035b1`形成141文件链，manifest raw SHA-256为`e635792d…4645d`。
+- 验证：journal52/52、release contract83/83、审计/跨岗21/21、Python Supervisor71/71、manifest9/9、inventory260/236/24、Node syntax、Python compile、bundle重放、凭据和diff门通过。定向ESLint在192MiB V8 heap下退出134，未提高heap或继续全仓库lint。
+- 资源/边界：Swap持续高于80%，未运行typecheck、build、Docker全量测试、Compose/PostgreSQL、backup/restore、Migration、镜像、部署、真实UAT、回滚或业务写。收口available约1.6GiB、Swap870/1024MiB、根盘约12GiB、Load`0.20/0.51/0.36`；四服务restart0/OOM false，宿主`oom_kill=2`无增量，无任务临时容器/manifest temp残留。
+- 数据库/API：无Schema、Migration或普通业务API变化；只扩展root Supervisor、rollback合同/控制器、promotion journal、安装联锁和机器审计。真实A4/A6/A7、账号、员工UAT、数据库和生产动作均未授权。
+- 治理：新增D-154，TASK79转`DONE`；自动启动`SELFHOST-UAT-PROMOTION-ROLLBACK-RUNTIME-ADAPTER-80`为唯一`DOING`，实现受信runtime adapter，TASK70继续等待资源与动态验证依赖。
+
 ### SELFHOST-UAT-PROMOTION-FINAL-RECEIPT-78 - `feat: add UAT promotion final receipt` / `build: bind UAT final receipt supervisor bundle` / `docs: close final receipt and start rollback executor`
 
 - 调度/范围：从TASK77最终Supervisor提交`2798862`/tree`2c74e6b0`启动唯一active task；只在仓库、fake-root和轻量Node/Python中实现checkpoint 13，不创建账号、不访问真实UAT/数据库、不把合成checkpoint 12冒充员工验收。

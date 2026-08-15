@@ -1,6 +1,6 @@
 # SELFHOST-UAT-PROMOTION-ROLLBACK-EXECUTOR-79 UAT晋升checkpoint 14/15精确前代回退
 
-> 状态：`DOING / ROLLBACK CHECKPOINT 14/15 EXECUTOR / ACTUAL ROLLBACK NOT AUTHORIZED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`
+> 状态：`DONE / REPOSITORY ROLLBACK CHECKPOINT 14/15 CONTROL PLANE VERIFIED / RUNTIME ADAPTER AND REAL ROLLBACK ABSENT / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO`
 > 日期：2026-08-15（Asia/Shanghai）
 > 严格代码起点：`main@1baa01a829e9475f21ed01493d4bbbde2a318955` / tree `e3e6b435703fcdc16466444b6cbb91fe1c840698`
 > 责任：Codex主智能体唯一写入、轻量测试串行、证据集成和Git提交；项目负责人保留真实快照、数据库、凭据、host、Compose、UAT/生产回退和破坏性动作专项授权
@@ -13,14 +13,14 @@ TASK78/D-153已让checkpoint 13以完整checkpoint 4—12链和独立授权形�
 
 ## 2. 验收标准
 
-- [ ] 完整核对checkpoint 13、升级前四域可恢复快照、前代Web/Worker镜像与运行配置、Migration结果/数据库围栏、postdeploy identity和现有TEST-only restore边界，固定可回退对象与不得自动处理的业务冲销边界。
-- [ ] `ROLLBACK_UAT_RELEASE`使用独立短时一次性授权；rollback intent和精确计划必须先于授权消费持久化，绑定同promotion/generation、checkpoint 13、目标前代、四域快照、镜像、Compose、数据库和三方actor。
-- [ ] checkpoint 14只从Supervisor派生参数调用受控adapter；数据库及uploads/attachments/backup_status恢复、前代Web/Worker恢复和运行配置恢复均须产生内容寻址分阶段结果，未知或partial不得猜测重跑、删除证据或发布成功。
-- [ ] 明确已过账业务事实与环境级快照恢复边界；不以直接删表、改账或down SQL代替精确快照恢复，不自动执行未授权业务冲销。
-- [ ] checkpoint 15在精确rollback result后重新验证数据库/四文件域摘要、Migration head、四服务身份、runtime configuration、strict identity、health及保护对象，发布`ROLLED_BACK`终态回执；不得复用晋升finalization授权或旧postdeploy回执。
-- [ ] history→receipt→current无覆盖发布、所有外部动作前后binding复核、崩溃点恢复、全局pending-intent和bundle-switch联锁闭合；已完成只接受精确同一rollback结果，冲突只保全/quarantine。
-- [ ] fake-root/断网测试覆盖正向合成结果、授权复用、目标代际/快照/镜像/数据库/服务漂移、外部失败、partial发布、恢复和quarantine；audit/launcher/installer/inventory适用回归通过。
-- [ ] 更新MASTER、TASKS、CHANGELOG、STATUS、DECISIONS、当前任务文档和授权包，完成资源、敏感信息和diff检查，形成独立source→manifest提交链并自动进入下一安全任务。
+- [x] 完整核对checkpoint 13、升级前四域可恢复快照、前代Web/Worker镜像与运行配置、Migration结果/数据库围栏、postdeploy identity和现有TEST-only restore边界，固定可回退对象与不得自动处理的业务冲销边界。
+- [x] `ROLLBACK_UAT_RELEASE`使用独立短时一次性授权；rollback intent和精确计划必须先于授权消费持久化，绑定同promotion/generation、checkpoint 13、目标前代、四域快照、镜像、Compose、数据库和三方actor。
+- [x] checkpoint 14只从Supervisor派生参数调用受控adapter；数据库及uploads/attachments/backup_status恢复、前代Web/Worker恢复和运行配置恢复均须产生内容寻址分阶段结果，未知或partial不得猜测重跑、删除证据或发布成功。
+- [x] 明确已过账业务事实与环境级快照恢复边界；不以直接删表、改账或down SQL代替精确快照恢复，不自动执行未授权业务冲销。
+- [x] checkpoint 15在精确rollback result后重新验证数据库/四文件域摘要、Migration head、四服务身份、runtime configuration、strict identity、health及保护对象，发布`ROLLED_BACK`终态回执；不得复用晋升finalization授权或旧postdeploy回执。
+- [x] history→receipt→current无覆盖发布、所有外部动作前后binding复核、崩溃点恢复、全局pending-intent和bundle-switch联锁闭合；已完成只接受精确同一rollback结果，冲突只保全/quarantine。
+- [x] fake-root/断网测试覆盖正向合成结果、授权复用、目标代际/快照/镜像/数据库/服务漂移、外部失败、partial发布、恢复和quarantine；audit/launcher/installer/inventory适用回归通过。
+- [x] 更新MASTER、TASKS、CHANGELOG、STATUS、DECISIONS、当前任务文档和授权包，完成资源、敏感信息和diff检查，形成独立source→manifest提交链并自动进入下一安全任务。
 
 ## 3. 禁止事项
 
@@ -32,3 +32,11 @@ TASK78/D-153已让checkpoint 13以完整checkpoint 4—12链和独立授权形�
 
 - TASK78 source`c39caad`→manifest-only`1baa01a`形成138文件bundle`7dd7a83c…591c3`；checkpoint 13仓库事务闭合，机器审计为13项SUPPORTED、2项P0阻断，实际人工UAT和回滚均未执行。
 - available约1.8GiB、Swap858MiB/1GiB、根盘约13GiB，Swap超过80%。只允许运行仓库静态、Python和受限Node轻量验证；TASK70继续`BLOCKED / RESOURCE STOP LINE + EXECUTOR DEPENDENCIES`。
+
+## 5. 完成证据
+
+- D-154固定checkpoint 14/15的执行包、独立授权、逐阶段/逐检查intent→result、严格postverify、`ROLLED_BACK`终态、全局及bundle切换联锁和保全式恢复。生产runtime adapter故意不进入bundle，真实入口必须在授权消费前返回失败；fake-root能力不冒充UAT回退能力。
+- source `1015b53ec1e0c90cc1ed4e9761255c204ad866f4` / tree `d8dc52cb0b88a1c4f3cdad505a3131924b99afa1`，manifest-only `cd9c9dee3bcf6aa859f177c699b754a129e2c54f` / tree `e6f035b180ab4be8f1613268b3f5e745ced05cac`，形成141文件bundle，manifest raw SHA-256为`e635792db65107d165d443325b1b70c15b325a499fb145dc404df07e2ce4645d`。
+- 机器审计15/15 checkpoint均为`SUPPORTED`，但执行仍以`ROLLBACK_RUNTIME_ADAPTER_NOT_BUNDLED`、`UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED`和`HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED`三项条件失败关闭；artifact/source-manifest SHA-256为`cc12d613…56187`/`74893a76…39605`。
+- journal 52/52、release contract 83/83、审计/跨岗21/21、Python Supervisor 71/71、manifest 9/9及inventory 260/236/24通过；Node语法与Python compile通过。定向ESLint在192MiB V8 heap下退出134，内核`oom_kill`仍为2，因此未提高heap或运行全仓库lint/build/Docker测试。
+- 末次资源为available 1.6GiB、Swap 870MiB/1GiB、根盘12GiB、Load `0.20/0.51/0.36`；四服务healthy/running、restart 0、OOMKilled false。没有连接数据库、读取Volume/备份/凭据、运行Compose/Migration/restore、修改UAT或留下任务临时容器。
