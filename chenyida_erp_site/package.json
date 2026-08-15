@@ -55,6 +55,7 @@
     "test:review:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-review-postgres.test.mjs",
     "test:review:ui": "node --experimental-strip-types --test tests/selfhost-review-ui-contract.test.mjs",
     "test:identity:unit": "node --experimental-strip-types --test tests/selfhost-identity-unit.test.mjs",
+    "test:authorization-matrix": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-application-authorization-matrix.test.mjs",
     "test:identity:ui": "node --experimental-strip-types --test tests/selfhost-identity-ui-contract.test.mjs",
     "test:identity:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-identity-postgres.test.mjs",
     "test:identity:migration-upgrade": "node --experimental-strip-types --test tests/selfhost-identity-migration-upgrade.test.mjs",

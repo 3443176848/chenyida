@@ -4,15 +4,15 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 253,
-  "required_tests": 229,
+  "total_tests": 254,
+  "required_tests": 230,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
     "HISTORICAL_D1_SITES": 22,
     "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 126,
+    "PURE_NODE": 127,
     "RELEASE_CONTRACT": 6,
     "SPECIAL_HARNESS": 7
   },
@@ -398,6 +398,15 @@
     {
       "path": "tests/selfhost-api-coverage.test.mjs",
       "sha256": "76f786147b87f513afc408ff8ce3e87df476844fead6e5b6ce7a3e1c229408d5",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
+      "path": "tests/selfhost-application-authorization-matrix.test.mjs",
+      "sha256": "5ffb1c8ef8f2f01c7446cf24a05f9adb859bc82c130447e5e68be606428babf7",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1873,7 +1882,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "ce0bf899e0da7c10549ae699713d0639267b7806f184e0c24c4840b4a61ec1bc",
+      "sha256": "ce7876017be559695ea84ec05853c97d7bbc2dcd554068a9f9c527cd45db33c2",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",

@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "approval": {
+    "status": "BUSINESS_APPROVAL_PENDING",
+    "owner": "ERP业务负责人",
+    "scope": "11个员工角色的岗位职责、职责分离和数据域可见性"
+  },
+  "expected_roles": [
+    "admin",
+    "manager",
+    "purchase",
+    "engineering",
+    "planning",
+    "production",
+    "warehouse",
+    "quality",
+    "sales",
+    "finance",
+    "operations"
+  ],
+  "wildcard_roles": [
+    "admin"
+  ],
+  "domain_by_permission_prefix": {
+    "dashboard": "MANAGEMENT_DASHBOARD",
+    "finance": "FINANCE",
+    "inventory": "INVENTORY",
+    "master.bom": "ENGINEERING_MASTER",
+    "master.customer": "PARTNER_MASTER",
+    "master.product": "ENGINEERING_MASTER",
+    "master.supplier": "PARTNER_MASTER",
+    "master.supplier_mapping": "SUPPLIER_MAPPING",
+    "material": "MATERIAL_MASTER",
+    "operations": "OPERATIONS",
+    "planning": "PLANNING",
+    "procurement": "PROCUREMENT",
+    "production": "PRODUCTION",
+    "project": "PROJECT",
+    "quality": "QUALITY",
+    "sales": "SALES",
+    "supplier_mapping": "SUPPLIER_MAPPING",
+    "system": "IDENTITY_AND_SYSTEM"
+  },
+  "dashboard_domain_permissions": {
+    "engineering": [
+      "master.product.read",
+      "master.bom.read"
+    ],
+    "finance": [
+      "finance.read"
+    ],
+    "inventory": [
+      "inventory.read"
+    ],
+    "material": [
+      "material.read"
+    ],
+    "operations": [
+      "operations.audit_status.read"
+    ],
+    "partners": [
+      "master.customer.read",
+      "master.supplier.read"
+    ],
+    "procurement": [
+      "procurement.read"
+    ],
+    "production": [
+      "production.read"
+    ],
+    "quality": [
+      "quality.read"
+    ],
+    "sales": [
+      "sales.read"
+    ]
+  },
+  "reviewed_handler_sources": [
+    "app/lib/ai-governance-suggestion-selfhost/handler.ts",
+    "app/lib/bom-selfhost/handler.ts",
+    "app/lib/dashboard-selfhost/handler.ts",
+    "app/lib/finance-selfhost/handler.ts",
+    "app/lib/identity-selfhost/handler.ts",
+    "app/lib/inventory-lot-selfhost/handler.ts",
+    "app/lib/inventory-selfhost/handler.ts",
+    "app/lib/master-data-selfhost/handler.ts",
+    "app/lib/material-governance-selfhost/handler.ts",
+    "app/lib/material-import-fallback/handler.ts",
+    "app/lib/material-import-normalization-selfhost/handler.ts",
+    "app/lib/material-import-review-selfhost/handler.ts",
+    "app/lib/material-import-selfhost/handler.ts",
+    "app/lib/material-requirement-selfhost/handler.ts",
+    "app/lib/material-selfhost/handler.ts",
+    "app/lib/material-standardization-selfhost/handler.ts",
+    "app/lib/planning-handoff-selfhost/handler.ts",
+    "app/lib/procurement-fulfillment-selfhost/handler.ts",
+    "app/lib/procurement-selfhost/handler.ts",
+    "app/lib/procurement-sourcing-selfhost/handler.ts",
+    "app/lib/production-batch-selfhost/handler.ts",
+    "app/lib/production-handoff-selfhost/handler.ts",
+    "app/lib/production-nonconformance-selfhost/handler.ts",
+    "app/lib/production-operation-selfhost/handler.ts",
+    "app/lib/production-routing-selfhost/handler.ts",
+    "app/lib/production-selfhost/handler.ts",
+    "app/lib/project-selfhost/handler.ts",
+    "app/lib/quality-selfhost/handler.ts",
+    "app/lib/sales-selfhost/handler.ts",
+    "app/lib/supplier-mapping-selfhost/handler.ts"
+  ],
+  "supplemental_authorization_roots": [],
+  "reviewed_authorization_source_manifest_sha256": "2c4870ca99fc93627f487962182a00c0a530bcdc6df7db8750c4db10af1a1863",
+  "route_prefix_literals": [
+    {
+      "source": "app/lib/quality-selfhost/handler.ts",
+      "literal": "/api/quality/finished-goods-",
+      "reason": "源码用于两个完整成品分配读取路由的受限前缀判断，完整路由分别纳入矩阵"
+    }
+  ],
+  "permission_usage_exceptions": [
+    {
+      "classification": "LEGACY_GRANTED_NOT_REACHABLE",
+      "permission": "material.import.commit",
+      "reason": "仅历史非self-hosted material-import handler引用；当前Node/PostgreSQL dispatcher不可达，保留项等待业务批准后删除"
+    },
+    {
+      "classification": "DYNAMIC_SOURCE_CONSTRUCTION",
+      "permission": "material.review.approve",
+      "reason": "self-hosted material routeFor通过material.review.${action}动态构造"
+    },
+    {
+      "classification": "DYNAMIC_SOURCE_CONSTRUCTION",
+      "permission": "material.review.reject",
+      "reason": "self-hosted material routeFor通过material.review.${action}动态构造"
+    },
+    {
+      "classification": "LEGACY_GRANTED_NOT_REACHABLE",
+      "permission": "sales.reverse",
+      "reason": "仅历史兼容权限，当前self-hosted发货冲销使用sales.delivery.reverse；等待业务批准后删除"
+    }
+  ],
+  "operations": []
+}
