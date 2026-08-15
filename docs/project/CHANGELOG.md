@@ -4,6 +4,18 @@
 
 ## 2026-08-15
 
+### SELFHOST-UAT-CROSS-ROLE-TRANSACTION-77 - `feat: add cross-role UAT promotion checkpoint` / `build: refresh release supervisor bundle manifest` / `docs: close cross-role checkpoint and start final receipt`
+
+- 调度/范围：从TASK76最终Supervisor提交`694f485`/tree`45007b67`启动唯一active task；只在仓库、fake-root和轻量Node/Python中实现checkpoint 12，不创建账号、不访问真实UAT/数据库、不执行业务写或伪造员工签字。
+- 边界决策：D-152固定非循环双摘要。全部4条workflow的32步骤、32控制、6冲销先完成并计算预签名全局`evidence_subject_sha256`，所有执行/观察/业务签字必须晚于全局执行完成；最终`result_sha256`再封装签字并由checkpoint发布。
+- Supervisor/事务：新增独立`VERIFY_UAT_CROSS_ROLE_EXECUTION`授权、精确checkpoint 11/bundle/合同/矩阵/result/source/actor绑定、消费前intent和全局pending联锁。internal result→history→receipt→current无覆盖发布ordinal 12，journal保持IN_PROGRESS。
+- 恢复：四个failpoint均可恢复。内部root-owned 0400 result同步后只依赖该精确raw/logical SHA、不可变bundle合同和checkpoint 11续写；external staging删除、替换或窗口过期不触发UAT重跑，内部副本不存在时仍严格复验外部source。
+- 审计/发布链：机器审计收敛为12项SUPPORTED、3项P0阻断，人工readiness继续`HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED`。source`018586d`/tree`e7da7106`→Supervisor`2798862`/tree`2c74e6b0`形成138文件链，manifest raw SHA-256为`d5398d78…b2ce2`。
+- 验证：Node组合62/62、journal4/4、Python UAT29/29、launcher/installer31/31、manifest定向4/4、inventory259/235/24及generator/syntax/JSON/diff/敏感门通过；未跳过或降低断言。
+- 资源/边界：Swap持续高于80%，未运行typecheck、全量测试、Docker build、Compose/PostgreSQL、backup/restore、Migration、镜像、部署、真实UAT、回滚或业务写。收口available约1.9GiB、Swap887/1024MiB、根盘约13GiB、Load`0.08/0.21/0.21`；四服务restart0/OOM false，宿主`oom_kill=2`无增量。
+- 数据库/API：无Schema、Migration或普通业务API变化；只扩展root Supervisor、结构化UAT结果合同、promotion journal和机器审计。真实A4/A6/A7、账号、员工UAT、数据库和生产动作均未授权。
+- 治理：新增D-152，TASK77转`DONE`；自动启动`SELFHOST-UAT-PROMOTION-FINAL-RECEIPT-78`为唯一`DOING`，先关闭checkpoint 13单调终态回执，TASK70继续等待资源与rollback执行器依赖。
+
 ### SELFHOST-UAT-POSTDEPLOY-TRANSACTION-76 - `feat: integrate postdeploy promotion checkpoints` / `fix: bind postdeploy results before publication` / `build: refresh release supervisor bundle manifest` / `docs: close postdeploy transaction and start cross-role checkpoint`
 
 - 调度/范围：从TASK75最终Supervisor提交`86be6d4`/tree`006c2309`启动唯一active task；只在仓库、fake-root、受限Node与可注入postdeploy adapter中实现checkpoint 10/11，不运行真实postdeploy、Compose、数据库或修改UAT/生产。

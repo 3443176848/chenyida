@@ -2,17 +2,32 @@
 
 最后更新时间：2026-08-15（Asia/Shanghai）
 
-## SELFHOST-UAT-CROSS-ROLE-TRANSACTION-77（执行中；把跨岗验收接入checkpoint 12不可变事务）
+## SELFHOST-UAT-PROMOTION-FINAL-RECEIPT-78（执行中；发布checkpoint 13单调终态回执）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / CROSS-ROLE CHECKPOINT 12 ADAPTER / HUMAN EXECUTION BLOCKED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；把TASK67跨岗合同、TASK66权限矩阵、checkpoint 11、逐步证据及三方签字接入独立授权、不可变journal和保全恢复 |
-| 严格代码起点 | PASS / CONTROLLED | `694f485cad3a6e9fbdc499c10cc801f0de77cafe`/tree`45007b67fb606bd423043d769efefd12acc67ab7`；用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / CHECKPOINT 10/11 REPOSITORY ADAPTER READY WITHOUT ACTUAL POSTDEPLOY | TASK76/D-151已固定两个postdeploy授权、发布前control binding及checkpoint 10/11；真实员工账号、范围、窗口和签字仍未授权/提供 |
+| 当前状态 | DOING / PROMOTION FINAL RECEIPT ADAPTER / ACTUAL UAT EVIDENCE ABSENT / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；以独立finalization授权、完整checkpoint 1—12链和单调binding聚合实现checkpoint 13 COMMITTED终态 |
+| 严格代码起点 | PASS / CONTROLLED | `2798862ebdd7df85748a0a69d6b3ddeea765d808`/tree`2c74e6b0e110d28e345588c79060d8ff29ab9c1e`；用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / CHECKPOINT 12 REPOSITORY ADAPTER READY WITHOUT ACTUAL HUMAN UAT | TASK77/D-152已固定双摘要签字合同、独立摄取授权、全局联锁及checkpoint 12；真实员工账号、范围、窗口、签字和执行仍未授权/提供 |
 | 动态验收 | BLOCKED / TASK70 | Swap超过80%且执行器未完整；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
-| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap889MiB/1GiB（超过80%）、根盘约13GiB；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
-| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不创建账号、不执行员工业务写，不运行postdeploy/Compose、pull/build/recreate/start/stop，不连接数据库或读取env/log/Volume；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
+| 资源 | STOP LINE ACTIVE | available约1.9GiB、Swap887MiB/1GiB（超过80%）、根盘约13GiB；仅运行仓库静态、Python和受限Node轻量验证，不修改Swap或服务 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不创建账号、不执行员工业务写，不运行UAT/finalization实际动作、Compose、pull/build/recreate/start/stop，不连接数据库或读取env/log/Volume；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
 | 系统是否可用 | NO | 无完整晋升/rollback执行器、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行或正式切换 |
+
+## SELFHOST-UAT-CROSS-ROLE-TRANSACTION-77（完成；checkpoint 12双摘要证据与保全恢复通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / REPOSITORY CROSS-ROLE CHECKPOINT 12 TRANSACTION VERIFIED / HUMAN EXECUTION NOT PERFORMED / PRODUCTION NO-GO | TASK77已释放active slot；TASK78接入checkpoint 13，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`018586d`/tree`e7da7106`→Supervisor`2798862`/tree`2c74e6b0`；138文件manifest raw SHA-256为`d5398d78…b2ce2`且重放一致 |
+| 摘要/签字 | PASS / TWO-LAYER NON-CYCLIC | 全部workflow执行证据完成后计算预签名`evidence_subject_sha256`；所有三方签字必须晚于全局执行完成，最终`result_sha256`再封装签字并由checkpoint 12发布 |
+| 事务/联锁 | PASS / FAIL CLOSED | 独立摄取授权、消费前intent、checkpoint 11及完整binding、全局pending联锁、内部result→history→receipt→current闭合；journal仍为IN_PROGRESS |
+| 恢复 | PASS / INTERNAL DURABLE RESULT | 四个failpoint可恢复；内部result落盘后external remove/replace/expiry不再影响续写，内部副本不存在时仍严格复验外部source |
+| 审计 | PASS / HUMAN UAT AND EXECUTOR STILL BLOCKED | 12项SUPPORTED、3项P0阻断；checkpoint 13与rollback 14/15仍开放，人工readiness仍为`HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED`，`assert-ready`继续拒绝 |
+| 自动验证 | PASS / SCOPED APPLICABLE | Node组合62/62、journal4/4、Python UAT29/29、launcher/installer31/31、manifest4/4、inventory259/235/24及generator/syntax/JSON/diff/敏感门通过 |
+| 资源/清理 | STOP LINE ACTIVE / CONTAINER OOM NONE | 收口available约1.9GiB、Swap887/1024MiB、根盘约13GiB、Load`0.08/0.21/0.21`；四服务restart0/OOM false，宿主`oom_kill=2`无增量 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未运行build、backup、Compose/PostgreSQL、Migration、镜像、部署、真实员工UAT、回滚或业务写；四个受保护Volume未触碰 |
+| 系统是否可用 | NO | 仓库checkpoint 12和合成fixture不等于actual人工UAT；仍缺final、rollback、真实恢复、正式门、业务批准、试运行和切换 |
 
 ## SELFHOST-UAT-POSTDEPLOY-TRANSACTION-76（完成；checkpoint 10/11事务和发布前control binding通过）
 

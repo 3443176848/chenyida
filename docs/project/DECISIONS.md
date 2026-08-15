@@ -3047,6 +3047,40 @@
 - 拒绝在结果发布后才首次比较外部摘要、允许多份binding择一、用current存在推断前置binding已提交，或在未知partial时自动重跑postdeploy。
 - 拒绝把fake-root结果、checkpoint 11仓库回执或静态SUPPORTED描述为actual postdeploy、人工UAT、final receipt或可投产结论。
 
+## D-152 checkpoint 12采用预签名全局证据主题与最终结果双摘要且内部落盘后仅恢复journal
+
+- 日期：2026-08-15
+- 状态：`ACCEPTED / REPOSITORY CROSS-ROLE CHECKPOINT 12 TRANSACTION VERIFIED / HUMAN EXECUTION NOT PERFORMED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK77对TASK67跨岗合同、TASK66授权矩阵、checkpoint 11、逐步结构化证据、三方签字、Supervisor全局联锁及partial恢复的源码核对，以及Node/Python轻量专项和独立只读攻击复核
+- 确认边界：只接受仓库证据合同、独立一次性摄取授权、内容寻址result、不可变intent/history/receipt/current及fake-root合成fixture；不授权或声称真实员工账号、业务写、人工签字、UAT/生产、数据库、部署或回滚已发生
+
+### Context
+
+- 签字如果直接包含最终`result_sha256`会形成哈希循环，因为最终结果自身包含签字及其摘要；若只按每条workflow局部完成时间允许签字，早期workflow还可能在后续workflow证据产生前签署一个声称覆盖全局的主题。
+- TASK67静态模板只定义所需步骤与证据来源，不能表达实际逐请求结果、数据库delta、audit/idempotency/CAS、账号人员映射和签字，也不能冒充人工已执行。
+- 外部cross-role staging在原始摄取时必须未过期且精确source-bound；但一旦相同raw/logical SHA的受信只读副本已同步进入promotion内部results，崩溃恢复继续依赖外部路径会把可恢复journal误送quarantine。
+
+### Decision
+
+1. checkpoint 12使用独立`VERIFY_UAT_CROSS_ROLE_EXECUTION` Supervisor v6一次性授权。cross-role intent必须先于授权消费落盘，精确绑定checkpoint 11、promotion/candidate/database/runtime/snapshot/Migration/deployment/postdeploy身份、Supervisor bundle、TASK67合同、TASK66矩阵、外部result raw/final SHA和三方Supervisor actor；人工执行授权必须与摄取授权及既有authorization chain不同。
+2. 每条workflow的全部步骤、control和追加式reversal先完成。系统从所有workflow的执行证据计算唯一`evidence_subject_sha256`，该主题排除所有签字、workflow封装摘要和signoff完成时间；所有执行人、观察人和业务验收人只能在全局`execution_completed_at`之后签署同一主题。
+3. 签字加入后再计算各`workflow_evidence_sha256`与最终`result_sha256`。因此`evidence_subject_sha256`明确表示“签名前精确执行payload”，`result_sha256`明确表示“含全部签字的最终封装”；checkpoint 12只发布后者，同时响应暴露两者及approval subject供审计，不得把两种摘要互换或声称签字循环绑定自身。
+4. 外部result首次摄取必须通过root marker、owner/mode、单硬链接、source identity、canonical、窗口、actor/approval及完整内容验证。内部`results/<operation>.<result_sha256>.json`同步成功后，恢复只使用该精确raw SHA副本、不可变bundle合同和checkpoint 11 current；外部staging删除、替换或窗口届满不得触发人工UAT重跑。
+5. checkpoint 12按internal result→history→receipt→current无覆盖发布并保持`IN_PROGRESS`。全局Supervisor pending-intent联锁在提交前只允许精确原操作或精确恢复；未知、冲突或内部副本不匹配只保全/quarantine。
+
+### Consequences
+
+- feature source`018586d8e2ecf36bbe773f8bb7e1e8754c9f620b`/tree`e7da71065ab1effdded1fbf74b5a72a27d68b25e`→manifest-only`2798862ebdd7df85748a0a69d6b3ddeea765d808`/tree`2c74e6b0e110d28e345588c79060d8ff29ab9c1e`形成138文件canonical链；manifest raw SHA-256为`d5398d78854fcec0d9a8339a7eb4be7a0e5d722904e530b5afed0a55d1cb2ce2`。
+- 机器审计由11项SUPPORTED/4项阻断收敛为12项SUPPORTED/3项P0阻断；checkpoint 13与rollback 14/15仍缺失，`assert-ready`继续拒绝，静态cross-role readiness仍为`HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED`。
+- Node组合62/62、journal cross-role4/4、Python UAT29/29、launcher/installer31/31、manifest定向4/4及inventory259/235/24通过；内部result后的external remove/replace/expiry恢复已有组合测试。
+- Swap持续超过80%，未运行build、全量测试、Compose/PostgreSQL、Migration、backup/restore、镜像、部署、真实UAT或回滚。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝让签字直接循环引用包含自身的最终摘要、让早期workflow在后续证据产生前签全局主题，或把任意evidence digest、空签字、占位批准ID和同人多账号冒充验收。
+- 拒绝把TASK67静态模板、合成fixture、Supervisor操作者声明或checkpoint 12仓库回执描述为真实员工已执行。
+- 拒绝在内部result已持久化后因外部staging清理而重跑业务动作；也拒绝在内部副本不存在或不匹配时绕过外部source复验。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
