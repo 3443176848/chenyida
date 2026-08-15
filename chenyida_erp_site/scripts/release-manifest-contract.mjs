@@ -53,8 +53,8 @@ export const RELEASE_GATE_PLAN_REPOSITORY_PATH = "chenyida_erp_site/release/rele
 export const RELEASE_VULNERABILITY_POLICY_ID = "chenyida-erp-zero-known-vulnerabilities-v1";
 export const RELEASE_VULNERABILITY_POLICY_SHA256 = "042cd1bb1185923a8f186319d90194911beba78f761938f42937c5fd0e463ab9";
 export const RELEASE_TEST_RUNTIME_POLICY_CONTRACT = "chenyida-erp-release-test-runtime-policy/v1";
-export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "a931d47746df3ddc0d3a5ae83bd84dbde519984abfef4ddfbb37115ae9256317";
-export const RELEASE_TEST_INVENTORY_SHA256 = "b785d86ad7e851efeeb5916025001d9d766efe9201a62768b7645ec50d7b1bc2";
+export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "b15bbce85c7a85fbde50791d62b4d09379d06780f4055e7dfb91c910c0ba0415";
+export const RELEASE_TEST_INVENTORY_SHA256 = "eb8f42092119fec85e78192a743bf7b2f29276ac53f80b6d9671d6193dbdd464";
 export const RELEASE_GATE_REQUIRED_STEP_IDS = [
   "release-contracts",
   "supervisor-python-contracts",

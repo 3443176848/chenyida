@@ -16,6 +16,7 @@
   "expected_implemented_supervisor_operations": [
     "BEGIN_UAT_PROMOTION",
     "CAPTURE_UAT_PROMOTION_SNAPSHOT",
+    "QUIESCE_UAT_WRITERS",
     "RECOVER_UAT_PROMOTION"
   ],
   "required_checkpoint_order": [
@@ -73,10 +74,10 @@
     },
     {
       "id": "WRITER_QUIESCE_RECEIPT",
-      "status": "PARTIAL",
+      "status": "SUPPORTED",
       "severity_if_incomplete": "P0",
-      "evidence": ["backup-selfhost.sh:web-container", "backup-selfhost.sh:worker-container"],
-      "finding": "备份入口要求Web/Worker已经停止并检查writer，但没有由晋升控制面停止精确容器并发布不可变quiesce receipt。"
+      "evidence": ["uat-promotion-transaction-journal.mjs:UAT_PROMOTION_QUIESCE_INTENT_CONTRACT", "uat-promotion-transaction-journal.mjs:probeDockerWriterQuiesce", "release-supervisor-launcher.py:QUIESCE_UAT_WRITERS"],
+      "finding": null
     },
     {
       "id": "ONE_TIME_MIGRATION_AUTHORIZATION",
@@ -143,7 +144,7 @@
     }
   ],
   "source_files": [
-    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
+    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
     {"path": "chenyida_erp_site/scripts/release-candidate-snapshot.py", "markers": ["VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT", "receipt_sha256"]},
     {"path": "chenyida_erp_site/scripts/release-manifest-contract.mjs", "markers": ["promotion_status", "RELEASE_NOT_ELIGIBLE"]},
     {"path": "chenyida_erp_site/scripts/release-lifecycle-contract.mjs", "markers": ["PRE_DEPLOY_EXISTING_RUNTIME_STABILITY", "POST_DEPLOY_CURRENT_RUNTIME_STRICT"]},
@@ -160,6 +161,6 @@
     {"path": "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs", "markers": ["buildReleaseIdentityFromPostDeployReceipt", "assertPostDeployReadinessStable"]},
     {"path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json", "markers": ["HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED", "\"status\": \"BLOCKED\""]},
     {"path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json", "markers": ["chenyida-erp-uat-promotion-transaction-policy/v1", "\"status\": \"NOT_IMPLEMENTED\""]},
-    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "validateBackupRecoveryReadinessV4", "AFTER_SNAPSHOT_CURRENT", "runUatPromotionTransactionPhase"]}
+    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT", "probeDockerWriterQuiesce", "validateBackupRecoveryReadinessV4", "AFTER_QUIESCE_CURRENT", "runUatPromotionTransactionPhase"]}
   ]
 }

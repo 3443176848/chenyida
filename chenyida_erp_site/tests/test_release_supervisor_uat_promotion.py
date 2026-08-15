@@ -172,6 +172,73 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
         }
 
+    def quiesce_parameters(self, recovery=False):
+        promotion_id = "promotion-supervisor-fixture"
+        snapshot_id = "promotion-supervisor-capture"
+        snapshot_intent_sha256 = "d" * 64
+        snapshot_intent = (
+            f"{supervisor.UAT_PROMOTION_STATE_ROOT}/intents/"
+            f"{snapshot_id}.{snapshot_intent_sha256}.json"
+        )
+        value = {
+            "promotion_state_root": str(supervisor.UAT_PROMOTION_STATE_ROOT),
+            "promotion_id": promotion_id,
+            "promotion_generation": 1,
+            "previous_checkpoint_receipt_sha256": "1" * 64,
+            "promotion_intent_sha256": "2" * 64,
+            "promotion_original_authorization_sha256": "3" * 64,
+            "snapshot_operation_id": snapshot_id,
+            "snapshot_intent_sha256": snapshot_intent_sha256,
+            "snapshot_intent_source": self.source(snapshot_intent, seed="9"),
+            "candidate_binding_sha256": "4" * 64,
+            "database_binding_sha256": "5" * 64,
+            "runtime_binding_sha256": "6" * 64,
+            "preupgrade_recovery_binding_sha256": "7" * 64,
+            "promotion_snapshot_binding_sha256": "8" * 64,
+            "current_checkpoint_source": self.source(str(supervisor.UAT_PROMOTION_CURRENT_FILE), seed="a"),
+            "runtime_identity_source": self.source(
+                str(supervisor.RELEASE_IDENTITY_FILE), mode="0440", gid=1234, seed="6",
+            ),
+            "deployment_class": "UAT",
+            "deployment_id": "chenyida-erp",
+            "compose_project": "chenyida-erp",
+            "compose_project_root": "/opt/erp/chenyida_erp_site",
+            "web_container": "chenyida-erp-web-1",
+            "web_container_id": "e" * 64,
+            "worker_container": "chenyida-erp-worker-1",
+            "worker_container_id": "f" * 64,
+            "quiesce_created_at": "2026-08-15T01:32:00.000Z",
+            "quiesce_expires_at": "2026-08-15T01:44:00.000Z",
+            "requester_identity_sha256": "a" * 64,
+            "approver_identity_sha256": "b" * 64,
+            "executor_identity_sha256": "c" * 64,
+            "policy_file_sha256": supervisor.UAT_PROMOTION_POLICY_FILE_SHA256,
+            "policy_sha256": supervisor.UAT_PROMOTION_POLICY_SHA256,
+        }
+        if recovery:
+            value.update({
+                "expected_intent_sha256": "9" * 64,
+                "original_authorization_sha256": "a" * 64,
+                "original_operation": "QUIESCE_WRITERS",
+                "original_operation_id": "promotion-supervisor-quiesce",
+            })
+        return value
+
+    def quiesce_authorization(self, bundle_digest, now, recovery=False):
+        operation = "RECOVER_UAT_PROMOTION" if recovery else "QUIESCE_UAT_WRITERS"
+        return {
+            "schema_version": 6,
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "authorization_id": "promotion-supervisor-quiesce-recovery" if recovery else "promotion-supervisor-quiesce",
+            "created_at": utc(now),
+            "expires_at": utc(now + timedelta(minutes=30)),
+            "supervisor_bundle_sha256": bundle_digest,
+            "operation": operation,
+            "parameters": self.quiesce_parameters(recovery),
+            "nonce": "f" * 64,
+            "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
+        }
+
     def test_v6_authorization_is_exact_and_recovery_binds_the_original_intent(self):
         bundle = "f" * 64
         original_now = datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc)
@@ -316,6 +383,80 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
                 capture_digest, lock_descriptor=51,
             )
         self.assertEqual(events, ["snapshot-sources", "node", "prepare", "snapshot-sources", "consume", "snapshot-sources", "execute", "cleanup"])
+
+    def test_quiesce_authorization_is_exact_distinct_and_recoverable(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 32, tzinfo=timezone.utc)
+        authorization = self.quiesce_authorization(bundle, now)
+        self.assertEqual(supervisor.validate_authorization(authorization, bundle, now), authorization)
+        context = supervisor.uat_promotion_context(authorization, "1" * 64)
+        self.assertEqual(context["operation"], "QUIESCE_WRITERS")
+        self.assertEqual(context["operation_id"], authorization["authorization_id"])
+        self.assertEqual(set(context["parameters"]), supervisor.UAT_PROMOTION_QUIESCE_PARAMETER_FIELDS)
+
+        recovery_now = datetime(2026, 8, 15, 1, 40, tzinfo=timezone.utc)
+        recovery = self.quiesce_authorization(bundle, recovery_now, recovery=True)
+        self.assertEqual(supervisor.validate_authorization(recovery, bundle, recovery_now), recovery)
+        recovery_context = supervisor.uat_promotion_context(recovery, "2" * 64)
+        self.assertEqual(recovery_context["operation"], "QUIESCE_WRITERS")
+        self.assertEqual(recovery_context["operation_id"], authorization["authorization_id"])
+        self.assertEqual(recovery_context["expected_intent_sha256"], "9" * 64)
+
+        reused_snapshot_id = {**authorization, "authorization_id": authorization["parameters"]["snapshot_operation_id"]}
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_TIME_INVALID"):
+            supervisor.validate_authorization(reused_snapshot_id, bundle, now)
+        invalid_container = {
+            **authorization,
+            "parameters": {**authorization["parameters"], "worker_container_id": "short"},
+        }
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_QUIESCE_CONTAINER_INVALID"):
+            supervisor.validate_authorization(invalid_container, bundle, now)
+        root_target = {
+            **authorization,
+            "parameters": {**authorization["parameters"], "compose_project_root": "/"},
+        }
+        with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_QUIESCE_PROJECT_ROOT_INVALID"):
+            supervisor.validate_authorization(root_target, bundle, now)
+
+    def test_quiesce_requires_exact_consumed_authorization_and_rechecks_sources_around_consumption(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 32, tzinfo=timezone.utc)
+        authorization = self.quiesce_authorization(bundle, now)
+        raw = supervisor.canonical_json(authorization)
+        authorization_digest = supervisor.sha256(raw)
+        recovery_parameters = self.quiesce_parameters(recovery=True)
+        recovery_parameters["original_authorization_sha256"] = authorization_digest
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-quiesce-consumed-") as temporary:
+            consumed = Path(temporary)
+            consumed.chmod(0o700)
+            file = consumed / f"{authorization['authorization_id']}.{authorization_digest}.json"
+            file.write_bytes(raw)
+            file.chmod(0o400)
+            self.assertEqual(
+                supervisor.validate_original_uat_promotion_authorization_consumed(recovery_parameters, bundle, consumed),
+                authorization,
+            )
+            changed = {**recovery_parameters, "compose_project_root": "/opt/erp/replaced"}
+            with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_ORIGINAL_AUTHORIZATION_INVALID"):
+                supervisor.validate_original_uat_promotion_authorization_consumed(changed, bundle, consumed)
+
+        events = []
+        patches = [
+            patch.object(supervisor, "verify_uat_promotion_quiesce_sources", side_effect=lambda *_: events.append("quiesce-sources")),
+            patch.object(supervisor, "prepare_runtime_privilege_node", side_effect=lambda *_: (events.append("node") or (Path("/tmp/runtime"), Path("/tmp/runtime/node")))),
+            patch.object(supervisor, "run_uat_promotion_runner", side_effect=lambda _node, _bundle, _context, phase, _lock: (events.append(phase) or {"result": "COMMITTED"})),
+            patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")),
+            patch.object(supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup")),
+        ]
+        with patches[0], patches[1], patches[2], patches[3], patches[4]:
+            supervisor.run_uat_promotion_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/quiesce.json"), authorization,
+                "1" * 64, lock_descriptor=51,
+            )
+        self.assertEqual(
+            events,
+            ["quiesce-sources", "node", "prepare", "quiesce-sources", "consume", "quiesce-sources", "execute", "cleanup"],
+        )
 
 
 if __name__ == "__main__":

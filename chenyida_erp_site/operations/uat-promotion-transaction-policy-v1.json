@@ -27,6 +27,7 @@
     ],
     "begin_operation": "BEGIN_UAT_PROMOTION",
     "snapshot_operation": "CAPTURE_UAT_PROMOTION_SNAPSHOT",
+    "quiesce_operation": "QUIESCE_UAT_WRITERS",
     "recovery_operation": "RECOVER_UAT_PROMOTION"
   },
   "required_intent_bindings": [
@@ -51,7 +52,10 @@
     "backup_capture_precondition": "EXACT_COMPOSE_WEB_WORKER_STOPPED",
     "snapshot_checkpoint": "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
     "postcapture_quiesce_checkpoint": "WRITER_QUIESCE_RECEIPT",
-    "checkpoint_order_decision": "CAPTURE_EMBEDS_WRITER_STOP_PROOF_AND_NEXT_CHECKPOINT_PROVES_CONTINUED_QUIESCE"
+    "checkpoint_order_decision": "CAPTURE_EMBEDS_WRITER_STOP_PROOF_AND_NEXT_CHECKPOINT_PROVES_CONTINUED_QUIESCE",
+    "continued_quiesce_proof": "SAME_CAPTURED_CONTAINER_IDS_STOPPED_WITH_LAST_START_AND_FINISH_NOT_AFTER_CAPTURE_VERIFY",
+    "compose_inventory_scope": "EXACT_PROJECT_AND_WORKING_DIRECTORY_NO_REPLACEMENT",
+    "external_writer_boundary": "NOT_PROVEN_UNTIL_ONE_TIME_MIGRATION_DATABASE_FENCE"
   },
   "checkpoint_order": [
     "CANDIDATE_SOURCE_SNAPSHOT",
@@ -74,7 +78,7 @@
   "adapters": [
     {"operation": "BEGIN_UAT_PROMOTION", "status": "IMPLEMENTED", "checkpoints": ["CANDIDATE_SOURCE_SNAPSHOT", "ELIGIBLE_RELEASE_MANIFEST", "PRE_DEPLOY_RUNTIME_STABILITY", "PROMOTION_INTENT_AND_DURABLE_JOURNAL"]},
     {"operation": "CAPTURE_UAT_PROMOTION_SNAPSHOT", "status": "IMPLEMENTED", "checkpoints": ["PROMOTION_BOUND_RECOVERABLE_SNAPSHOT"]},
-    {"operation": "QUIESCE_UAT_WRITERS", "status": "NOT_IMPLEMENTED", "checkpoints": ["WRITER_QUIESCE_RECEIPT"]},
+    {"operation": "QUIESCE_UAT_WRITERS", "status": "IMPLEMENTED", "checkpoints": ["WRITER_QUIESCE_RECEIPT"]},
     {"operation": "RUN_UAT_PROMOTION_MIGRATION", "status": "NOT_IMPLEMENTED", "checkpoints": ["ONE_TIME_MIGRATION_AUTHORIZATION", "MIGRATION_COMMIT_RECEIPT"]},
     {"operation": "DEPLOY_UAT_RELEASE", "status": "NOT_IMPLEMENTED", "checkpoints": ["COMPOSE_DEPLOYMENT_RECEIPT", "POST_DEPLOY_RUNTIME_CONFIGURATION", "POST_DEPLOY_IDENTITY", "CROSS_ROLE_UAT_EXECUTION", "PROMOTION_FINAL_RECEIPT"]},
     {"operation": "ROLLBACK_UAT_RELEASE", "status": "NOT_IMPLEMENTED", "checkpoints": ["ROLLBACK_TO_UAT_EXECUTOR", "ROLLBACK_POSTVERIFY_AND_FINAL_RECEIPT"]},

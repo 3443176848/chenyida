@@ -29,18 +29,18 @@ test("current repository audit is valid but UAT promotion remains blocked", () =
   assert.equal(result.artifact.audit_validation.result, "PASS");
   assert.equal(result.artifact.execution_readiness.status, "BLOCKED");
   assert.equal(result.artifact.execution_readiness.may_start, false);
-  assert.equal(result.artifact.execution_readiness.blocking_checkpoint_count, 8);
-  assert.equal(result.artifact.execution_readiness.p0_blocker_count, 7);
+  assert.equal(result.artifact.execution_readiness.blocking_checkpoint_count, 7);
+  assert.equal(result.artifact.execution_readiness.p0_blocker_count, 6);
   assert.equal(result.artifact.execution_readiness.p1_blocker_count, 1);
 });
 
 test("audit observes the exact Supervisor gap and TEST-only restore boundary", () => {
   const { artifact, errors } = buildUatPromotionRollbackAudit(inputs());
   assert.deepEqual(errors, []);
-  assert.equal(artifact.observations.supervisor_operation_count, 22);
+  assert.equal(artifact.observations.supervisor_operation_count, 23);
   assert.equal(artifact.observations.required_promotion_operation_count, 7);
-  assert.deepEqual(artifact.observations.implemented_required_promotion_operations, ["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "RECOVER_UAT_PROMOTION"]);
-  assert.equal(artifact.observations.missing_required_promotion_operations.length, 4);
+  assert.deepEqual(artifact.observations.implemented_required_promotion_operations, ["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "RECOVER_UAT_PROMOTION"]);
+  assert.equal(artifact.observations.missing_required_promotion_operations.length, 3);
   assert.equal(artifact.observations.restore_target_policy, "TEST_ONLY");
   assert.equal(artifact.observations.migration_authorization, "REPEATABLE_ENVIRONMENT_CONFIRMATION");
   assert.equal(artifact.observations.compose_release_image_binding, "DIGEST_OVERRIDE_WITHOUT_PROMOTION_RECEIPT");
@@ -75,15 +75,15 @@ test("source marker drift and cross-role readiness promotion are rejected", () =
   assert.ok(errors.includes("AUDIT_CROSS_ROLE_UAT_BOUNDARY_DRIFT"));
 });
 
-test("an undeclared promotion operation cannot silently expand the audited implementation", () => {
+test("a declared promotion operation cannot disappear from the audited implementation", () => {
   const fixture = inputs();
   const launcherPath = "chenyida_erp_site/scripts/release-supervisor-launcher.py";
   fixture.sourceBodies.set(launcherPath, fixture.sourceBodies.get(launcherPath).replace(
-    "UAT_PROMOTION_OPERATIONS = {",
-    'UAT_PROMOTION_OPERATIONS = {\n    "QUIESCE_UAT_WRITERS": "QUIESCE",',
+    '    "QUIESCE_UAT_WRITERS": "QUIESCE_WRITERS",\n',
+    "",
   ));
   const result = buildUatPromotionRollbackAudit(fixture);
-  assert.ok(result.errors.includes("AUDIT_IMPLEMENTED_OPERATION_DRIFT:BEGIN_UAT_PROMOTION,CAPTURE_UAT_PROMOTION_SNAPSHOT,QUIESCE_UAT_WRITERS,RECOVER_UAT_PROMOTION"));
+  assert.ok(result.errors.includes("AUDIT_IMPLEMENTED_OPERATION_DRIFT:BEGIN_UAT_PROMOTION,CAPTURE_UAT_PROMOTION_SNAPSHOT,RECOVER_UAT_PROMOTION"));
 });
 
 test("artifact is deterministic and self-digested", () => {

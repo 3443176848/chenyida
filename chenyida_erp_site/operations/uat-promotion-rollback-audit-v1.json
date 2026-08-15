@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "a7004c2eaa732563d28cf3eace61ca82fcf53edc829361bb9ab2288f7991eae9",
+  "artifact_sha256": "7085cd75281b25f0556cfc8cee7153f3dda988490e3b498d838f77321aca03fc",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -64,14 +64,15 @@
     },
     {
       "evidence": [
-        "backup-selfhost.sh:web-container",
-        "backup-selfhost.sh:worker-container"
+        "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_QUIESCE_INTENT_CONTRACT",
+        "uat-promotion-transaction-journal.mjs:probeDockerWriterQuiesce",
+        "release-supervisor-launcher.py:QUIESCE_UAT_WRITERS"
       ],
-      "finding": "备份入口要求Web/Worker已经停止并检查writer，但没有由晋升控制面停止精确容器并发布不可变quiesce receipt。",
+      "finding": null,
       "id": "WRITER_QUIESCE_RECEIPT",
       "ordinal": 6,
       "severity_if_incomplete": "P0",
-      "status": "PARTIAL"
+      "status": "SUPPORTED"
     },
     {
       "evidence": [
@@ -170,21 +171,15 @@
   "deployment_class": "UAT",
   "execution_class": "AUDIT_ONLY_NOT_AUTHORIZED",
   "execution_readiness": {
-    "blocking_checkpoint_count": 8,
+    "blocking_checkpoint_count": 7,
     "code": "UAT_PROMOTION_EXECUTOR_NOT_READY",
     "may_start": false,
-    "p0_blocker_count": 7,
+    "p0_blocker_count": 6,
     "p1_blocker_count": 1,
     "statement": "当前只允许继续仓库实施和隔离验证；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
     "status": "BLOCKED"
   },
   "findings": [
-    {
-      "finding": "备份入口要求Web/Worker已经停止并检查writer，但没有由晋升控制面停止精确容器并发布不可变quiesce receipt。",
-      "id": "WRITER_QUIESCE_RECEIPT",
-      "severity": "P0",
-      "status": "PARTIAL"
-    },
     {
       "finding": "Migration绑定ELIGIBLE manifest和目标身份，但授权来自可重复环境变量；Supervisor没有一次性迁移操作或消费回执。",
       "id": "ONE_TIME_MIGRATION_AUTHORIZATION",
@@ -231,17 +226,17 @@
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "2712e9738ab2ca2f9cf43a7da39f85ed053942e3da9e1c4ebcd394965b51cca9"
+      "sha256": "a8ee676868373aa23a193b28aec02d99ff0608cc478cf9be9a22aca4f2406a62"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
-      "sha256": "5c9526a30d7fa9e8918f7ba5db0f2fe1635fa2eea4b9dbfc16d4251345a50e8b"
+      "sha256": "09e6405821f2131033438f970ae04fc5295cef8df14bd82561b0c16571846276"
     },
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 233,
-      "sha256": "b785d86ad7e851efeeb5916025001d9d766efe9201a62768b7645ec50d7b1bc2",
+      "sha256": "eb8f42092119fec85e78192a743bf7b2f29276ac53f80b6d9671d6193dbdd464",
       "total_tests": 257
     },
     "source_manifest": {
@@ -268,7 +263,7 @@
             "\"status\": \"BLOCKED\""
           ],
           "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
-          "sha256": "9fb9e8eb939ba138a819b1e774ce425730d8103ac4a6bf807a72e1927d63dbc2"
+          "sha256": "5437ea4143f7e2f5b6d65c0121e28c5bc450b92b459fc348543ab291be46e585"
         },
         {
           "markers": [
@@ -276,7 +271,7 @@
             "\"status\": \"NOT_IMPLEMENTED\""
           ],
           "path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json",
-          "sha256": "fa719c27557b92054d5d1fd8f126a7a922b033170f4451d1f1e721ab079ef976"
+          "sha256": "162d86b3833f26005e34ac48f46d5b72e49edbfa4067896e6ed68f87a86cc00f"
         },
         {
           "markers": [
@@ -357,7 +352,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "066c29193999711c9197c03c1807842c8376a38508d4be815154c51df3a77750"
+          "sha256": "cd01b23f86a46d270f929e5ff8c8b0de0815847b18273a9a1befd6689dded6e7"
         },
         {
           "markers": [
@@ -371,11 +366,12 @@
           "markers": [
             "ENTRYPOINTS = {",
             "CAPTURE_UAT_PROMOTION_SNAPSHOT",
+            "QUIESCE_UAT_WRITERS",
             "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION",
             "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
           ],
           "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
-          "sha256": "b2154d44f06486d040d99a5c737ee84ddeda8d1a73f32ec628962955da14ab32"
+          "sha256": "2a69aaf136a0bf701e1241c2404ab1e50dafb35611a9ac0ec1c14cb82752121f"
         },
         {
           "markers": [
@@ -389,15 +385,17 @@
           "markers": [
             "UAT_PROMOTION_INTENT_CONTRACT",
             "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT",
+            "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT",
+            "probeDockerWriterQuiesce",
             "validateBackupRecoveryReadinessV4",
-            "AFTER_SNAPSHOT_CURRENT",
+            "AFTER_QUIESCE_CURRENT",
             "runUatPromotionTransactionPhase"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs",
-          "sha256": "2152e30e1db813a275ad38f1206b80f598a083a7cf86020ad51a8691125a6ac4"
+          "sha256": "ff7ad206287cbdb312e6845766a281cef602a499845b9bc37731d5b64f4f8994"
         }
       ],
-      "sha256": "0bbcaf63a774e094559646acf619d9c6588c9423bfc3d60f1acf1a8176354c0f"
+      "sha256": "e05d25d6e16959f8b7f106c42e10eb3885b6b5819aec137ab7b4957e8c6d7e61"
     }
   },
   "observations": {
@@ -406,18 +404,18 @@
     "implemented_required_promotion_operations": [
       "BEGIN_UAT_PROMOTION",
       "CAPTURE_UAT_PROMOTION_SNAPSHOT",
+      "QUIESCE_UAT_WRITERS",
       "RECOVER_UAT_PROMOTION"
     ],
     "migration_authorization": "REPEATABLE_ENVIRONMENT_CONFIRMATION",
     "missing_required_promotion_operations": [
-      "QUIESCE_UAT_WRITERS",
       "RUN_UAT_PROMOTION_MIGRATION",
       "DEPLOY_UAT_RELEASE",
       "ROLLBACK_UAT_RELEASE"
     ],
     "required_promotion_operation_count": 7,
     "restore_target_policy": "TEST_ONLY",
-    "supervisor_operation_count": 22,
+    "supervisor_operation_count": 23,
     "supervisor_operations": [
       "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1",
       "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
@@ -431,6 +429,7 @@
       "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION",
       "PUBLISH_MONITORING_BACKUP_PROJECTION",
       "PUBLISH_MONITORING_COMPONENTS_PROJECTION",
+      "QUIESCE_UAT_WRITERS",
       "RECONCILE_POSTGRESQL_RUNTIME_PRIVILEGES",
       "RECOVER_MONITORING_NOTIFIER_EGRESS_V1_ACTIVATION",
       "RECOVER_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2_ACTIVATION",

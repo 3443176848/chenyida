@@ -21,6 +21,7 @@ import {
   UAT_PROMOTION_CURRENT_FILE,
   UAT_PROMOTION_POLICY_FILE_SHA256,
   UAT_PROMOTION_POLICY_SHA256,
+  UAT_PROMOTION_QUIESCE_INTENT_CONTRACT,
   UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT,
   UAT_PROMOTION_STATE_ROOT,
   ZERO_SHA256,
@@ -354,6 +355,11 @@ function snapshotReadiness(identity, activation, objects, variant = "valid") {
       database_snapshot: "PG_DUMP_CONSISTENT_SNAPSHOT",
       writer_boundary: "EXACT_COMPOSE_WEB_WORKER_STOPPED",
       recovery_point_at: variant === "old-evidence" ? "2026-08-15T00:29:00.000Z" : "2026-08-15T01:14:00.000Z",
+      verified_after: variant === "old-evidence" ? "2026-08-15T00:30:00.000Z" : "2026-08-15T01:20:00.000Z",
+      web_container: "chenyida-erp-web-1",
+      web_container_id: identity.web_container_id,
+      worker_container: "chenyida-erp-worker-1",
+      worker_container_id: identity.worker_container_id,
     },
     artifacts,
     evidence: {
@@ -494,6 +500,135 @@ function snapshotRecoveryContext(original, intentSha256, suffix = "recovery") {
 
 const snapshotValidators = Object.freeze({ snapshotReadinessValidator: (value) => value });
 
+function quiescedWriter(expected, service) {
+  const capture = expected.capture[service];
+  return {
+    container_name: capture.container_name,
+    container_id: capture.container_id,
+    service,
+    image_digest: capture.image_digest,
+    compose_project: expected.parameters.compose_project,
+    compose_project_root: expected.parameters.compose_project_root,
+    compose_config_hash: digest(`${service}-compose-config`),
+    created_at: "2026-08-14T23:00:00.000000000Z",
+    last_started_at: "2026-08-15T00:50:00.000000000Z",
+    last_finished_at: "2026-08-15T01:18:00.000000000Z",
+    restart_count: 0,
+    exit_code: 0,
+    status: "exited",
+    running: false,
+    restarting: false,
+    paused: false,
+    dead: false,
+    oom_killed: false,
+    oneoff: false,
+    container_number: 1,
+    application_version: expected.capture.application_version,
+    git_commit: expected.capture.git_commit,
+  };
+}
+
+function quiesceEvidence(expected, variant = "valid") {
+  const value = {
+    contract: "chenyida-erp-uat-writer-quiesce-evidence/v1",
+    status: "CONTINUED_QUIESCE_VERIFIED",
+    checked_at: expected.checkedAt,
+    snapshot_writer_verified_at: expected.capture.snapshot_writer_verified_at,
+    docker_client_identity_sha256: digest("docker-client"),
+    docker_daemon_id_sha256: digest("docker-daemon"),
+    docker_server_version: "fixture-1.0",
+    docker_storage_driver: "overlay2",
+    compose_project: expected.parameters.compose_project,
+    compose_project_root: expected.parameters.compose_project_root,
+    project_container_count: 4,
+    project_inventory_sha256: digest("compose-project-inventory"),
+    allowed_running_services: ["caddy", "postgres"],
+    writer_scope: "EXACT_COMPOSE_PROJECT_AND_WORKING_DIRECTORY_ONLY_EXTERNAL_CLIENTS_DEFERRED_TO_MIGRATION_FENCE",
+    web: quiescedWriter(expected, "web"),
+    worker: quiescedWriter(expected, "worker"),
+  };
+  if (variant === "running") value.web.running = true;
+  if (variant === "restarted") value.worker.last_finished_at = "2026-08-15T01:21:00.000000000Z";
+  if (variant === "replaced") value.web.container_id = "9".repeat(64);
+  if (variant === "extra-writer") value.project_container_count = 5;
+  return value;
+}
+
+async function quiesceFixture({ promotionId = "promotion-quiesce-001", evidenceVariant = "valid", operationId = null } = {}) {
+  const base = await snapshotFixture({ promotionId });
+  await run(base.context, "prepare", base.root, snapshotValidators);
+  await run(base.context, "execute", base.root, snapshotValidators);
+  const current = validateUatPromotionCheckpointReceipt(
+    JSON.parse(await readFile(physical(base.root, UAT_PROMOTION_CURRENT_FILE), "utf8")),
+  );
+  const snapshotIntentFile = await intentPath(base.root, base.context.operation_id);
+  const snapshotIntent = JSON.parse(await readFile(snapshotIntentFile, "utf8"));
+  const identity = JSON.parse(await readFile(physical(base.root, identityPath), "utf8"));
+  const quiesceOperationId = operationId ?? `${promotionId}-quiesce`;
+  const parameters = {
+    promotion_state_root: UAT_PROMOTION_STATE_ROOT,
+    promotion_id: promotionId,
+    promotion_generation: current.promotion_generation,
+    previous_checkpoint_receipt_sha256: current.receipt_sha256,
+    promotion_intent_sha256: current.intent_sha256,
+    promotion_original_authorization_sha256: current.original_authorization_sha256,
+    snapshot_operation_id: base.context.operation_id,
+    snapshot_intent_sha256: snapshotIntent.snapshot_intent_sha256,
+    snapshot_intent_source: await source(base.root, `${UAT_PROMOTION_STATE_ROOT}/intents/${path.basename(snapshotIntentFile)}`),
+    candidate_binding_sha256: current.candidate_binding_sha256,
+    database_binding_sha256: current.database_binding_sha256,
+    runtime_binding_sha256: current.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: current.recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: current.promotion_snapshot_binding_sha256,
+    current_checkpoint_source: await source(base.root, UAT_PROMOTION_CURRENT_FILE),
+    runtime_identity_source: await source(base.root, identityPath),
+    deployment_class: "UAT",
+    deployment_id: "chenyida-erp",
+    compose_project: "chenyida-erp",
+    compose_project_root: "/opt/erp/chenyida_erp_site",
+    web_container: snapshotIntent.writer_capture.web.container_name,
+    web_container_id: identity.web_container_id,
+    worker_container: snapshotIntent.writer_capture.worker.container_name,
+    worker_container_id: identity.worker_container_id,
+    quiesce_created_at: "2026-08-15T01:32:00.000Z",
+    quiesce_expires_at: "2026-08-15T01:44:00.000Z",
+    requester_identity_sha256: digest("quiesce-requester"),
+    approver_identity_sha256: digest("quiesce-approver"),
+    executor_identity_sha256: digest("quiesce-executor"),
+    policy_file_sha256: UAT_PROMOTION_POLICY_FILE_SHA256,
+    policy_sha256: UAT_PROMOTION_POLICY_SHA256,
+  };
+  const authorization = digest(`authorization-${quiesceOperationId}`);
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: quiesceOperationId,
+    operation: "QUIESCE_WRITERS",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: quiesceOperationId,
+    execution_authorization_sha256: authorization,
+    execution_created_at: parameters.quiesce_created_at,
+    original_authorization_sha256: authorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  const quiesceValidators = Object.freeze({ writerQuiesceValidator: (expected) => quiesceEvidence(expected, evidenceVariant) });
+  return { ...base, context, snapshotIntent, quiesceValidators };
+}
+
+function quiesceRecoveryContext(original, intentSha256, suffix = "recovery") {
+  const executionId = `${original.operation_id}-${suffix}`;
+  return {
+    ...original,
+    execution_mode: "RECOVERY",
+    execution_authorization_id: executionId,
+    execution_authorization_sha256: digest(`authorization-${executionId}`),
+    execution_created_at: "2026-08-15T01:36:00.000Z",
+    expected_intent_sha256: intentSha256,
+  };
+}
+
 async function run(context, phase, root, options = {}) {
   return runUatPromotionTransactionPhase(context, phase, { filesystemRoot: root, siteRoot, allowTestRoot: true, ...options });
 }
@@ -551,6 +686,7 @@ test("checkpoint contract rejects skip, cross-binding, authorization reuse and U
     runtime_binding_sha256: previous.runtime_binding_sha256,
     recovery_binding_sha256: previous.recovery_binding_sha256,
     promotion_snapshot_binding_sha256: digest("promotion-snapshot"),
+    writer_quiesce_binding_sha256: ZERO_SHA256,
   };
   const next = createNextUatPromotionCheckpointReceipt(previous, base);
   assert.equal(next.previous_checkpoint_receipt_sha256, previous.receipt_sha256);
@@ -568,12 +704,14 @@ test("checkpoint contract rejects skip, cross-binding, authorization reuse and U
     checkpoint_id: "WRITER_QUIESCE_RECEIPT",
     recorded_at: "2026-08-15T01:11:00.000Z",
     checkpoint_authorization_sha256: digest("quiesce-authorization"),
+    writer_quiesce_binding_sha256: digest("writer-quiesce"),
   });
   assert.throws(() => createNextUatPromotionCheckpointReceipt(quiesce, {
     ...base,
     checkpoint_id: "ONE_TIME_MIGRATION_AUTHORIZATION",
     recorded_at: "2026-08-15T01:12:00.000Z",
     checkpoint_authorization_sha256: digest("snapshot-authorization"),
+    writer_quiesce_binding_sha256: quiesce.writer_quiesce_binding_sha256,
   }), (error) => error.code === "UAT_PROMOTION_CHECKPOINT_AUTHORIZATION_REUSED");
 });
 
@@ -727,6 +865,112 @@ test("CAPTURE source replacement and linked snapshot intents are preserved and q
     const recovery = snapshotRecoveryContext(linked.context, snapshotPrepared.intent_sha256, `recovery-${kind}`);
     assert.equal((await run(recovery, "recover-prepare", linked.root, snapshotValidators)).decision, "QUARANTINE");
     assert.equal((await run(recovery, "recover-execute", linked.root, snapshotValidators)).result, "QUARANTINED");
+  }
+});
+
+test("QUIESCE publishes checkpoint 6 with same-writer continued-stop evidence and an explicit external-client boundary", async (t) => {
+  const { root, context, quiesceValidators } = await quiesceFixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const prepared = await run(context, "prepare", root, quiesceValidators);
+  assert.equal(prepared.result, "PREPARED");
+  assert.equal((await run(context, "prepare", root, quiesceValidators)).result, "ALREADY_PREPARED");
+  const storedIntent = JSON.parse(await readFile(await intentPath(root, context.operation_id), "utf8"));
+  assert.equal(storedIntent.contract, UAT_PROMOTION_QUIESCE_INTENT_CONTRACT);
+  assert.equal(storedIntent.quiesce_intent_sha256, prepared.intent_sha256);
+  assert.equal(storedIntent.quiesce_evidence.status, "CONTINUED_QUIESCE_VERIFIED");
+  assert.equal(
+    storedIntent.quiesce_evidence.writer_scope,
+    "EXACT_COMPOSE_PROJECT_AND_WORKING_DIRECTORY_ONLY_EXTERNAL_CLIENTS_DEFERRED_TO_MIGRATION_FENCE",
+  );
+  assert.equal(storedIntent.snapshot_writer_capture.web.container_id, context.parameters.web_container_id);
+  assert.equal(storedIntent.snapshot_writer_capture.worker.container_id, context.parameters.worker_container_id);
+  const committed = await run(context, "execute", root, quiesceValidators);
+  assert.equal(committed.result, "COMMITTED");
+  const current = validateUatPromotionCheckpointReceipt(
+    JSON.parse(await readFile(physical(root, UAT_PROMOTION_CURRENT_FILE), "utf8")),
+  );
+  assert.equal(current.checkpoint_id, "WRITER_QUIESCE_RECEIPT");
+  assert.equal(current.checkpoint_ordinal, 6);
+  assert.equal(current.checkpoint_evidence_sha256, prepared.intent_sha256);
+  assert.notEqual(current.writer_quiesce_binding_sha256, ZERO_SHA256);
+  assert.equal(current.writer_quiesce_binding_sha256, storedIntent.writer_quiesce_binding_sha256);
+  assert.equal(current.checkpoint_authorization_sha256, context.execution_authorization_sha256);
+});
+
+test("QUIESCE rejects running, restarted, replaced and extra Compose writer evidence", async (t) => {
+  for (const [index, variant] of ["running", "restarted", "replaced", "extra-writer"].entries()) {
+    const fixtureValue = await quiesceFixture({ promotionId: `promotion-quiesce-negative-${index}`, evidenceVariant: variant });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    await assert.rejects(
+      run(fixtureValue.context, "prepare", fixtureValue.root, fixtureValue.quiesceValidators),
+      (error) => error.code === "UAT_PROMOTION_QUIESCE_EVIDENCE_INVALID",
+      variant,
+    );
+  }
+});
+
+test("QUIESCE rejects cross-runtime binding and source replacement", async (t) => {
+  const crossed = await quiesceFixture({ promotionId: "promotion-quiesce-crossed" });
+  t.after(() => rm(crossed.root, { recursive: true, force: true }));
+  const changed = structuredClone(crossed.context);
+  changed.parameters.worker_container_id = "8".repeat(64);
+  await assert.rejects(
+    run(changed, "prepare", crossed.root, crossed.quiesceValidators),
+    (error) => error.code === "UAT_PROMOTION_QUIESCE_BINDING_MISMATCH",
+  );
+
+  const replaced = await quiesceFixture({ promotionId: "promotion-quiesce-source-replaced" });
+  t.after(() => rm(replaced.root, { recursive: true, force: true }));
+  const prepared = await run(replaced.context, "prepare", replaced.root, replaced.quiesceValidators);
+  const identityFile = physical(replaced.root, identityPath);
+  const original = await readFile(identityFile);
+  await chmod(identityFile, 0o600);
+  await writeFile(identityFile, Buffer.concat([original, Buffer.from(" ")]));
+  await chmod(identityFile, 0o440);
+  await assert.rejects(run(replaced.context, "execute", replaced.root, replaced.quiesceValidators));
+  const recovery = quiesceRecoveryContext(replaced.context, prepared.intent_sha256, "source-replaced-recovery");
+  assert.equal((await run(recovery, "recover-prepare", replaced.root, replaced.quiesceValidators)).decision, "QUARANTINE");
+  assert.equal((await run(recovery, "recover-execute", replaced.root, replaced.quiesceValidators)).result, "QUARANTINED");
+  assert.deepEqual(await readFile(identityFile), Buffer.concat([original, Buffer.from(" ")]));
+});
+
+test("QUIESCE publication crashes converge through fresh recovery authorization", async (t) => {
+  for (const [index, failpoint] of ["AFTER_QUIESCE_HISTORY", "AFTER_QUIESCE_RECEIPT", "AFTER_QUIESCE_CURRENT"].entries()) {
+    const fixtureValue = await quiesceFixture({ promotionId: `promotion-quiesce-crash-${index}` });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, fixtureValue.quiesceValidators);
+    await assert.rejects(
+      run(fixtureValue.context, "execute", fixtureValue.root, {
+        ...fixtureValue.quiesceValidators,
+        fault: async (point) => { if (point === failpoint) throw new Error(`CRASH:${point}`); },
+      }),
+      new RegExp(`CRASH:${failpoint}`),
+    );
+    const recovery = quiesceRecoveryContext(fixtureValue.context, prepared.intent_sha256, `recovery-${index}`);
+    const planned = await run(recovery, "recover-prepare", fixtureValue.root, fixtureValue.quiesceValidators);
+    assert.ok(["RESUME_PUBLICATION", "ALREADY_COMMITTED"].includes(planned.decision));
+    const result = await run(recovery, "recover-execute", fixtureValue.root, fixtureValue.quiesceValidators);
+    assert.ok(["COMMITTED", "ALREADY_COMMITTED"].includes(result.result));
+    assert.equal(
+      JSON.parse(await readFile(physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8")).receipt_sha256,
+      result.receipt_sha256,
+    );
+  }
+});
+
+test("linked QUIESCE intents are never followed and are quarantined", async (t) => {
+  for (const kind of ["hardlink", "symlink"]) {
+    const fixtureValue = await quiesceFixture({ promotionId: `promotion-quiesce-${kind}` });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, fixtureValue.quiesceValidators);
+    const intent = await intentPath(fixtureValue.root, fixtureValue.context.operation_id);
+    const preserved = path.join(fixtureValue.root, `${kind}-quiesce-intent.json`);
+    await rename(intent, preserved);
+    if (kind === "hardlink") await link(preserved, intent);
+    else await symlink(preserved, intent);
+    const recovery = quiesceRecoveryContext(fixtureValue.context, prepared.intent_sha256, `recovery-${kind}`);
+    assert.equal((await run(recovery, "recover-prepare", fixtureValue.root, fixtureValue.quiesceValidators)).decision, "QUARANTINE");
+    assert.equal((await run(recovery, "recover-execute", fixtureValue.root, fixtureValue.quiesceValidators)).result, "QUARANTINED");
   }
 });
 

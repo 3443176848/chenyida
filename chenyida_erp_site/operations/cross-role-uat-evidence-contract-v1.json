@@ -62,7 +62,7 @@
     "stop_authority_person": null,
     "uat_account_mapping_approval_id": null
   },
-  "artifact_sha256": "0152fb69944104dd3a2072a45c4d27717d310926d332fd06ce9a57db2d3677ae",
+  "artifact_sha256": "7e07b6274276e1b0f06c98d8ca311a7693fa827fbf0d6db9eaa6104d9d467f94",
   "authority": "REPOSITORY_SYNTHETIC_EVIDENCE_ONLY",
   "contract": "chenyida-erp-cross-role-uat-evidence-contract/v1",
   "coverage": {
@@ -227,7 +227,7 @@
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 233,
-      "sha256": "b785d86ad7e851efeeb5916025001d9d766efe9201a62768b7645ec50d7b1bc2",
+      "sha256": "eb8f42092119fec85e78192a743bf7b2f29276ac53f80b6d9671d6193dbdd464",
       "total_tests": 257
     }
   },

@@ -2296,7 +2296,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-rollback-audit.test.mjs",
-      "sha256": "9b0877f2f5809a75a806d216a2f015e7bfa4d795cfe9753acd91c658d380965f",
+      "sha256": "e69aedb997c79a8a2bce56298b13d8afbd171859ee0a21de2788af2fea1d0825",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -2305,7 +2305,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-transaction-journal.test.mjs",
-      "sha256": "b4e51537096229d60df3c6e31259518112a2b51473792eab0cc1cc99fe8fa3ba",
+      "sha256": "8a7cae123224c825ae02abc6e5b5b354c4e29485120dc672a8bc83f154629483",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
