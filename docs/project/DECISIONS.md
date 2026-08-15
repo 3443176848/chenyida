@@ -3186,6 +3186,41 @@
 - 拒绝无限重试、覆盖旧intent/result、用新观察改写旧attempt，或在漂移后仍称contain成功；也拒绝自动删除candidate数据库/Volume以“清理”unknown状态。
 - 拒绝把gateway存在、15/15静态SUPPORTED、fake-root containment或当前bundle描述为固定executor已激活、真实回退已验或可投产。
 
+## D-156 固定回退执行器先闭合身份与激活事务，缺少UAT能力处理器时不得消费授权
+
+- 日期：2026-08-16
+- 状态：`ACCEPTED / FIXED EXECUTOR BOUNDARY AND ACTIVATION V2 VERIFIED / UAT-CAPABLE HANDLERS ABSENT / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK81对九阶段/十三检查、现有TEST-only恢复工具、gateway trusted descriptor、Supervisor授权及installer切换联锁的逐项核对，以及Node/Python fake-root专项回归
+- 确认边界：只接受仓库/fake-root中的固定executor、activation v2和失败关闭能力声明；不授权或声称host已安装/激活、UAT-capable restore handler、真实数据库/Volume/Compose/UAT回退或人工UAT已发生
+
+### Context
+
+- TASK80 gateway已能安全启动一个受信executor，但固定路径缺失；若直接指向现有TEST-only恢复器，就会绕过其TEST目标限制并把合成能力错误提升为UAT执行权。
+- executor和activation升级跨越多个内容寻址对象。只覆盖一个`current`或软链接会在崩溃后留下无法判定的plan/executor代际，且可能使新bundle读取旧执行器或旧授权。
+- 真实UAT数据库、四文件域和前代运行面物化器仍未实现；静态catalog完整不等于这些能力存在。授权必须在能力检查成功前保持未消费。
+
+### Decision
+
+1. 固定catalog锁定九个stage和十三个check的handler、tool、argv、source、timeout、idempotency及unknown策略；无shell、无自由路径/参数，TEST restore和前向Compose控制明确禁止。catalog状态固定为`BLOCKED_MISSING_UAT_CAPABLE_HANDLERS`，后续只能由独立任务实现专用能力后提升。
+2. fixed executor只接受gateway newline-terminated canonical request和trusted-FD manifest v2，精确复核operation/action/label/deadline、plan/intent/source、activation/current/executor/Docker及打开描述符身份。当前在全部验证完成后稳定返回`ROLLBACK_FIXED_EXECUTOR_UAT_CAPABILITY_UNAVAILABLE`，不得执行外部工具。
+3. activation v2采用content-addressed intent/executor/plan/history/receipt/current/alias/recovery对象；install、upgrade、rollback都追加generation而不覆盖历史。七个已知发布崩溃点只允许同一精确recovery intent加fresh authorization续写，未知partial或外来alias保全并阻断。
+4. Supervisor v7为ACTIVATE/ROLLBACK/RECOVER分别使用短时、精确bundle/executor/plan绑定授权。prepare在能力缺失时返回`BLOCKED_CAPABILITY_UNAVAILABLE`且不创建activation state、不消费授权；未来支持路径只能在prepare成功与commit之间消费。
+5. installer在切换bundle前验证activation intent/history/receipt/current/alias/recovery的精确字段、代际、内容身份和链关系；任一partial、extra field、alias/current漂移或未闭合rollback必须失败关闭。
+6. 下一任务TASK82独立实现UAT-capable handler与物化边界；TASK70仍须等待这些能力完成且资源停止线解除后，才能运行合成Compose/隔离PostgreSQL动态演练。
+
+### Consequences
+
+- feature source`57f1f4aa78b80d7fd4d1bcbd16916340a29a65d4`/tree`ea4a53b08e68d84eed9386b57ac00d9777429e5f`→manifest-only`7a1ef5619c4fd5258f0e3acd40d0979c92217993`/tree`cf81fb7b8f22456f329a2feeae5a60ff8d7b6d37`形成149文件canonical链；manifest raw SHA-256为`bd8cf7c381f3581f649161980e163920e3a04054bebf81ff28a43fc21d903fc1`且逐字节重放一致。
+- inventory为262/238/24；Node合同80/80、transaction journal71/71、Python installer/launcher/adapter56/56、manifest9/9及installer21/21通过。跨岗与晋升审计self-digest为`47eff0cc…78a8`/`6c3cdceb…29b5`。
+- 机器审计仍为`BLOCKED`，P0继续包含UAT能力/host activation和隔离回退演练，P1为人工跨岗UAT；`assert-ready`继续拒绝。当前固定executor是安全边界，不是可执行UAT回退能力。
+- 收口available约1.4GiB、Swap832/1024MiB、根盘约12GiB，宿主`oom_kill=2`无任务内增量；未运行build、Docker/Compose/PostgreSQL、Migration、backup/restore、部署、真实UAT或回退。系统保持`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝把TEST-only restore、现有前向Compose controller、operator shell或自由argv重标为UAT handler，也拒绝以catalog条目或fixture通过声称能力已存在。
+- 拒绝覆盖activation current/alias、复用过期原授权恢复、猜测未知partial，或在能力检查前消费一次性授权。
+- 拒绝因15个checkpoint静态SUPPORTED、固定executor已进bundle或fake-root激活成功而移除动态回退与人工UAT阻断。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

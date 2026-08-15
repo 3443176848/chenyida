@@ -2,6 +2,20 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-16
+
+### SELFHOST-UAT-PROMOTION-ROLLBACK-FIXED-EXECUTOR-81 - `feat: add fixed UAT rollback executor boundary` / `build: bind fixed UAT rollback executor bundle` / `docs: close fixed rollback executor and start capability handlers`
+
+- 调度/范围：从TASK80最终Supervisor提交`3509a71`/tree`c7d063db`启动唯一active task；只在仓库、fake-root和断网轻量测试中实现fixed executor与activation，不连接真实数据库、不读取Volume/备份、不运行Compose或UAT/生产回退。
+- 边界决策：D-156固定九阶段/十三检查closed catalog与trusted-FD manifest v2。catalog明确`BLOCKED_MISSING_UAT_CAPABLE_HANDLERS`，executor验证全部request/descriptor/identity后只返回稳定能力blocker；TEST-only restore和前向Compose controller不能获得UAT执行权。
+- activation/Supervisor：content-addressed intent/executor/plan/history/receipt/current/alias/recovery支持install、upgrade、rollback与七个崩溃点fresh-authorization续写。Supervisor v7新增ACTIVATE/ROLLBACK/RECOVER精确授权；能力检查先于授权消费且阻断时不创建activation state。
+- installer/恢复：bundle切换联锁逐字段验证activation代际、plan/executor content identity、history/receipt/current/alias/recovery链；partial、额外字段、外来alias或previous/rollback target漂移均失败关闭。
+- 审计/发布链：15/15 checkpoint保持SUPPORTED，但UAT能力/host activation、隔离回退演练和人工UAT三项条件继续阻断；`assert-ready`继续返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。source`57f1f4a`/tree`ea4a53b0`→Supervisor`7a1ef56`/tree`cf81fb7b`形成149文件链，manifest raw SHA-256为`bd8cf7c3…3fc1`。
+- 验证：Node合同组合80/80、transaction journal71/71、Python installer/launcher/adapter56/56、manifest9/9、installer21/21、inventory262/238/24、cross-role/audit生成物重放、Node syntax、Python AST、凭据扫描1770文件和diff门通过。
+- 资源/边界：未运行build、Docker全量测试、Compose/PostgreSQL、backup/restore、Migration、镜像、部署、真实UAT、回退或业务写。收口available约1.4GiB、Swap832/1024MiB、根盘约12GiB、Load`0.64/0.58/0.37`；四服务restart0/OOM false，宿主`oom_kill=2`无任务内增量，无任务临时容器/manifest temp残留。
+- 数据库/API：无Schema、Migration或普通业务API变化；只扩展root Supervisor、fixed executor/catalog、activation publisher、gateway trusted manifest、安装联锁和机器审计。真实A4/A6/A7、账号、员工UAT、数据库和生产动作均未授权。
+- 治理：新增D-156，TASK81转`DONE`；自动启动`SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82`为唯一`DOING`，实现UAT专用handler与物化边界，TASK70继续等待资源与动态验证依赖。
+
 ## 2026-08-15
 
 ### SELFHOST-UAT-PROMOTION-ROLLBACK-RUNTIME-ADAPTER-80 - `feat: add trusted UAT rollback runtime gateway` / `build: bind UAT rollback runtime gateway bundle` / `docs: close rollback runtime gateway and start fixed executor`

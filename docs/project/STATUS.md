@@ -1,18 +1,33 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-15（Asia/Shanghai）
+最后更新时间：2026-08-16（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-ROLLBACK-FIXED-EXECUTOR-81（执行中；建立固定执行器与激活合同）
+## SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82（执行中；建立UAT专用能力处理器）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / FIXED ROLLBACK EXECUTOR AND ACTIVATION CONTRACT / REPOSITORY AND FAKE-ROOT ONLY / REAL ROLLBACK NOT AUTHORIZED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；实现固定executor、content-addressed activation及九阶段/十三检查的受控工具映射 |
-| 严格代码起点 | PASS / CONTROLLED | `3509a71848d682153c18e139617def56132e4890`/tree`c7d063db001978aea711c9bd29dc2338c72d9c6d`；145文件bundle`b3ecdf11…ab7e5`，用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / TRUSTED GATEWAY COMPLETE WITHOUT EXECUTOR | TASK80/D-155已固定canonical gateway、descriptor执行、完整运行观察和三次containment receipt；固定executor/activation、隔离演练及人工UAT仍缺失 |
-| 动态验收 | BLOCKED / TASK70 | 固定executor尚未完成且资源余量窄；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
-| 资源 | STOP LINE ACTIVE | available约1.3GiB、Swap813MiB/1GiB、根盘约12GiB；此前受限ESLint发生V8 heap OOM，仅运行仓库静态、Python、受限Node及fake-root轻量验证，不修改Swap或服务 |
+| 当前状态 | DOING / UAT-CAPABLE ROLLBACK HANDLERS / REPOSITORY AND FAKE-ROOT ONLY / HOST ACTIVATION AND REAL ROLLBACK NOT AUTHORIZED / RESOURCE STOP LINE ACTIVE / PRODUCTION NO-GO | 唯一active task；实现数据库、四文件域、前代Web/Worker和postverify专用handler与物化边界 |
+| 严格代码起点 | PASS / CONTROLLED | `7a1ef5619c4fd5258f0e3acd40d0979c92217993`/tree`cf81fb7b8f22456f329a2feeae5a60ff8d7b6d37`；149文件bundle`bd8cf7c3…3fc1`，用户未跟踪报告继续不读不改不提交 |
+| 依赖 | PASS / FIXED EXECUTOR BOUNDARY COMPLETE WITHOUT UAT HANDLERS | TASK81/D-156已固定executor、activation v2、Supervisor v7和installer联锁；UAT-capable handler、host activation、隔离演练及人工UAT仍缺失 |
+| 动态验收 | BLOCKED / TASK70 | 专用handler尚未完成且Swap超过80%；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态测试替代 |
+| 资源 | STOP LINE ACTIVE | available约1.4GiB、Swap832MiB/1GiB、根盘约12GiB；仅运行仓库静态、Python、受限Node及fake-root轻量验证，不修改Swap或服务 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不运行restore/rollback/Compose、pull/build/recreate/start/stop，不连接数据库或读取env/log/Volume/备份；A1—A8、UAT/生产、真实数据和Volume动作均未授权 |
-| 系统是否可用 | NO | fixed executor/activation、动态回退、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
+| 系统是否可用 | NO | UAT-capable handler/host activation、动态回退、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
+
+## SELFHOST-UAT-PROMOTION-ROLLBACK-FIXED-EXECUTOR-81（完成；固定执行器边界与activation v2通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / FIXED ROLLBACK EXECUTOR BOUNDARY AND ACTIVATION V2 VERIFIED / UAT-CAPABLE HANDLERS ABSENT / PRODUCTION NO-GO | TASK81已释放active slot；TASK82接入专用handler，TASK70保持受阻 |
+| 不可变链 | PASS / CONTENT ADDRESSED | source`57f1f4a`/tree`ea4a53b0`→Supervisor`7a1ef56`/tree`cf81fb7b`；149文件manifest raw SHA-256为`bd8cf7c3…3fc1`且重放一致 |
+| catalog/executor | PASS / FAIL CLOSED | 九阶段/十三检查closed catalog、trusted-FD manifest v2和固定executor输入/身份验证闭合；能力缺失时只返回稳定typed blocker，不调用外部工具 |
+| activation/Supervisor | PASS / MONOTONIC | activation v2 install/upgrade/rollback及七个崩溃点无覆盖恢复；Supervisor v7授权精确绑定bundle/executor/plan，能力阻断发生在授权消费前 |
+| installer联锁 | PASS / EXACT CHAIN | intent/history/receipt/current/alias/recovery、代际及plan/executor content identity必须完整一致，partial、extra field或alias漂移均阻断bundle切换 |
+| 审计 | PASS / CAPABILITY AND DYNAMIC EXECUTION BLOCKED | 15/15 checkpoint保持SUPPORTED；UAT能力/host activation、隔离回退演练、人工UAT仍阻断，`assert-ready`继续拒绝 |
+| 自动验证 | PASS / SCOPED APPLICABLE | Node合同80/80、journal71/71、Python installer/launcher/adapter56/56、manifest9/9、installer21/21、inventory262/238/24、syntax/AST/diff/凭据门通过 |
+| 资源/清理 | STOP LINE ACTIVE / CONTAINER OOM NONE | 收口available约1.4GiB、Swap832/1024MiB、根盘约12GiB、Load`0.64/0.58/0.37`；四服务restart0/OOM false，宿主`oom_kill=2`无增量，无任务临时容器/manifest temp残留 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 未运行build、backup、Compose/PostgreSQL、Migration、镜像、部署、真实员工UAT、恢复、回滚或业务写；四个受保护Volume未触碰 |
+| 系统是否可用 | NO | 仓库fixed executor和fake-root activation不等于actual UAT能力或回退；仍缺真实恢复、正式门、业务批准、试运行和切换 |
 
 ## SELFHOST-UAT-PROMOTION-ROLLBACK-RUNTIME-ADAPTER-80（完成；受信runtime gateway通过）
 
