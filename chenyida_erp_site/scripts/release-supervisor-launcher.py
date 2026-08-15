@@ -84,8 +84,8 @@ UAT_PROMOTION_CROSS_ROLE_RESULT_MARKER_VALUE = b"chenyida-erp-uat-cross-role-res
 UAT_PROMOTION_CROSS_ROLE_CONTRACT_RELATIVE = Path(
     "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json"
 )
-UAT_PROMOTION_POLICY_FILE_SHA256 = "a78d551ffe8496d31ef3cfb6c961c464748ec0b6badf733951bf57194a4b2bae"
-UAT_PROMOTION_POLICY_SHA256 = "5ade8772ad9dd4961c128c8eca1bdeec7b4909f79a5b275b6be14ab4961caf37"
+UAT_PROMOTION_POLICY_FILE_SHA256 = "8b41e61e1e53a4c60833eb0f25cdca8d55c13b01142ab59dea956cd62e45f558"
+UAT_PROMOTION_POLICY_SHA256 = "70a999c4a5be491be1a20ad4697eaf65453463a71c6abaeb3df4b5ce24fce73f"
 UAT_PROMOTION_RECOVERY_READINESS_FILE = Path("/var/lib/chenyida-erp/backup-status/recovery-readiness.json")
 UAT_PROMOTION_CANDIDATE_RECEIPTS_ROOT = Path("/var/lib/chenyida-erp/release-candidate-snapshots/receipts")
 UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1"
@@ -353,6 +353,7 @@ UAT_PROMOTION_OPERATIONS = {
     "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION": "POSTDEPLOY_RUNTIME_CONFIGURATION",
     "VERIFY_UAT_POSTDEPLOY_IDENTITY": "POSTDEPLOY_IDENTITY",
     "VERIFY_UAT_CROSS_ROLE_EXECUTION": "CROSS_ROLE_UAT",
+    "FINALIZE_UAT_PROMOTION": "FINALIZATION",
     "RECOVER_UAT_PROMOTION": "RECOVER",
 }
 
@@ -366,6 +367,7 @@ UAT_PROMOTION_CONFIRMATIONS = {
     "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION": "AUTHORIZE_VERIFY_EXACT_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
     "VERIFY_UAT_POSTDEPLOY_IDENTITY": "AUTHORIZE_VERIFY_EXACT_UAT_POSTDEPLOY_IDENTITY",
     "VERIFY_UAT_CROSS_ROLE_EXECUTION": "AUTHORIZE_INGEST_EXACT_UAT_CROSS_ROLE_EXECUTION_EVIDENCE",
+    "FINALIZE_UAT_PROMOTION": "AUTHORIZE_FINALIZE_EXACT_UAT_PROMOTION_RECEIPT_ONLY",
     "RECOVER_UAT_PROMOTION": "AUTHORIZE_RECOVER_EXACT_UAT_PROMOTION",
 }
 
@@ -511,6 +513,25 @@ UAT_PROMOTION_CROSS_ROLE_PARAMETER_FIELDS = {
     "authorization_matrix_source_manifest_sha256", "cross_role_result_root", "result_id",
     "cross_role_result", "cross_role_result_file_sha256", "cross_role_result_sha256",
     "cross_role_result_source", "verification_created_at", "verification_expires_at",
+    "requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256",
+    "policy_file_sha256", "policy_sha256",
+}
+
+UAT_PROMOTION_FINALIZATION_PARAMETER_FIELDS = {
+    "promotion_state_root", "promotion_id", "promotion_generation",
+    "previous_checkpoint_receipt_sha256", "checkpoint_receipt_sha256_chain",
+    "checkpoint_evidence_sha256_by_id", "authorization_sha256_chain",
+    "previous_authorization_chain_sha256", "promotion_intent_sha256",
+    "promotion_original_authorization_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "current_checkpoint_source", "finalization_id",
+    "cross_role_operation_id", "cross_role_intent_sha256", "cross_role_intent_source",
+    "cross_role_result_file_sha256", "cross_role_result_sha256", "cross_role_result_source",
+    "cross_role_human_execution_authorization_sha256", "evidence_subject_sha256",
+    "approval_subject_sha256", "finalization_created_at", "finalization_expires_at",
     "requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256",
     "policy_file_sha256", "policy_sha256",
 }
@@ -1155,6 +1176,32 @@ def verify_uat_promotion_cross_role_sources(parameters: dict[str, Any]) -> dict[
     return {
         name: verify_authorized_projection_source(
             source, "SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_SOURCE_CHANGED",
+        )
+        for name, source in sources.items()
+    }
+
+
+def verify_uat_promotion_finalization_sources(parameters: dict[str, Any]) -> dict[str, bytes]:
+    trusted_owned_directory(
+        UAT_PROMOTION_STATE_ROOT, 0, 0, {0o700}, "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+    )
+    trusted_owned_marker(
+        UAT_PROMOTION_STATE_ROOT / UAT_PROMOTION_STATE_MARKER, UAT_PROMOTION_STATE_MARKER_VALUE,
+        0, 0, {0o400}, "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+    )
+    for name in ("intents", "results"):
+        trusted_owned_directory(
+            UAT_PROMOTION_STATE_ROOT / name, 0, 0, {0o700},
+            "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+        )
+    sources = {
+        "current": parameters["current_checkpoint_source"],
+        "cross_role_intent": parameters["cross_role_intent_source"],
+        "cross_role_result": parameters["cross_role_result_source"],
+    }
+    return {
+        name: verify_authorized_projection_source(
+            source, "SUPERVISOR_UAT_PROMOTION_FINALIZATION_SOURCE_CHANGED",
         )
         for name, source in sources.items()
     }
@@ -2458,7 +2505,129 @@ def validate_uat_promotion_cross_role_parameters(
     return parameters
 
 
+def validate_uat_promotion_finalization_parameters(
+        parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    recovery = operation == "RECOVER_UAT_PROMOTION"
+    original_operation = parameters.get("original_operation") if isinstance(parameters, dict) else None
+    if operation != "FINALIZE_UAT_PROMOTION" \
+            and not (recovery and original_operation == "FINALIZATION"):
+        reject("SUPERVISOR_UAT_PROMOTION_OPERATION_INVALID")
+    expected_fields = set(UAT_PROMOTION_FINALIZATION_PARAMETER_FIELDS)
+    if recovery:
+        expected_fields |= UAT_PROMOTION_RECOVERY_PARAMETER_FIELDS
+    parameters = exact_fields(
+        parameters, expected_fields, "SUPERVISOR_UAT_PROMOTION_FINALIZATION_PARAMETERS_INVALID",
+    )
+    if parameters["promotion_state_root"] != str(UAT_PROMOTION_STATE_ROOT):
+        reject("SUPERVISOR_UAT_PROMOTION_STATE_PATH_INVALID")
+    for field in ("promotion_id", "finalization_id", "cross_role_operation_id"):
+        if not isinstance(parameters[field], str) or not IDENTIFIER.fullmatch(parameters[field]):
+            reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_IDENTIFIER_INVALID")
+    if len({parameters["promotion_id"], parameters["finalization_id"],
+            parameters["cross_role_operation_id"]}) != 3:
+        reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_IDENTIFIER_INVALID")
+    if not isinstance(parameters["promotion_generation"], int) \
+            or isinstance(parameters["promotion_generation"], bool) \
+            or not 1 <= parameters["promotion_generation"] <= 1_000_000:
+        reject("SUPERVISOR_UAT_PROMOTION_GENERATION_INVALID")
+    checkpoint_ids = (
+        "PROMOTION_INTENT_AND_DURABLE_JOURNAL", "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
+        "WRITER_QUIESCE_RECEIPT", "ONE_TIME_MIGRATION_AUTHORIZATION",
+        "MIGRATION_COMMIT_RECEIPT", "COMPOSE_DEPLOYMENT_RECEIPT",
+        "POST_DEPLOY_RUNTIME_CONFIGURATION", "POST_DEPLOY_IDENTITY",
+        "CROSS_ROLE_UAT_EXECUTION",
+    )
+    receipt_chain = parameters["checkpoint_receipt_sha256_chain"]
+    authorization_chain = parameters["authorization_sha256_chain"]
+    evidence = parameters["checkpoint_evidence_sha256_by_id"]
+    if not isinstance(receipt_chain, list) or len(receipt_chain) != len(checkpoint_ids) \
+            or len(set(receipt_chain)) != len(receipt_chain) \
+            or any(not isinstance(item, str) or not SHA256.fullmatch(item) or item == "0" * 64
+                   for item in receipt_chain) \
+            or receipt_chain[-1] != parameters["previous_checkpoint_receipt_sha256"]:
+        reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_CHAIN_INVALID")
+    if not isinstance(evidence, dict) or set(evidence) != set(checkpoint_ids) \
+            or any(not isinstance(evidence[item], str) or not SHA256.fullmatch(evidence[item])
+                   or evidence[item] == "0" * 64 for item in checkpoint_ids):
+        reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_CHAIN_INVALID")
+    if not isinstance(authorization_chain, list) or len(authorization_chain) != len(checkpoint_ids) \
+            or len(set(authorization_chain)) != len(authorization_chain) \
+            or any(not isinstance(item, str) or not SHA256.fullmatch(item) or item == "0" * 64
+                   for item in authorization_chain) \
+            or sha256(canonical_json(authorization_chain)) \
+            != parameters["previous_authorization_chain_sha256"]:
+        reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_CHAIN_INVALID")
+    digest_fields = {
+        "previous_checkpoint_receipt_sha256", "previous_authorization_chain_sha256",
+        "promotion_intent_sha256", "promotion_original_authorization_sha256",
+        "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256",
+        "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+        "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+        "migration_fence_binding_sha256", "migration_result_binding_sha256",
+        "compose_deployment_binding_sha256", "cross_role_intent_sha256",
+        "cross_role_result_file_sha256", "cross_role_result_sha256",
+        "cross_role_human_execution_authorization_sha256", "evidence_subject_sha256",
+        "approval_subject_sha256", "requester_identity_sha256", "approver_identity_sha256",
+        "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+    }
+    if recovery:
+        digest_fields |= {"expected_intent_sha256", "original_authorization_sha256"}
+    for field in digest_fields:
+        if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]) \
+                or parameters[field] == "0" * 64:
+            reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_DIGEST_INVALID")
+    if evidence["CROSS_ROLE_UAT_EXECUTION"] != parameters["cross_role_result_sha256"] \
+            or authorization_chain[0] != parameters["promotion_original_authorization_sha256"] \
+            or parameters["cross_role_human_execution_authorization_sha256"] in authorization_chain:
+        reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_CHAIN_INVALID")
+    if parameters["policy_file_sha256"] != UAT_PROMOTION_POLICY_FILE_SHA256 \
+            or parameters["policy_sha256"] != UAT_PROMOTION_POLICY_SHA256:
+        reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_POLICY_INVALID")
+    if len({parameters["requester_identity_sha256"], parameters["approver_identity_sha256"],
+            parameters["executor_identity_sha256"]}) != 3:
+        reject("SUPERVISOR_UAT_PROMOTION_ACTORS_INVALID")
+    created = parse_time(
+        parameters["finalization_created_at"], "SUPERVISOR_UAT_PROMOTION_FINALIZATION_TIME_INVALID",
+    )
+    expires = parse_time(
+        parameters["finalization_expires_at"], "SUPERVISOR_UAT_PROMOTION_FINALIZATION_TIME_INVALID",
+    )
+    if expires <= created or expires - created > timedelta(minutes=15):
+        reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_TIME_INVALID")
+    cross_role_intent = UAT_PROMOTION_STATE_ROOT / "intents" \
+        / f"{parameters['cross_role_operation_id']}.{parameters['cross_role_intent_sha256']}.json"
+    cross_role_result = UAT_PROMOTION_STATE_ROOT / "results" \
+        / f"{parameters['cross_role_operation_id']}.{parameters['cross_role_result_sha256']}.json"
+    sources = {
+        "current": validate_uat_promotion_source(
+            parameters["current_checkpoint_source"], UAT_PROMOTION_CURRENT_FILE, {"0400"}, 0,
+            "SUPERVISOR_UAT_PROMOTION_FINALIZATION_SOURCE_INVALID",
+        ),
+        "cross_role_intent": validate_uat_promotion_source(
+            parameters["cross_role_intent_source"], cross_role_intent, {"0400"}, 0,
+            "SUPERVISOR_UAT_PROMOTION_FINALIZATION_SOURCE_INVALID",
+        ),
+        "cross_role_result": validate_uat_promotion_source(
+            parameters["cross_role_result_source"], cross_role_result, {"0400"}, 0,
+            "SUPERVISOR_UAT_PROMOTION_FINALIZATION_SOURCE_INVALID",
+        ),
+    }
+    if sources["cross_role_result"]["sha256"] != parameters["cross_role_result_file_sha256"] \
+            or len({source["path"] for source in sources.values()}) != len(sources):
+        reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_SOURCE_BINDING_INVALID")
+    if recovery:
+        original_id = parameters["original_operation_id"]
+        if not isinstance(original_id, str) or not IDENTIFIER.fullmatch(original_id) \
+                or original_id != parameters["finalization_id"]:
+            reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_IDENTIFIER_INVALID")
+    return parameters
+
+
 def validate_uat_promotion_parameters(parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    if operation == "FINALIZE_UAT_PROMOTION" \
+            or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) \
+            and parameters.get("original_operation") == "FINALIZATION":
+        return validate_uat_promotion_finalization_parameters(parameters, operation)
     if operation == "VERIFY_UAT_CROSS_ROLE_EXECUTION" \
             or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) \
             and parameters.get("original_operation") == "CROSS_ROLE_UAT":
@@ -2743,11 +2912,14 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "POSTDEPLOY_IDENTITY"
         cross_role_operation = operation == "VERIFY_UAT_CROSS_ROLE_EXECUTION" \
             or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "CROSS_ROLE_UAT"
+        finalization_operation = operation == "FINALIZE_UAT_PROMOTION" \
+            or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "FINALIZATION"
         window_created = parse_time(
             parameters["snapshot_created_at"] if snapshot_operation else parameters["quiesce_created_at"] if quiesce_operation
             else parameters["authorization_created_at"] if migration_authorization_operation
             else parameters["execution_created_at"] if migration_execution_operation
             else parameters["deployment_created_at"] if compose_deployment_operation
+            else parameters["finalization_created_at"] if finalization_operation
             else parameters["verification_created_at"] if postdeploy_runtime_operation \
             or postdeploy_identity_operation or cross_role_operation
             else parameters["promotion_created_at"],
@@ -2758,6 +2930,7 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             else parameters["authorization_expires_at"] if migration_authorization_operation
             else parameters["execution_expires_at"] if migration_execution_operation
             else parameters["deployment_expires_at"] if compose_deployment_operation
+            else parameters["finalization_expires_at"] if finalization_operation
             else parameters["verification_expires_at"] if postdeploy_runtime_operation \
             or postdeploy_identity_operation or cross_role_operation
             else parameters["promotion_expires_at"],
@@ -2820,6 +2993,16 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
                 ) or Path(parameters["cross_role_contract"])
                 != BUNDLES_ROOT / value["supervisor_bundle_sha256"] \
                 / UAT_PROMOTION_CROSS_ROLE_CONTRACT_RELATIVE
+                or abs(window_created - created) > timedelta(minutes=5)
+                or window_created > now + timedelta(minutes=5) or window_expires > expires):
+            reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
+        elif operation == "FINALIZE_UAT_PROMOTION" and (
+                value["authorization_id"] != parameters["finalization_id"]
+                or value["authorization_id"] in (
+                    parameters["promotion_id"], parameters["cross_role_operation_id"],
+                ) or sha256(canonical_json(value)) in parameters["authorization_sha256_chain"]
+                or sha256(canonical_json(value))
+                == parameters["cross_role_human_execution_authorization_sha256"]
                 or abs(window_created - created) > timedelta(minutes=5)
                 or window_created > now + timedelta(minutes=5) or window_expires > expires):
             reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
@@ -3347,6 +3530,7 @@ def validate_original_uat_promotion_authorization_consumed(parameters: dict[str,
         "POSTDEPLOY_RUNTIME_CONFIGURATION": "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
         "POSTDEPLOY_IDENTITY": "VERIFY_UAT_POSTDEPLOY_IDENTITY",
         "CROSS_ROLE_UAT": "VERIFY_UAT_CROSS_ROLE_EXECUTION",
+        "FINALIZATION": "FINALIZE_UAT_PROMOTION",
     }.get(parameters["original_operation"])
     if raw != canonical_json(value) or value["contract"] != UAT_PROMOTION_AUTHORIZATION_CONTRACT \
         or value["authorization_id"] != original_id or value["operation"] != expected_operation:
@@ -3360,6 +3544,7 @@ def validate_original_uat_promotion_authorization_consumed(parameters: dict[str,
         else UAT_PROMOTION_POSTDEPLOY_RUNTIME_PARAMETER_FIELDS if parameters["original_operation"] == "POSTDEPLOY_RUNTIME_CONFIGURATION" \
         else UAT_PROMOTION_POSTDEPLOY_IDENTITY_PARAMETER_FIELDS if parameters["original_operation"] == "POSTDEPLOY_IDENTITY" \
         else UAT_PROMOTION_CROSS_ROLE_PARAMETER_FIELDS if parameters["original_operation"] == "CROSS_ROLE_UAT" \
+        else UAT_PROMOTION_FINALIZATION_PARAMETER_FIELDS if parameters["original_operation"] == "FINALIZATION" \
         else UAT_PROMOTION_BASE_PARAMETER_FIELDS
     if any(original_parameters[field] != parameters[field] for field in fields):
         reject("SUPERVISOR_UAT_PROMOTION_ORIGINAL_AUTHORIZATION_INVALID")
@@ -3712,30 +3897,35 @@ def assert_no_uat_migration_execution_interlock(
             continue
         verification_contracts = {
             "chenyida-erp-uat-promotion-postdeploy-runtime-intent/v1": (
-                "POSTDEPLOY_RUNTIME_CONFIGURATION", "postdeploy_runtime_intent_sha256",
+                "POSTDEPLOY_RUNTIME_CONFIGURATION", "verification_operation_id",
+                "postdeploy_runtime_intent_sha256",
             ),
             "chenyida-erp-uat-promotion-postdeploy-identity-intent/v1": (
-                "POSTDEPLOY_IDENTITY", "postdeploy_identity_intent_sha256",
+                "POSTDEPLOY_IDENTITY", "verification_operation_id",
+                "postdeploy_identity_intent_sha256",
             ),
             "chenyida-erp-uat-promotion-cross-role-intent/v1": (
-                "CROSS_ROLE_UAT", "cross_role_intent_sha256",
+                "CROSS_ROLE_UAT", "verification_operation_id", "cross_role_intent_sha256",
+            ),
+            "chenyida-erp-uat-promotion-finalization-intent/v1": (
+                "FINALIZATION", "finalization_operation_id", "finalization_intent_sha256",
             ),
         }
         binding = verification_contracts.get(value.get("contract"))
         if binding is None:
             continue
-        original_operation, digest_field = binding
+        original_operation, operation_id_field, digest_field = binding
         if raw != canonical_json(value) or value.get("schema_version") != 1 \
-                or not isinstance(value.get("verification_operation_id"), str) \
-                or not IDENTIFIER.fullmatch(value["verification_operation_id"]) \
+                or not isinstance(value.get(operation_id_field), str) \
+                or not IDENTIFIER.fullmatch(value[operation_id_field]) \
                 or not isinstance(value.get("execution_authorization_sha256"), str) \
                 or not SHA256.fullmatch(value["execution_authorization_sha256"]) \
                 or not isinstance(value.get(digest_field), str) or not SHA256.fullmatch(value[digest_field]) \
-                or name != f"{value['verification_operation_id']}.{value[digest_field]}.json":
+                or name != f"{value[operation_id_field]}.{value[digest_field]}.json":
             reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
         verification_intents.append({
             "operation": original_operation,
-            "operation_id": value["verification_operation_id"],
+            "operation_id": value[operation_id_field],
             "execution_authorization_sha256": value["execution_authorization_sha256"],
         })
     if not execution_intents and not verification_intents:
@@ -3778,6 +3968,7 @@ def assert_no_uat_migration_execution_interlock(
         "POSTDEPLOY_RUNTIME_CONFIGURATION": "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
         "POSTDEPLOY_IDENTITY": "VERIFY_UAT_POSTDEPLOY_IDENTITY",
         "CROSS_ROLE_UAT": "VERIFY_UAT_CROSS_ROLE_EXECUTION",
+        "FINALIZATION": "FINALIZE_UAT_PROMOTION",
     }
     same_pending_verification = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
         and len(pending_verification) == 1 \
@@ -3794,6 +3985,8 @@ def assert_no_uat_migration_execution_interlock(
         operations = {intent["operation"] for intent in pending_verification}
         if operations == {"CROSS_ROLE_UAT"}:
             reject("SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_RECOVERY_REQUIRED")
+        if operations == {"FINALIZATION"}:
+            reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED")
         if operations <= {"POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"}:
             reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_RECOVERY_REQUIRED")
         reject("SUPERVISOR_UAT_PROMOTION_CHECKPOINT_RECOVERY_REQUIRED")
@@ -4083,6 +4276,8 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
         or recovery and parameters.get("original_operation") == "POSTDEPLOY_IDENTITY"
     cross_role = authorization["operation"] == "VERIFY_UAT_CROSS_ROLE_EXECUTION" \
         or recovery and parameters.get("original_operation") == "CROSS_ROLE_UAT"
+    finalization = authorization["operation"] == "FINALIZE_UAT_PROMOTION" \
+        or recovery and parameters.get("original_operation") == "FINALIZATION"
     parameter_fields = UAT_PROMOTION_SNAPSHOT_PARAMETER_FIELDS if snapshot \
         else UAT_PROMOTION_QUIESCE_PARAMETER_FIELDS if quiesce \
         else UAT_PROMOTION_MIGRATION_AUTHORIZATION_PARAMETER_FIELDS if migration_authorization \
@@ -4091,6 +4286,7 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
         else UAT_PROMOTION_POSTDEPLOY_RUNTIME_PARAMETER_FIELDS if postdeploy_runtime \
         else UAT_PROMOTION_POSTDEPLOY_IDENTITY_PARAMETER_FIELDS if postdeploy_identity \
         else UAT_PROMOTION_CROSS_ROLE_PARAMETER_FIELDS if cross_role \
+        else UAT_PROMOTION_FINALIZATION_PARAMETER_FIELDS if finalization \
         else UAT_PROMOTION_BASE_PARAMETER_FIELDS
     promotion_parameters = {field: parameters[field] for field in parameter_fields}
     return {
@@ -4103,7 +4299,8 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
             else "COMPOSE_DEPLOYMENT" if compose_deployment \
             else "POSTDEPLOY_RUNTIME_CONFIGURATION" if postdeploy_runtime \
             else "POSTDEPLOY_IDENTITY" if postdeploy_identity \
-            else "CROSS_ROLE_UAT" if cross_role else "BEGIN",
+            else "CROSS_ROLE_UAT" if cross_role \
+            else "FINALIZATION" if finalization else "BEGIN",
         "execution_mode": "RECOVERY" if recovery else "ORIGINAL",
         "execution_authorization_id": authorization["authorization_id"],
         "execution_authorization_sha256": authorization_digest,
@@ -4192,6 +4389,14 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
             digest_fields = {
                 "intent_sha256", "verification_plan_sha256", "cross_role_result_sha256",
             }
+        elif context["operation"] == "FINALIZATION":
+            expected_fields = {
+                "result", "promotion_id", "intent_sha256", "finalization_plan_sha256",
+                "cross_role_result_sha256",
+            }
+            digest_fields = {
+                "intent_sha256", "finalization_plan_sha256", "cross_role_result_sha256",
+            }
         else:
             expected_fields = {"result", "promotion_id", "intent_sha256", "receipt_sha256"}
             digest_fields = {"intent_sha256", "receipt_sha256"}
@@ -4222,6 +4427,9 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
             digest_fields |= {
                 "cross_role_result_sha256", "evidence_subject_sha256", "approval_subject_sha256",
             }
+        elif context["operation"] == "FINALIZATION":
+            expected_fields |= {"finalization_plan_sha256", "cross_role_result_sha256"}
+            digest_fields |= {"finalization_plan_sha256", "cross_role_result_sha256"}
     elif phase == "recover-prepare":
         expected_results = {"RECOVERY_PREPARED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "recovery_sha256", "decision"}
@@ -4259,6 +4467,9 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
             digest_fields |= {
                 "cross_role_result_sha256", "evidence_subject_sha256", "approval_subject_sha256",
             }
+        elif context["operation"] == "FINALIZATION":
+            expected_fields |= {"finalization_plan_sha256", "cross_role_result_sha256"}
+            digest_fields |= {"finalization_plan_sha256", "cross_role_result_sha256"}
     else:
         expected_results = {"QUARANTINED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "recovery_sha256", "quarantine_sha256"}
@@ -4572,6 +4783,7 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
         postdeploy_runtime = authorization["operation"] == "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION"
         postdeploy_identity = authorization["operation"] == "VERIFY_UAT_POSTDEPLOY_IDENTITY"
         cross_role = authorization["operation"] == "VERIFY_UAT_CROSS_ROLE_EXECUTION"
+        finalization = authorization["operation"] == "FINALIZE_UAT_PROMOTION"
         if recovery:
             validate_original_uat_promotion_authorization_consumed(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -4590,6 +4802,8 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_postdeploy_sources(authorization["parameters"], authorization["operation"])
         elif cross_role:
             verify_uat_promotion_cross_role_sources(authorization["parameters"])
+        elif finalization:
+            verify_uat_promotion_finalization_sources(authorization["parameters"])
         else:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -4613,6 +4827,8 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_postdeploy_sources(authorization["parameters"], authorization["operation"])
         elif cross_role:
             verify_uat_promotion_cross_role_sources(authorization["parameters"])
+        elif finalization:
+            verify_uat_promotion_finalization_sources(authorization["parameters"])
         elif not recovery:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -4639,6 +4855,8 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
                 raise failure
         elif cross_role:
             verify_uat_promotion_cross_role_sources(authorization["parameters"])
+        elif finalization:
+            verify_uat_promotion_finalization_sources(authorization["parameters"])
         elif not recovery:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -4699,6 +4917,19 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             if committed.get("cross_role_result_sha256") \
                     != authorization["parameters"]["cross_role_result_sha256"]:
                 reject("SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_RESULT_BINDING_INVALID")
+            return committed
+        if finalization:
+            if prepared.get("cross_role_result_sha256") \
+                    != authorization["parameters"]["cross_role_result_sha256"]:
+                reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_RESULT_BINDING_INVALID")
+            committed = run_uat_promotion_runner(
+                node_path, bundle_root, context, "execute", lock_descriptor,
+            )
+            if committed.get("cross_role_result_sha256") \
+                    != authorization["parameters"]["cross_role_result_sha256"] \
+                    or committed.get("finalization_plan_sha256") \
+                    != prepared.get("finalization_plan_sha256"):
+                reject("SUPERVISOR_UAT_PROMOTION_FINALIZATION_RESULT_BINDING_INVALID")
             return committed
         return run_uat_promotion_runner(
             node_path, bundle_root, context, "recover-execute" if recovery else "execute", lock_descriptor,

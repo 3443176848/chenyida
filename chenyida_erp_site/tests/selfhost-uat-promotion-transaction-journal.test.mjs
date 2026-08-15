@@ -51,6 +51,7 @@ import {
 import { canonicalJson as crossRoleCanonicalJson } from "../scripts/cross-role-uat-evidence-contract.mjs";
 import {
   UAT_PROMOTION_CURRENT_FILE,
+  UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT,
   UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT,
   UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT,
   UAT_PROMOTION_POLICY_FILE_SHA256,
@@ -1782,6 +1783,107 @@ function crossRoleRecoveryContext(original, intentSha256, suffix = "recovery") {
   };
 }
 
+async function finalizationFixture({ promotionId = "promotion-finalization-001" } = {}) {
+  const fixtureValue = await crossRoleFixture({ promotionId });
+  const crossRolePrepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:48:31.000Z"),
+  });
+  await run(fixtureValue.context, "execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:48:32.000Z"),
+  });
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  const receiptsRoot = physical(
+    fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/receipts`,
+  );
+  const receipts = (await Promise.all((await readdir(receiptsRoot)).map(async (name) => (
+    validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+      path.join(receiptsRoot, name), "utf8",
+    )))
+  )))).sort((left, right) => left.checkpoint_ordinal - right.checkpoint_ordinal);
+  assert.deepEqual(receipts.map((receipt) => receipt.checkpoint_ordinal), [4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  const finalizationId = `${promotionId}-finalize`;
+  const finalizationAuthorization = digest(`finalization-authorization:${finalizationId}`);
+  const crossRoleIntentLogical = `${UAT_PROMOTION_STATE_ROOT}/intents/${fixtureValue.context.operation_id}.${crossRolePrepared.intent_sha256}.json`;
+  const crossRoleResultLogical = `${UAT_PROMOTION_STATE_ROOT}/results/${fixtureValue.context.operation_id}.${fixtureValue.result.result_sha256}.json`;
+  const parameters = {
+    promotion_state_root: UAT_PROMOTION_STATE_ROOT,
+    promotion_id: current.promotion_id,
+    promotion_generation: current.promotion_generation,
+    previous_checkpoint_receipt_sha256: current.receipt_sha256,
+    checkpoint_receipt_sha256_chain: receipts.map((receipt) => receipt.receipt_sha256),
+    checkpoint_evidence_sha256_by_id: Object.fromEntries(receipts.map((receipt) => [
+      receipt.checkpoint_id, receipt.checkpoint_evidence_sha256,
+    ])),
+    authorization_sha256_chain: current.authorization_sha256_chain,
+    previous_authorization_chain_sha256: current.authorization_chain_sha256,
+    promotion_intent_sha256: current.intent_sha256,
+    promotion_original_authorization_sha256: current.original_authorization_sha256,
+    candidate_binding_sha256: current.candidate_binding_sha256,
+    database_binding_sha256: current.database_binding_sha256,
+    runtime_binding_sha256: current.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: current.recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: current.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: current.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: current.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: current.migration_fence_binding_sha256,
+    migration_result_binding_sha256: current.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: current.compose_deployment_binding_sha256,
+    current_checkpoint_source: await source(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE),
+    finalization_id: finalizationId,
+    cross_role_operation_id: fixtureValue.context.operation_id,
+    cross_role_intent_sha256: crossRolePrepared.intent_sha256,
+    cross_role_intent_source: await source(fixtureValue.root, crossRoleIntentLogical),
+    cross_role_result_file_sha256: (await source(
+      fixtureValue.root, crossRoleResultLogical,
+    )).sha256,
+    cross_role_result_sha256: fixtureValue.result.result_sha256,
+    cross_role_result_source: await source(fixtureValue.root, crossRoleResultLogical),
+    cross_role_human_execution_authorization_sha256:
+      fixtureValue.result.human_execution_authorization_sha256,
+    evidence_subject_sha256: fixtureValue.result.evidence_subject_sha256,
+    approval_subject_sha256: fixtureValue.result.approval.approval_subject_sha256,
+    finalization_created_at: "2026-08-15T01:48:40.000Z",
+    finalization_expires_at: "2026-08-15T01:48:55.000Z",
+    requester_identity_sha256: digest(`finalization-requester:${finalizationId}`),
+    approver_identity_sha256: digest(`finalization-approver:${finalizationId}`),
+    executor_identity_sha256: digest(`finalization-executor:${finalizationId}`),
+    policy_file_sha256: UAT_PROMOTION_POLICY_FILE_SHA256,
+    policy_sha256: UAT_PROMOTION_POLICY_SHA256,
+  };
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: finalizationId,
+    operation: "FINALIZATION",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: finalizationId,
+    execution_authorization_sha256: finalizationAuthorization,
+    execution_created_at: parameters.finalization_created_at,
+    original_authorization_sha256: finalizationAuthorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  return {
+    ...fixtureValue, context, crossRoleContext: fixtureValue.context, crossRolePrepared,
+    current, receipts, crossRoleIntentLogical, crossRoleResultLogical,
+  };
+}
+
+function finalizationRecoveryContext(original, intentSha256, suffix = "recovery") {
+  const executionId = `${original.operation_id}-${suffix}`;
+  return {
+    ...original,
+    execution_mode: "RECOVERY",
+    execution_authorization_id: executionId,
+    execution_authorization_sha256: digest(`finalization-recovery-authorization:${executionId}`),
+    execution_created_at: "2026-08-15T01:48:50.000Z",
+    expected_intent_sha256: intentSha256,
+  };
+}
+
 async function run(context, phase, root, options = {}) {
   const resolved = { ...options };
   if (phase === "execute"
@@ -3153,6 +3255,166 @@ test("cross-role publication crash recovery resumes journal only and never rerun
       fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/results`,
     ))).filter((name) => artifactMatches(name, fixtureValue.context.operation_id)).length, 1);
   }
+});
+
+test("finalization persists an aggregate intent before publishing checkpoint 13 as the terminal receipt", async (t) => {
+  const fixtureValue = await finalizationFixture();
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:48:41.000Z"),
+  });
+  assert.equal(prepared.result, "PREPARED");
+  assert.equal(prepared.cross_role_result_sha256, fixtureValue.result.result_sha256);
+  const before = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  assert.equal(before.checkpoint_id, "CROSS_ROLE_UAT_EXECUTION");
+  assert.equal(before.checkpoint_ordinal, 12);
+  assert.equal(before.journal_status, "IN_PROGRESS");
+  const storedIntent = JSON.parse(await readFile(
+    await intentPath(fixtureValue.root, fixtureValue.context.operation_id), "utf8",
+  ));
+  assert.equal(storedIntent.contract, UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT);
+  assert.equal(storedIntent.finalization_intent_sha256, prepared.intent_sha256);
+  assert.deepEqual(storedIntent.checkpoint_receipt_sha256_chain,
+    fixtureValue.context.parameters.checkpoint_receipt_sha256_chain);
+  assert.equal(storedIntent.checkpoint_evidence_sha256_by_id.CROSS_ROLE_UAT_EXECUTION,
+    fixtureValue.result.result_sha256);
+  assert.deepEqual(storedIntent.rollback, {
+    checkpoint_14: "NOT_IMPLEMENTED_NOT_AUTHORIZED",
+    checkpoint_15: "NOT_IMPLEMENTED_NOT_AUTHORIZED",
+    rollback_ready: false,
+    database_protection_release: false,
+    backup_protection_release: false,
+  });
+  const committed = await run(fixtureValue.context, "execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:48:42.000Z"),
+  });
+  assert.equal(committed.result, "COMMITTED");
+  assert.equal(committed.intent_sha256, prepared.intent_sha256);
+  assert.equal(committed.finalization_plan_sha256, prepared.finalization_plan_sha256);
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  assert.equal(current.checkpoint_id, "PROMOTION_FINAL_RECEIPT");
+  assert.equal(current.checkpoint_ordinal, 13);
+  assert.equal(current.checkpoint_status, "COMMITTED");
+  assert.equal(current.journal_status, "COMMITTED");
+  assert.equal(current.checkpoint_evidence_sha256, prepared.intent_sha256);
+  assert.deepEqual(current.authorization_sha256_chain, [
+    ...fixtureValue.context.parameters.authorization_sha256_chain,
+    fixtureValue.context.original_authorization_sha256,
+  ]);
+});
+
+test("finalization rejects pre-sign subject substitution and reused ingest or human authorization", async (t) => {
+  const substituted = await finalizationFixture({
+    promotionId: "promotion-finalization-subject-substitution",
+  });
+  t.after(() => rm(substituted.root, { recursive: true, force: true }));
+  const subjectContext = structuredClone(substituted.context);
+  subjectContext.parameters.checkpoint_evidence_sha256_by_id.CROSS_ROLE_UAT_EXECUTION =
+    substituted.result.evidence_subject_sha256;
+  await assert.rejects(
+    run(subjectContext, "prepare", substituted.root, {
+      now: new Date("2026-08-15T01:48:41.000Z"),
+    }),
+    (error) => error.code === "UAT_PROMOTION_FINALIZATION_PARAMETERS_INVALID",
+  );
+
+  const reused = await finalizationFixture({
+    promotionId: "promotion-finalization-reused-authorization",
+  });
+  t.after(() => rm(reused.root, { recursive: true, force: true }));
+  for (const authorization of [
+    reused.current.checkpoint_authorization_sha256,
+    reused.result.human_execution_authorization_sha256,
+  ]) {
+    const reusedContext = {
+      ...reused.context,
+      execution_authorization_sha256: authorization,
+      original_authorization_sha256: authorization,
+    };
+    await assert.rejects(
+      run(reusedContext, "prepare", reused.root, {
+        now: new Date("2026-08-15T01:48:41.000Z"),
+      }),
+      (error) => error.code === "UAT_PROMOTION_FINALIZATION_CURRENT_MISMATCH",
+    );
+  }
+});
+
+test("finalization publication crashes converge only through a fresh recovery authorization", async (t) => {
+  const cases = [
+    ["AFTER_FINALIZATION_HISTORY", "RESUME_PUBLICATION"],
+    ["AFTER_FINALIZATION_RECEIPT", "RESUME_PUBLICATION"],
+    ["AFTER_FINALIZATION_CURRENT", "ALREADY_COMMITTED"],
+  ];
+  for (const [index, [failpoint, expectedDecision]] of cases.entries()) {
+    const fixtureValue = await finalizationFixture({
+      promotionId: `promotion-finalization-crash-${index}`,
+    });
+    t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+    const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+      now: new Date("2026-08-15T01:48:41.000Z"),
+    });
+    await assert.rejects(
+      run(fixtureValue.context, "execute", fixtureValue.root, {
+        now: new Date("2026-08-15T01:48:42.000Z"),
+        fault: async (stage) => {
+          if (stage === failpoint) throw new Error(`injected:${stage}`);
+        },
+      }),
+      new RegExp(`injected:${failpoint}`),
+    );
+    const recovery = finalizationRecoveryContext(
+      fixtureValue.context, prepared.intent_sha256, `recovery-${index}`,
+    );
+    const recoveryPrepared = await run(recovery, "recover-prepare", fixtureValue.root, {
+      now: new Date("2026-08-15T02:00:00.000Z"),
+    });
+    assert.equal(recoveryPrepared.decision, expectedDecision);
+    const recovered = await run(recovery, "recover-execute", fixtureValue.root, {
+      now: new Date("2026-08-15T02:00:01.000Z"),
+    });
+    assert.equal(recovered.result,
+      expectedDecision === "ALREADY_COMMITTED" ? "ALREADY_COMMITTED" : "COMMITTED");
+    const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+      physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+    )));
+    assert.equal(current.checkpoint_id, "PROMOTION_FINAL_RECEIPT");
+    assert.equal(current.checkpoint_ordinal, 13);
+    assert.equal(current.journal_status, "COMMITTED");
+  }
+});
+
+test("finalization source replacement is preserved and a fresh recovery authorization quarantines it", async (t) => {
+  const fixtureValue = await finalizationFixture({
+    promotionId: "promotion-finalization-replaced-source",
+  });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:48:41.000Z"),
+  });
+  const resultFile = physical(fixtureValue.root, fixtureValue.crossRoleResultLogical);
+  await writeFile(resultFile, "{}\n");
+  await assert.rejects(
+    run(fixtureValue.context, "execute", fixtureValue.root, {
+      now: new Date("2026-08-15T01:48:42.000Z"),
+    }),
+    (error) => error.code === "UAT_PROMOTION_FINALIZATION_CROSS_ROLE_RESULT_SOURCE_INVALID",
+  );
+  const recovery = finalizationRecoveryContext(
+    fixtureValue.context, prepared.intent_sha256, "replaced",
+  );
+  assert.equal((await run(recovery, "recover-prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T02:00:00.000Z"),
+  })).decision, "QUARANTINE");
+  const quarantined = await run(recovery, "recover-execute", fixtureValue.root, {
+    now: new Date("2026-08-15T02:00:01.000Z"),
+  });
+  assert.equal(quarantined.result, "QUARANTINED");
+  assert.equal(await readFile(resultFile, "utf8"), "{}\n");
 });
 
 test("fake root requires an explicit test-only option and a symlinked state root fails closed", async (t) => {

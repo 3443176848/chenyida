@@ -709,6 +709,103 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
         }
 
+    def finalization_parameters(self, recovery=False):
+        promotion_id = "promotion-supervisor-fixture"
+        finalization_id = "promotion-supervisor-finalization"
+        cross_role_id = "promotion-supervisor-cross-role"
+        cross_role_intent_sha256 = "c" * 64
+        cross_role_result_sha256 = "b" * 64
+        cross_role_result_file_sha256 = "e" * 64
+        authorization_chain = [character * 64 for character in "abcdef123"]
+        checkpoint_ids = (
+            "PROMOTION_INTENT_AND_DURABLE_JOURNAL", "PROMOTION_BOUND_RECOVERABLE_SNAPSHOT",
+            "WRITER_QUIESCE_RECEIPT", "ONE_TIME_MIGRATION_AUTHORIZATION",
+            "MIGRATION_COMMIT_RECEIPT", "COMPOSE_DEPLOYMENT_RECEIPT",
+            "POST_DEPLOY_RUNTIME_CONFIGURATION", "POST_DEPLOY_IDENTITY",
+            "CROSS_ROLE_UAT_EXECUTION",
+        )
+        receipt_chain = [character * 64 for character in "123456789"]
+        evidence = {
+            checkpoint_id: (str(index) * 64 if index <= 9 else "a" * 64)
+            for index, checkpoint_id in enumerate(checkpoint_ids, start=1)
+        }
+        evidence["CROSS_ROLE_UAT_EXECUTION"] = cross_role_result_sha256
+        value = {
+            "promotion_state_root": str(supervisor.UAT_PROMOTION_STATE_ROOT),
+            "promotion_id": promotion_id,
+            "promotion_generation": 1,
+            "previous_checkpoint_receipt_sha256": receipt_chain[-1],
+            "checkpoint_receipt_sha256_chain": receipt_chain,
+            "checkpoint_evidence_sha256_by_id": evidence,
+            "authorization_sha256_chain": authorization_chain,
+            "previous_authorization_chain_sha256": supervisor.sha256(
+                supervisor.canonical_json(authorization_chain)
+            ),
+            "promotion_intent_sha256": "d" * 64,
+            "promotion_original_authorization_sha256": authorization_chain[0],
+            "candidate_binding_sha256": "f" * 64,
+            "database_binding_sha256": "1" * 64,
+            "runtime_binding_sha256": "2" * 64,
+            "preupgrade_recovery_binding_sha256": "3" * 64,
+            "promotion_snapshot_binding_sha256": "4" * 64,
+            "writer_quiesce_binding_sha256": "5" * 64,
+            "migration_authorization_binding_sha256": "6" * 64,
+            "migration_fence_binding_sha256": "7" * 64,
+            "migration_result_binding_sha256": "8" * 64,
+            "compose_deployment_binding_sha256": "9" * 64,
+            "current_checkpoint_source": self.source(
+                str(supervisor.UAT_PROMOTION_CURRENT_FILE), seed="9",
+            ),
+            "finalization_id": finalization_id,
+            "cross_role_operation_id": cross_role_id,
+            "cross_role_intent_sha256": cross_role_intent_sha256,
+            "cross_role_intent_source": self.source(
+                f"{supervisor.UAT_PROMOTION_STATE_ROOT}/intents/"
+                f"{cross_role_id}.{cross_role_intent_sha256}.json", seed="d",
+            ),
+            "cross_role_result_file_sha256": cross_role_result_file_sha256,
+            "cross_role_result_sha256": cross_role_result_sha256,
+            "cross_role_result_source": self.source(
+                f"{supervisor.UAT_PROMOTION_STATE_ROOT}/results/"
+                f"{cross_role_id}.{cross_role_result_sha256}.json", seed="e",
+            ),
+            "cross_role_human_execution_authorization_sha256": "4" * 64,
+            "evidence_subject_sha256": "5" * 64,
+            "approval_subject_sha256": "6" * 64,
+            "finalization_created_at": "2026-08-15T01:49:00.000Z",
+            "finalization_expires_at": "2026-08-15T01:49:30.000Z",
+            "requester_identity_sha256": "7" * 64,
+            "approver_identity_sha256": "8" * 64,
+            "executor_identity_sha256": "9" * 64,
+            "policy_file_sha256": supervisor.UAT_PROMOTION_POLICY_FILE_SHA256,
+            "policy_sha256": supervisor.UAT_PROMOTION_POLICY_SHA256,
+        }
+        if recovery:
+            value.update({
+                "expected_intent_sha256": "f" * 64,
+                "original_authorization_sha256": "a" * 64,
+                "original_operation": "FINALIZATION",
+                "original_operation_id": finalization_id,
+            })
+        return value
+
+    def finalization_authorization(self, bundle_digest, recovery=False):
+        operation = "RECOVER_UAT_PROMOTION" if recovery else "FINALIZE_UAT_PROMOTION"
+        created = datetime(2026, 8, 15, 1, 49, tzinfo=timezone.utc)
+        return {
+            "schema_version": 6,
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "authorization_id": "promotion-supervisor-finalization-recovery" if recovery
+            else "promotion-supervisor-finalization",
+            "created_at": utc(created + (timedelta(seconds=15) if recovery else timedelta())),
+            "expires_at": utc(created + timedelta(minutes=1)),
+            "supervisor_bundle_sha256": bundle_digest,
+            "operation": operation,
+            "parameters": self.finalization_parameters(recovery),
+            "nonce": "f" * 64,
+            "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
+        }
+
     def test_cross_role_authorization_binds_exact_bundle_result_and_independent_ingest_context(self):
         bundle = "f" * 64
         now = datetime(2026, 8, 15, 1, 48, tzinfo=timezone.utc)
@@ -855,6 +952,128 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
         self.assertEqual(events, [
             "cross-role-sources", "node", "prepare", "cross-role-sources", "consume",
             "cross-role-sources", "execute", "cleanup",
+        ])
+
+    def test_finalization_authorization_binds_checkpoint_12_result_and_terminal_context(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 49, tzinfo=timezone.utc)
+        authorization = self.finalization_authorization(bundle)
+        self.assertEqual(supervisor.validate_authorization(authorization, bundle, now), authorization)
+        context = supervisor.uat_promotion_context(authorization, "c" * 64)
+        self.assertEqual(context["operation"], "FINALIZATION")
+        self.assertEqual(context["operation_id"], authorization["parameters"]["finalization_id"])
+        self.assertEqual(
+            context["parameters"]["checkpoint_evidence_sha256_by_id"]["CROSS_ROLE_UAT_EXECUTION"],
+            context["parameters"]["cross_role_result_sha256"],
+        )
+        self.assertNotEqual(
+            context["parameters"]["cross_role_intent_sha256"],
+            context["parameters"]["cross_role_intent_source"]["sha256"],
+        )
+
+        substituted = self.finalization_authorization(bundle)
+        substituted["parameters"]["checkpoint_evidence_sha256_by_id"]["CROSS_ROLE_UAT_EXECUTION"] = \
+            substituted["parameters"]["evidence_subject_sha256"]
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError,
+                "SUPERVISOR_UAT_PROMOTION_FINALIZATION_CHAIN_INVALID"):
+            supervisor.validate_authorization(substituted, bundle, now)
+
+        reused_id = self.finalization_authorization(bundle)
+        reused_id["authorization_id"] = reused_id["parameters"]["cross_role_operation_id"]
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_TIME_INVALID"):
+            supervisor.validate_authorization(reused_id, bundle, now)
+
+    def test_finalization_recovery_binds_exact_consumed_authorization(self):
+        bundle = "f" * 64
+        original = self.finalization_authorization(bundle)
+        original_raw = supervisor.canonical_json(original)
+        original_digest = supervisor.sha256(original_raw)
+        recovery = self.finalization_authorization(bundle, recovery=True)
+        recovery["parameters"]["original_authorization_sha256"] = original_digest
+        recovery_now = datetime(2026, 8, 15, 1, 49, 15, tzinfo=timezone.utc)
+        self.assertEqual(supervisor.validate_authorization(recovery, bundle, recovery_now), recovery)
+        context = supervisor.uat_promotion_context(recovery, "c" * 64)
+        self.assertEqual(context["operation"], "FINALIZATION")
+        self.assertEqual(context["execution_mode"], "RECOVERY")
+        self.assertEqual(context["operation_id"], original["authorization_id"])
+
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-finalization-consumed-") as temporary:
+            consumed = Path(temporary)
+            consumed.chmod(0o700)
+            consumed_file = consumed / f"{original['authorization_id']}.{original_digest}.json"
+            consumed_file.write_bytes(original_raw)
+            consumed_file.chmod(0o400)
+            self.assertEqual(
+                supervisor.validate_original_uat_promotion_authorization_consumed(
+                    recovery["parameters"], bundle, consumed,
+                ),
+                original,
+            )
+            changed = {
+                **recovery["parameters"],
+                "cross_role_result_file_sha256": "9" * 64,
+            }
+            with self.assertRaisesRegex(
+                    supervisor.SupervisorError,
+                    "SUPERVISOR_UAT_PROMOTION_FINALIZATION_SOURCE_BINDING_INVALID"):
+                supervisor.validate_original_uat_promotion_authorization_consumed(
+                    changed, bundle, consumed,
+                )
+
+    def test_finalization_runner_response_and_source_rechecks_are_exact(self):
+        authorization = self.finalization_authorization("f" * 64)
+        context = supervisor.uat_promotion_context(authorization, "c" * 64)
+        prepared = {
+            "result": "PREPARED",
+            "promotion_id": context["parameters"]["promotion_id"],
+            "intent_sha256": "1" * 64,
+            "finalization_plan_sha256": "2" * 64,
+            "cross_role_result_sha256": context["parameters"]["cross_role_result_sha256"],
+        }
+        committed = {
+            "result": "COMMITTED",
+            "promotion_id": context["parameters"]["promotion_id"],
+            "intent_sha256": "1" * 64,
+            "receipt_sha256": "3" * 64,
+            "finalization_plan_sha256": "2" * 64,
+            "cross_role_result_sha256": context["parameters"]["cross_role_result_sha256"],
+        }
+        for phase, response in (("prepare", prepared), ("execute", committed)):
+            with patch.object(
+                    supervisor.subprocess, "run",
+                    return_value=supervisor.subprocess.CompletedProcess(
+                        [], 0, stdout=supervisor.canonical_json(response), stderr=b"",
+                    )):
+                self.assertEqual(supervisor.run_uat_promotion_runner(
+                    Path("/tmp/runtime/node"), Path("/trusted/bundle"), context, phase, 51,
+                ), response)
+
+        events = []
+
+        def runner(_node, _bundle, _context, phase, _lock, **kwargs):
+            self.assertEqual(kwargs, {})
+            events.append(phase)
+            return prepared if phase == "prepare" else committed
+
+        with patch.object(
+                supervisor, "verify_uat_promotion_finalization_sources",
+                side_effect=lambda *_: events.append("finalization-sources")), \
+                patch.object(supervisor, "prepare_runtime_privilege_node", side_effect=lambda *_: (
+                    events.append("node") or (Path("/tmp/runtime"), Path("/tmp/runtime/node"))
+                )), \
+                patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner), \
+                patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")), \
+                patch.object(supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup")):
+            result = supervisor.run_uat_promotion_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/finalization.json"),
+                authorization, "c" * 64, lock_descriptor=51,
+            )
+        self.assertEqual(result, committed)
+        self.assertEqual(events, [
+            "finalization-sources", "node", "prepare", "finalization-sources", "consume",
+            "finalization-sources", "execute", "cleanup",
         ])
 
     def test_postdeploy_authorizations_accept_distinct_contract_and_raw_source_digests(self):
@@ -1834,6 +2053,70 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                         supervisor.SupervisorError,
                         "SUPERVISOR_UAT_PROMOTION_CROSS_ROLE_RECOVERY_REQUIRED"):
+                    supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+                supervisor.assert_no_uat_migration_execution_interlock(exact, original_authorization)
+                supervisor.assert_no_uat_migration_execution_interlock(recovery, "f" * 64)
+                current.chmod(0o600)
+                current.write_bytes(supervisor.canonical_json({
+                    "authorization_sha256_chain": [original_authorization],
+                }))
+                current.chmod(0o400)
+                supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+
+    def test_pending_finalization_intent_requires_exact_original_or_recovery_until_committed(self):
+        original_authorization = "d" * 64
+        operation_id = "promotion-supervisor-finalization"
+        intent_sha256 = "e" * 64
+        unrelated = self.authorization(
+            "f" * 64, datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc),
+        )
+        exact = {
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "operation": "FINALIZE_UAT_PROMOTION",
+            "authorization_id": operation_id,
+            "parameters": {},
+        }
+        recovery = {
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "operation": "RECOVER_UAT_PROMOTION",
+            "authorization_id": "promotion-supervisor-finalization-recovery",
+            "parameters": {
+                "original_operation": "FINALIZATION",
+                "original_operation_id": operation_id,
+                "original_authorization_sha256": original_authorization,
+            },
+        }
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-finalization-interlock-") as temporary:
+            root = Path(temporary) / "state"
+            intents = root / "intents"
+            active = root / "active-fences"
+            transfers = root / "fence-transfers"
+            intents.mkdir(parents=True, mode=0o700)
+            root.chmod(0o700)
+            intents.chmod(0o700)
+            marker = root / supervisor.UAT_PROMOTION_STATE_MARKER
+            marker.write_bytes(supervisor.UAT_PROMOTION_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            intent = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-uat-promotion-finalization-intent/v1",
+                "finalization_operation_id": operation_id,
+                "execution_authorization_sha256": original_authorization,
+                "finalization_intent_sha256": intent_sha256,
+            }
+            intent_file = intents / f"{operation_id}.{intent_sha256}.json"
+            intent_file.write_bytes(supervisor.canonical_json(intent))
+            intent_file.chmod(0o400)
+            current = root / "current.json"
+            current.write_bytes(supervisor.canonical_json({"authorization_sha256_chain": ["c" * 64]}))
+            current.chmod(0o400)
+            with patch.object(supervisor, "UAT_PROMOTION_STATE_ROOT", root), \
+                    patch.object(supervisor, "UAT_PROMOTION_CURRENT_FILE", current), \
+                    patch.object(supervisor, "UAT_PROMOTION_ACTIVE_FENCES_ROOT", active), \
+                    patch.object(supervisor, "UAT_PROMOTION_FENCE_TRANSFERS_ROOT", transfers):
+                with self.assertRaisesRegex(
+                        supervisor.SupervisorError,
+                        "SUPERVISOR_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED"):
                     supervisor.assert_no_uat_migration_execution_interlock(unrelated)
                 supervisor.assert_no_uat_migration_execution_interlock(exact, original_authorization)
                 supervisor.assert_no_uat_migration_execution_interlock(recovery, "f" * 64)

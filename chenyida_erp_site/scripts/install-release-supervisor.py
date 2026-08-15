@@ -57,6 +57,9 @@ NOTIFIER_EGRESS_BASE_UNIT = Path("/etc/systemd/system/chenyida-erp-monitor-notif
 NOTIFIER_EGRESS_DROPIN = Path("/etc/systemd/system/chenyida-erp-monitor-notifier.service.d/50-chenyida-erp-notifier-egress.conf")
 NOTIFIER_EGRESS_TEMPLATE_FILE_SHA256 = "ebb318471ef96a9d91e78c72d81802aa193480befe36017c43b74277eb0c4617"
 NOTIFIER_EGRESS_TEMPLATE_POLICY_SHA256 = "abaf585ec2c5c735e18418265a688f01f2b4d1e0b26b2125432cde860f222b20"
+UAT_PROMOTION_STATE_ROOT = Path("/var/lib/chenyida-erp/uat-promotion-transactions-v1")
+UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1"
+UAT_PROMOTION_STATE_MARKER_VALUE = b"chenyida-erp-uat-promotion-transactions/v1\n"
 SUPERVISOR_BASE = Path("/usr/local/libexec/chenyida-erp-release-supervisor")
 BUNDLES_ROOT = SUPERVISOR_BASE / "bundles"
 LAUNCHERS_ROOT = SUPERVISOR_BASE / "launchers"
@@ -292,6 +295,74 @@ def ensure_root_marker(path: Path, expected: bytes) -> None:
     except FileExistsError:
         if trusted_file(path, 0o400, MAX_JSON_BYTES, "SUPERVISOR_INSTALL_MARKER_INVALID") != expected:
             reject("SUPERVISOR_INSTALL_MARKER_INVALID")
+
+
+def assert_no_uat_promotion_finalization_interlock(state_root: Path | None = None) -> None:
+    state_root = state_root or UAT_PROMOTION_STATE_ROOT
+    try:
+        os.lstat(state_root)
+    except FileNotFoundError:
+        return
+    except OSError:
+        reject("SUPERVISOR_INSTALL_UAT_PROMOTION_FINALIZATION_STATE_INVALID")
+    code = "SUPERVISOR_INSTALL_UAT_PROMOTION_FINALIZATION_STATE_INVALID"
+    trusted_directory(state_root, 0o700, code)
+    if trusted_file(
+        state_root / UAT_PROMOTION_STATE_MARKER, 0o400, 256, code,
+    ) != UAT_PROMOTION_STATE_MARKER_VALUE:
+        reject(code)
+    intents_root = state_root / "intents"
+    trusted_directory(intents_root, 0o700, code)
+    try:
+        names = sorted(os.listdir(intents_root))
+    except OSError:
+        reject(code)
+    if len(names) > 20_000 or any(
+            not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json", name)
+            for name in names):
+        reject(code)
+    finalization_intents: list[dict[str, Any]] = []
+    for name in names:
+        raw = trusted_file(intents_root / name, 0o400, MAX_JSON_BYTES, code)
+        value = strict_json(raw, code)
+        if not isinstance(value, dict) \
+                or value.get("contract") != "chenyida-erp-uat-promotion-finalization-intent/v1":
+            continue
+        required = {
+            "schema_version", "contract", "finalization_operation_id",
+            "execution_authorization_sha256", "finalization_intent_sha256",
+        }
+        body = {key: item for key, item in value.items() if key != "finalization_intent_sha256"}
+        if not required <= set(value) or raw != canonical_json(value) \
+                or value.get("schema_version") != 1 \
+                or not isinstance(value.get("finalization_operation_id"), str) \
+                or not IDENTIFIER.fullmatch(value["finalization_operation_id"]) \
+                or not isinstance(value.get("execution_authorization_sha256"), str) \
+                or not SHA256.fullmatch(value["execution_authorization_sha256"]) \
+                or value["execution_authorization_sha256"] == "0" * 64 \
+                or not isinstance(value.get("finalization_intent_sha256"), str) \
+                or not SHA256.fullmatch(value["finalization_intent_sha256"]) \
+                or sha256(canonical_json(body)) != value["finalization_intent_sha256"] \
+                or name != f"{value['finalization_operation_id']}.{value['finalization_intent_sha256']}.json":
+            reject(code)
+        finalization_intents.append(value)
+    if not finalization_intents:
+        return
+    current_raw = trusted_file(state_root / "current.json", 0o400, MAX_JSON_BYTES, code)
+    current = strict_json(current_raw, code)
+    authorization_chain = current.get("authorization_sha256_chain") \
+        if isinstance(current, dict) else None
+    if not isinstance(current, dict) or current_raw != canonical_json(current) \
+            or not isinstance(authorization_chain, list) \
+            or any(not isinstance(item, str) or not SHA256.fullmatch(item)
+                   for item in authorization_chain):
+        reject(code)
+    pending = [
+        intent for intent in finalization_intents
+        if intent["execution_authorization_sha256"] not in authorization_chain
+    ]
+    if pending:
+        reject("SUPERVISOR_INSTALL_UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED")
 
 
 def assert_no_runtime_privilege_operator_interlock(state_root: Path | None = None) -> None:
@@ -1078,6 +1149,7 @@ def install(repository: Path, authorization: dict[str, Any], authorization_path:
         reject("SUPERVISOR_INSTALL_MANIFEST_DIGEST_MISMATCH")
     _, payloads = validate_bundle_payload(repository, authorization, manifest_raw)
     preflight_bundle(manifest_raw, payloads, launcher_raw, authorization["bundle_manifest_sha256"])
+    assert_no_uat_promotion_finalization_interlock()
     assert_no_runtime_privilege_operator_interlock()
     assert_no_cluster_policy_activation_interlock()
     assert_no_notifier_egress_activation_interlock()

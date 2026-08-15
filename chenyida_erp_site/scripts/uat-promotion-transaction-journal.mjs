@@ -68,6 +68,7 @@ export const UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT = "chenyida-erp-ua
 export const UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-runtime-intent/v1";
 export const UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-identity-intent/v1";
 export const UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT = "chenyida-erp-uat-promotion-cross-role-intent/v1";
+export const UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT = "chenyida-erp-uat-promotion-finalization-intent/v1";
 export const UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-identity-evidence/v1";
 export const UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-containment/v1";
 export const UAT_PROMOTION_RECEIPT_CONTRACT = "chenyida-erp-uat-promotion-checkpoint-receipt/v1";
@@ -78,8 +79,8 @@ export const UAT_PROMOTION_CURRENT_FILE = `${UAT_PROMOTION_STATE_ROOT}/current.j
 export const UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1";
 export const UAT_PROMOTION_STATE_MARKER_VALUE = "chenyida-erp-uat-promotion-transactions/v1\n";
 export const UAT_PROMOTION_POLICY_RELATIVE = "operations/uat-promotion-transaction-policy-v1.json";
-export const UAT_PROMOTION_POLICY_FILE_SHA256 = "a78d551ffe8496d31ef3cfb6c961c464748ec0b6badf733951bf57194a4b2bae";
-export const UAT_PROMOTION_POLICY_SHA256 = "5ade8772ad9dd4961c128c8eca1bdeec7b4909f79a5b275b6be14ab4961caf37";
+export const UAT_PROMOTION_POLICY_FILE_SHA256 = "8b41e61e1e53a4c60833eb0f25cdca8d55c13b01142ab59dea956cd62e45f558";
+export const UAT_PROMOTION_POLICY_SHA256 = "70a999c4a5be491be1a20ad4697eaf65453463a71c6abaeb3df4b5ce24fce73f";
 export const ZERO_SHA256 = "0".repeat(64);
 
 const SITE_ROOT = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
@@ -284,6 +285,22 @@ const CROSS_ROLE_UAT_PARAMETER_FIELDS = Object.freeze([
   "requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256",
   "policy_file_sha256", "policy_sha256",
 ]);
+const FINALIZATION_PARAMETER_FIELDS = Object.freeze([
+  "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+  "checkpoint_receipt_sha256_chain", "checkpoint_evidence_sha256_by_id",
+  "authorization_sha256_chain", "previous_authorization_chain_sha256", "promotion_intent_sha256",
+  "promotion_original_authorization_sha256", "candidate_binding_sha256", "database_binding_sha256",
+  "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+  "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+  "migration_fence_binding_sha256", "migration_result_binding_sha256",
+  "compose_deployment_binding_sha256", "current_checkpoint_source", "finalization_id",
+  "cross_role_operation_id", "cross_role_intent_sha256", "cross_role_intent_source",
+  "cross_role_result_file_sha256", "cross_role_result_sha256", "cross_role_result_source",
+  "cross_role_human_execution_authorization_sha256", "evidence_subject_sha256",
+  "approval_subject_sha256", "finalization_created_at",
+  "finalization_expires_at", "requester_identity_sha256", "approver_identity_sha256",
+  "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+]);
 const WRITER_CAPTURE_FIELDS = Object.freeze([
   "deployment_class", "deployment_id", "compose_project", "snapshot_recovery_point_at", "snapshot_writer_verified_at",
   "application_version", "git_commit", "migration_head", "migration_manifest_sha256", "web", "worker",
@@ -345,7 +362,7 @@ function validatePolicy(value) {
   if (!same(value.deployment, { class: "UAT", id: "chenyida-erp", database: "chenyida_erp", database_marker: "chenyida-erp-deployment/v2:UAT:chenyida-erp" })) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.state, ["root", "marker", "marker_value", "directory_mode", "file_mode", "owner_uid", "owner_gid"], "UAT_PROMOTION_POLICY_INVALID");
   if (!same(value.state, { root: UAT_PROMOTION_STATE_ROOT, marker: UAT_PROMOTION_STATE_MARKER, marker_value: UAT_PROMOTION_STATE_MARKER_VALUE, directory_mode: "0700", file_mode: "0400", owner_uid: 0, owner_gid: 0 })) reject("UAT_PROMOTION_POLICY_INVALID");
-  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "migration_authorization_operation", "migration_execution_operation", "compose_deployment_operation", "postdeploy_runtime_configuration_operation", "postdeploy_identity_operation", "cross_role_uat_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
+  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "migration_authorization_operation", "migration_execution_operation", "compose_deployment_operation", "postdeploy_runtime_configuration_operation", "postdeploy_identity_operation", "cross_role_uat_operation", "finalization_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
   if (value.authorization.contract !== "chenyida-erp-release-supervisor-authorization/v6"
     || value.authorization.maximum_window_minutes !== 60 || value.authorization.begin_operation !== "BEGIN_UAT_PROMOTION"
     || value.authorization.snapshot_operation !== "CAPTURE_UAT_PROMOTION_SNAPSHOT"
@@ -356,6 +373,7 @@ function validatePolicy(value) {
     || value.authorization.postdeploy_runtime_configuration_operation !== "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION"
     || value.authorization.postdeploy_identity_operation !== "VERIFY_UAT_POSTDEPLOY_IDENTITY"
     || value.authorization.cross_role_uat_operation !== "VERIFY_UAT_CROSS_ROLE_EXECUTION"
+    || value.authorization.finalization_operation !== "FINALIZE_UAT_PROMOTION"
     || value.authorization.recovery_operation !== "RECOVER_UAT_PROMOTION"
     || !same(value.authorization.required_distinct_actors, ["requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256"])) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.snapshot_writer_dependency, [
@@ -374,7 +392,7 @@ function validatePolicy(value) {
   if (!same(value.checkpoint_order, CHECKPOINT_ORDER) || value.initial_checkpoint !== CHECKPOINT_ORDER[3]) reject("UAT_PROMOTION_POLICY_INVALID");
   if (!Array.isArray(value.required_intent_bindings) || value.required_intent_bindings.length !== 16
     || new Set(value.required_intent_bindings).size !== value.required_intent_bindings.length) reject("UAT_PROMOTION_POLICY_INVALID");
-  if (!Array.isArray(value.adapters) || value.adapters.length !== 11) reject("UAT_PROMOTION_POLICY_INVALID");
+  if (!Array.isArray(value.adapters) || value.adapters.length !== 12) reject("UAT_PROMOTION_POLICY_INVALID");
   const expectedAdapters = new Map([
     ["BEGIN_UAT_PROMOTION", "IMPLEMENTED"], ["CAPTURE_UAT_PROMOTION_SNAPSHOT", "IMPLEMENTED"],
     ["QUIESCE_UAT_WRITERS", "IMPLEMENTED"], ["RUN_UAT_PROMOTION_MIGRATION", "IMPLEMENTED"],
@@ -383,6 +401,7 @@ function validatePolicy(value) {
     ["VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "IMPLEMENTED"],
     ["VERIFY_UAT_POSTDEPLOY_IDENTITY", "IMPLEMENTED"],
     ["VERIFY_UAT_CROSS_ROLE_EXECUTION", "IMPLEMENTED"],
+    ["FINALIZE_UAT_PROMOTION", "IMPLEMENTED"],
     ["ROLLBACK_UAT_RELEASE", "NOT_IMPLEMENTED"],
     ["RECOVER_UAT_PROMOTION", "IMPLEMENTED"],
   ]);
@@ -940,9 +959,90 @@ export function validateUatPromotionCrossRoleParameters(value) {
   return value;
 }
 
+export function validateUatPromotionFinalizationParameters(value) {
+  const code = "UAT_PROMOTION_FINALIZATION_PARAMETERS_INVALID";
+  exactKeys(value, FINALIZATION_PARAMETER_FIELDS, code);
+  if (value.promotion_state_root !== UAT_PROMOTION_STATE_ROOT) {
+    reject("UAT_PROMOTION_STATE_PATH_INVALID");
+  }
+  for (const field of ["promotion_id", "finalization_id", "cross_role_operation_id"]) {
+    identifier(value[field], code);
+  }
+  if (new Set([
+    value.promotion_id, value.finalization_id, value.cross_role_operation_id,
+  ]).size !== 3) reject(code);
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  const aggregateCheckpointIds = CHECKPOINT_ORDER.slice(3, 12);
+  if (!Array.isArray(value.checkpoint_receipt_sha256_chain)
+    || value.checkpoint_receipt_sha256_chain.length !== aggregateCheckpointIds.length
+    || value.checkpoint_receipt_sha256_chain.some((item) => typeof item !== "string"
+      || !SHA256.test(item) || item === ZERO_SHA256)
+    || new Set(value.checkpoint_receipt_sha256_chain).size
+      !== value.checkpoint_receipt_sha256_chain.length
+    || value.checkpoint_receipt_sha256_chain.at(-1)
+      !== value.previous_checkpoint_receipt_sha256) reject(code);
+  exactKeys(value.checkpoint_evidence_sha256_by_id, aggregateCheckpointIds, code);
+  for (const checkpointId of aggregateCheckpointIds) {
+    digest(value.checkpoint_evidence_sha256_by_id[checkpointId], code);
+  }
+  if (!Array.isArray(value.authorization_sha256_chain)
+    || value.authorization_sha256_chain.length !== aggregateCheckpointIds.length
+    || value.authorization_sha256_chain.some((item) => typeof item !== "string"
+      || !SHA256.test(item) || item === ZERO_SHA256)
+    || new Set(value.authorization_sha256_chain).size !== value.authorization_sha256_chain.length
+    || clusterSha256(value.authorization_sha256_chain)
+      !== value.previous_authorization_chain_sha256) reject(code);
+  for (const field of [
+    "previous_checkpoint_receipt_sha256", "previous_authorization_chain_sha256",
+    "promotion_intent_sha256", "promotion_original_authorization_sha256",
+    "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "cross_role_intent_sha256",
+    "cross_role_result_file_sha256", "cross_role_result_sha256",
+    "cross_role_human_execution_authorization_sha256", "evidence_subject_sha256",
+    "approval_subject_sha256", "requester_identity_sha256",
+    "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+  ]) digest(value[field], code);
+  if (value.checkpoint_evidence_sha256_by_id.CROSS_ROLE_UAT_EXECUTION
+    !== value.cross_role_result_sha256) reject(code);
+  if (value.policy_file_sha256 !== UAT_PROMOTION_POLICY_FILE_SHA256
+    || value.policy_sha256 !== UAT_PROMOTION_POLICY_SHA256) {
+    reject("UAT_PROMOTION_POLICY_BINDING_INVALID");
+  }
+  if (new Set([
+    value.requester_identity_sha256, value.approver_identity_sha256,
+    value.executor_identity_sha256,
+  ]).size !== 3) reject("UAT_PROMOTION_ACTORS_INVALID");
+  const created = Date.parse(iso(value.finalization_created_at, code));
+  const expires = Date.parse(iso(value.finalization_expires_at, code));
+  if (expires <= created || expires - created > 15 * 60 * 1000) reject(code);
+  const crossRoleIntentPath = `${UAT_PROMOTION_STATE_ROOT}/intents/${value.cross_role_operation_id}.${value.cross_role_intent_sha256}.json`;
+  const crossRoleResultPath = `${UAT_PROMOTION_STATE_ROOT}/results/${value.cross_role_operation_id}.${value.cross_role_result_sha256}.json`;
+  validateSourceSpec(
+    value.current_checkpoint_source, UAT_PROMOTION_CURRENT_FILE, new Set(["0400"]),
+    `${code}_CURRENT_SOURCE_INVALID`, 0,
+  );
+  validateSourceSpec(
+    value.cross_role_intent_source, crossRoleIntentPath, new Set(["0400"]),
+    `${code}_CROSS_ROLE_INTENT_SOURCE_INVALID`, 0,
+  );
+  validateSourceSpec(
+    value.cross_role_result_source, crossRoleResultPath, new Set(["0400"]),
+    `${code}_CROSS_ROLE_RESULT_SOURCE_INVALID`, 0,
+  );
+  if (value.cross_role_result_source.sha256 !== value.cross_role_result_file_sha256
+    || new Set([
+      value.current_checkpoint_source.path, value.cross_role_intent_source.path,
+      value.cross_role_result_source.path,
+    ]).size !== 3) reject("UAT_PROMOTION_FINALIZATION_SOURCE_BINDING_INVALID");
+  return value;
+}
+
 export function validateUatPromotionContext(value) {
   exactKeys(value, CONTEXT_FIELDS, "UAT_PROMOTION_CONTEXT_INVALID");
-  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT"]).has(value.operation)
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT", "FINALIZATION"]).has(value.operation)
     || !new Set(["ORIGINAL", "RECOVERY"]).has(value.execution_mode)) reject("UAT_PROMOTION_CONTEXT_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
@@ -956,14 +1056,16 @@ export function validateUatPromotionContext(value) {
   else if (value.operation === "COMPOSE_DEPLOYMENT") validateUatPromotionComposeDeploymentParameters(value.parameters);
   else if (value.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION") validateUatPromotionPostdeployRuntimeParameters(value.parameters);
   else if (value.operation === "POSTDEPLOY_IDENTITY") validateUatPromotionPostdeployIdentityParameters(value.parameters);
-  else validateUatPromotionCrossRoleParameters(value.parameters);
+  else if (value.operation === "CROSS_ROLE_UAT") validateUatPromotionCrossRoleParameters(value.parameters);
+  else validateUatPromotionFinalizationParameters(value.parameters);
   const operationCreatedAt = value.operation === "BEGIN" ? value.parameters.promotion_created_at
     : value.operation === "CAPTURE_SNAPSHOT" ? value.parameters.snapshot_created_at
       : value.operation === "QUIESCE_WRITERS" ? value.parameters.quiesce_created_at
         : value.operation === "MIGRATION_AUTHORIZATION" ? value.parameters.authorization_created_at
           : value.operation === "MIGRATION_EXECUTION" ? value.parameters.execution_created_at
             : value.operation === "COMPOSE_DEPLOYMENT" ? value.parameters.deployment_created_at
-              : value.parameters.verification_created_at;
+              : value.operation === "FINALIZATION" ? value.parameters.finalization_created_at
+                : value.parameters.verification_created_at;
   if (value.execution_mode === "ORIGINAL") {
     if (value.execution_authorization_id !== value.operation_id || value.execution_authorization_sha256 !== value.original_authorization_sha256
       || value.expected_intent_sha256 !== null || Math.abs(Date.parse(value.execution_created_at) - Date.parse(operationCreatedAt)) > 5 * 60 * 1000
@@ -980,7 +1082,9 @@ export function validateUatPromotionContext(value) {
         || value.operation_id === value.parameters.deployment_operation_id
         || value.operation_id === value.parameters.runtime_probe_operation_id)
       || value.operation === "CROSS_ROLE_UAT" && (value.operation_id !== value.parameters.result_id
-        || value.operation_id === value.parameters.postdeploy_identity_operation_id)) {
+        || value.operation_id === value.parameters.postdeploy_identity_operation_id)
+      || value.operation === "FINALIZATION" && (value.operation_id !== value.parameters.finalization_id
+        || value.operation_id === value.parameters.cross_role_operation_id)) {
       reject("UAT_PROMOTION_CONTEXT_BINDING_INVALID");
     }
   } else {
@@ -2608,6 +2712,103 @@ async function verifyCrossRoleSources(context, filesystemRoot, options = {}) {
   });
 }
 
+async function readFinalizationCrossRoleEvidence(parameters, supervisorBundleSha256, filesystemRoot, now = null) {
+  const crossRoleIntent = await readAuthorizedSource(
+    parameters.cross_role_intent_source, filesystemRoot, validateUatPromotionCrossRoleIntent,
+    "UAT_PROMOTION_FINALIZATION_CROSS_ROLE_INTENT_SOURCE_INVALID",
+  );
+  const intent = crossRoleIntent.value;
+  const contract = await readAuthorizedSource(
+    intent.parameters.cross_role_contract_source, filesystemRoot, validateCrossRoleUatTemplate,
+    "UAT_PROMOTION_FINALIZATION_CROSS_ROLE_CONTRACT_SOURCE_INVALID",
+  );
+  const result = await readAuthorizedSource(
+    parameters.cross_role_result_source, filesystemRoot,
+    (value) => validateUatPromotionCrossRoleResult(value, {
+      template: contract.value, ...(now === null ? {} : { now }),
+    }),
+    "UAT_PROMOTION_FINALIZATION_CROSS_ROLE_RESULT_SOURCE_INVALID",
+  );
+  if (crossRoleIntent.raw.toString("utf8") !== canonicalClusterJson(intent)
+    || result.raw.toString("utf8") !== canonicalUatPromotionCrossRoleResultJson(result.value)
+    || intent.cross_role_intent_sha256 !== parameters.cross_role_intent_sha256
+    || intent.verification_operation_id !== parameters.cross_role_operation_id
+    || intent.supervisor_bundle_sha256 !== supervisorBundleSha256
+    || result.value.verification_operation_id !== parameters.cross_role_operation_id
+    || result.value.result_sha256 !== parameters.cross_role_result_sha256
+    || sha256(result.raw) !== parameters.cross_role_result_file_sha256
+    || result.value.human_execution_authorization_sha256
+      !== parameters.cross_role_human_execution_authorization_sha256
+    || result.value.evidence_subject_sha256 !== parameters.evidence_subject_sha256
+    || result.value.approval.approval_subject_sha256 !== parameters.approval_subject_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_CROSS_ROLE_EVIDENCE_MISMATCH");
+  }
+  return Object.freeze({ intent, result: result.value, resultRaw: result.raw });
+}
+
+async function verifyFinalizationSources(context, filesystemRoot, options = {}) {
+  const parameters = context.parameters;
+  const observedAt = options.now ?? new Date();
+  if (!(observedAt instanceof Date) || Number.isNaN(observedAt.getTime())) {
+    reject("UAT_PROMOTION_FINALIZATION_TIME_INVALID");
+  }
+  const current = await readAuthorizedSource(
+    parameters.current_checkpoint_source, filesystemRoot, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_FINALIZATION_CURRENT_SOURCE_INVALID",
+  );
+  if (current.raw.toString("utf8") !== canonicalClusterJson(current.value)) {
+    reject("UAT_PROMOTION_FINALIZATION_SOURCE_CANONICAL_INVALID");
+  }
+  const evidence = await readFinalizationCrossRoleEvidence(
+    parameters, context.supervisor_bundle_sha256, filesystemRoot, observedAt,
+  );
+  const previous = current.value;
+  const bindings = {
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: parameters.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: parameters.migration_fence_binding_sha256,
+    migration_result_binding_sha256: parameters.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: parameters.compose_deployment_binding_sha256,
+  };
+  if (previous.promotion_id !== parameters.promotion_id
+    || previous.promotion_generation !== parameters.promotion_generation
+    || previous.checkpoint_id !== "CROSS_ROLE_UAT_EXECUTION" || previous.checkpoint_ordinal !== 12
+    || previous.checkpoint_status !== "COMMITTED" || previous.journal_status !== "IN_PROGRESS"
+    || previous.receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || previous.authorization_chain_sha256 !== parameters.previous_authorization_chain_sha256
+    || !same(previous.authorization_sha256_chain, parameters.authorization_sha256_chain)
+    || previous.intent_sha256 !== parameters.promotion_intent_sha256
+    || previous.original_authorization_sha256 !== parameters.promotion_original_authorization_sha256
+    || Object.entries(bindings).some(([field, expected]) => previous[field] !== expected)
+    || previous.checkpoint_evidence_sha256 !== parameters.cross_role_result_sha256
+    || previous.checkpoint_authorization_sha256 !== evidence.intent.execution_authorization_sha256
+    || previous.authorization_sha256_chain.includes(context.original_authorization_sha256)
+    || evidence.result.human_execution_authorization_sha256 === context.original_authorization_sha256
+    || previous.authorization_sha256_chain.includes(evidence.result.human_execution_authorization_sha256)
+    || evidence.intent.promotion_id !== parameters.promotion_id
+    || evidence.intent.promotion_generation !== parameters.promotion_generation
+    || evidence.intent.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || evidence.intent.previous_checkpoint_receipt_sha256
+      !== previous.previous_checkpoint_receipt_sha256
+    || evidence.intent.cross_role_result_sha256 !== parameters.cross_role_result_sha256
+    || evidence.result.previous_checkpoint_receipt_sha256
+      !== previous.previous_checkpoint_receipt_sha256
+    || evidence.result.signoff_completed_at !== previous.recorded_at
+    || Date.parse(parameters.finalization_created_at) < Date.parse(previous.recorded_at)
+    || Date.parse(parameters.finalization_expires_at) > Date.parse(previous.promotion_expires_at)
+    || context.execution_mode === "ORIGINAL"
+      && (observedAt.getTime() < Date.parse(parameters.finalization_created_at)
+        || observedAt.getTime() >= Date.parse(parameters.finalization_expires_at))) {
+    reject("UAT_PROMOTION_FINALIZATION_CURRENT_MISMATCH");
+  }
+  return Object.freeze({ previous, crossRoleIntent: evidence.intent, result: evidence.result });
+}
+
 async function ensureDirectory(directory, parent, mode, code) {
   await trustedDirectory(parent, new Set([0o700, 0o750, 0o755]), code);
   let created = false;
@@ -2933,6 +3134,7 @@ function createIntent(context) {
       VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION: "IMPLEMENTED",
       VERIFY_UAT_POSTDEPLOY_IDENTITY: "IMPLEMENTED",
       VERIFY_UAT_CROSS_ROLE_EXECUTION: "IMPLEMENTED",
+      FINALIZE_UAT_PROMOTION: "IMPLEMENTED",
       ROLLBACK_UAT_RELEASE: "NOT_IMPLEMENTED",
       RECOVER_UAT_PROMOTION: "IMPLEMENTED",
     },
@@ -2970,6 +3172,7 @@ export function validateUatPromotionIntent(value) {
       VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION: "IMPLEMENTED",
       VERIFY_UAT_POSTDEPLOY_IDENTITY: "IMPLEMENTED",
       VERIFY_UAT_CROSS_ROLE_EXECUTION: "IMPLEMENTED",
+      FINALIZE_UAT_PROMOTION: "IMPLEMENTED",
       ROLLBACK_UAT_RELEASE: "NOT_IMPLEMENTED",
       RECOVER_UAT_PROMOTION: "IMPLEMENTED",
     })
@@ -3807,6 +4010,230 @@ export function validateUatPromotionCrossRoleIntent(value) {
   return value;
 }
 
+function finalizationRollbackBoundary() {
+  return Object.freeze({
+    checkpoint_14: "NOT_IMPLEMENTED_NOT_AUTHORIZED",
+    checkpoint_15: "NOT_IMPLEMENTED_NOT_AUTHORIZED",
+    rollback_ready: false,
+    database_protection_release: false,
+    backup_protection_release: false,
+  });
+}
+
+function finalizationPlanBinding(parameters, checkpointIntentSha256ById, executionAuthorizationSha256) {
+  return clusterSha256({
+    operation: "PROMOTION_FINALIZATION",
+    execution_scope: "FINAL_RECEIPT_ONLY_NO_ROLLBACK_NO_DATABASE_OR_BACKUP_ACTION",
+    target_checkpoint_id: "PROMOTION_FINAL_RECEIPT",
+    target_checkpoint_ordinal: 13,
+    target_journal_status: "COMMITTED",
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    completed_checkpoints: CHECKPOINT_ORDER.slice(0, 12),
+    checkpoint_receipt_sha256_chain: parameters.checkpoint_receipt_sha256_chain,
+    checkpoint_evidence_sha256_by_id: parameters.checkpoint_evidence_sha256_by_id,
+    checkpoint_intent_sha256_by_id: checkpointIntentSha256ById,
+    prior_authorization_sha256_chain: parameters.authorization_sha256_chain,
+    final_authorization_sha256_chain: [
+      ...parameters.authorization_sha256_chain, executionAuthorizationSha256,
+    ],
+    previous_authorization_chain_sha256: parameters.previous_authorization_chain_sha256,
+    promotion_intent_sha256: parameters.promotion_intent_sha256,
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: parameters.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: parameters.migration_fence_binding_sha256,
+    migration_result_binding_sha256: parameters.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: parameters.compose_deployment_binding_sha256,
+    cross_role_intent_sha256: parameters.cross_role_intent_sha256,
+    cross_role_result_sha256: parameters.cross_role_result_sha256,
+    cross_role_human_execution_authorization_sha256:
+      parameters.cross_role_human_execution_authorization_sha256,
+    evidence_subject_sha256: parameters.evidence_subject_sha256,
+    approval_subject_sha256: parameters.approval_subject_sha256,
+    rollback: finalizationRollbackBoundary(),
+  });
+}
+
+function createFinalizationIntent(context, sources, aggregate) {
+  const parameters = context.parameters;
+  const finalAuthorizationSha256Chain = [
+    ...parameters.authorization_sha256_chain, context.original_authorization_sha256,
+  ];
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT,
+    execution_scope: "FINAL_RECEIPT_ONLY_NO_ROLLBACK_NO_DATABASE_OR_BACKUP_ACTION",
+    finalization_operation_id: context.operation_id,
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    created_at: parameters.finalization_created_at,
+    expires_at: parameters.finalization_expires_at,
+    execution_authorization_sha256: context.original_authorization_sha256,
+    supervisor_bundle_sha256: context.supervisor_bundle_sha256,
+    parameters,
+    completed_checkpoints: CHECKPOINT_ORDER.slice(0, 12),
+    checkpoint_receipt_sha256_chain: aggregate.receiptSha256Chain,
+    checkpoint_receipt_chain_sha256: clusterSha256(aggregate.receiptSha256Chain),
+    checkpoint_evidence_sha256_by_id: aggregate.evidenceById,
+    checkpoint_evidence_chain_sha256: clusterSha256(aggregate.evidenceById),
+    checkpoint_intent_sha256_by_id: aggregate.checkpointIntentSha256ById,
+    checkpoint_intent_chain_sha256: clusterSha256(aggregate.checkpointIntentSha256ById),
+    prior_authorization_sha256_chain: parameters.authorization_sha256_chain,
+    prior_authorization_chain_sha256: parameters.previous_authorization_chain_sha256,
+    final_authorization_sha256_chain: finalAuthorizationSha256Chain,
+    final_authorization_chain_sha256: clusterSha256(finalAuthorizationSha256Chain),
+    promotion_intent_sha256: parameters.promotion_intent_sha256,
+    previous_checkpoint_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: parameters.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: parameters.migration_fence_binding_sha256,
+    migration_result_binding_sha256: parameters.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: parameters.compose_deployment_binding_sha256,
+    cross_role_operation_id: parameters.cross_role_operation_id,
+    cross_role_intent_sha256: parameters.cross_role_intent_sha256,
+    cross_role_result_sha256: parameters.cross_role_result_sha256,
+    cross_role_human_execution_authorization_sha256:
+      parameters.cross_role_human_execution_authorization_sha256,
+    evidence_subject_sha256: parameters.evidence_subject_sha256,
+    approval_subject_sha256: parameters.approval_subject_sha256,
+    rollback: finalizationRollbackBoundary(),
+    finalization_plan_sha256: finalizationPlanBinding(
+      parameters, aggregate.checkpointIntentSha256ById, context.original_authorization_sha256,
+    ),
+  };
+  return Object.freeze(validateUatPromotionFinalizationIntent({
+    ...body, finalization_intent_sha256: clusterSha256(body),
+  }));
+}
+
+export function validateUatPromotionFinalizationIntent(value) {
+  const code = "UAT_PROMOTION_FINALIZATION_INTENT_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "execution_scope", "finalization_operation_id",
+    "promotion_id", "promotion_generation", "created_at", "expires_at",
+    "execution_authorization_sha256", "supervisor_bundle_sha256", "parameters",
+    "completed_checkpoints", "checkpoint_receipt_sha256_chain",
+    "checkpoint_receipt_chain_sha256", "checkpoint_evidence_sha256_by_id",
+    "checkpoint_evidence_chain_sha256", "checkpoint_intent_sha256_by_id",
+    "checkpoint_intent_chain_sha256", "prior_authorization_sha256_chain",
+    "prior_authorization_chain_sha256", "final_authorization_sha256_chain",
+    "final_authorization_chain_sha256", "promotion_intent_sha256",
+    "previous_checkpoint_receipt_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "cross_role_operation_id",
+    "cross_role_intent_sha256", "cross_role_result_sha256",
+    "cross_role_human_execution_authorization_sha256", "evidence_subject_sha256",
+    "approval_subject_sha256", "rollback", "finalization_plan_sha256",
+    "finalization_intent_sha256",
+  ], code);
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT
+    || value.execution_scope
+      !== "FINAL_RECEIPT_ONLY_NO_ROLLBACK_NO_DATABASE_OR_BACKUP_ACTION") reject(code);
+  validateUatPromotionFinalizationParameters(value.parameters);
+  identifier(value.finalization_operation_id, code);
+  identifier(value.promotion_id, code);
+  identifier(value.cross_role_operation_id, code);
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  iso(value.created_at, code); iso(value.expires_at, code);
+  for (const field of [
+    "execution_authorization_sha256", "supervisor_bundle_sha256",
+    "checkpoint_receipt_chain_sha256", "checkpoint_evidence_chain_sha256",
+    "checkpoint_intent_chain_sha256", "prior_authorization_chain_sha256",
+    "final_authorization_chain_sha256", "promotion_intent_sha256",
+    "previous_checkpoint_receipt_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "cross_role_intent_sha256",
+    "cross_role_result_sha256", "cross_role_human_execution_authorization_sha256",
+    "evidence_subject_sha256", "approval_subject_sha256", "finalization_plan_sha256",
+    "finalization_intent_sha256",
+  ]) digest(value[field], code);
+  const checkpointIds = CHECKPOINT_ORDER.slice(3, 12);
+  exactKeys(value.checkpoint_intent_sha256_by_id, checkpointIds, code);
+  for (const checkpointId of checkpointIds) digest(value.checkpoint_intent_sha256_by_id[checkpointId], code);
+  if (!same(value.completed_checkpoints, CHECKPOINT_ORDER.slice(0, 12))
+    || !same(value.rollback, finalizationRollbackBoundary())
+    || !same(value.checkpoint_receipt_sha256_chain,
+      value.parameters.checkpoint_receipt_sha256_chain)
+    || !same(value.checkpoint_evidence_sha256_by_id,
+      value.parameters.checkpoint_evidence_sha256_by_id)
+    || !same(value.prior_authorization_sha256_chain,
+      value.parameters.authorization_sha256_chain)
+    || !same(value.final_authorization_sha256_chain, [
+      ...value.parameters.authorization_sha256_chain, value.execution_authorization_sha256,
+    ])
+    || new Set(value.final_authorization_sha256_chain).size
+      !== value.final_authorization_sha256_chain.length
+    || value.execution_authorization_sha256
+      === value.cross_role_human_execution_authorization_sha256
+    || value.prior_authorization_sha256_chain.includes(
+      value.cross_role_human_execution_authorization_sha256,
+    )
+    || value.finalization_operation_id !== value.parameters.finalization_id
+    || value.promotion_id !== value.parameters.promotion_id
+    || value.promotion_generation !== value.parameters.promotion_generation
+    || value.created_at !== value.parameters.finalization_created_at
+    || value.expires_at !== value.parameters.finalization_expires_at
+    || value.promotion_intent_sha256 !== value.parameters.promotion_intent_sha256
+    || value.previous_checkpoint_receipt_sha256
+      !== value.parameters.previous_checkpoint_receipt_sha256
+    || value.cross_role_operation_id !== value.parameters.cross_role_operation_id
+    || value.cross_role_intent_sha256 !== value.parameters.cross_role_intent_sha256
+    || value.cross_role_result_sha256 !== value.parameters.cross_role_result_sha256
+    || value.cross_role_human_execution_authorization_sha256
+      !== value.parameters.cross_role_human_execution_authorization_sha256
+    || value.evidence_subject_sha256 !== value.parameters.evidence_subject_sha256
+    || value.approval_subject_sha256 !== value.parameters.approval_subject_sha256
+    || value.checkpoint_receipt_chain_sha256
+      !== clusterSha256(value.checkpoint_receipt_sha256_chain)
+    || value.checkpoint_evidence_chain_sha256
+      !== clusterSha256(value.checkpoint_evidence_sha256_by_id)
+    || value.checkpoint_intent_chain_sha256
+      !== clusterSha256(value.checkpoint_intent_sha256_by_id)
+    || value.prior_authorization_chain_sha256
+      !== clusterSha256(value.prior_authorization_sha256_chain)
+    || value.final_authorization_chain_sha256
+      !== clusterSha256(value.final_authorization_sha256_chain)
+    || value.finalization_plan_sha256 !== finalizationPlanBinding(
+      value.parameters, value.checkpoint_intent_sha256_by_id,
+      value.execution_authorization_sha256,
+    )) reject("UAT_PROMOTION_FINALIZATION_INTENT_BINDING_INVALID");
+  for (const [intentField, parameterField] of [
+    ["candidate_binding_sha256", "candidate_binding_sha256"],
+    ["database_binding_sha256", "database_binding_sha256"],
+    ["runtime_binding_sha256", "runtime_binding_sha256"],
+    ["preupgrade_recovery_binding_sha256", "preupgrade_recovery_binding_sha256"],
+    ["promotion_snapshot_binding_sha256", "promotion_snapshot_binding_sha256"],
+    ["writer_quiesce_binding_sha256", "writer_quiesce_binding_sha256"],
+    ["migration_authorization_binding_sha256", "migration_authorization_binding_sha256"],
+    ["migration_fence_binding_sha256", "migration_fence_binding_sha256"],
+    ["migration_result_binding_sha256", "migration_result_binding_sha256"],
+    ["compose_deployment_binding_sha256", "compose_deployment_binding_sha256"],
+  ]) {
+    if (value[intentField] !== value.parameters[parameterField]) {
+      reject("UAT_PROMOTION_FINALIZATION_INTENT_BINDING_INVALID");
+    }
+  }
+  if (clusterSha256(bodyWithout(value, "finalization_intent_sha256"))
+    !== value.finalization_intent_sha256) reject("UAT_PROMOTION_FINALIZATION_INTENT_BINDING_INVALID");
+  return value;
+}
+
 function intentFile(paths, intent) { return path.join(paths.intents, `${intent.promotion_id}.${intent.intent_sha256}.json`); }
 function snapshotIntentFile(paths, intent) { return path.join(paths.intents, `${intent.snapshot_operation_id}.${intent.snapshot_intent_sha256}.json`); }
 function quiesceIntentFile(paths, intent) { return path.join(paths.intents, `${intent.quiesce_operation_id}.${intent.quiesce_intent_sha256}.json`); }
@@ -3827,6 +4254,9 @@ function postdeployIdentityIntentFile(paths, intent) {
 }
 function crossRoleIntentFile(paths, intent) {
   return path.join(paths.intents, `${intent.verification_operation_id}.${intent.cross_role_intent_sha256}.json`);
+}
+function finalizationIntentFile(paths, intent) {
+  return path.join(paths.intents, `${intent.finalization_operation_id}.${intent.finalization_intent_sha256}.json`);
 }
 function migrationGrantFile(paths, operationId, grantSha256) {
   return path.join(paths.grants, `${operationId}.${grantSha256}.json`);
@@ -3869,7 +4299,8 @@ async function committedChain(paths, allowed = {}) {
       || receipt.value.database_binding_sha256 !== intent.database_binding_sha256
       || receipt.value.runtime_binding_sha256 !== intent.runtime_binding_sha256
       || receipt.value.recovery_binding_sha256 !== intent.recovery_binding_sha256
-      || receipt.value.original_authorization_sha256 !== intent.original_authorization_sha256) reject("UAT_PROMOTION_RECEIPT_INTENT_MISMATCH");
+      || receipt.value.original_authorization_sha256 !== intent.original_authorization_sha256
+      || receipt.value.promotion_expires_at !== intent.expires_at) reject("UAT_PROMOTION_RECEIPT_INTENT_MISMATCH");
     const sameGeneration = receipts.filter((entry) => entry.value.promotion_generation === receipt.value.promotion_generation);
     if (sameGeneration.length === 0) {
       const priorGeneration = receipts.at(-1)?.value ?? null;
@@ -3877,25 +4308,178 @@ async function committedChain(paths, allowed = {}) {
         || receipt.value.previous_checkpoint_receipt_sha256 !== ZERO_SHA256
         || receipt.value.previous_promotion_receipt_sha256 !== (priorGeneration?.receipt_sha256 ?? ZERO_SHA256)
         || receipt.value.checkpoint_evidence_sha256 !== intent.intent_sha256
+        || receipt.value.checkpoint_status !== "COMMITTED" || receipt.value.journal_status !== "IN_PROGRESS"
+        || receipt.value.recorded_at !== intent.created_at
         || priorGeneration !== null && !new Set(["COMMITTED", "ROLLED_BACK"]).has(priorGeneration.journal_status)) reject("UAT_PROMOTION_GENERATION_CHAIN_INVALID");
     } else {
       const previous = sameGeneration.at(-1).value;
+      const expectedPreviousJournal = receipt.value.checkpoint_ordinal === 14 ? "COMMITTED"
+        : receipt.value.checkpoint_ordinal === 15 ? "ROLLBACK_IN_PROGRESS" : "IN_PROGRESS";
       if (receipt.value.journal_sequence !== previous.journal_sequence + 1
         || receipt.value.checkpoint_ordinal !== previous.checkpoint_ordinal + 1
         || receipt.value.previous_checkpoint_receipt_sha256 !== previous.receipt_sha256
         || receipt.value.previous_promotion_receipt_sha256 !== previous.previous_promotion_receipt_sha256
+        || previous.checkpoint_status !== "COMMITTED" || previous.journal_status !== expectedPreviousJournal
+        || receipt.value.promotion_expires_at !== previous.promotion_expires_at
+        || Date.parse(receipt.value.recorded_at) < Date.parse(previous.recorded_at)
+        || !same(receipt.value.authorization_sha256_chain, [
+          ...previous.authorization_sha256_chain, receipt.value.checkpoint_authorization_sha256,
+        ])
         || receipt.value.promotion_snapshot_binding_sha256 !== previous.promotion_snapshot_binding_sha256
           && receipt.value.checkpoint_ordinal !== 5
-      || receipt.value.writer_quiesce_binding_sha256 !== previous.writer_quiesce_binding_sha256
+        || receipt.value.writer_quiesce_binding_sha256 !== previous.writer_quiesce_binding_sha256
           && receipt.value.checkpoint_ordinal !== 6
         || receipt.value.migration_authorization_binding_sha256 !== previous.migration_authorization_binding_sha256
-          && receipt.value.checkpoint_ordinal !== 7) reject("UAT_PROMOTION_CHECKPOINT_CHAIN_INVALID");
+          && receipt.value.checkpoint_ordinal !== 7
+        || receipt.value.migration_fence_binding_sha256 !== previous.migration_fence_binding_sha256
+          && receipt.value.checkpoint_ordinal !== 8
+        || receipt.value.migration_result_binding_sha256 !== previous.migration_result_binding_sha256
+          && receipt.value.checkpoint_ordinal !== 8
+        || receipt.value.compose_deployment_binding_sha256 !== previous.compose_deployment_binding_sha256
+          && receipt.value.checkpoint_ordinal !== 9) reject("UAT_PROMOTION_CHECKPOINT_CHAIN_INVALID");
     }
     receipts.push(receipt);
   }
   if (intents.some((intent) => !receipts.some((receipt) => receipt.value.intent_sha256 === intent.value.intent_sha256))
     || !current.raw.equals(receipts.at(-1)?.raw ?? Buffer.alloc(0))) reject("UAT_PROMOTION_CURRENT_INVALID");
   return Object.freeze({ current, intents, receipts });
+}
+
+async function finalizationCheckpointAggregate(paths, parameters, allowed = {}) {
+  const chain = await committedChain(paths, allowed);
+  const receipts = chain.receipts
+    .map((entry) => entry.value)
+    .filter((receipt) => receipt.promotion_generation === parameters.promotion_generation
+      && receipt.checkpoint_ordinal <= 12);
+  const checkpointIds = CHECKPOINT_ORDER.slice(3, 12);
+  if (receipts.length !== checkpointIds.length
+    || receipts.some((receipt, index) => receipt.checkpoint_id !== checkpointIds[index]
+      || receipt.checkpoint_ordinal !== index + 4)
+    || receipts.at(-1)?.receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_CHAIN_INVALID");
+  }
+  const receiptSha256Chain = receipts.map((receipt) => receipt.receipt_sha256);
+  const evidenceById = Object.fromEntries(receipts.map((receipt) => [
+    receipt.checkpoint_id, receipt.checkpoint_evidence_sha256,
+  ]));
+  const authorizationSha256Chain = receipts.at(-1).authorization_sha256_chain;
+  if (!same(receiptSha256Chain, parameters.checkpoint_receipt_sha256_chain)
+    || !same(evidenceById, parameters.checkpoint_evidence_sha256_by_id)
+    || !same(authorizationSha256Chain, parameters.authorization_sha256_chain)) {
+    reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_AGGREGATE_MISMATCH");
+  }
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const storedIntents = [];
+  for (const name of names) {
+    const stored = await trustedJsonFile(
+      path.join(paths.intents, name), 0o400, validateAnyUatPromotionIntent,
+      "UAT_PROMOTION_INTENT_INVALID",
+    );
+    storedIntents.push(stored.value);
+  }
+  const specifications = [
+    [UAT_PROMOTION_INTENT_CONTRACT, "intent_sha256", "promotion_id"],
+    [UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT, "snapshot_intent_sha256", "snapshot_operation_id"],
+    [UAT_PROMOTION_QUIESCE_INTENT_CONTRACT, "quiesce_intent_sha256", "quiesce_operation_id"],
+    [UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT, "migration_authorization_intent_sha256", "migration_authorization_operation_id"],
+    [UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT, "migration_execution_intent_sha256", "migration_operation_id"],
+    [UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT, "compose_deployment_intent_sha256", "deployment_operation_id"],
+    [UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT, "postdeploy_runtime_intent_sha256", "verification_operation_id"],
+    [UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT, "postdeploy_identity_intent_sha256", "verification_operation_id"],
+    [UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT, "cross_role_intent_sha256", "verification_operation_id"],
+  ];
+  const checkpointIntentSha256ById = {};
+  const checkpointIntents = [];
+  for (let index = 0; index < receipts.length; index += 1) {
+    const receipt = receipts[index];
+    const [contract, digestField] = specifications[index];
+    let matches;
+    if (index === 0) {
+      matches = chain.intents.map((entry) => entry.value).filter((intent) =>
+        intent.contract === contract
+        && intent.promotion_id === receipt.promotion_id
+        && intent.promotion_generation === receipt.promotion_generation
+        && intent.original_authorization_sha256 === receipt.checkpoint_authorization_sha256
+        && intent.intent_sha256 === receipt.checkpoint_evidence_sha256);
+    } else {
+      matches = storedIntents.filter((intent) => intent.contract === contract
+        && intent.promotion_id === receipt.promotion_id
+        && intent.promotion_generation === receipt.promotion_generation
+        && intent.execution_authorization_sha256 === receipt.checkpoint_authorization_sha256
+        && intent.previous_checkpoint_receipt_sha256 === receipts[index - 1].receipt_sha256
+        && intent.promotion_intent_sha256 === receipt.intent_sha256);
+    }
+    if (matches.length !== 1) reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_INTENT_MISMATCH");
+    const intent = matches[0];
+    for (const [intentField, receiptField] of [
+      ["candidate_binding_sha256", "candidate_binding_sha256"],
+      ["database_binding_sha256", "database_binding_sha256"],
+      ["runtime_binding_sha256", "runtime_binding_sha256"],
+      ["preupgrade_recovery_binding_sha256", "recovery_binding_sha256"],
+      ["promotion_snapshot_binding_sha256", "promotion_snapshot_binding_sha256"],
+      ["writer_quiesce_binding_sha256", "writer_quiesce_binding_sha256"],
+      ["migration_authorization_binding_sha256", "migration_authorization_binding_sha256"],
+      ["migration_fence_binding_sha256", "migration_fence_binding_sha256"],
+      ["migration_result_binding_sha256", "migration_result_binding_sha256"],
+      ["compose_deployment_binding_sha256", "compose_deployment_binding_sha256"],
+    ]) {
+      if (Object.hasOwn(intent, intentField) && intent[intentField] !== receipt[receiptField]) {
+        reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_INTENT_BINDING_INVALID");
+      }
+    }
+    checkpointIntentSha256ById[receipt.checkpoint_id] = intent[digestField];
+    checkpointIntents.push(intent);
+  }
+  if (receipts[1].checkpoint_evidence_sha256 !== checkpointIntents[1].promotion_snapshot_binding_sha256
+    || receipts[2].checkpoint_evidence_sha256 !== checkpointIntents[2].quiesce_intent_sha256
+    || receipts[3].checkpoint_evidence_sha256
+      !== checkpointIntents[3].migration_authorization_intent_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_EVIDENCE_MISMATCH");
+  }
+  const migrationGrant = await loadStoredMigrationExecutionGrant(paths, checkpointIntents[4]);
+  const migrationResult = await loadMigrationExecutionResult(paths, checkpointIntents[4], migrationGrant);
+  if (receipts[4].checkpoint_evidence_sha256 !== migrationResult.result_sha256
+    || receipts[4].migration_fence_binding_sha256 !== migrationResult.database_fence_binding_sha256
+    || receipts[4].migration_result_binding_sha256 !== migrationResult.migration_result_binding_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_EVIDENCE_MISMATCH");
+  }
+  const deploymentResult = await loadComposeDeploymentResult(paths, checkpointIntents[5]);
+  const transfer = await loadComposeDeploymentFenceTransfer(paths, checkpointIntents[5], deploymentResult);
+  if (receipts[5].checkpoint_evidence_sha256 !== deploymentResult.result_sha256
+    || receipts[5].compose_deployment_binding_sha256 !== composeDeploymentBinding(deploymentResult, transfer)) {
+    reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_EVIDENCE_MISMATCH");
+  }
+  const runtimeResult = await trustedJsonFile(
+    path.join(paths.results, `${checkpointIntents[6].verification_operation_id}.${receipts[6].checkpoint_evidence_sha256}.json`),
+    0o400, (value) => validateRuntimeConfigurationProbeReceipt(value, { now: new Date(value.probed_at) }),
+    "UAT_PROMOTION_FINALIZATION_POSTDEPLOY_RUNTIME_RESULT_INVALID", 0, true,
+    canonicalRuntimeConfigurationProbeJson,
+  );
+  if (!runtimeResult || sha256(runtimeResult.raw) !== receipts[6].checkpoint_evidence_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_EVIDENCE_MISMATCH");
+  }
+  const identityEvidence = await trustedJsonFile(
+    path.join(paths.results, `${checkpointIntents[7].verification_operation_id}.${receipts[7].checkpoint_evidence_sha256}.json`),
+    0o400, validatePostdeployIdentityEvidence,
+    "UAT_PROMOTION_FINALIZATION_POSTDEPLOY_IDENTITY_RESULT_INVALID", 0, true,
+    canonicalPostdeployIdentityEvidenceJson,
+  );
+  if (!identityEvidence
+    || identityEvidence.value.evidence_sha256 !== receipts[7].checkpoint_evidence_sha256
+    || identityEvidence.value.execution_authorization_sha256
+      !== receipts[7].checkpoint_authorization_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_EVIDENCE_MISMATCH");
+  }
+  if (receipts[8].checkpoint_evidence_sha256 !== checkpointIntents[8].cross_role_result_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_CHECKPOINT_EVIDENCE_MISMATCH");
+  }
+  return Object.freeze({
+    chain, receipts, receiptSha256Chain, evidenceById, authorizationSha256Chain,
+    checkpointIntentSha256ById: Object.freeze(checkpointIntentSha256ById),
+  });
 }
 
 function stagedNames(intent, receipt) {
@@ -4955,6 +5539,7 @@ function validateAnyUatPromotionIntent(value) {
     [UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT, validateUatPromotionPostdeployRuntimeIntent],
     [UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT, validateUatPromotionPostdeployIdentityIntent],
     [UAT_PROMOTION_CROSS_ROLE_INTENT_CONTRACT, validateUatPromotionCrossRoleIntent],
+    [UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT, validateUatPromotionFinalizationIntent],
   ]);
   const validator = validators.get(value?.contract);
   if (!validator) reject("UAT_PROMOTION_INTENT_INVALID");
@@ -5668,6 +6253,220 @@ async function executeCrossRoleCheckpoint(context, options) {
   return commitCrossRoleCheckpoint(context, intent, sources, paths, options);
 }
 
+async function assertNoOtherPendingFinalizationIntent(paths, current, context) {
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  for (const name of names) {
+    const stored = await trustedJsonFile(
+      path.join(paths.intents, name), 0o400, validateAnyUatPromotionIntent,
+      "UAT_PROMOTION_INTENT_INVALID",
+    );
+    const intent = stored.value;
+    if (intent.contract === UAT_PROMOTION_FINALIZATION_INTENT_CONTRACT
+      && intent.promotion_id === current.promotion_id
+      && intent.promotion_generation === current.promotion_generation
+      && intent.previous_checkpoint_receipt_sha256 === current.receipt_sha256
+      && intent.finalization_operation_id !== context.operation_id) {
+      reject("UAT_PROMOTION_FINALIZATION_RECOVERY_REQUIRED");
+    }
+  }
+}
+
+async function prepareFinalization(context, options) {
+  await repositoryPolicy(options.siteRoot);
+  const paths = await layout(options.filesystemRoot, false);
+  if ((await readdir(paths.quarantine)).length !== 0) reject("UAT_PROMOTION_QUARANTINE_PRESENT");
+  await assertNoCommittedPostdeployAnomaly(paths);
+  const sources = await verifyFinalizationSources(context, options.filesystemRoot, options);
+  const aggregate = await finalizationCheckpointAggregate(paths, context.parameters);
+  if (aggregate.chain.current?.value.receipt_sha256 !== sources.previous.receipt_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_PREVIOUS_CHANGED");
+  }
+  await assertNoOtherPendingFinalizationIntent(paths, sources.previous, context);
+  const intent = createFinalizationIntent(context, sources, aggregate);
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length > 1 || matches.length === 1
+    && matches[0] !== path.basename(finalizationIntentFile(paths, intent))) {
+    reject("UAT_PROMOTION_FINALIZATION_OPERATION_ID_REUSED");
+  }
+  const raw = Buffer.from(canonicalClusterJson(intent));
+  if (matches.length === 1) {
+    const existing = await trustedJsonFile(
+      finalizationIntentFile(paths, intent), 0o400, validateUatPromotionFinalizationIntent,
+      "UAT_PROMOTION_FINALIZATION_INTENT_INVALID",
+    );
+    if (!existing?.raw.equals(raw)) reject("UAT_PROMOTION_FINALIZATION_INTENT_CONFLICT");
+    return Object.freeze({
+      result: "ALREADY_PREPARED", promotion_id: intent.promotion_id,
+      intent_sha256: intent.finalization_intent_sha256,
+      finalization_plan_sha256: intent.finalization_plan_sha256,
+      cross_role_result_sha256: intent.cross_role_result_sha256,
+    });
+  }
+  await ensureRawFile(
+    finalizationIntentFile(paths, intent), raw, 0o400, validateUatPromotionFinalizationIntent,
+    "UAT_PROMOTION_FINALIZATION_INTENT_CONFLICT",
+  );
+  await syncDirectory(paths.intents, "UAT_PROMOTION_INTENT_SYNC_FAILED");
+  return Object.freeze({
+    result: "PREPARED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.finalization_intent_sha256,
+    finalization_plan_sha256: intent.finalization_plan_sha256,
+    cross_role_result_sha256: intent.cross_role_result_sha256,
+  });
+}
+
+async function loadStoredFinalizationIntent(context, paths) {
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length !== 1) reject("UAT_PROMOTION_FINALIZATION_INTENT_MISSING");
+  const stored = await trustedJsonFile(
+    path.join(paths.intents, matches[0]), 0o400, validateUatPromotionFinalizationIntent,
+    "UAT_PROMOTION_FINALIZATION_INTENT_INVALID",
+  );
+  if (!stored
+    || matches[0] !== `${context.operation_id}.${stored.value.finalization_intent_sha256}.json`
+    || stored.value.finalization_intent_sha256 !== (context.expected_intent_sha256
+      ?? stored.value.finalization_intent_sha256)
+    || stored.value.execution_authorization_sha256 !== context.original_authorization_sha256
+    || stored.value.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || !same(stored.value.parameters, context.parameters)) {
+    reject("UAT_PROMOTION_FINALIZATION_INTENT_BINDING_INVALID");
+  }
+  return stored.value;
+}
+
+async function loadFinalizationIntent(context, paths, sources, aggregate) {
+  const expected = createFinalizationIntent(context, sources, aggregate);
+  const stored = await loadStoredFinalizationIntent(context, paths);
+  if (stored.finalization_intent_sha256 !== expected.finalization_intent_sha256
+    || !same(stored, expected)) reject("UAT_PROMOTION_FINALIZATION_INTENT_BINDING_INVALID");
+  return stored;
+}
+
+function createFinalizationCheckpointReceipt(context, intent, previous) {
+  return createNextUatPromotionCheckpointReceipt(previous, {
+    checkpoint_id: "PROMOTION_FINAL_RECEIPT",
+    checkpoint_status: "COMMITTED",
+    journal_status: "COMMITTED",
+    recorded_at: intent.created_at,
+    checkpoint_evidence_sha256: intent.finalization_intent_sha256,
+    checkpoint_authorization_sha256: context.original_authorization_sha256,
+    intent_sha256: intent.promotion_intent_sha256,
+    candidate_binding_sha256: intent.candidate_binding_sha256,
+    database_binding_sha256: intent.database_binding_sha256,
+    runtime_binding_sha256: intent.runtime_binding_sha256,
+    recovery_binding_sha256: intent.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: intent.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: intent.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: intent.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: intent.migration_fence_binding_sha256,
+    migration_result_binding_sha256: intent.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: intent.compose_deployment_binding_sha256,
+  });
+}
+
+async function finalizationCandidateState(paths, intent, previous, receipt) {
+  const name = receiptName(receipt);
+  const receiptRaw = Buffer.from(canonicalClusterJson(receipt));
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  if (current?.value.receipt_sha256 === receipt.receipt_sha256) {
+    const chain = await committedChain(paths);
+    if (chain.current?.value.receipt_sha256 !== receipt.receipt_sha256
+      || chain.current.value.checkpoint_ordinal !== 13
+      || chain.current.value.journal_status !== "COMMITTED") {
+      reject("UAT_PROMOTION_FINALIZATION_COMMITTED_STATE_MISMATCH");
+    }
+    return Object.freeze({ committed: true, history: true, receipt: true, current: true, receiptRaw, chain });
+  }
+  const chain = await committedChain(paths, { history: new Set([name]), receipts: new Set([name]) });
+  if (chain.current?.value.receipt_sha256 !== previous.receipt_sha256
+    || chain.current.value.intent_sha256 !== intent.promotion_intent_sha256
+    || chain.current.value.checkpoint_ordinal !== 12
+    || chain.current.value.journal_status !== "IN_PROGRESS") {
+    reject("UAT_PROMOTION_FINALIZATION_PREVIOUS_CHANGED");
+  }
+  const history = await trustedJsonFile(
+    historyFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_HISTORY_INVALID",
+  );
+  const storedReceipt = await trustedJsonFile(
+    receiptFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_RECEIPT_INVALID",
+  );
+  const historyDone = history?.raw.equals(receiptRaw) ?? false;
+  const receiptDone = storedReceipt?.raw.equals(receiptRaw) ?? false;
+  if (history !== null && !historyDone || storedReceipt !== null && !receiptDone) {
+    reject("UAT_PROMOTION_FINALIZATION_PUBLICATION_CONFLICT");
+  }
+  if (receiptDone && !historyDone) {
+    reject("UAT_PROMOTION_FINALIZATION_PUBLICATION_STAGE_ORDER_INVALID");
+  }
+  return Object.freeze({ committed: false, history: historyDone, receipt: receiptDone, current: false, receiptRaw, chain });
+}
+
+async function commitFinalization(context, intent, previous, paths, options) {
+  const receipt = createFinalizationCheckpointReceipt(context, intent, previous);
+  let state = await finalizationCandidateState(paths, intent, previous, receipt);
+  if (!state.history) {
+    await ensureRawFile(
+      historyFile(paths, receipt), state.receiptRaw, 0o400,
+      validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_HISTORY_CONFLICT",
+    );
+    await syncDirectory(paths.history, "UAT_PROMOTION_HISTORY_SYNC_FAILED");
+    await options.fault?.("AFTER_FINALIZATION_HISTORY");
+  }
+  state = await finalizationCandidateState(paths, intent, previous, receipt);
+  if (!state.receipt) {
+    await ensureRawFile(
+      receiptFile(paths, receipt), state.receiptRaw, 0o400,
+      validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_RECEIPT_CONFLICT",
+    );
+    await syncDirectory(paths.receipts, "UAT_PROMOTION_RECEIPT_SYNC_FAILED");
+    await options.fault?.("AFTER_FINALIZATION_RECEIPT");
+  }
+  state = await finalizationCandidateState(paths, intent, previous, receipt);
+  if (!state.current) {
+    const temporary = path.join(
+      paths.stateRoot, `.current.${context.operation_id}.${receipt.receipt_sha256}.tmp`,
+    );
+    await atomicAlias(
+      paths.current, temporary, state.receiptRaw, 0o400,
+      validateUatPromotionCheckpointReceipt, state.chain.current?.raw ?? null,
+      "UAT_PROMOTION_CURRENT_PUBLICATION",
+    );
+    await options.fault?.("AFTER_FINALIZATION_CURRENT");
+  }
+  state = await finalizationCandidateState(paths, intent, previous, receipt);
+  if (!state.committed) reject("UAT_PROMOTION_FINALIZATION_COMMIT_INCOMPLETE");
+  return Object.freeze({
+    result: "COMMITTED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.finalization_intent_sha256,
+    receipt_sha256: receipt.receipt_sha256,
+    finalization_plan_sha256: intent.finalization_plan_sha256,
+    cross_role_result_sha256: intent.cross_role_result_sha256,
+  });
+}
+
+async function executeFinalization(context, options) {
+  const paths = await layout(options.filesystemRoot, false);
+  const sources = await verifyFinalizationSources(context, options.filesystemRoot, options);
+  const aggregate = await finalizationCheckpointAggregate(paths, context.parameters);
+  const intent = await loadFinalizationIntent(context, paths, sources, aggregate);
+  return commitFinalization(context, intent, sources.previous, paths, options);
+}
+
 function recoveryPlan(context, decision, reason) {
   const body = {
     schema_version: 3,
@@ -5693,7 +6492,7 @@ function validateRecoveryPlan(value) {
     "decision", "reason", "recovery_sha256",
   ], "UAT_PROMOTION_RECOVERY_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_RECOVERY_CONTRACT
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT"]).has(value.original_operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT", "FINALIZATION"]).has(value.original_operation)
     || !new Set(["RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"]).has(value.decision)
     || (value.decision === "QUARANTINE") !== (typeof value.reason === "string")) reject("UAT_PROMOTION_RECOVERY_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_RECOVERY_INVALID");
@@ -5722,6 +6521,7 @@ function recoverableStateFailure(error) {
     "UAT_PROMOTION_COMPOSE_DEPLOYMENT_", "UAT_PROMOTION_ACTIVE_FENCE_TRANSFER_",
     "UAT_PROMOTION_POSTDEPLOY_", "RUNTIME_CONFIGURATION_PROBE_", "POSTDEPLOY_", "RELEASE_",
     "UAT_PROMOTION_CROSS_ROLE_",
+    "UAT_PROMOTION_FINALIZATION_",
   ].some((prefix) => error.code.startsWith(prefix));
 }
 
@@ -5945,6 +6745,109 @@ async function assessCrossRoleRecovery(context, paths, options) {
   return state.committed ? "ALREADY_COMMITTED" : "RESUME_PUBLICATION";
 }
 
+async function loadFinalizationPreviousCheckpoint(intent, paths) {
+  const observedCurrent = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  if (!observedCurrent || observedCurrent.value.receipt_sha256
+      !== intent.previous_checkpoint_receipt_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_PREVIOUS_CHANGED");
+  }
+  const expectedReceipt = createFinalizationCheckpointReceipt(
+    { original_authorization_sha256: intent.execution_authorization_sha256 },
+    intent, observedCurrent.value,
+  );
+  const expectedName = receiptName(expectedReceipt);
+  const chain = await committedChain(paths, {
+    history: new Set([expectedName]), receipts: new Set([expectedName]),
+  });
+  const previous = chain.receipts
+    .map((entry) => entry.value)
+    .find((receipt) => receipt.receipt_sha256 === intent.previous_checkpoint_receipt_sha256);
+  if (!previous || previous.promotion_id !== intent.promotion_id
+    || previous.promotion_generation !== intent.promotion_generation
+    || previous.checkpoint_id !== "CROSS_ROLE_UAT_EXECUTION" || previous.checkpoint_ordinal !== 12
+    || previous.checkpoint_status !== "COMMITTED" || previous.journal_status !== "IN_PROGRESS"
+    || previous.checkpoint_evidence_sha256 !== intent.cross_role_result_sha256
+    || previous.authorization_chain_sha256 !== intent.prior_authorization_chain_sha256
+    || !same(previous.authorization_sha256_chain, intent.prior_authorization_sha256_chain)
+    || previous.authorization_sha256_chain.includes(intent.execution_authorization_sha256)
+    || previous.intent_sha256 !== intent.promotion_intent_sha256
+    || previous.candidate_binding_sha256 !== intent.candidate_binding_sha256
+    || previous.database_binding_sha256 !== intent.database_binding_sha256
+    || previous.runtime_binding_sha256 !== intent.runtime_binding_sha256
+    || previous.recovery_binding_sha256 !== intent.preupgrade_recovery_binding_sha256
+    || previous.promotion_snapshot_binding_sha256 !== intent.promotion_snapshot_binding_sha256
+    || previous.writer_quiesce_binding_sha256 !== intent.writer_quiesce_binding_sha256
+    || previous.migration_authorization_binding_sha256
+      !== intent.migration_authorization_binding_sha256
+    || previous.migration_fence_binding_sha256 !== intent.migration_fence_binding_sha256
+    || previous.migration_result_binding_sha256 !== intent.migration_result_binding_sha256
+    || previous.compose_deployment_binding_sha256 !== intent.compose_deployment_binding_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_PREVIOUS_CHANGED");
+  }
+  return previous;
+}
+
+async function alreadyCommittedFinalization(context, paths, intent, filesystemRoot) {
+  const chain = await committedChain(paths);
+  const current = chain.current?.value;
+  if (current?.checkpoint_id !== "PROMOTION_FINAL_RECEIPT" || current.checkpoint_ordinal !== 13
+    || current.checkpoint_status !== "COMMITTED" || current.journal_status !== "COMMITTED"
+    || current.previous_checkpoint_receipt_sha256 !== intent.previous_checkpoint_receipt_sha256
+    || current.checkpoint_authorization_sha256 !== intent.execution_authorization_sha256
+    || current.checkpoint_evidence_sha256 !== intent.finalization_intent_sha256
+    || !same(current.authorization_sha256_chain, intent.final_authorization_sha256_chain)
+    || current.authorization_chain_sha256 !== intent.final_authorization_chain_sha256
+    || current.compose_deployment_binding_sha256 !== intent.compose_deployment_binding_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_COMMITTED_STATE_MISMATCH");
+  }
+  await finalizationCheckpointAggregate(paths, intent.parameters);
+  const evidence = await readFinalizationCrossRoleEvidence(
+    intent.parameters, intent.supervisor_bundle_sha256, filesystemRoot,
+  );
+  if (evidence.result.result_sha256 !== intent.cross_role_result_sha256) {
+    reject("UAT_PROMOTION_FINALIZATION_COMMITTED_STATE_MISMATCH");
+  }
+  return Object.freeze({
+    result: "ALREADY_COMMITTED", promotion_id: intent.promotion_id,
+    intent_sha256: intent.finalization_intent_sha256,
+    receipt_sha256: current.receipt_sha256,
+    finalization_plan_sha256: intent.finalization_plan_sha256,
+    cross_role_result_sha256: intent.cross_role_result_sha256,
+  });
+}
+
+async function assessFinalizationRecovery(context, paths, options) {
+  const intent = await loadStoredFinalizationIntent(context, paths);
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  if (current?.value.checkpoint_id === "PROMOTION_FINAL_RECEIPT"
+    && current.value.previous_checkpoint_receipt_sha256
+      === intent.previous_checkpoint_receipt_sha256
+    && current.value.checkpoint_authorization_sha256 === intent.execution_authorization_sha256
+    && current.value.checkpoint_evidence_sha256 === intent.finalization_intent_sha256) {
+    await alreadyCommittedFinalization(context, paths, intent, options.filesystemRoot);
+    return "ALREADY_COMMITTED";
+  }
+  const previous = await loadFinalizationPreviousCheckpoint(intent, paths);
+  const receipt = createFinalizationCheckpointReceipt(context, intent, previous);
+  const expectedName = receiptName(receipt);
+  const aggregate = await finalizationCheckpointAggregate(paths, intent.parameters, {
+    history: new Set([expectedName]), receipts: new Set([expectedName]),
+  });
+  const evidence = await readFinalizationCrossRoleEvidence(
+    intent.parameters, intent.supervisor_bundle_sha256, options.filesystemRoot,
+  );
+  const expected = createFinalizationIntent(context, { previous, result: evidence.result }, aggregate);
+  if (!same(expected, intent)) reject("UAT_PROMOTION_FINALIZATION_INTENT_BINDING_INVALID");
+  const state = await finalizationCandidateState(paths, intent, previous, receipt);
+  return state.committed ? "ALREADY_COMMITTED" : "RESUME_PUBLICATION";
+}
+
 async function prepareRecovery(context, options) {
   await repositoryPolicy(options.siteRoot);
   const paths = await layout(options.filesystemRoot, false);
@@ -6057,6 +6960,8 @@ async function prepareRecovery(context, options) {
         );
         if (state.committed) decision = "ALREADY_COMMITTED";
       }
+    } else if (context.operation === "FINALIZATION") {
+      decision = await assessFinalizationRecovery(context, paths, options);
     } else if (context.operation === "CROSS_ROLE_UAT") {
       decision = await assessCrossRoleRecovery(context, paths, options);
     } else if (new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)) {
@@ -6120,7 +7025,7 @@ function validateQuarantine(value) {
     "intent_sha256", "recovery_sha256", "reason", "preservation", "quarantine_sha256",
   ], "UAT_PROMOTION_QUARANTINE_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_QUARANTINE_CONTRACT || value.status !== "QUARANTINED"
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT"]).has(value.operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY", "CROSS_ROLE_UAT", "FINALIZATION"]).has(value.operation)
     || value.preservation !== "FILES_LEFT_IN_PLACE_NO_AUTOMATIC_DELETE" || typeof value.reason !== "string" || value.reason.length < 4) reject("UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.promotion_id, "UAT_PROMOTION_QUARANTINE_INVALID");
@@ -6224,6 +7129,27 @@ async function executeRecovery(context, options) {
       result = await commitMigrationExecution(
         context, artifacts.intent, migrationResult, sources, paths, options,
       );
+    } else if (context.operation === "FINALIZATION" && plan.decision === "ALREADY_COMMITTED") {
+      const intent = await loadStoredFinalizationIntent(context, paths);
+      result = await alreadyCommittedFinalization(
+        context, paths, intent, options.filesystemRoot,
+      );
+    } else if (context.operation === "FINALIZATION") {
+      const intent = await loadStoredFinalizationIntent(context, paths);
+      const previous = await loadFinalizationPreviousCheckpoint(intent, paths);
+      const receipt = createFinalizationCheckpointReceipt(context, intent, previous);
+      const expectedName = receiptName(receipt);
+      const aggregate = await finalizationCheckpointAggregate(paths, intent.parameters, {
+        history: new Set([expectedName]), receipts: new Set([expectedName]),
+      });
+      const evidence = await readFinalizationCrossRoleEvidence(
+        intent.parameters, intent.supervisor_bundle_sha256, options.filesystemRoot,
+      );
+      const expected = createFinalizationIntent(
+        context, { previous, result: evidence.result }, aggregate,
+      );
+      if (!same(expected, intent)) reject("UAT_PROMOTION_FINALIZATION_INTENT_BINDING_INVALID");
+      result = await commitFinalization(context, intent, previous, paths, options);
     } else if (context.operation === "CROSS_ROLE_UAT" && plan.decision === "ALREADY_COMMITTED") {
       const intent = await loadStoredCrossRoleIntent(context, paths);
       result = await alreadyCommittedCrossRoleResult(
@@ -6534,6 +7460,7 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
     if (context.operation === "MIGRATION_EXECUTION") return prepareMigrationExecution(context, resolved);
     if (context.operation === "COMPOSE_DEPLOYMENT") return prepareComposeDeployment(context, resolved);
     if (context.operation === "CROSS_ROLE_UAT") return prepareCrossRoleCheckpoint(context, resolved);
+    if (context.operation === "FINALIZATION") return prepareFinalization(context, resolved);
     return preparePostdeployCheckpoint(context, resolved);
   }
   const paths = await layout(filesystemRoot, false);
@@ -6571,6 +7498,7 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
       return executePostdeployCheckpoint(context, resolved);
     }
     if (context.operation === "CROSS_ROLE_UAT") return executeCrossRoleCheckpoint(context, resolved);
+    if (context.operation === "FINALIZATION") return executeFinalization(context, resolved);
     const sources = await verifyComposeDeploymentSources(context, filesystemRoot);
     const intent = await loadComposeDeploymentIntent(context, paths, sources);
     const result = await loadComposeDeploymentResult(paths, intent);
