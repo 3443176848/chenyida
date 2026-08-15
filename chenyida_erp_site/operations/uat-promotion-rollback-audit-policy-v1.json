@@ -11,6 +11,8 @@
     "AUTHORIZE_UAT_PROMOTION_MIGRATION",
     "RUN_UAT_PROMOTION_MIGRATION",
     "DEPLOY_UAT_RELEASE",
+    "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
+    "VERIFY_UAT_POSTDEPLOY_IDENTITY",
     "ROLLBACK_UAT_RELEASE",
     "RECOVER_UAT_PROMOTION"
   ],
@@ -21,6 +23,8 @@
     "AUTHORIZE_UAT_PROMOTION_MIGRATION",
     "RUN_UAT_PROMOTION_MIGRATION",
     "DEPLOY_UAT_RELEASE",
+    "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
+    "VERIFY_UAT_POSTDEPLOY_IDENTITY",
     "RECOVER_UAT_PROMOTION"
   ],
   "required_checkpoint_order": [
@@ -108,14 +112,14 @@
       "id": "POST_DEPLOY_RUNTIME_CONFIGURATION",
       "status": "SUPPORTED",
       "severity_if_incomplete": "P0",
-      "evidence": ["postdeploy-runtime-configuration-probe.mjs:POSTDEPLOY_RUNTIME_CONFIGURATION_PROBE_CONTRACT", "postdeploy-runtime-configuration-probe.mjs:runtime_configuration_sha256"],
+      "evidence": ["release-supervisor-launcher.py:VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT", "uat-promotion-transaction-journal.mjs:AFTER_POSTDEPLOY_RUNTIME_CURRENT", "postdeploy-runtime-configuration-probe.mjs:POSTDEPLOY_RUNTIME_CONFIGURATION_PROBE_CONTRACT"],
       "finding": null
     },
     {
       "id": "POST_DEPLOY_IDENTITY",
       "status": "SUPPORTED",
       "severity_if_incomplete": "P0",
-      "evidence": ["postdeploy-release-contract.mjs:POSTDEPLOY_RECEIPT_CONTRACT", "postdeploy-release-verifier.mjs:buildReleaseIdentityFromPostDeployReceipt"],
+      "evidence": ["release-supervisor-launcher.py:VERIFY_UAT_POSTDEPLOY_IDENTITY", "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT", "uat-promotion-transaction-journal.mjs:UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT", "postdeploy-release-contract.mjs:POSTDEPLOY_RECEIPT_CONTRACT"],
       "finding": null
     },
     {
@@ -148,7 +152,7 @@
     }
   ],
   "source_files": [
-    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
+    {"path": "chenyida_erp_site/scripts/release-supervisor-launcher.py", "markers": ["ENTRYPOINTS = {", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY", "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"]},
     {"path": "chenyida_erp_site/scripts/release-candidate-snapshot.py", "markers": ["VERIFY_EXACT_RELEASE_CANDIDATE_SNAPSHOT", "receipt_sha256"]},
     {"path": "chenyida_erp_site/scripts/release-manifest-contract.mjs", "markers": ["promotion_status", "RELEASE_NOT_ELIGIBLE"]},
     {"path": "chenyida_erp_site/scripts/release-lifecycle-contract.mjs", "markers": ["PRE_DEPLOY_EXISTING_RUNTIME_STABILITY", "POST_DEPLOY_CURRENT_RUNTIME_STRICT"]},
@@ -170,7 +174,7 @@
     {"path": "chenyida_erp_site/scripts/postdeploy-release-contract.mjs", "markers": ["POSTDEPLOY_RECEIPT_CONTRACT", "buildReleaseIdentityFromPostDeployReceipt"]},
     {"path": "chenyida_erp_site/scripts/postdeploy-release-verifier.mjs", "markers": ["buildReleaseIdentityFromPostDeployReceipt", "assertPostDeployReadinessStable"]},
     {"path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json", "markers": ["HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED", "\"status\": \"BLOCKED\""]},
-    {"path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json", "markers": ["chenyida-erp-uat-promotion-transaction-policy/v1", "\"operation\": \"DEPLOY_UAT_RELEASE\", \"status\": \"PARTIAL\""]},
-    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT", "UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT", "MIGRATION_COMMIT_RECEIPT", "COMPOSE_DEPLOYMENT_RECEIPT", "probeDockerWriterQuiesce", "validateBackupRecoveryReadinessV4", "AFTER_COMPOSE_DEPLOYMENT_CURRENT", "runUatPromotionTransactionPhase"]}
+    {"path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json", "markers": ["chenyida-erp-uat-promotion-transaction-policy/v1", "\"operation\": \"DEPLOY_UAT_RELEASE\", \"status\": \"IMPLEMENTED\"", "\"operation\": \"VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION\", \"status\": \"IMPLEMENTED\"", "\"operation\": \"VERIFY_UAT_POSTDEPLOY_IDENTITY\", \"status\": \"IMPLEMENTED\""]},
+    {"path": "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs", "markers": ["UAT_PROMOTION_INTENT_CONTRACT", "UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT", "UAT_PROMOTION_QUIESCE_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT", "UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT", "UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT", "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT", "MIGRATION_COMMIT_RECEIPT", "COMPOSE_DEPLOYMENT_RECEIPT", "probeDockerWriterQuiesce", "validateBackupRecoveryReadinessV4", "AFTER_COMPOSE_DEPLOYMENT_CURRENT", "AFTER_POSTDEPLOY_RUNTIME_CURRENT", "AFTER_POSTDEPLOY_IDENTITY_CURRENT", "runUatPromotionTransactionPhase"]}
   ]
 }

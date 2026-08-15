@@ -503,6 +503,357 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
             "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS["DEPLOY_UAT_RELEASE"],
         }
 
+    def postdeploy_parameters(self, identity=False):
+        promotion_id = "promotion-supervisor-fixture"
+        deployment_id = "promotion-supervisor-compose-deployment"
+        deployment_result_sha256 = "2" * 64
+        transfer_sha256 = "3" * 64
+        manifest = "/var/lib/chenyida-erp/release-artifacts/promotion-supervisor/release-manifest.json"
+        value = {
+            "promotion_state_root": str(supervisor.UAT_PROMOTION_STATE_ROOT),
+            "promotion_id": promotion_id,
+            "promotion_generation": 1,
+            "previous_checkpoint_receipt_sha256": "1" * 64,
+            "promotion_intent_sha256": "4" * 64,
+            "promotion_original_authorization_sha256": "5" * 64,
+            "candidate_binding_sha256": "6" * 64,
+            "database_binding_sha256": "7" * 64,
+            "runtime_binding_sha256": "8" * 64,
+            "preupgrade_recovery_binding_sha256": "9" * 64,
+            "promotion_snapshot_binding_sha256": "a" * 64,
+            "writer_quiesce_binding_sha256": "b" * 64,
+            "migration_authorization_binding_sha256": "c" * 64,
+            "migration_fence_binding_sha256": "d" * 64,
+            "migration_result_binding_sha256": "e" * 64,
+            "compose_deployment_binding_sha256": "f" * 64,
+            "current_checkpoint_source": self.source(str(supervisor.UAT_PROMOTION_CURRENT_FILE), seed="a"),
+            "deployment_operation_id": deployment_id,
+            "deployment_result_sha256": deployment_result_sha256,
+            "deployment_result_source": self.source(
+                f"{supervisor.UAT_PROMOTION_STATE_ROOT}/results/{deployment_id}.{deployment_result_sha256}.json",
+                seed="b",
+            ),
+            "fence_transfer_sha256": transfer_sha256,
+            "fence_transfer_source": self.source(
+                f"{supervisor.UAT_PROMOTION_FENCE_TRANSFERS_ROOT}/{deployment_id}.{transfer_sha256}.json",
+                seed="c",
+            ),
+            "release_manifest": manifest,
+            "release_manifest_sha256": "7" * 64,
+            "release_manifest_source": self.source(manifest, mode="0440", seed="7"),
+            "deployment_class": "UAT",
+            "deployment_id": "chenyida-erp",
+            "compose_project": "chenyida-erp",
+            "compose_project_root": "/opt/erp/chenyida_erp_site",
+            "runtime_guard_contract": supervisor.RUNTIME_GUARD_CONTRACT,
+            "runtime_guard_mode": supervisor.POST_DEPLOY_RUNTIME_GUARD_MODE,
+            "runtime_policy_sha256": supervisor.RUNTIME_POLICY_SHA256,
+            "reader_gid": 1234,
+            "caddy_container": "chenyida-erp-caddy-1",
+            "postgres_container": "chenyida-erp-postgres-1",
+            "web_container": "chenyida-erp-web-1",
+            "worker_container": "chenyida-erp-worker-1",
+            "verification_created_at": "2026-08-15T01:43:00.000Z",
+            "verification_expires_at": "2026-08-15T01:48:00.000Z",
+            "requester_identity_sha256": "1" * 64,
+            "approver_identity_sha256": "2" * 64,
+            "executor_identity_sha256": "3" * 64,
+            "policy_file_sha256": supervisor.UAT_PROMOTION_POLICY_FILE_SHA256,
+            "policy_sha256": supervisor.UAT_PROMOTION_POLICY_SHA256,
+        }
+        if not identity:
+            value.update({
+                "probe_root": str(supervisor.RUNTIME_PROBE_ROOT),
+                "probe_id": "promotion-supervisor-runtime-probe",
+            })
+            return value
+        probe_id = "promotion-supervisor-runtime-probe"
+        runtime_intent_sha256 = "4" * 64
+        runtime_result_sha256 = "5" * 64
+        run_id = "promotion-supervisor-postdeploy-identity"
+        value.update({
+            "previous_checkpoint_receipt_sha256": "6" * 64,
+            "runtime_probe_operation_id": probe_id,
+            "runtime_probe_intent_sha256": runtime_intent_sha256,
+            "runtime_probe_intent_source": self.source(
+                f"{supervisor.UAT_PROMOTION_STATE_ROOT}/intents/{probe_id}.{runtime_intent_sha256}.json",
+                seed="a",
+            ),
+            "runtime_probe_result_sha256": runtime_result_sha256,
+            "runtime_probe_result_source": self.source(
+                f"{supervisor.UAT_PROMOTION_STATE_ROOT}/results/{probe_id}.{runtime_result_sha256}.json",
+                seed="5",
+            ),
+            "runtime_probe_receipt": str(
+                supervisor.RUNTIME_PROBE_ROOT / f"{probe_id}.runtime-configuration-probe.json"
+            ),
+            "runtime_probe_receipt_sha256": runtime_result_sha256,
+            "runtime_probe_receipt_source": self.source(
+                str(supervisor.RUNTIME_PROBE_ROOT / f"{probe_id}.runtime-configuration-probe.json"),
+                seed="5",
+            ),
+            "runtime_configuration_sha256": "6" * 64,
+            "postdeploy_root": str(supervisor.POSTDEPLOY_ROOT_BASE / run_id),
+            "identity_root": str(supervisor.RELEASE_IDENTITY_ROOT),
+            "run_id": run_id,
+        })
+        return value
+
+    def postdeploy_authorization(self, bundle_digest, identity=False):
+        parameters = self.postdeploy_parameters(identity)
+        operation = "VERIFY_UAT_POSTDEPLOY_IDENTITY" if identity \
+            else "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION"
+        identifier = parameters["run_id"] if identity else parameters["probe_id"]
+        created = datetime(2026, 8, 15, 1, 43, tzinfo=timezone.utc)
+        return {
+            "schema_version": 6,
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "authorization_id": identifier,
+            "created_at": utc(created),
+            "expires_at": utc(created + timedelta(minutes=5)),
+            "supervisor_bundle_sha256": bundle_digest,
+            "operation": operation,
+            "parameters": parameters,
+            "nonce": "f" * 64,
+            "confirmation": supervisor.UAT_PROMOTION_CONFIRMATIONS[operation],
+        }
+
+    def test_postdeploy_authorizations_accept_distinct_contract_and_raw_source_digests(self):
+        bundle = "f" * 64
+        now = datetime(2026, 8, 15, 1, 43, tzinfo=timezone.utc)
+        runtime = self.postdeploy_authorization(bundle)
+        identity = self.postdeploy_authorization(bundle, identity=True)
+        self.assertEqual(supervisor.validate_authorization(runtime, bundle, now), runtime)
+        self.assertEqual(supervisor.validate_authorization(identity, bundle, now), identity)
+        runtime_context = supervisor.uat_promotion_context(runtime, "8" * 64)
+        identity_context = supervisor.uat_promotion_context(identity, "9" * 64)
+        self.assertEqual(runtime_context["operation"], "POSTDEPLOY_RUNTIME_CONFIGURATION")
+        self.assertEqual(identity_context["operation"], "POSTDEPLOY_IDENTITY")
+        self.assertNotEqual(runtime_context["operation_id"], identity_context["operation_id"])
+        self.assertNotEqual(
+            identity["parameters"]["runtime_probe_intent_source"]["sha256"],
+            identity["parameters"]["runtime_probe_intent_sha256"],
+        )
+        changed_manifest = {
+            **runtime,
+            "parameters": {
+                **runtime["parameters"],
+                "release_manifest_source": {
+                    **runtime["parameters"]["release_manifest_source"], "sha256": "9" * 64,
+                },
+            },
+        }
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_BINDING_INVALID"):
+            supervisor.validate_authorization(changed_manifest, bundle, now)
+
+    def test_postdeploy_journal_failure_attempts_containment_after_authorization_consumption(self):
+        bundle = "f" * 64
+        authorization = self.postdeploy_authorization(bundle)
+        events = []
+
+        def runner(_node, _bundle, _context, phase, _lock, **kwargs):
+            events.append(phase)
+            if phase == "prepare":
+                return {"result": "PREPARED", "intent_sha256": "7" * 64}
+            if phase == "execute":
+                raise supervisor.SupervisorError("JOURNAL_EXECUTION_FAILED")
+            self.assertEqual(kwargs, {
+                "failure_stage": "JOURNAL_EXECUTION",
+                "failure_code": "UAT_PROMOTION_POSTDEPLOY_JOURNAL_EXECUTION_FAILED",
+            })
+            return {"result": "CONTAINED"}
+
+        patches = [
+            patch.object(
+                supervisor, "verify_uat_promotion_postdeploy_sources",
+                side_effect=lambda *_: events.append("postdeploy-sources"),
+            ),
+            patch.object(
+                supervisor, "prepare_runtime_privilege_node",
+                side_effect=lambda *_: (events.append("node") or (
+                    Path("/tmp/runtime"), Path("/tmp/runtime/node"),
+                )),
+            ),
+            patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner),
+            patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")),
+            patch.object(
+                supervisor, "run_uat_promotion_postdeploy_control",
+                side_effect=lambda node, *_: (
+                    self.assertEqual(node, Path("/tmp/runtime/node"))
+                    or events.append("control")
+                    or {"probe_sha256": "6" * 64}
+                ),
+            ),
+            patch.object(
+                supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup"),
+            ),
+        ]
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            with self.assertRaisesRegex(supervisor.SupervisorError, "JOURNAL_EXECUTION_FAILED"):
+                supervisor.run_uat_promotion_authorization(
+                    Path("/trusted/bundle"), Path("/trusted/pending/postdeploy.json"),
+                    authorization, "8" * 64, lock_descriptor=51,
+                )
+        self.assertEqual(events, [
+            "postdeploy-sources", "node", "prepare", "postdeploy-sources", "consume",
+            "postdeploy-sources", "control", "execute", "contain", "cleanup",
+        ])
+
+    def test_postdeploy_source_drift_after_consumption_is_contained_with_exact_stage(self):
+        authorization = self.postdeploy_authorization("f" * 64)
+        events = []
+        source_checks = 0
+
+        def verify(*_):
+            nonlocal source_checks
+            source_checks += 1
+            events.append(f"source-{source_checks}")
+            if source_checks == 3:
+                raise supervisor.SupervisorError("POST_CONSUME_SOURCE_DRIFT")
+
+        def runner(_node, _bundle, _context, phase, _lock, **kwargs):
+            events.append(phase)
+            if phase == "prepare":
+                return {"result": "PREPARED", "intent_sha256": "7" * 64}
+            self.assertEqual(phase, "contain")
+            self.assertEqual(kwargs, {
+                "failure_stage": "POST_AUTHORIZATION_SOURCE_RECHECK",
+                "failure_code": "UAT_PROMOTION_POSTDEPLOY_POST_AUTHORIZATION_SOURCE_RECHECK_FAILED",
+            })
+            return {"result": "CONTAINED"}
+
+        with patch.object(supervisor, "verify_uat_promotion_postdeploy_sources", side_effect=verify), \
+                patch.object(supervisor, "prepare_runtime_privilege_node", return_value=(
+                    Path("/tmp/runtime"), Path("/tmp/runtime/node"),
+                )), \
+                patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner), \
+                patch.object(supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume")), \
+                patch.object(supervisor, "run_uat_promotion_postdeploy_control") as control, \
+                patch.object(supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup")):
+            with self.assertRaisesRegex(supervisor.SupervisorError, "POST_CONSUME_SOURCE_DRIFT"):
+                supervisor.run_uat_promotion_authorization(
+                    Path("/trusted/bundle"), Path("/trusted/pending/postdeploy.json"),
+                    authorization, "8" * 64, lock_descriptor=51,
+                )
+        control.assert_not_called()
+        self.assertEqual(events, [
+            "source-1", "prepare", "source-2", "consume", "source-3", "contain", "cleanup",
+        ])
+
+    def test_postdeploy_crosscheck_containment_failure_is_not_suppressed(self):
+        authorization = self.postdeploy_authorization("f" * 64)
+        events = []
+
+        def runner(_node, _bundle, _context, phase, _lock, **kwargs):
+            events.append(phase)
+            if phase == "prepare":
+                return {"result": "PREPARED", "intent_sha256": "7" * 64}
+            if phase == "execute":
+                return {"runtime_probe_result_sha256": "5" * 64}
+            self.assertEqual(kwargs, {
+                "failure_stage": "RESULT_CROSSCHECK",
+                "failure_code": "UAT_PROMOTION_POSTDEPLOY_RESULT_CROSSCHECK_FAILED",
+            })
+            raise supervisor.SupervisorError("CONTAINMENT_RECORD_FAILED")
+
+        with patch.object(supervisor, "verify_uat_promotion_postdeploy_sources"), \
+                patch.object(supervisor, "prepare_runtime_privilege_node", return_value=(
+                    Path("/tmp/runtime"), Path("/tmp/runtime/node"),
+                )), \
+                patch.object(supervisor, "run_uat_promotion_runner", side_effect=runner), \
+                patch.object(supervisor, "consume_authorization"), \
+                patch.object(supervisor, "run_uat_promotion_postdeploy_control", return_value={
+                    "probe_sha256": "6" * 64,
+                }), \
+                patch.object(supervisor, "cleanup_runtime_privilege_node"):
+            with self.assertRaisesRegex(supervisor.SupervisorError, "CONTAINMENT_RECORD_FAILED"):
+                supervisor.run_uat_promotion_authorization(
+                    Path("/trusted/bundle"), Path("/trusted/pending/postdeploy.json"),
+                    authorization, "8" * 64, lock_descriptor=51,
+                )
+        self.assertEqual(events, ["prepare", "execute", "contain"])
+
+    def test_committed_postdeploy_anomaly_blocks_the_global_release_interlock(self):
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-promotion-anomaly-") as temporary:
+            root = Path(temporary)
+            root.chmod(0o700)
+            marker = root / supervisor.UAT_PROMOTION_STATE_MARKER
+            marker.write_bytes(supervisor.UAT_PROMOTION_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            containment_root = root / "containments"
+            containment_root.mkdir(mode=0o700)
+            body = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-uat-promotion-postdeploy-containment/v1",
+                "status": "POSTDEPLOY_COMMITTED_SUPERVISOR_ANOMALY",
+                "contained_at": "2026-08-15T01:43:32.000Z",
+                "operation": "POSTDEPLOY_RUNTIME_CONFIGURATION",
+                "operation_id": "promotion-supervisor-runtime-probe",
+                "promotion_id": "promotion-supervisor-fixture",
+                "intent_sha256": "1" * 64,
+                "execution_authorization_sha256": "2" * 64,
+                "preserved_checkpoint_receipt_sha256": "3" * 64,
+                "deployment_result_sha256": "4" * 64,
+                "fence_transfer_sha256": "5" * 64,
+                "observed_checkpoint_id": "POST_DEPLOY_RUNTIME_CONFIGURATION",
+                "observed_checkpoint_ordinal": 10,
+                "external_artifact_state": "TRUSTED_FINAL_ARTIFACT_PRESENT",
+                "failure_stage": "RESULT_CROSSCHECK",
+                "failure_code": "UAT_PROMOTION_POSTDEPLOY_RESULT_CROSSCHECK_FAILED",
+                "preservation": (
+                    "COMMITTED_POSTDEPLOY_CHECKPOINT_LEFT_UNCHANGED_NO_ROLLBACK_NO_DELETE_NO_DATABASE_ACTION"
+                ),
+            }
+            digest = supervisor.sha256(supervisor.canonical_json(body))
+            record = {**body, "containment_sha256": digest}
+            record_path = containment_root / f"{body['operation_id']}.{digest}.json"
+            record_path.write_bytes(supervisor.canonical_json(record))
+            record_path.chmod(0o400)
+            with patch.object(supervisor, "UAT_PROMOTION_STATE_ROOT", root):
+                with self.assertRaisesRegex(
+                        supervisor.SupervisorError,
+                        "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_ANOMALY_REQUIRES_REVIEW"):
+                    supervisor.assert_no_uat_migration_execution_interlock({}, None)
+
+    def test_postdeploy_timeout_signals_the_exact_process_group_before_failure(self):
+        authorization = self.postdeploy_authorization("f" * 64)
+        context = supervisor.uat_promotion_context(authorization, "8" * 64)
+        calls = []
+
+        class Process:
+            pid = 43210
+            returncode = -15
+
+            def communicate(self, timeout=None):
+                calls.append(("communicate", timeout))
+                if timeout == 8 * 60:
+                    raise supervisor.subprocess.TimeoutExpired("postdeploy", timeout)
+                return b"", b""
+
+        captured = {}
+
+        def popen(command, **kwargs):
+            captured["command"] = command
+            captured.update(kwargs)
+            return Process()
+
+        with patch.object(supervisor.subprocess, "Popen", side_effect=popen), \
+                patch.object(supervisor.os, "killpg", side_effect=lambda pid, sig: calls.append((pid, sig))):
+            with self.assertRaisesRegex(
+                    supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_FAILED"):
+                supervisor.run_uat_promotion_postdeploy_control(
+                    Path("/tmp/chenyida-erp-runtime-privilege-node.fixture/node"),
+                    Path("/trusted/bundle"), context, 51,
+                )
+        self.assertTrue(captured["start_new_session"])
+        self.assertEqual(
+            captured["env"]["ERP_RELEASE_SUPERVISOR_NODE_RUNTIME"],
+            "/tmp/chenyida-erp-runtime-privilege-node.fixture/node",
+        )
+        self.assertIn((43210, supervisor.signal.SIGTERM), calls)
+        self.assertNotIn((43210, supervisor.signal.SIGKILL), calls)
+
     def test_v6_authorization_is_exact_and_recovery_binds_the_original_intent(self):
         bundle = "f" * 64
         original_now = datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc)
@@ -1094,6 +1445,63 @@ class ReleaseSupervisorUatPromotionTest(unittest.TestCase):
                 with self.assertRaisesRegex(
                         supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID"):
                     supervisor.assert_no_uat_migration_execution_interlock(recovery)
+
+    def test_pending_postdeploy_intent_blocks_new_work_except_exact_original_or_recovery(self):
+        original_authorization = "d" * 64
+        operation_id = "promotion-supervisor-runtime-probe"
+        intent_sha256 = "e" * 64
+        unrelated = self.authorization(
+            "f" * 64, datetime(2026, 8, 15, 1, 1, tzinfo=timezone.utc),
+        )
+        exact = {
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "operation": "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
+            "authorization_id": operation_id,
+            "parameters": {},
+        }
+        recovery = {
+            "contract": supervisor.UAT_PROMOTION_AUTHORIZATION_CONTRACT,
+            "operation": "RECOVER_UAT_PROMOTION",
+            "authorization_id": "promotion-supervisor-runtime-probe-recovery",
+            "parameters": {
+                "original_operation": "POSTDEPLOY_RUNTIME_CONFIGURATION",
+                "original_operation_id": operation_id,
+                "original_authorization_sha256": original_authorization,
+            },
+        }
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-postdeploy-interlock-") as temporary:
+            root = Path(temporary) / "state"
+            intents = root / "intents"
+            active = root / "active-fences"
+            transfers = root / "fence-transfers"
+            intents.mkdir(parents=True, mode=0o700)
+            root.chmod(0o700)
+            intents.chmod(0o700)
+            marker = root / supervisor.UAT_PROMOTION_STATE_MARKER
+            marker.write_bytes(supervisor.UAT_PROMOTION_STATE_MARKER_VALUE)
+            marker.chmod(0o400)
+            intent = {
+                "schema_version": 1,
+                "contract": "chenyida-erp-uat-promotion-postdeploy-runtime-intent/v1",
+                "verification_operation_id": operation_id,
+                "execution_authorization_sha256": original_authorization,
+                "postdeploy_runtime_intent_sha256": intent_sha256,
+            }
+            intent_file = intents / f"{operation_id}.{intent_sha256}.json"
+            intent_file.write_bytes(supervisor.canonical_json(intent))
+            intent_file.chmod(0o400)
+            current = root / "current.json"
+            current.write_bytes(supervisor.canonical_json({"authorization_sha256_chain": ["c" * 64]}))
+            current.chmod(0o400)
+            with patch.object(supervisor, "UAT_PROMOTION_STATE_ROOT", root), \
+                    patch.object(supervisor, "UAT_PROMOTION_CURRENT_FILE", current), \
+                    patch.object(supervisor, "UAT_PROMOTION_ACTIVE_FENCES_ROOT", active), \
+                    patch.object(supervisor, "UAT_PROMOTION_FENCE_TRANSFERS_ROOT", transfers):
+                with self.assertRaisesRegex(
+                        supervisor.SupervisorError, "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_RECOVERY_REQUIRED"):
+                    supervisor.assert_no_uat_migration_execution_interlock(unrelated)
+                supervisor.assert_no_uat_migration_execution_interlock(exact, original_authorization)
+                supervisor.assert_no_uat_migration_execution_interlock(recovery, "f" * 64)
 
     def test_migration_recovery_contains_after_consumption_before_journal_execution(self):
         bundle = "f" * 64

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmod, link, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, chown, link, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -33,6 +33,14 @@ import {
 } from "../scripts/uat-promotion-compose-deployment-contract.mjs";
 import { runUatPromotionComposeDeploymentControl } from "../scripts/uat-promotion-compose-deployment-control.mjs";
 import {
+  canonicalRuntimeConfigurationProbeJson,
+  createRuntimeConfigurationProbeReceipt,
+} from "../scripts/postdeploy-runtime-configuration-probe.mjs";
+import {
+  buildPostDeployReceipt,
+  buildReleaseIdentityFromPostDeployReceipt,
+} from "../scripts/postdeploy-release-contract.mjs";
+import {
   UAT_PROMOTION_CURRENT_FILE,
   UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT,
   UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT,
@@ -51,8 +59,8 @@ const siteRoot = path.resolve(new URL("../", import.meta.url).pathname);
 const gitCommit = "a".repeat(40);
 const gitTree = "b".repeat(40);
 const version = "0.1.0-alpha.47";
-const webImage = `127.0.0.1:5000/chenyida-erp/web@sha256:${"c".repeat(64)}`;
-const workerImage = `127.0.0.1:5000/chenyida-erp/worker@sha256:${"d".repeat(64)}`;
+const webImage = `registry.example.com/chenyida-erp/web@sha256:${"c".repeat(64)}`;
+const workerImage = `registry.example.com/chenyida-erp/worker@sha256:${"d".repeat(64)}`;
 const databaseSystemIdentifier = "7612345678901234567";
 const databaseOid = "16384";
 const databaseMarker = "chenyida-erp-deployment/v2:UAT:chenyida-erp";
@@ -1161,6 +1169,282 @@ async function writeComposeDeploymentCompletion(root, context, intent) {
   return { result, transfer };
 }
 
+function postdeployServices(deploymentResult) {
+  const services = new Map([
+    ...deploymentResult.services.map((item) => [item.service, item]),
+    ...deploymentResult.unchanged_services.map((item) => [item.service, item]),
+  ]);
+  return ["caddy", "postgres", "web", "worker"].map((name) => {
+    const item = services.get(name);
+    return {
+      service: name,
+      container_id: item.container_id,
+      image_id: item.image_id,
+      image_reference: item.image_reference,
+      restart_count: item.restart_count,
+      oom_killed: item.oom_killed,
+      running: item.running,
+      restarting: false,
+      paused: false,
+      dead: false,
+      status: "running",
+      health: item.health,
+      healthcheck_present: name !== "caddy",
+    };
+  });
+}
+
+function postdeployCommonParameters(current, composeContext, completion, root) {
+  const deploymentResultLogical = `${UAT_PROMOTION_STATE_ROOT}/results/${composeContext.operation_id}.${completion.result.result_sha256}.json`;
+  const fenceTransferLogical = `${UAT_PROMOTION_STATE_ROOT}/fence-transfers/${composeContext.operation_id}.${completion.transfer.transfer_sha256}.json`;
+  return {
+    promotion_state_root: UAT_PROMOTION_STATE_ROOT,
+    promotion_id: current.promotion_id,
+    promotion_generation: current.promotion_generation,
+    previous_checkpoint_receipt_sha256: current.receipt_sha256,
+    promotion_intent_sha256: current.intent_sha256,
+    promotion_original_authorization_sha256: current.original_authorization_sha256,
+    candidate_binding_sha256: current.candidate_binding_sha256,
+    database_binding_sha256: current.database_binding_sha256,
+    runtime_binding_sha256: current.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: current.recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: current.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: current.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: current.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: current.migration_fence_binding_sha256,
+    migration_result_binding_sha256: current.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: current.compose_deployment_binding_sha256,
+    current_checkpoint_source: null,
+    deployment_operation_id: composeContext.operation_id,
+    deployment_result_sha256: completion.result.result_sha256,
+    deployment_result_source: null,
+    fence_transfer_sha256: completion.transfer.transfer_sha256,
+    fence_transfer_source: null,
+    release_manifest: composeContext.parameters.release_manifest,
+    release_manifest_sha256: composeContext.parameters.release_manifest_sha256,
+    release_manifest_source: null,
+    deployment_class: "UAT",
+    deployment_id: "chenyida-erp",
+    compose_project: "chenyida-erp",
+    compose_project_root: composeContext.parameters.compose_project_root,
+    runtime_guard_contract: "chenyida-erp-release-runtime-guard/v1",
+    runtime_guard_mode: POST_DEPLOY_RUNTIME_GUARD_MODE,
+    runtime_policy_sha256: RELEASE_RUNTIME_POLICY_SHA256,
+    reader_gid: 1000,
+    caddy_container: "chenyida-erp-caddy-1",
+    postgres_container: "chenyida-erp-postgres-1",
+    web_container: "chenyida-erp-web-1",
+    worker_container: "chenyida-erp-worker-1",
+    requester_identity_sha256: digest(`postdeploy-requester-${current.promotion_id}`),
+    approver_identity_sha256: digest(`postdeploy-approver-${current.promotion_id}`),
+    executor_identity_sha256: digest(`postdeploy-executor-${current.promotion_id}`),
+    policy_file_sha256: UAT_PROMOTION_POLICY_FILE_SHA256,
+    policy_sha256: UAT_PROMOTION_POLICY_SHA256,
+    _sources: { root, deploymentResultLogical, fenceTransferLogical },
+  };
+}
+
+async function bindPostdeployCommonSources(parameters) {
+  const { root, deploymentResultLogical, fenceTransferLogical } = parameters._sources;
+  const value = { ...parameters };
+  delete value._sources;
+  value.current_checkpoint_source = await source(root, UAT_PROMOTION_CURRENT_FILE);
+  value.deployment_result_source = await source(root, deploymentResultLogical);
+  value.fence_transfer_source = await source(root, fenceTransferLogical);
+  value.release_manifest_source = await source(root, value.release_manifest);
+  return value;
+}
+
+async function postdeployRuntimeFixture({
+  promotionId = "promotion-postdeploy-runtime-001", operationId = null,
+} = {}) {
+  const deployment = await composeDeploymentFixture({ promotionId });
+  await run(deployment.context, "prepare", deployment.root);
+  const deploymentIntent = JSON.parse(await readFile(await intentPath(
+    deployment.root, deployment.context.operation_id,
+  ), "utf8"));
+  const completion = await writeComposeDeploymentCompletion(
+    deployment.root, deployment.context, deploymentIntent,
+  );
+  await run(deployment.context, "execute", deployment.root);
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(deployment.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  const probeId = operationId ?? `${promotionId}-runtime-probe`;
+  const parameters = await bindPostdeployCommonSources({
+    ...postdeployCommonParameters(current, deployment.context, completion, deployment.root),
+    verification_created_at: "2026-08-15T01:42:10.000Z",
+    verification_expires_at: "2026-08-15T01:46:00.000Z",
+    probe_root: "/var/lib/chenyida-erp/runtime-probes",
+    probe_id: probeId,
+  });
+  const authorization = digest(`authorization-${probeId}`);
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: probeId,
+    operation: "POSTDEPLOY_RUNTIME_CONFIGURATION",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: probeId,
+    execution_authorization_sha256: authorization,
+    execution_created_at: parameters.verification_created_at,
+    original_authorization_sha256: authorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  return { ...deployment, context, composeContext: deployment.context, completion };
+}
+
+async function writeRuntimeProbe(root, context, completion, mutate = (value) => value) {
+  await directory(root, context.parameters.probe_root, 0o700);
+  await rawFile(
+    root, `${context.parameters.probe_root}/.chenyida-erp-runtime-probe-root-v1`,
+    "chenyida-erp-runtime-probe-root/v1\n", 0o400,
+  );
+  const release = JSON.parse(await readFile(physical(root, context.parameters.release_manifest), "utf8"));
+  const receipt = mutate(createRuntimeConfigurationProbeReceipt({
+    probeId: context.parameters.probe_id,
+    probedAt: "2026-08-15T01:42:30.000Z",
+    deploymentClass: "UAT",
+    deploymentId: context.parameters.deployment_id,
+    composeProject: context.parameters.compose_project,
+    composeProjectRoot: context.parameters.compose_project_root,
+    manifest: release,
+    manifestSha256: context.parameters.release_manifest_sha256,
+    runtimeGuardContract: context.parameters.runtime_guard_contract,
+    runtimeGuardMode: context.parameters.runtime_guard_mode,
+    runtimePolicySha256: context.parameters.runtime_policy_sha256,
+    selectors: {
+      caddy: context.parameters.caddy_container,
+      postgres: context.parameters.postgres_container,
+      web: context.parameters.web_container,
+      worker: context.parameters.worker_container,
+    },
+    runtime: {
+      services: postdeployServices(completion.result),
+      runtime_configuration_sha256: completion.result.runtime_configuration_sha256,
+    },
+    control: {
+      supervisor_bundle_sha256: context.supervisor_bundle_sha256,
+      authorization_sha256: context.original_authorization_sha256,
+    },
+  }));
+  const logical = `${context.parameters.probe_root}/${context.parameters.probe_id}.runtime-configuration-probe.json`;
+  await rawFile(root, logical, canonicalRuntimeConfigurationProbeJson(receipt), 0o400);
+  return { receipt, logical };
+}
+
+async function postdeployIdentityFixture({ promotionId = "promotion-postdeploy-identity-001" } = {}) {
+  const runtime = await postdeployRuntimeFixture({ promotionId });
+  const runtimePrepared = await run(runtime.context, "prepare", runtime.root);
+  const runtimeProbe = await writeRuntimeProbe(runtime.root, runtime.context, runtime.completion);
+  await run(runtime.context, "execute", runtime.root, { now: new Date("2026-08-15T01:42:31.000Z") });
+  const current = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(runtime.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  const runId = `${promotionId}-identity`;
+  const runtimeIntentLogical = `${UAT_PROMOTION_STATE_ROOT}/intents/${runtime.context.operation_id}.${runtimePrepared.intent_sha256}.json`;
+  const runtimeResultLogical = `${UAT_PROMOTION_STATE_ROOT}/results/${runtime.context.operation_id}.${current.checkpoint_evidence_sha256}.json`;
+  const parameters = await bindPostdeployCommonSources({
+    ...postdeployCommonParameters(current, runtime.composeContext, runtime.completion, runtime.root),
+    verification_created_at: "2026-08-15T01:43:00.000Z",
+    verification_expires_at: "2026-08-15T01:48:00.000Z",
+    runtime_probe_operation_id: runtime.context.operation_id,
+    runtime_probe_intent_sha256: runtimePrepared.intent_sha256,
+    runtime_probe_intent_source: await source(runtime.root, runtimeIntentLogical),
+    runtime_probe_result_sha256: current.checkpoint_evidence_sha256,
+    runtime_probe_result_source: await source(runtime.root, runtimeResultLogical),
+    runtime_probe_receipt: runtimeProbe.logical,
+    runtime_probe_receipt_sha256: (await source(runtime.root, runtimeProbe.logical)).sha256,
+    runtime_probe_receipt_source: await source(runtime.root, runtimeProbe.logical),
+    runtime_configuration_sha256: runtimeProbe.receipt.runtime_configuration_sha256,
+    postdeploy_root: `/var/lib/chenyida-erp/postdeploy/${runId}`,
+    identity_root: "/var/lib/chenyida-erp/release-identity",
+    run_id: runId,
+  });
+  const authorization = digest(`authorization-${runId}`);
+  const context = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-transaction-context/v1",
+    operation_id: runId,
+    operation: "POSTDEPLOY_IDENTITY",
+    execution_mode: "ORIGINAL",
+    execution_authorization_id: runId,
+    execution_authorization_sha256: authorization,
+    execution_created_at: parameters.verification_created_at,
+    original_authorization_sha256: authorization,
+    supervisor_bundle_sha256: supervisorBundleSha256,
+    expected_intent_sha256: null,
+    parameters,
+  };
+  return {
+    ...runtime, context, runtimeContext: runtime.context, runtimePrepared,
+    runtimeProbe: runtimeProbe.receipt,
+  };
+}
+
+async function writePostdeployIdentityEvidence(root, context, runtimeProbe, mutateReceipt = (value) => value) {
+  const release = JSON.parse(await readFile(physical(root, context.parameters.release_manifest), "utf8"));
+  const readiness = {
+    deployment_class: "UAT",
+    deployment_id: "chenyida-erp",
+    version: release.source.package_version,
+    revision: release.source.git_commit.slice(0, 12),
+    migration_head: release.migrations.head,
+    migration_manifest_sha256: release.migrations.allowlist_sha256,
+    database_time: "2026-08-15T01:43:30.000Z",
+    components: {
+      postgresql: "READY", migration: "READY", worker: "READY",
+      uploads: "READY", attachments: "READY", runtime: "READY",
+    },
+  };
+  const receipt = mutateReceipt(buildPostDeployReceipt({
+    runId: context.parameters.run_id,
+    generatedAt: readiness.database_time,
+    deploymentClass: "UAT",
+    deploymentId: "chenyida-erp",
+    composeProject: "chenyida-erp",
+    manifest: release,
+    manifestSha256: context.parameters.release_manifest_sha256,
+    supervisorBundleSha256: context.supervisor_bundle_sha256,
+    authorizationSha256: context.original_authorization_sha256,
+    runtimePolicySha256: context.parameters.runtime_policy_sha256,
+    runtimeConfigurationSha256: context.parameters.runtime_configuration_sha256,
+    services: runtimeProbe.services,
+    readiness,
+  }));
+  await directory(root, "/var/lib/chenyida-erp/postdeploy", 0o755);
+  await directory(root, context.parameters.postdeploy_root, 0o750);
+  await rawFile(
+    root, `${context.parameters.postdeploy_root}/.chenyida-erp-release-artifact-root-v1`,
+    "chenyida-erp-release-artifact-root/v1\n", 0o440,
+  );
+  const receiptLogical = `${context.parameters.postdeploy_root}/${context.parameters.run_id}.postdeploy-receipt.json`;
+  await rawFile(root, receiptLogical, releaseCanonicalJson(receipt), 0o440);
+  const receiptSha256 = (await source(root, receiptLogical)).sha256;
+  const identity = buildReleaseIdentityFromPostDeployReceipt({ receipt, receiptSha256 });
+  await rawFile(root, identityPath, releaseCanonicalJson(identity), 0o440);
+  for (const logical of [
+    "/var/lib/chenyida-erp/release-identity",
+    "/var/lib/chenyida-erp/release-identity/.chenyida-erp-release-identity-root-v1",
+    identityPath,
+  ]) await chown(physical(root, logical), 0, context.parameters.reader_gid);
+  return { receipt, identity, receiptLogical };
+}
+
+function postdeployRecoveryContext(original, intentSha256, suffix = "recovery") {
+  const executionId = `${original.operation_id}-${suffix}`;
+  return {
+    ...original,
+    execution_mode: "RECOVERY",
+    execution_authorization_id: executionId,
+    execution_authorization_sha256: digest(`authorization-${executionId}`),
+    execution_created_at: "2026-08-15T01:44:00.000Z",
+    expected_intent_sha256: intentSha256,
+  };
+}
+
 async function run(context, phase, root, options = {}) {
   return runUatPromotionTransactionPhase(context, phase, { filesystemRoot: root, siteRoot, allowTestRoot: true, ...options });
 }
@@ -1968,6 +2252,330 @@ test("compose deployment controller persists exact completion for checkpoint 9",
   const committed = await run(fixtureValue.context, "execute", fixtureValue.root);
   assert.equal(committed.deployment_result_sha256, control.deployment_result_sha256);
   assert.equal(committed.fence_transfer_sha256, control.fence_transfer_sha256);
+});
+
+test("postdeploy runtime and identity use distinct authorizations and stop the journal at checkpoint 11", async (t) => {
+  const fixtureValue = await postdeployIdentityFixture();
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const checkpoint10 = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  assert.equal(checkpoint10.checkpoint_id, "POST_DEPLOY_RUNTIME_CONFIGURATION");
+  assert.equal(checkpoint10.checkpoint_ordinal, 10);
+  assert.equal(checkpoint10.checkpoint_authorization_sha256, fixtureValue.runtimeContext.original_authorization_sha256);
+  assert.notEqual(fixtureValue.context.original_authorization_sha256, fixtureValue.runtimeContext.original_authorization_sha256);
+  assert.notEqual(fixtureValue.context.original_authorization_sha256, fixtureValue.composeContext.original_authorization_sha256);
+
+  const replay = structuredClone(fixtureValue.context);
+  replay.execution_authorization_sha256 = fixtureValue.runtimeContext.original_authorization_sha256;
+  replay.original_authorization_sha256 = fixtureValue.runtimeContext.original_authorization_sha256;
+  await assert.rejects(
+    run(replay, "prepare", fixtureValue.root),
+    (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_DEPLOYMENT_BINDING_INVALID",
+  );
+
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+  const evidence = await writePostdeployIdentityEvidence(
+    fixtureValue.root, fixtureValue.context, fixtureValue.runtimeProbe,
+  );
+  const committed = await run(fixtureValue.context, "execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:43:31.000Z"),
+  });
+  assert.equal(committed.result, "COMMITTED");
+  assert.equal(committed.intent_sha256, prepared.intent_sha256);
+  assert.equal(committed.postdeploy_receipt_sha256, (await source(
+    fixtureValue.root, evidence.receiptLogical,
+  )).sha256);
+  const checkpoint11 = validateUatPromotionCheckpointReceipt(JSON.parse(await readFile(
+    physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE), "utf8",
+  )));
+  assert.equal(checkpoint11.checkpoint_id, "POST_DEPLOY_IDENTITY");
+  assert.equal(checkpoint11.checkpoint_ordinal, 11);
+  assert.equal(checkpoint11.journal_status, "IN_PROGRESS");
+  assert.equal(checkpoint11.authorization_sha256_chain.at(-2), fixtureValue.runtimeContext.original_authorization_sha256);
+  assert.equal(checkpoint11.authorization_sha256_chain.at(-1), fixtureValue.context.original_authorization_sha256);
+});
+
+test("postdeploy runtime rejects cross-promotion and exact service identity drift", async (t) => {
+  const crossPromotion = await postdeployRuntimeFixture({ promotionId: "promotion-postdeploy-cross" });
+  t.after(() => rm(crossPromotion.root, { recursive: true, force: true }));
+  const changedContext = structuredClone(crossPromotion.context);
+  changedContext.parameters.promotion_id = "different-promotion";
+  await assert.rejects(
+    run(changedContext, "prepare", crossPromotion.root),
+    (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_CURRENT_MISMATCH",
+  );
+
+  const serviceDrift = await postdeployRuntimeFixture({ promotionId: "promotion-postdeploy-service-drift" });
+  t.after(() => rm(serviceDrift.root, { recursive: true, force: true }));
+  await run(serviceDrift.context, "prepare", serviceDrift.root);
+  await writeRuntimeProbe(serviceDrift.root, serviceDrift.context, serviceDrift.completion, (value) => {
+    const changed = structuredClone(value);
+    changed.services.find((item) => item.service === "web").container_id = "9".repeat(64);
+    return changed;
+  });
+  await assert.rejects(
+    run(serviceDrift.context, "execute", serviceDrift.root, { now: new Date("2026-08-15T01:42:31.000Z") }),
+    (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_RUNTIME_RESULT_BINDING_INVALID",
+  );
+});
+
+test("postdeploy runtime and identity publication crashes resume without rerunning external controls", async (t) => {
+  const operations = [
+    {
+      name: "runtime",
+      fixture: (index) => postdeployRuntimeFixture({ promotionId: `promotion-postdeploy-runtime-crash-${index}` }),
+      write: (value) => writeRuntimeProbe(value.root, value.context, value.completion),
+      now: new Date("2026-08-15T01:44:00.000Z"),
+      failpoints: [
+        "AFTER_POSTDEPLOY_RUNTIME_RESULT", "AFTER_POSTDEPLOY_RUNTIME_HISTORY",
+        "AFTER_POSTDEPLOY_RUNTIME_RECEIPT", "AFTER_POSTDEPLOY_RUNTIME_CURRENT",
+      ],
+    },
+    {
+      name: "identity",
+      fixture: (index) => postdeployIdentityFixture({ promotionId: `promotion-postdeploy-identity-crash-${index}` }),
+      write: (value) => writePostdeployIdentityEvidence(value.root, value.context, value.runtimeProbe),
+      now: new Date("2026-08-15T01:44:00.000Z"),
+      failpoints: [
+        "AFTER_POSTDEPLOY_IDENTITY_RESULT", "AFTER_POSTDEPLOY_IDENTITY_HISTORY",
+        "AFTER_POSTDEPLOY_IDENTITY_RECEIPT", "AFTER_POSTDEPLOY_IDENTITY_CURRENT",
+      ],
+    },
+  ];
+  for (const operation of operations) {
+    for (const [index, failpoint] of operation.failpoints.entries()) {
+      const fixtureValue = await operation.fixture(index);
+      t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+      const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+      await operation.write(fixtureValue);
+      await assert.rejects(
+        run(fixtureValue.context, "execute", fixtureValue.root, {
+          now: operation.now,
+          fault: async (point) => { if (point === failpoint) throw new Error(`CRASH:${point}`); },
+        }),
+        new RegExp(`CRASH:${failpoint}`),
+      );
+      const recovery = postdeployRecoveryContext(
+        fixtureValue.context, prepared.intent_sha256, `${operation.name}-${index}`,
+      );
+      const planned = await run(recovery, "recover-prepare", fixtureValue.root, { now: operation.now });
+      assert.ok(["RESUME_PUBLICATION", "ALREADY_COMMITTED"].includes(planned.decision));
+      const recovered = await run(recovery, "recover-execute", fixtureValue.root, { now: operation.now });
+      assert.ok(["COMMITTED", "ALREADY_COMMITTED"].includes(recovered.result));
+    }
+  }
+});
+
+test("postdeploy external failure records containment without changing checkpoint 9 and missing evidence quarantines", async (t) => {
+  const fixtureValue = await postdeployRuntimeFixture({ promotionId: "promotion-postdeploy-contained" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  const prepared = await run(fixtureValue.context, "prepare", fixtureValue.root);
+  const currentFile = physical(fixtureValue.root, UAT_PROMOTION_CURRENT_FILE);
+  const before = await readFile(currentFile);
+  const contained = await run(fixtureValue.context, "contain", fixtureValue.root, {
+    now: new Date("2026-08-15T01:42:40.000Z"),
+    failureStage: "EXTERNAL_CONTROL",
+    failureCode: "UAT_PROMOTION_POSTDEPLOY_EXTERNAL_CONTROL_FAILED",
+  });
+  assert.equal(contained.result, "CONTAINED");
+  assert.deepEqual(await readFile(currentFile), before);
+  assert.equal((await readdir(physical(
+    fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/containments`,
+  ))).length, 1);
+
+  const bypass = structuredClone(fixtureValue.context);
+  bypass.operation_id = "promotion-postdeploy-contained-replacement";
+  bypass.execution_authorization_id = bypass.operation_id;
+  bypass.execution_authorization_sha256 = digest(`authorization-${bypass.operation_id}`);
+  bypass.original_authorization_sha256 = bypass.execution_authorization_sha256;
+  bypass.parameters.probe_id = bypass.operation_id;
+  await assert.rejects(
+    run(bypass, "prepare", fixtureValue.root),
+    (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_RECOVERY_REQUIRED",
+  );
+
+  const recovery = postdeployRecoveryContext(fixtureValue.context, prepared.intent_sha256, "missing");
+  assert.equal((await run(recovery, "recover-prepare", fixtureValue.root, {
+    now: new Date("2026-08-15T01:44:00.000Z"),
+  })).decision, "QUARANTINE");
+  assert.equal((await run(recovery, "recover-execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:44:00.000Z"),
+  })).result, "QUARANTINED");
+  assert.deepEqual(await readFile(currentFile), before);
+});
+
+test("identity containment reports prepared receipt state as partial instead of absent", async (t) => {
+  const fixtureValue = await postdeployIdentityFixture({ promotionId: "promotion-postdeploy-partial" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  await run(fixtureValue.context, "prepare", fixtureValue.root);
+  await directory(fixtureValue.root, "/var/lib/chenyida-erp/postdeploy", 0o755);
+  await directory(fixtureValue.root, fixtureValue.context.parameters.postdeploy_root, 0o750);
+  await rawFile(
+    fixtureValue.root,
+    `${fixtureValue.context.parameters.postdeploy_root}/.${fixtureValue.context.parameters.run_id}.postdeploy-receipt.prepared.json`,
+    "{}\n", 0o400,
+  );
+  await run(fixtureValue.context, "contain", fixtureValue.root, {
+    now: new Date("2026-08-15T01:43:31.000Z"),
+    failureStage: "EXTERNAL_CONTROL",
+    failureCode: "UAT_PROMOTION_POSTDEPLOY_EXTERNAL_CONTROL_FAILED",
+  });
+  const containmentDirectory = physical(
+    fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/containments`,
+  );
+  const [name] = await readdir(containmentDirectory);
+  const containment = JSON.parse(await readFile(path.join(containmentDirectory, name), "utf8"));
+  assert.equal(containment.external_artifact_state, "UNTRUSTED_OR_PARTIAL");
+});
+
+test("empty untrusted postdeploy roots are partial rather than absent", async (t) => {
+  const runtime = await postdeployRuntimeFixture({ promotionId: "promotion-postdeploy-untrusted-runtime-root" });
+  t.after(() => rm(runtime.root, { recursive: true, force: true }));
+  await run(runtime.context, "prepare", runtime.root);
+  await directory(runtime.root, runtime.context.parameters.probe_root, 0o755);
+  await run(runtime.context, "contain", runtime.root, {
+    now: new Date("2026-08-15T01:43:31.000Z"),
+    failureStage: "EXTERNAL_CONTROL",
+    failureCode: "UAT_PROMOTION_POSTDEPLOY_EXTERNAL_CONTROL_FAILED",
+  });
+  let [name] = await readdir(physical(runtime.root, `${UAT_PROMOTION_STATE_ROOT}/containments`));
+  let containment = JSON.parse(await readFile(path.join(
+    physical(runtime.root, `${UAT_PROMOTION_STATE_ROOT}/containments`), name,
+  ), "utf8"));
+  assert.equal(containment.external_artifact_state, "UNTRUSTED_OR_PARTIAL");
+
+  const identity = await postdeployIdentityFixture({ promotionId: "promotion-postdeploy-untrusted-identity-root" });
+  t.after(() => rm(identity.root, { recursive: true, force: true }));
+  await run(identity.context, "prepare", identity.root);
+  await directory(identity.root, "/var/lib/chenyida-erp/postdeploy", 0o755);
+  await directory(identity.root, identity.context.parameters.postdeploy_root, 0o750);
+  await run(identity.context, "contain", identity.root, {
+    now: new Date("2026-08-15T01:43:31.000Z"),
+    failureStage: "EXTERNAL_CONTROL",
+    failureCode: "UAT_PROMOTION_POSTDEPLOY_EXTERNAL_CONTROL_FAILED",
+  });
+  [name] = await readdir(physical(identity.root, `${UAT_PROMOTION_STATE_ROOT}/containments`));
+  containment = JSON.parse(await readFile(path.join(
+    physical(identity.root, `${UAT_PROMOTION_STATE_ROOT}/containments`), name,
+  ), "utf8"));
+  assert.equal(containment.external_artifact_state, "UNTRUSTED_OR_PARTIAL");
+});
+
+test("committed postdeploy response anomaly is durable and blocks the next checkpoint", async (t) => {
+  const fixtureValue = await postdeployRuntimeFixture({ promotionId: "promotion-postdeploy-committed-anomaly" });
+  t.after(() => rm(fixtureValue.root, { recursive: true, force: true }));
+  await run(fixtureValue.context, "prepare", fixtureValue.root);
+  await writeRuntimeProbe(fixtureValue.root, fixtureValue.context, fixtureValue.completion);
+  await run(fixtureValue.context, "execute", fixtureValue.root, {
+    now: new Date("2026-08-15T01:43:31.000Z"),
+  });
+  const recorded = await run(fixtureValue.context, "contain", fixtureValue.root, {
+    now: new Date("2026-08-15T01:43:32.000Z"),
+    failureStage: "RESULT_CROSSCHECK",
+    failureCode: "UAT_PROMOTION_POSTDEPLOY_RESULT_CROSSCHECK_FAILED",
+  });
+  assert.equal(recorded.result, "COMMITTED_ANOMALY_RECORDED");
+  const [name] = await readdir(physical(fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/containments`));
+  const containment = JSON.parse(await readFile(path.join(
+    physical(fixtureValue.root, `${UAT_PROMOTION_STATE_ROOT}/containments`), name,
+  ), "utf8"));
+  assert.equal(containment.status, "POSTDEPLOY_COMMITTED_SUPERVISOR_ANOMALY");
+  assert.equal(containment.observed_checkpoint_ordinal, 10);
+  const next = structuredClone(fixtureValue.context);
+  next.operation_id = "promotion-postdeploy-after-anomaly";
+  next.execution_authorization_id = next.operation_id;
+  next.execution_authorization_sha256 = digest(`authorization-${next.operation_id}`);
+  next.original_authorization_sha256 = next.execution_authorization_sha256;
+  next.parameters.probe_id = next.operation_id;
+  await assert.rejects(
+    run(next, "prepare", fixtureValue.root),
+    (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_ANOMALY_REQUIRES_REVIEW",
+  );
+});
+
+test("linked postdeploy intent and cross-operation identity receipt are preserved and rejected", async (t) => {
+  const linked = await postdeployRuntimeFixture({ promotionId: "promotion-postdeploy-linked-intent" });
+  t.after(() => rm(linked.root, { recursive: true, force: true }));
+  const linkedPrepared = await run(linked.context, "prepare", linked.root);
+  const storedIntent = await intentPath(linked.root, linked.context.operation_id);
+  const outside = path.join(linked.root, "postdeploy-linked-intent-source.json");
+  await rename(storedIntent, outside);
+  await link(outside, storedIntent);
+  const linkedRecovery = postdeployRecoveryContext(linked.context, linkedPrepared.intent_sha256, "linked");
+  assert.equal((await run(linkedRecovery, "recover-prepare", linked.root, {
+    now: new Date("2026-08-15T01:44:00.000Z"),
+  })).decision, "QUARANTINE");
+
+  const crossOperation = await postdeployIdentityFixture({ promotionId: "promotion-postdeploy-cross-auth" });
+  t.after(() => rm(crossOperation.root, { recursive: true, force: true }));
+  const originalRuntimeIntentPath = await intentPath(
+    crossOperation.root, crossOperation.runtimeContext.operation_id,
+  );
+  const forgedRuntimeIntent = JSON.parse(await readFile(originalRuntimeIntentPath, "utf8"));
+  forgedRuntimeIntent.promotion_id = "different-promotion";
+  forgedRuntimeIntent.parameters.promotion_id = "different-promotion";
+  const forgedParameters = forgedRuntimeIntent.parameters;
+  forgedRuntimeIntent.verification_plan_sha256 = clusterSha256({
+    operation: "POSTDEPLOY_RUNTIME_CONFIGURATION",
+    promotion_id: forgedParameters.promotion_id,
+    promotion_generation: forgedParameters.promotion_generation,
+    previous_checkpoint_receipt_sha256: forgedParameters.previous_checkpoint_receipt_sha256,
+    deployment_operation_id: forgedParameters.deployment_operation_id,
+    deployment_result_sha256: forgedParameters.deployment_result_sha256,
+    fence_transfer_sha256: forgedParameters.fence_transfer_sha256,
+    compose_deployment_binding_sha256: forgedParameters.compose_deployment_binding_sha256,
+    release_manifest_sha256: forgedParameters.release_manifest_sha256,
+    compose_project_root_sha256: createHash("sha256").update(forgedParameters.compose_project_root).digest("hex"),
+    runtime_policy_sha256: forgedParameters.runtime_policy_sha256,
+    selectors: {
+      caddy: forgedParameters.caddy_container,
+      postgres: forgedParameters.postgres_container,
+      web: forgedParameters.web_container,
+      worker: forgedParameters.worker_container,
+    },
+    probe_id: forgedParameters.probe_id,
+    probe_path: `${forgedParameters.probe_root}/${forgedParameters.probe_id}.runtime-configuration-probe.json`,
+    runtime_configuration_sha256: forgedRuntimeIntent.runtime_configuration_sha256,
+  });
+  delete forgedRuntimeIntent.postdeploy_runtime_intent_sha256;
+  forgedRuntimeIntent.postdeploy_runtime_intent_sha256 = clusterSha256(forgedRuntimeIntent);
+  const forgedRuntimeIntentLogical = `${UAT_PROMOTION_STATE_ROOT}/intents/${crossOperation.runtimeContext.operation_id}.${forgedRuntimeIntent.postdeploy_runtime_intent_sha256}.json`;
+  await canonicalFile(crossOperation.root, forgedRuntimeIntentLogical, forgedRuntimeIntent, 0o400);
+  const crossedRuntime = structuredClone(crossOperation.context);
+  crossedRuntime.parameters.runtime_probe_intent_sha256 = forgedRuntimeIntent.postdeploy_runtime_intent_sha256;
+  crossedRuntime.parameters.runtime_probe_intent_source = await source(
+    crossOperation.root, forgedRuntimeIntentLogical,
+  );
+  await assert.rejects(
+    run(crossedRuntime, "prepare", crossOperation.root),
+    (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RUNTIME_BINDING_INVALID",
+  );
+  await run(crossOperation.context, "prepare", crossOperation.root);
+  const identityBypass = structuredClone(crossOperation.context);
+  identityBypass.operation_id = "promotion-postdeploy-cross-auth-replacement";
+  identityBypass.execution_authorization_id = identityBypass.operation_id;
+  identityBypass.execution_authorization_sha256 = digest(`authorization-${identityBypass.operation_id}`);
+  identityBypass.original_authorization_sha256 = identityBypass.execution_authorization_sha256;
+  identityBypass.parameters.run_id = identityBypass.operation_id;
+  identityBypass.parameters.postdeploy_root = `/var/lib/chenyida-erp/postdeploy/${identityBypass.operation_id}`;
+  await assert.rejects(
+    run(identityBypass, "prepare", crossOperation.root),
+    (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_RECOVERY_REQUIRED",
+  );
+  await writePostdeployIdentityEvidence(
+    crossOperation.root, crossOperation.context, crossOperation.runtimeProbe, (receipt) => ({
+      ...structuredClone(receipt),
+      control: {
+        ...receipt.control,
+        authorization_sha256: crossOperation.runtimeContext.original_authorization_sha256,
+      },
+    }),
+  );
+  await assert.rejects(
+    run(crossOperation.context, "execute", crossOperation.root, { now: new Date("2026-08-15T01:43:31.000Z") }),
+    (error) => error.code === "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RESULT_BINDING_INVALID",
+  );
 });
 
 test("fake root requires an explicit test-only option and a symlinked state root fails closed", async (t) => {

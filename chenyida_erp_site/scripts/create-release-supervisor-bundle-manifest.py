@@ -21,7 +21,7 @@ GIT_OBJECT = re.compile(r"^[0-9a-f]{40}$")
 SAFE_RELATIVE = re.compile(r"^[A-Za-z0-9._/-]{1,240}$")
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024
-MAX_BUNDLE_FILES = 132
+MAX_BUNDLE_FILES = 134
 
 
 class BundleManifestError(Exception):

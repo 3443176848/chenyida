@@ -621,6 +621,95 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_RUNTIME_PROBE_BINDING_INVALID"):
             supervisor.validate_runtime_probe_receipt(parameters, "f" * 64, now, root)
 
+    def test_direct_postdeploy_entrypoint_reuses_supervisor_node_and_cleans_it(self):
+        events = []
+        authorization = {
+            "operation": "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY",
+            "parameters": {},
+            "supervisor_bundle_sha256": "f" * 64,
+        }
+
+        class Process:
+            pid = 43210
+
+            def wait(self, timeout=None):
+                events.append(f"wait-{timeout}")
+                return 0
+
+        def popen(command, **kwargs):
+            events.append("popen")
+            self.assertEqual(command, ["/trusted/postdeploy-entrypoint"])
+            self.assertEqual(
+                kwargs["env"]["ERP_RELEASE_SUPERVISOR_NODE_RUNTIME"],
+                "/tmp/chenyida-erp-runtime-privilege-node.fixture/node",
+            )
+            self.assertTrue(kwargs["start_new_session"])
+            self.assertEqual(kwargs["pass_fds"], (51,))
+            return Process()
+
+        with patch.object(
+                supervisor, "prepare_runtime_privilege_node",
+                side_effect=lambda *_: (events.append("node") or (
+                    Path("/tmp/chenyida-erp-runtime-privilege-node.fixture"),
+                    Path("/tmp/chenyida-erp-runtime-privilege-node.fixture/node"),
+                )),
+            ), patch.object(
+                supervisor, "verify_candidate", side_effect=lambda *_: events.append("candidate"),
+            ), patch.object(
+                supervisor, "validate_runtime_probe_receipt", side_effect=lambda *_: events.append("receipt"),
+            ), patch.object(
+                supervisor, "command_for", side_effect=lambda *_: (events.append("command") or ["/trusted/postdeploy-entrypoint"]),
+            ), patch.object(
+                supervisor, "consume_authorization", side_effect=lambda *_: events.append("consume"),
+            ), patch.object(
+                supervisor.subprocess, "Popen", side_effect=popen,
+            ), patch.object(
+                supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup"),
+            ):
+            supervisor.run_direct_postdeploy_authorization(
+                Path("/trusted/bundle"), Path("/trusted/pending/postdeploy.json"),
+                authorization, "a" * 64, 51,
+            )
+        self.assertEqual(events, [
+            "node", "candidate", "receipt", "command", "consume", "popen", "wait-900", "cleanup",
+        ])
+
+    def test_direct_postdeploy_timeout_terminates_group_before_node_cleanup(self):
+        events = []
+        authorization = {
+            "operation": "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION",
+            "parameters": {},
+            "supervisor_bundle_sha256": "f" * 64,
+        }
+
+        class Process:
+            pid = 54321
+            attempts = 0
+
+            def wait(self, timeout=None):
+                self.attempts += 1
+                events.append(f"wait-{timeout}")
+                if self.attempts == 1:
+                    raise supervisor.subprocess.TimeoutExpired("fixture", timeout)
+                return 0
+
+        patches = [
+            patch.object(supervisor, "prepare_runtime_privilege_node", return_value=(Path("/tmp/runtime"), Path("/tmp/runtime/node"))),
+            patch.object(supervisor, "verify_candidate"),
+            patch.object(supervisor, "command_for", return_value=["/trusted/postdeploy-entrypoint"]),
+            patch.object(supervisor, "consume_authorization"),
+            patch.object(supervisor.subprocess, "Popen", return_value=Process()),
+            patch.object(supervisor.os, "killpg", side_effect=lambda pid, sig: events.append(f"signal-{pid}-{sig}")),
+            patch.object(supervisor, "cleanup_runtime_privilege_node", side_effect=lambda *_: events.append("cleanup")),
+        ]
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5], patches[6]:
+            with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_POSTDEPLOY_ENTRYPOINT_TIMEOUT"):
+                supervisor.run_direct_postdeploy_authorization(
+                    Path("/trusted/bundle"), Path("/trusted/pending/postdeploy.json"),
+                    authorization, "a" * 64, 51,
+                )
+        self.assertEqual(events, ["wait-900", f"signal-54321-{supervisor.signal.SIGTERM}", "wait-30", "cleanup"])
+
 
 if __name__ == "__main__":
     unittest.main()

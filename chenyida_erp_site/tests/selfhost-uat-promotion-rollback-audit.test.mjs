@@ -34,18 +34,21 @@ test("current repository audit is valid but UAT promotion remains blocked", () =
   assert.equal(result.artifact.execution_readiness.p1_blocker_count, 1);
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "MIGRATION_COMMIT_RECEIPT").status, "SUPPORTED");
   assert.equal(result.artifact.capabilities.find((entry) => entry.id === "COMPOSE_DEPLOYMENT_RECEIPT").status, "SUPPORTED");
+  assert.equal(result.artifact.capabilities.find((entry) => entry.id === "POST_DEPLOY_RUNTIME_CONFIGURATION").status, "SUPPORTED");
+  assert.equal(result.artifact.capabilities.find((entry) => entry.id === "POST_DEPLOY_IDENTITY").status, "SUPPORTED");
 });
 
 test("audit observes the exact Supervisor gap and TEST-only restore boundary", () => {
   const { artifact, errors } = buildUatPromotionRollbackAudit(inputs());
   assert.deepEqual(errors, []);
-  assert.equal(artifact.observations.supervisor_operation_count, 26);
-  assert.equal(artifact.observations.required_promotion_operation_count, 8);
-  assert.deepEqual(artifact.observations.implemented_required_promotion_operations, ["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "RECOVER_UAT_PROMOTION"]);
+  assert.equal(artifact.observations.supervisor_operation_count, 28);
+  assert.equal(artifact.observations.required_promotion_operation_count, 10);
+  assert.deepEqual(artifact.observations.implemented_required_promotion_operations, ["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY", "RECOVER_UAT_PROMOTION"]);
   assert.deepEqual(artifact.observations.missing_required_promotion_operations, ["ROLLBACK_UAT_RELEASE"]);
   assert.equal(artifact.observations.restore_target_policy, "TEST_ONLY");
   assert.equal(artifact.observations.migration_authorization, "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED");
   assert.equal(artifact.observations.compose_release_image_binding, "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT");
+  assert.equal(artifact.observations.postdeploy_transaction_binding, "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE");
   assert.equal(artifact.observations.cross_role_uat_readiness, "BLOCKED");
 });
 
@@ -77,6 +80,15 @@ test("source marker drift and cross-role readiness promotion are rejected", () =
   assert.ok(errors.includes("AUDIT_CROSS_ROLE_UAT_BOUNDARY_DRIFT"));
 });
 
+test("postdeploy transaction evidence cannot regress to standalone probes", () => {
+  const fixture = inputs();
+  const journalPath = "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs";
+  fixture.sourceBodies.set(journalPath, fixture.sourceBodies.get(journalPath).replaceAll("UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT", "REMOVED_POSTDEPLOY_CONTAINMENT"));
+  const result = buildUatPromotionRollbackAudit(fixture);
+  assert.ok(result.errors.some((entry) => entry.startsWith("AUDIT_SOURCE_MARKER_DRIFT:")));
+  assert.ok(result.errors.includes("AUDIT_POSTDEPLOY_TRANSACTION_BINDING_DRIFT"));
+});
+
 test("a declared promotion operation cannot disappear from the audited implementation", () => {
   const fixture = inputs();
   const launcherPath = "chenyida_erp_site/scripts/release-supervisor-launcher.py";
@@ -85,7 +97,7 @@ test("a declared promotion operation cannot disappear from the audited implement
     "",
   ));
   const result = buildUatPromotionRollbackAudit(fixture);
-  assert.ok(result.errors.includes("AUDIT_IMPLEMENTED_OPERATION_DRIFT:BEGIN_UAT_PROMOTION,CAPTURE_UAT_PROMOTION_SNAPSHOT,AUTHORIZE_UAT_PROMOTION_MIGRATION,RUN_UAT_PROMOTION_MIGRATION,DEPLOY_UAT_RELEASE,RECOVER_UAT_PROMOTION"));
+  assert.ok(result.errors.includes("AUDIT_IMPLEMENTED_OPERATION_DRIFT:BEGIN_UAT_PROMOTION,CAPTURE_UAT_PROMOTION_SNAPSHOT,AUTHORIZE_UAT_PROMOTION_MIGRATION,RUN_UAT_PROMOTION_MIGRATION,DEPLOY_UAT_RELEASE,VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION,VERIFY_UAT_POSTDEPLOY_IDENTITY,RECOVER_UAT_PROMOTION"));
 });
 
 test("artifact is deterministic and self-digested", () => {

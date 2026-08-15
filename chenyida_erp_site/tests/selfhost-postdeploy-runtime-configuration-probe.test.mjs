@@ -75,6 +75,10 @@ test("probe receipt is one-hour bounded and rejects selector, runtime and contro
 
 test("probe wrapper takes the canonical global lock and validates secret files on both sides of inspection", async () => {
   const wrapper = await readFile(new URL("../scripts/probe-postdeploy-runtime-configuration.sh", import.meta.url), "utf8");
+  assert.match(wrapper, /ERP_RELEASE_SUPERVISOR_NODE_RUNTIME/);
+  assert.match(wrapper, /chenyida-erp-runtime-privilege-node\.\*/);
+  assert.match(wrapper, /0:0:555:1/);
+  assert.doesNotMatch(wrapper, /NODE_IMAGE=|docker create|docker cp|NODE_BOOTSTRAP/);
   const lock = wrapper.indexOf("acquire_chenyida_release_gate_lock");
   const firstSecret = wrapper.indexOf("verify_runtime_secret_boundary", lock);
   const probe = wrapper.indexOf("postdeploy-runtime-configuration-probe.mjs", firstSecret);

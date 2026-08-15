@@ -453,7 +453,7 @@ test("native image evidence is digest-pinned, offline, socketless and scans each
   assert.doesNotMatch(producer, /--ignore-unfixed|--vex|--ignore-policy|--skip-files|--skip-dirs/);
 });
 
-test("release wrappers never pull implicitly when creating task containers", async () => {
+test("release wrappers and Supervisor never pull implicitly when creating task containers", async () => {
   const files = [
     "build-release-candidate-images.sh",
     "create-release-image-evidence.sh",
@@ -463,7 +463,6 @@ test("release wrappers never pull implicitly when creating task containers", asy
     "run-release-postgres-regression-tests.sh",
     "run-release-migration-postgres-test.sh",
     "run-backup-recovery-postgres-test.sh",
-    "write-release-identity.sh",
   ];
   for (const file of files) {
     const source = await readFile(new URL(`../scripts/${file}`, import.meta.url), "utf8");
@@ -477,6 +476,14 @@ test("release wrappers never pull implicitly when creating task containers", asy
     }
     assert.ok(count > 0, `${file} must exercise a checked Docker create path`);
   }
+  for (const file of ["probe-postdeploy-runtime-configuration.sh", "write-release-identity.sh"]) {
+    const source = await readFile(new URL(`../scripts/${file}`, import.meta.url), "utf8");
+    assert.match(source, /ERP_RELEASE_SUPERVISOR_NODE_RUNTIME/, `${file} must use the Supervisor Node runtime`);
+    assert.doesNotMatch(source, /docker (?:create|run)|NODE_IMAGE/, `${file} must not create an inner bootstrap container`);
+  }
+  const launcher = await readFile(new URL("../scripts/release-supervisor-launcher.py", import.meta.url), "utf8");
+  assert.match(launcher, /"create", "--pull=never", "--name", container_name/);
+  assert.match(launcher, /run_direct_postdeploy_authorization/);
 });
 
 test("release wrappers terminate on signals and standalone container ownership is unique", async () => {

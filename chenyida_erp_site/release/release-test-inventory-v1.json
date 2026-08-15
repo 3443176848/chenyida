@@ -1207,7 +1207,7 @@
     },
     {
       "path": "tests/selfhost-postdeploy-runtime-configuration-probe.test.mjs",
-      "sha256": "95cfcdea03d9a812e1935182187c3ae7febc49664e231122d9804687f001430f",
+      "sha256": "84fb070d79c583637c058b56a11664361377b383ceeed02bad44d5a94ef9d66d",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1891,7 +1891,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "ca094129c19072b5e626e70ac13ebba0e2ca63b1081633d02e8edb1b2830473d",
+      "sha256": "eaf2c7e6522ba1eb53fbf39ad3a203fbd659ceba90298708f7c8322ee8567c3c",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -1900,7 +1900,7 @@
     },
     {
       "path": "tests/selfhost-release-identity-contract.test.mjs",
-      "sha256": "f8490372d3fcd46b464e4659aeb72e122195081a6291d9402353264c9c9a4fa5",
+      "sha256": "7ad731c6075060e42aeca8c45db0678df0cb586fa38b4ab3e2085934a35dc3fa",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2305,7 +2305,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-rollback-audit.test.mjs",
-      "sha256": "1a0135d86c2e99b082eb8be80481f7283c906343e9366bc97b191d756984780f",
+      "sha256": "daecb98dd63076e8621919226a427dc27cea3636857dc1e61e8ed808b9e61170",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -2314,7 +2314,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-transaction-journal.test.mjs",
-      "sha256": "8f20d53a23994aef133210e6325e4cea4372fd2deb7ab442645e4973b311e2dd",
+      "sha256": "f48ef5ea72ded2cafd7ccecda621a415f5ef803fa1267bb287569c039aa1ad07",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

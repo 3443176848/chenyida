@@ -13,15 +13,7 @@ usage() {
 RELEASE_MANIFEST=""; RELEASE_MANIFEST_SHA256=""; POSTDEPLOY_ROOT=""; IDENTITY_ROOT=""; READER_GID=""; RUN_ID=""
 RUNTIME_GUARD_CONTRACT=""; RUNTIME_GUARD_MODE=""; RUNTIME_POLICY_SHA256=""; RUNTIME_CONFIGURATION_SHA256=""; DEPLOYMENT_CLASS=""; DEPLOYMENT_ID=""; COMPOSE_PROJECT=""; COMPOSE_PROJECT_ROOT=""
 CADDY_CONTAINER=""; POSTGRES_CONTAINER=""; WEB_CONTAINER=""; WORKER_CONTAINER=""; CONFIRM=""
-NODE_RUNTIME_ROOT=""; NODE_BOOTSTRAP_ID=""; NODE_BOOTSTRAP_NAME=""; NODE_RUNTIME=""; RECEIPT_SHA256=""; PREPARED=NO
-
-remove_node_bootstrap() {
-  if [ -z "$NODE_BOOTSTRAP_ID" ] && [ -n "$NODE_BOOTSTRAP_NAME" ]; then NODE_BOOTSTRAP_ID=$(/usr/bin/docker inspect --format '{{.Id}}' "$NODE_BOOTSTRAP_NAME" 2>/dev/null || true); fi
-  [ -n "$NODE_BOOTSTRAP_ID" ] || return 0
-  [ "$(/usr/bin/docker inspect --format '{{index .Config.Labels "chenyida.erp.postdeploy-verifier"}}|{{index .Config.Labels "chenyida.erp.release-authorization"}}|{{.Name}}' "$NODE_BOOTSTRAP_ID" 2>/dev/null || true)" = "$RUN_ID|$AUTHORIZATION_SHA256|/$NODE_BOOTSTRAP_NAME" ] || { echo "refusing to remove an unowned postdeploy bootstrap container" >&2; return 1; }
-  /usr/bin/docker rm -f "$NODE_BOOTSTRAP_ID" >/dev/null
-  NODE_BOOTSTRAP_ID=""
-}
+NODE_RUNTIME=""; RECEIPT_SHA256=""; PREPARED=NO
 
 abort_prepared() {
   [ "$PREPARED" = YES ] && [ -n "$NODE_RUNTIME" ] && [ -n "$RECEIPT_SHA256" ] || return 0
@@ -33,8 +25,6 @@ abort_prepared() {
 cleanup() {
   status=0
   abort_prepared >/dev/null 2>&1 || status=1
-  remove_node_bootstrap >/dev/null 2>&1 || status=1
-  if [ -n "$NODE_RUNTIME_ROOT" ]; then case "$NODE_RUNTIME_ROOT" in /tmp/chenyida-erp-postdeploy-node.*) rm -rf -- "$NODE_RUNTIME_ROOT" || status=1 ;; *) status=1 ;; esac; fi
   [ "$status" = 0 ] || exit 1
 }
 on_signal() { signal_status=$1; trap - EXIT HUP INT TERM; cleanup; exit "$signal_status"; }
@@ -123,14 +113,12 @@ LOCK_HELPER="$SCRIPT_DIR/release-gate-lock.sh"
 acquire_chenyida_release_gate_lock || exit 1
 ERP_RELEASE_GATE_LOCK_HELD=YES; export ERP_RELEASE_GATE_LOCK_HELD
 
-NODE_IMAGE='node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3'
-/usr/bin/docker image inspect "$NODE_IMAGE" >/dev/null 2>&1 || { echo "pinned postdeploy tooling image is unavailable; pulling is forbidden" >&2; exit 1; }
-NODE_BOOTSTRAP_NAME="cyd-postdeploy-node-$AUTHORIZATION_SHA256"
-NODE_RUNTIME_ROOT=$(mktemp -d /tmp/chenyida-erp-postdeploy-node.XXXXXX)
-NODE_BOOTSTRAP_ID=$(/usr/bin/docker create --pull=never --name "$NODE_BOOTSTRAP_NAME" --label "chenyida.erp.postdeploy-verifier=$RUN_ID" --label "chenyida.erp.release-authorization=$AUTHORIZATION_SHA256" --network none --read-only --cap-drop ALL --security-opt no-new-privileges --memory 64m --memory-swap 64m --cpus 0.25 --pids-limit 16 "$NODE_IMAGE" true)
-/usr/bin/docker cp "$NODE_BOOTSTRAP_ID:/usr/local/bin/node" "$NODE_RUNTIME_ROOT/node"
-remove_node_bootstrap
-chmod 0755 "$NODE_RUNTIME_ROOT/node"; NODE_RUNTIME="$NODE_RUNTIME_ROOT/node"
+NODE_RUNTIME=${ERP_RELEASE_SUPERVISOR_NODE_RUNTIME:-}
+NODE_RUNTIME_ROOT=$(dirname -- "$NODE_RUNTIME")
+[ "$(dirname -- "$NODE_RUNTIME_ROOT")" = /tmp ] || { echo "supervisor Node runtime root is invalid" >&2; exit 1; }
+case "$(basename -- "$NODE_RUNTIME_ROOT")" in chenyida-erp-runtime-privilege-node.*) : ;; *) echo "supervisor Node runtime root is invalid" >&2; exit 1 ;; esac
+[ -d "$NODE_RUNTIME_ROOT" ] && [ ! -L "$NODE_RUNTIME_ROOT" ] && [ "$(readlink -f "$NODE_RUNTIME_ROOT")" = "$NODE_RUNTIME_ROOT" ] && [ "$(stat -c '%u:%g:%a' "$NODE_RUNTIME_ROOT")" = 0:0:700 ] || { echo "supervisor Node runtime root is invalid" >&2; exit 1; }
+[ "$NODE_RUNTIME" = "$NODE_RUNTIME_ROOT/node" ] && [ -f "$NODE_RUNTIME" ] && [ ! -L "$NODE_RUNTIME" ] && [ "$(readlink -f "$NODE_RUNTIME")" = "$NODE_RUNTIME" ] && [ "$(stat -c '%u:%g:%a:%h' "$NODE_RUNTIME")" = 0:0:555:1 ] || { echo "supervisor Node runtime is invalid" >&2; exit 1; }
 
 verify_runtime_secret_boundary || { echo "runtime secret boundary is invalid" >&2; exit 1; }
 PREPARE_OUTPUT=$(env -i PATH="$PATH" LC_ALL=C LANG=C TZ=UTC ERP_RELEASE_GATE_LOCK_HELD=YES ERP_RELEASE_SUPERVISOR_LAUNCHED=YES ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256="$SUPERVISOR_BUNDLE_SHA256" ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256="$AUTHORIZATION_SHA256" \

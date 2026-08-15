@@ -188,6 +188,15 @@ function inspectRepository(policy, sourceBodies, errors) {
       && compose.includes("chenyida.erp.uat-deployment-operation")
       && compose.includes("chenyida.erp.uat-deployment-authorization")
       ? "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT" : "UNKNOWN",
+    postdeploy_transaction_binding: launcher.includes('"VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION": "POSTDEPLOY_RUNTIME_CONFIGURATION"')
+      && launcher.includes('"VERIFY_UAT_POSTDEPLOY_IDENTITY": "POSTDEPLOY_IDENTITY"')
+      && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT")
+      && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT")
+      && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT")
+      && promotionJournal.includes("UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT")
+      && promotionJournal.includes("AFTER_POSTDEPLOY_RUNTIME_CURRENT")
+      && promotionJournal.includes("AFTER_POSTDEPLOY_IDENTITY_CURRENT")
+      ? "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE" : "UNKNOWN",
     cross_role_uat_readiness: crossRole?.readiness?.status ?? "UNKNOWN",
   };
   if (!Array.isArray(expectedImplemented) || expectedImplemented.some((item) => !IDENTIFIER.test(item))
@@ -195,6 +204,7 @@ function inspectRepository(policy, sourceBodies, errors) {
   if (observations.restore_target_policy !== "TEST_ONLY") error(errors, "AUDIT_RESTORE_BOUNDARY_DRIFT");
   if (observations.migration_authorization !== "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED") error(errors, "AUDIT_MIGRATION_AUTHORIZATION_DRIFT");
   if (observations.compose_release_image_binding !== "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT") error(errors, "AUDIT_COMPOSE_BINDING_DRIFT");
+  if (observations.postdeploy_transaction_binding !== "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE") error(errors, "AUDIT_POSTDEPLOY_TRANSACTION_BINDING_DRIFT");
   if (observations.cross_role_uat_readiness !== "BLOCKED") error(errors, "AUDIT_CROSS_ROLE_UAT_BOUNDARY_DRIFT");
   return observations;
 }
@@ -284,7 +294,7 @@ export function renderMarkdown(artifact) {
     `- 执行判定：\`${artifact.execution_readiness.code}\`；P0=${artifact.execution_readiness.p0_blocker_count}，P1=${artifact.execution_readiness.p1_blocker_count}，may_start=\`${artifact.execution_readiness.may_start}\`。`,
     `- ${artifact.execution_readiness.statement}`,
     "",
-    "仓库已有候选source snapshot、ELIGIBLE manifest、pre-deploy runtime guard、promotion intent/journal、promotion-bound actual-offhost snapshot验收、同一Compose Web/Worker持续静默回执、一次性Migration数据库围栏与提交回执，以及仅替换Web/Worker的checkpoint 9受控Compose部署回执；但postdeploy配置/身份尚未接入同一事务，业务UAT、终态提交和回退适配器仍未闭合。",
+    "仓库已有候选source snapshot、ELIGIBLE manifest、pre-deploy runtime guard、promotion intent/journal、promotion-bound actual-offhost snapshot验收、同一Compose Web/Worker持续静默回执、一次性Migration数据库围栏与提交回执、checkpoint 9受控Compose部署回执，以及checkpoint 10/11内容寻址且可恢复的postdeploy配置与身份回执；业务UAT、终态提交和回退适配器仍未闭合。",
     "",
     "## 2. Supervisor操作面",
     "",
@@ -305,6 +315,7 @@ export function renderMarkdown(artifact) {
     `- UAT恢复目标：\`${artifact.observations.restore_target_policy}\`；当前恢复器只能写不同cluster上的可丢弃TEST目标。`,
     `- Migration授权：\`${artifact.observations.migration_authorization}\`；checkpoint 7与独立checkpoint 8授权、数据库围栏、逐文件事务、最终核对和不可覆盖提交回执已形成同一内容寻址链。`,
     `- Compose发布：\`${artifact.observations.compose_release_image_binding}\`；checkpoint 9绑定精确digest、受保护资源身份、数据库围栏交接和unknown/partial保全，但不代表后续postdeploy与业务UAT检查点已提交。`,
+    `- Postdeploy事务：\`${artifact.observations.postdeploy_transaction_binding}\`；checkpoint 10/11使用彼此独立的一次性授权，绑定checkpoint 9结果、围栏交接、manifest、四服务运行身份，并按history→receipt→current单调提交。`,
     "- Writer静默回执只覆盖精确Compose项目与working directory；checkpoint 8在SQL前重验静默并以数据库级围栏拒绝未标记或外部业务客户端，围栏保持至后续部署或保全恢复接管。",
     `- TASK67人工UAT状态：\`${artifact.observations.cross_role_uat_readiness}\`。`,
     "",
@@ -312,7 +323,7 @@ export function renderMarkdown(artifact) {
     "",
     "任何工具、手册或operator在本artifact仍为BLOCKED时调用晋升断言，必须得到`UAT_PROMOTION_EXECUTOR_NOT_READY`。不得用root手工Compose、可重复环境变量、TEST恢复回执、旧postdeploy receipt或最终health页面绕过缺失检查点。",
     "",
-    "下一实现必须把postdeploy runtime configuration与identity接入checkpoint 10/11的同一内容寻址事务，再补齐人工UAT、promotion终态提交和精确前代回退；执行器完整后才可在合成Compose和隔离PostgreSQL做动态验证。",
+    "下一实现必须补齐checkpoint 12人工UAT受控执行证据、checkpoint 13 promotion终态提交和checkpoint 14/15精确前代回退；执行器完整后才可在合成Compose和隔离PostgreSQL做动态验证。",
     "",
     "## 6. 源码manifest",
     "",

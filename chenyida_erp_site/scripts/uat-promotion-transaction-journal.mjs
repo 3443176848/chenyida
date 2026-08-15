@@ -6,6 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  RELEASE_IDENTITY_PUBLISH_LOCK,
   RELEASE_IDENTITY_ROOT_MARKER,
   RELEASE_IDENTITY_ROOT_MARKER_VALUE,
   parseStrictJson,
@@ -38,6 +39,15 @@ import {
   validateUatPromotionActiveFenceTransfer,
   validateUatPromotionComposeDeploymentResult,
 } from "./uat-promotion-compose-deployment-contract.mjs";
+import {
+  canonicalRuntimeConfigurationProbeJson,
+  validateRuntimeConfigurationProbeReceipt,
+} from "./postdeploy-runtime-configuration-probe.mjs";
+import {
+  buildReleaseIdentityFromPostDeployReceipt,
+  validatePostDeployReceipt,
+} from "./postdeploy-release-contract.mjs";
+import { canonicalJson as canonicalReleaseJson } from "./release-manifest-contract.mjs";
 
 export const UAT_PROMOTION_POLICY_CONTRACT = "chenyida-erp-uat-promotion-transaction-policy/v1";
 export const UAT_PROMOTION_CONTEXT_CONTRACT = "chenyida-erp-uat-promotion-transaction-context/v1";
@@ -47,6 +57,10 @@ export const UAT_PROMOTION_QUIESCE_INTENT_CONTRACT = "chenyida-erp-uat-promotion
 export const UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT = "chenyida-erp-uat-promotion-migration-authorization-intent/v1";
 export const UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT = "chenyida-erp-uat-promotion-migration-execution-intent/v1";
 export const UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT = "chenyida-erp-uat-promotion-compose-deployment-intent/v1";
+export const UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-runtime-intent/v1";
+export const UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-identity-intent/v1";
+export const UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-identity-evidence/v1";
+export const UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT = "chenyida-erp-uat-promotion-postdeploy-containment/v1";
 export const UAT_PROMOTION_RECEIPT_CONTRACT = "chenyida-erp-uat-promotion-checkpoint-receipt/v1";
 export const UAT_PROMOTION_RECOVERY_CONTRACT = "chenyida-erp-uat-promotion-recovery/v3";
 export const UAT_PROMOTION_QUARANTINE_CONTRACT = "chenyida-erp-uat-promotion-quarantine/v3";
@@ -55,8 +69,8 @@ export const UAT_PROMOTION_CURRENT_FILE = `${UAT_PROMOTION_STATE_ROOT}/current.j
 export const UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1";
 export const UAT_PROMOTION_STATE_MARKER_VALUE = "chenyida-erp-uat-promotion-transactions/v1\n";
 export const UAT_PROMOTION_POLICY_RELATIVE = "operations/uat-promotion-transaction-policy-v1.json";
-export const UAT_PROMOTION_POLICY_FILE_SHA256 = "16c998ddea1b94010bb605c03c18ecc3e2f7dfeab913a3d8cc1c01f70b069585";
-export const UAT_PROMOTION_POLICY_SHA256 = "7ff7f23c11caafecadda4bc3a5086b0892d72a37a90ce3e0081f84e18df01359";
+export const UAT_PROMOTION_POLICY_FILE_SHA256 = "e25ffc7b9176b2cc94c0d0bb87ced077671a1cd5481ce7f2c9c8f44ad442b4d0";
+export const UAT_PROMOTION_POLICY_SHA256 = "b82f0181a7d016560f580e769fc10e8e9c2acf3a3224c11f7336ddb99c564a44";
 export const ZERO_SHA256 = "0".repeat(64);
 
 const SITE_ROOT = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
@@ -75,6 +89,13 @@ const CLUSTER_POLICY_STATE_MARKER = ".chenyida-erp-postgresql-cluster-recovery-p
 const CLUSTER_POLICY_STATE_MARKER_VALUE = "chenyida-erp-postgresql-cluster-recovery-policy-activation/v1\n";
 const ACTIVE_MIGRATION_FENCES_ROOT = `${UAT_PROMOTION_STATE_ROOT}/active-fences`;
 const FENCE_TRANSFERS_ROOT = `${UAT_PROMOTION_STATE_ROOT}/fence-transfers`;
+const RUNTIME_PROBE_ROOT = "/var/lib/chenyida-erp/runtime-probes";
+const RUNTIME_PROBE_MARKER = ".chenyida-erp-runtime-probe-root-v1";
+const RUNTIME_PROBE_MARKER_VALUE = "chenyida-erp-runtime-probe-root/v1\n";
+const POSTDEPLOY_ROOT = "/var/lib/chenyida-erp/postdeploy";
+const POSTDEPLOY_RUNTIME_GUARD_CONTRACT = "chenyida-erp-release-runtime-guard/v1";
+const POSTDEPLOY_RUNTIME_GUARD_MODE = "POST_DEPLOY_CURRENT_RUNTIME_STRICT";
+const POSTDEPLOY_RUNTIME_POLICY_SHA256 = "e4920820ed954c2689e3de53dea9b7f36945969c8287b06d87a3871e7d3ecf00";
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const SHA256 = /^[0-9a-f]{64}$/u;
 const COMMIT = /^[0-9a-f]{40}$/u;
@@ -82,6 +103,19 @@ const VERSION = /^0\.1\.0-alpha\.\d+$/u;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/u;
 const IMAGE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)+@sha256:[0-9a-f]{64}$/u;
 const MIGRATION = /^\d{4}_[a-z0-9_]+\.sql$/u;
+const POSTDEPLOY_FAILURE_CODES = Object.freeze({
+  POST_AUTHORIZATION_SOURCE_RECHECK: "UAT_PROMOTION_POSTDEPLOY_POST_AUTHORIZATION_SOURCE_RECHECK_FAILED",
+  EXTERNAL_CONTROL: "UAT_PROMOTION_POSTDEPLOY_EXTERNAL_CONTROL_FAILED",
+  JOURNAL_EXECUTION: "UAT_PROMOTION_POSTDEPLOY_JOURNAL_EXECUTION_FAILED",
+  RESULT_CROSSCHECK: "UAT_PROMOTION_POSTDEPLOY_RESULT_CROSSCHECK_FAILED",
+});
+
+function validatePostdeployFailure(stage, code) {
+  if (!Object.hasOwn(POSTDEPLOY_FAILURE_CODES, stage) || POSTDEPLOY_FAILURE_CODES[stage] !== code) {
+    reject("UAT_PROMOTION_POSTDEPLOY_FAILURE_CLASSIFICATION_INVALID");
+  }
+  return Object.freeze({ stage, code });
+}
 const ROLE = /^[a-z_][a-z0-9_$-]{0,62}$/u;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
 const BACKUP_ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/u;
@@ -197,6 +231,30 @@ const COMPOSE_DEPLOYMENT_PARAMETER_FIELDS = Object.freeze([
   "deployment_expires_at", "requester_identity_sha256", "approver_identity_sha256",
   "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
 ]);
+const POSTDEPLOY_COMMON_PARAMETER_FIELDS = Object.freeze([
+  "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+  "promotion_intent_sha256", "promotion_original_authorization_sha256", "candidate_binding_sha256",
+  "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+  "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+  "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+  "migration_result_binding_sha256", "compose_deployment_binding_sha256", "current_checkpoint_source",
+  "deployment_operation_id", "deployment_result_sha256", "deployment_result_source",
+  "fence_transfer_sha256", "fence_transfer_source", "release_manifest", "release_manifest_sha256",
+  "release_manifest_source", "deployment_class", "deployment_id", "compose_project",
+  "compose_project_root", "runtime_guard_contract", "runtime_guard_mode", "runtime_policy_sha256",
+  "reader_gid", "caddy_container", "postgres_container", "web_container", "worker_container",
+  "verification_created_at", "verification_expires_at", "requester_identity_sha256",
+  "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+]);
+const POSTDEPLOY_RUNTIME_PARAMETER_FIELDS = Object.freeze([
+  ...POSTDEPLOY_COMMON_PARAMETER_FIELDS, "probe_root", "probe_id",
+]);
+const POSTDEPLOY_IDENTITY_PARAMETER_FIELDS = Object.freeze([
+  ...POSTDEPLOY_COMMON_PARAMETER_FIELDS, "runtime_probe_operation_id", "runtime_probe_intent_sha256",
+  "runtime_probe_intent_source", "runtime_probe_result_sha256", "runtime_probe_result_source",
+  "runtime_probe_receipt", "runtime_probe_receipt_sha256", "runtime_probe_receipt_source",
+  "runtime_configuration_sha256", "postdeploy_root", "identity_root", "run_id",
+]);
 const WRITER_CAPTURE_FIELDS = Object.freeze([
   "deployment_class", "deployment_id", "compose_project", "snapshot_recovery_point_at", "snapshot_writer_verified_at",
   "application_version", "git_commit", "migration_head", "migration_manifest_sha256", "web", "worker",
@@ -258,7 +316,7 @@ function validatePolicy(value) {
   if (!same(value.deployment, { class: "UAT", id: "chenyida-erp", database: "chenyida_erp", database_marker: "chenyida-erp-deployment/v2:UAT:chenyida-erp" })) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.state, ["root", "marker", "marker_value", "directory_mode", "file_mode", "owner_uid", "owner_gid"], "UAT_PROMOTION_POLICY_INVALID");
   if (!same(value.state, { root: UAT_PROMOTION_STATE_ROOT, marker: UAT_PROMOTION_STATE_MARKER, marker_value: UAT_PROMOTION_STATE_MARKER_VALUE, directory_mode: "0700", file_mode: "0400", owner_uid: 0, owner_gid: 0 })) reject("UAT_PROMOTION_POLICY_INVALID");
-  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "migration_authorization_operation", "migration_execution_operation", "compose_deployment_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
+  exactKeys(value.authorization, ["contract", "maximum_window_minutes", "required_distinct_actors", "begin_operation", "snapshot_operation", "quiesce_operation", "migration_authorization_operation", "migration_execution_operation", "compose_deployment_operation", "postdeploy_runtime_configuration_operation", "postdeploy_identity_operation", "recovery_operation"], "UAT_PROMOTION_POLICY_INVALID");
   if (value.authorization.contract !== "chenyida-erp-release-supervisor-authorization/v6"
     || value.authorization.maximum_window_minutes !== 60 || value.authorization.begin_operation !== "BEGIN_UAT_PROMOTION"
     || value.authorization.snapshot_operation !== "CAPTURE_UAT_PROMOTION_SNAPSHOT"
@@ -266,6 +324,8 @@ function validatePolicy(value) {
     || value.authorization.migration_authorization_operation !== "AUTHORIZE_UAT_PROMOTION_MIGRATION"
     || value.authorization.migration_execution_operation !== "RUN_UAT_PROMOTION_MIGRATION"
     || value.authorization.compose_deployment_operation !== "DEPLOY_UAT_RELEASE"
+    || value.authorization.postdeploy_runtime_configuration_operation !== "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION"
+    || value.authorization.postdeploy_identity_operation !== "VERIFY_UAT_POSTDEPLOY_IDENTITY"
     || value.authorization.recovery_operation !== "RECOVER_UAT_PROMOTION"
     || !same(value.authorization.required_distinct_actors, ["requester_identity_sha256", "approver_identity_sha256", "executor_identity_sha256"])) reject("UAT_PROMOTION_POLICY_INVALID");
   exactKeys(value.snapshot_writer_dependency, [
@@ -284,12 +344,15 @@ function validatePolicy(value) {
   if (!same(value.checkpoint_order, CHECKPOINT_ORDER) || value.initial_checkpoint !== CHECKPOINT_ORDER[3]) reject("UAT_PROMOTION_POLICY_INVALID");
   if (!Array.isArray(value.required_intent_bindings) || value.required_intent_bindings.length !== 16
     || new Set(value.required_intent_bindings).size !== value.required_intent_bindings.length) reject("UAT_PROMOTION_POLICY_INVALID");
-  if (!Array.isArray(value.adapters) || value.adapters.length !== 8) reject("UAT_PROMOTION_POLICY_INVALID");
+  if (!Array.isArray(value.adapters) || value.adapters.length !== 10) reject("UAT_PROMOTION_POLICY_INVALID");
   const expectedAdapters = new Map([
     ["BEGIN_UAT_PROMOTION", "IMPLEMENTED"], ["CAPTURE_UAT_PROMOTION_SNAPSHOT", "IMPLEMENTED"],
     ["QUIESCE_UAT_WRITERS", "IMPLEMENTED"], ["RUN_UAT_PROMOTION_MIGRATION", "IMPLEMENTED"],
     ["AUTHORIZE_UAT_PROMOTION_MIGRATION", "IMPLEMENTED"],
-    ["DEPLOY_UAT_RELEASE", "PARTIAL"], ["ROLLBACK_UAT_RELEASE", "NOT_IMPLEMENTED"],
+    ["DEPLOY_UAT_RELEASE", "IMPLEMENTED"],
+    ["VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "IMPLEMENTED"],
+    ["VERIFY_UAT_POSTDEPLOY_IDENTITY", "IMPLEMENTED"],
+    ["ROLLBACK_UAT_RELEASE", "NOT_IMPLEMENTED"],
     ["RECOVER_UAT_PROMOTION", "IMPLEMENTED"],
   ]);
   for (const adapter of value.adapters) {
@@ -685,9 +748,107 @@ export function validateUatPromotionComposeDeploymentParameters(value) {
   return value;
 }
 
+function validatePostdeployCommonParameters(value, expectedFields, code) {
+  exactKeys(value, expectedFields, code);
+  if (value.promotion_state_root !== UAT_PROMOTION_STATE_ROOT) reject("UAT_PROMOTION_STATE_PATH_INVALID");
+  for (const field of ["promotion_id", "deployment_operation_id"]) identifier(value[field], code);
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  integer(value.reader_gid, 1, 2_147_483_647, code);
+  for (const field of [
+    "previous_checkpoint_receipt_sha256", "promotion_intent_sha256",
+    "promotion_original_authorization_sha256", "candidate_binding_sha256", "database_binding_sha256",
+    "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "deployment_result_sha256", "fence_transfer_sha256",
+    "release_manifest_sha256", "runtime_policy_sha256", "requester_identity_sha256",
+    "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+  ]) digest(value[field], code);
+  if (value.policy_file_sha256 !== UAT_PROMOTION_POLICY_FILE_SHA256
+    || value.policy_sha256 !== UAT_PROMOTION_POLICY_SHA256
+    || value.runtime_guard_contract !== POSTDEPLOY_RUNTIME_GUARD_CONTRACT
+    || value.runtime_guard_mode !== POSTDEPLOY_RUNTIME_GUARD_MODE
+    || value.runtime_policy_sha256 !== POSTDEPLOY_RUNTIME_POLICY_SHA256) reject("UAT_PROMOTION_POSTDEPLOY_POLICY_INVALID");
+  if (new Set([
+    value.requester_identity_sha256, value.approver_identity_sha256, value.executor_identity_sha256,
+  ]).size !== 3) reject("UAT_PROMOTION_ACTORS_INVALID");
+  if (value.deployment_class !== "UAT" || value.deployment_id !== "chenyida-erp"
+    || value.compose_project !== "chenyida-erp") reject("UAT_PROMOTION_POSTDEPLOY_DEPLOYMENT_INVALID");
+  const expectedContainers = {
+    caddy_container: "chenyida-erp-caddy-1", postgres_container: "chenyida-erp-postgres-1",
+    web_container: "chenyida-erp-web-1", worker_container: "chenyida-erp-worker-1",
+  };
+  if (Object.entries(expectedContainers).some(([field, expected]) => value[field] !== expected)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_SELECTORS_INVALID");
+  }
+  for (const field of ["release_manifest", "compose_project_root"]) {
+    if (typeof value[field] !== "string" || !path.isAbsolute(value[field])
+      || path.normalize(value[field]) !== value[field] || value[field] === "/") {
+      reject("UAT_PROMOTION_POSTDEPLOY_PATH_INVALID");
+    }
+  }
+  const created = Date.parse(iso(value.verification_created_at, "UAT_PROMOTION_POSTDEPLOY_TIME_INVALID"));
+  const expires = Date.parse(iso(value.verification_expires_at, "UAT_PROMOTION_POSTDEPLOY_TIME_INVALID"));
+  if (expires <= created || expires - created > 15 * 60 * 1000) reject("UAT_PROMOTION_POSTDEPLOY_TIME_INVALID");
+  const deploymentResultPath = `${UAT_PROMOTION_STATE_ROOT}/results/${value.deployment_operation_id}.${value.deployment_result_sha256}.json`;
+  const transferPath = `${FENCE_TRANSFERS_ROOT}/${value.deployment_operation_id}.${value.fence_transfer_sha256}.json`;
+  validateSourceSpec(value.current_checkpoint_source, UAT_PROMOTION_CURRENT_FILE, new Set(["0400"]), `${code}_CURRENT_SOURCE_INVALID`, 0);
+  validateSourceSpec(value.deployment_result_source, deploymentResultPath, new Set(["0400"]), `${code}_DEPLOYMENT_SOURCE_INVALID`, 0);
+  validateSourceSpec(value.fence_transfer_source, transferPath, new Set(["0400"]), `${code}_TRANSFER_SOURCE_INVALID`, 0);
+  validateSourceSpec(value.release_manifest_source, value.release_manifest, new Set(["0440"]), `${code}_MANIFEST_SOURCE_INVALID`, 0);
+  if (value.release_manifest_source.sha256 !== value.release_manifest_sha256
+    || new Set([
+      value.current_checkpoint_source.path, value.deployment_result_source.path,
+      value.fence_transfer_source.path, value.release_manifest_source.path,
+    ]).size !== 4) reject("UAT_PROMOTION_POSTDEPLOY_SOURCE_BINDING_INVALID");
+  return value;
+}
+
+export function validateUatPromotionPostdeployRuntimeParameters(value) {
+  validatePostdeployCommonParameters(
+    value, POSTDEPLOY_RUNTIME_PARAMETER_FIELDS, "UAT_PROMOTION_POSTDEPLOY_RUNTIME_PARAMETERS_INVALID",
+  );
+  identifier(value.probe_id, "UAT_PROMOTION_POSTDEPLOY_RUNTIME_IDENTIFIER_INVALID");
+  if (value.probe_id.length > 101 || value.probe_root !== RUNTIME_PROBE_ROOT) {
+    reject("UAT_PROMOTION_POSTDEPLOY_RUNTIME_PATH_INVALID");
+  }
+  return value;
+}
+
+export function validateUatPromotionPostdeployIdentityParameters(value) {
+  validatePostdeployCommonParameters(
+    value, POSTDEPLOY_IDENTITY_PARAMETER_FIELDS, "UAT_PROMOTION_POSTDEPLOY_IDENTITY_PARAMETERS_INVALID",
+  );
+  for (const field of ["runtime_probe_operation_id", "run_id"]) {
+    identifier(value[field], "UAT_PROMOTION_POSTDEPLOY_IDENTITY_IDENTIFIER_INVALID");
+  }
+  for (const field of [
+    "runtime_probe_intent_sha256", "runtime_probe_result_sha256", "runtime_probe_receipt_sha256",
+    "runtime_configuration_sha256",
+  ]) digest(value[field], "UAT_PROMOTION_POSTDEPLOY_IDENTITY_DIGEST_INVALID");
+  if (value.run_id.length > 101 || value.postdeploy_root !== `${POSTDEPLOY_ROOT}/${value.run_id}`
+    || value.identity_root !== path.dirname(RELEASE_IDENTITY_FILE)
+    || value.runtime_probe_receipt !== `${RUNTIME_PROBE_ROOT}/${value.runtime_probe_operation_id}.runtime-configuration-probe.json`
+    || value.runtime_probe_receipt_sha256 !== value.runtime_probe_result_sha256) {
+    reject("UAT_PROMOTION_POSTDEPLOY_IDENTITY_PATH_INVALID");
+  }
+  const runtimeIntentPath = `${UAT_PROMOTION_STATE_ROOT}/intents/${value.runtime_probe_operation_id}.${value.runtime_probe_intent_sha256}.json`;
+  const runtimeResultPath = `${UAT_PROMOTION_STATE_ROOT}/results/${value.runtime_probe_operation_id}.${value.runtime_probe_result_sha256}.json`;
+  validateSourceSpec(value.runtime_probe_intent_source, runtimeIntentPath, new Set(["0400"]), "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RUNTIME_INTENT_SOURCE_INVALID", 0);
+  validateSourceSpec(value.runtime_probe_result_source, runtimeResultPath, new Set(["0400"]), "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RUNTIME_RESULT_SOURCE_INVALID", 0);
+  validateSourceSpec(value.runtime_probe_receipt_source, value.runtime_probe_receipt, new Set(["0400"]), "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RUNTIME_RECEIPT_SOURCE_INVALID", 0);
+  if (value.runtime_probe_result_source.sha256 !== value.runtime_probe_result_sha256
+    || value.runtime_probe_receipt_source.sha256 !== value.runtime_probe_receipt_sha256
+    || new Set([
+      value.runtime_probe_intent_source.path, value.runtime_probe_result_source.path,
+      value.runtime_probe_receipt_source.path, value.current_checkpoint_source.path,
+    ]).size !== 4) reject("UAT_PROMOTION_POSTDEPLOY_IDENTITY_SOURCE_BINDING_INVALID");
+  return value;
+}
+
 export function validateUatPromotionContext(value) {
   exactKeys(value, CONTEXT_FIELDS, "UAT_PROMOTION_CONTEXT_INVALID");
-  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT"]).has(value.operation)
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_CONTEXT_CONTRACT || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(value.operation)
     || !new Set(["ORIGINAL", "RECOVERY"]).has(value.execution_mode)) reject("UAT_PROMOTION_CONTEXT_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_CONTEXT_ID_INVALID");
@@ -698,13 +859,16 @@ export function validateUatPromotionContext(value) {
   else if (value.operation === "QUIESCE_WRITERS") validateUatPromotionQuiesceParameters(value.parameters);
   else if (value.operation === "MIGRATION_AUTHORIZATION") validateUatPromotionMigrationAuthorizationParameters(value.parameters);
   else if (value.operation === "MIGRATION_EXECUTION") validateUatPromotionMigrationExecutionParameters(value.parameters);
-  else validateUatPromotionComposeDeploymentParameters(value.parameters);
+  else if (value.operation === "COMPOSE_DEPLOYMENT") validateUatPromotionComposeDeploymentParameters(value.parameters);
+  else if (value.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION") validateUatPromotionPostdeployRuntimeParameters(value.parameters);
+  else validateUatPromotionPostdeployIdentityParameters(value.parameters);
   const operationCreatedAt = value.operation === "BEGIN" ? value.parameters.promotion_created_at
     : value.operation === "CAPTURE_SNAPSHOT" ? value.parameters.snapshot_created_at
       : value.operation === "QUIESCE_WRITERS" ? value.parameters.quiesce_created_at
         : value.operation === "MIGRATION_AUTHORIZATION" ? value.parameters.authorization_created_at
           : value.operation === "MIGRATION_EXECUTION" ? value.parameters.execution_created_at
-            : value.parameters.deployment_created_at;
+            : value.operation === "COMPOSE_DEPLOYMENT" ? value.parameters.deployment_created_at
+              : value.parameters.verification_created_at;
   if (value.execution_mode === "ORIGINAL") {
     if (value.execution_authorization_id !== value.operation_id || value.execution_authorization_sha256 !== value.original_authorization_sha256
       || value.expected_intent_sha256 !== null || Math.abs(Date.parse(value.execution_created_at) - Date.parse(operationCreatedAt)) > 5 * 60 * 1000
@@ -714,7 +878,12 @@ export function validateUatPromotionContext(value) {
       || value.operation === "MIGRATION_EXECUTION" && (value.operation_id === value.parameters.migration_authorization_operation_id
         || value.execution_authorization_sha256 === value.parameters.migration_approval_authorization_sha256)
       || value.operation === "COMPOSE_DEPLOYMENT" && (value.operation_id === value.parameters.migration_operation_id
-        || value.execution_authorization_sha256 === value.parameters.migration_execution_authorization_sha256)) {
+        || value.execution_authorization_sha256 === value.parameters.migration_execution_authorization_sha256)
+      || value.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION" && (value.operation_id !== value.parameters.probe_id
+        || value.operation_id === value.parameters.deployment_operation_id)
+      || value.operation === "POSTDEPLOY_IDENTITY" && (value.operation_id !== value.parameters.run_id
+        || value.operation_id === value.parameters.deployment_operation_id
+        || value.operation_id === value.parameters.runtime_probe_operation_id)) {
       reject("UAT_PROMOTION_CONTEXT_BINDING_INVALID");
     }
   } else {
@@ -1013,7 +1182,10 @@ async function trustedMarker(file, raw, mode, gid, code) {
   } finally { await handle.close(); }
 }
 
-async function trustedJsonFile(file, mode, validator, code, expectedGid = 0, requireCanonical = true) {
+async function trustedJsonFile(
+  file, mode, validator, code, expectedGid = 0, requireCanonical = true,
+  canonicalizer = canonicalClusterJson,
+) {
   const metadata = await lstat(file, { bigint: true }).catch((error) => error?.code === "ENOENT" ? null : reject(code));
   if (metadata === null) return null;
   if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.uid !== 0n || metadata.gid !== BigInt(expectedGid)
@@ -1033,7 +1205,7 @@ async function trustedJsonFile(file, mode, validator, code, expectedGid = 0, req
     let parsed, value;
     try { parsed = parseStrictJson(raw.toString("utf8"), MAX_JSON_BYTES); value = validator(parsed); }
     catch { reject(code); }
-    if (requireCanonical && raw.toString("utf8") !== canonicalClusterJson(value)) reject(code);
+    if (requireCanonical && raw.toString("utf8") !== canonicalizer(value)) reject(code);
     return Object.freeze({ raw, value, metadata: opened });
   } finally { await handle.close(); }
 }
@@ -2000,6 +2172,211 @@ async function verifyComposeDeploymentSources(context, filesystemRoot) {
   });
 }
 
+function assertPostdeployDeploymentArtifacts(parameters, previous, deploymentResult, transfer, manifest, context) {
+  const binding = clusterSha256({
+    deployment_result_sha256: deploymentResult.result_sha256,
+    fence_transfer_sha256: transfer.transfer_sha256,
+  });
+  if (deploymentResult.promotion_id !== parameters.promotion_id
+    || deploymentResult.deployment_operation_id !== parameters.deployment_operation_id
+    || deploymentResult.result_sha256 !== parameters.deployment_result_sha256
+    || deploymentResult.release_manifest_sha256 !== parameters.release_manifest_sha256
+    || deploymentResult.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || deploymentResult.compose_project !== parameters.compose_project
+    || deploymentResult.compose_project_root !== parameters.compose_project_root
+    || deploymentResult.runtime_configuration_sha256 !== transfer.runtime_configuration_sha256
+    || transfer.promotion_id !== parameters.promotion_id
+    || transfer.deployment_operation_id !== parameters.deployment_operation_id
+    || transfer.deployment_result_sha256 !== deploymentResult.result_sha256
+    || transfer.transfer_sha256 !== parameters.fence_transfer_sha256
+    || transfer.database_handoff_sha256 !== deploymentResult.database_handoff.handoff_sha256
+    || binding !== parameters.compose_deployment_binding_sha256
+    || previous.compose_deployment_binding_sha256 !== binding
+    || previous.authorization_sha256_chain.includes(context.original_authorization_sha256)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_DEPLOYMENT_BINDING_INVALID");
+  }
+  if (manifest.allowed_deployment_classes.length !== 1 || manifest.allowed_deployment_classes[0] !== "UAT"
+    || manifest.control.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || manifest.source.git_commit.length !== 40 || manifest.source.git_tree.length !== 40
+    || manifest.images.web.image_reference !== deploymentResult.services[0].image_reference
+    || manifest.images.worker.image_reference !== deploymentResult.services[1].image_reference) {
+    reject("UAT_PROMOTION_POSTDEPLOY_MANIFEST_BINDING_INVALID");
+  }
+}
+
+function expectedRuntimeServices(deploymentResult) {
+  const byService = new Map([
+    ...deploymentResult.services.map((item) => [item.service, item]),
+    ...deploymentResult.unchanged_services.map((item) => [item.service, item]),
+  ]);
+  return ["caddy", "postgres", "web", "worker"].map((service) => {
+    const item = byService.get(service);
+    return Object.freeze({
+      service,
+      container_id: item.container_id,
+      image_id: item.image_id,
+      image_reference: item.image_reference,
+      restart_count: item.restart_count,
+      oom_killed: item.oom_killed,
+      running: item.running,
+      health: item.health,
+    });
+  });
+}
+
+function assertRuntimeProbeBinding(
+  probe, parameters, context, deploymentResult, transfer, manifest, now,
+  minimumProbedAt = parameters.verification_created_at,
+  maximumProbedAt = parameters.verification_expires_at,
+) {
+  try { validateRuntimeConfigurationProbeReceipt(probe, { now }); }
+  catch { reject("UAT_PROMOTION_POSTDEPLOY_RUNTIME_RESULT_INVALID"); }
+  const expectedServices = expectedRuntimeServices(deploymentResult);
+  if ((probe.probe_id !== parameters.runtime_probe_operation_id && probe.probe_id !== parameters.probe_id)
+    || probe.control.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || probe.control.authorization_sha256 !== context.original_authorization_sha256
+    || !same(probe.deployment, { class: "UAT", id: parameters.deployment_id, compose_project: parameters.compose_project })
+    || probe.release.manifest_sha256 !== parameters.release_manifest_sha256
+    || probe.release.git_commit !== manifest.source.git_commit
+    || probe.release.package_version !== manifest.source.package_version
+    || !same(probe.runtime_guard, { contract: parameters.runtime_guard_contract, mode: parameters.runtime_guard_mode })
+    || probe.runtime_policy_sha256 !== parameters.runtime_policy_sha256
+    || probe.runtime_configuration_sha256 !== deploymentResult.runtime_configuration_sha256
+    || probe.runtime_configuration_sha256 !== transfer.runtime_configuration_sha256
+    || probe.compose_project_root_sha256 !== sha256(Buffer.from(parameters.compose_project_root, "utf8"))
+    || !same(probe.selectors, {
+      caddy: parameters.caddy_container, postgres: parameters.postgres_container,
+      web: parameters.web_container, worker: parameters.worker_container,
+    })
+    || probe.services.some((item, index) => {
+      const expected = expectedServices[index];
+      return item.service !== expected.service || item.container_id !== expected.container_id
+        || item.image_id !== expected.image_id || item.image_reference !== expected.image_reference
+        || item.restart_count !== expected.restart_count || item.oom_killed !== expected.oom_killed
+        || item.running !== expected.running || item.health !== expected.health;
+    })
+    || Date.parse(probe.probed_at) < Date.parse(deploymentResult.completed_at)
+    || Date.parse(probe.probed_at) < Date.parse(transfer.transferred_at)
+    || Date.parse(probe.probed_at) < Date.parse(minimumProbedAt)
+    || Date.parse(probe.probed_at) >= Date.parse(maximumProbedAt)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_RUNTIME_RESULT_BINDING_INVALID");
+  }
+  return probe;
+}
+
+async function verifyPostdeployCommonSources(context, filesystemRoot, expectedCheckpoint) {
+  const parameters = context.parameters;
+  const current = await readAuthorizedSource(
+    parameters.current_checkpoint_source, filesystemRoot, validateUatPromotionCheckpointReceipt,
+    "UAT_PROMOTION_POSTDEPLOY_CURRENT_SOURCE_INVALID",
+  );
+  const deployment = await readAuthorizedSource(
+    parameters.deployment_result_source, filesystemRoot, validateUatPromotionComposeDeploymentResult,
+    "UAT_PROMOTION_POSTDEPLOY_DEPLOYMENT_SOURCE_INVALID",
+  );
+  const transfer = await readAuthorizedSource(
+    parameters.fence_transfer_source, filesystemRoot, validateUatPromotionActiveFenceTransfer,
+    "UAT_PROMOTION_POSTDEPLOY_TRANSFER_SOURCE_INVALID",
+  );
+  const releaseRoot = physicalPath(path.dirname(parameters.release_manifest), filesystemRoot);
+  await trustedMarker(
+    path.join(releaseRoot, RELEASE_ARTIFACT_MARKER), Buffer.from(RELEASE_ARTIFACT_MARKER_VALUE),
+    0o440, 0, "UAT_PROMOTION_POSTDEPLOY_MANIFEST_ROOT_INVALID",
+  );
+  const release = await readAuthorizedSource(
+    parameters.release_manifest_source, filesystemRoot,
+    (value) => validateReleaseManifest(value, { now: new Date(parameters.verification_created_at), requireEligible: true }),
+    "UAT_PROMOTION_POSTDEPLOY_MANIFEST_SOURCE_INVALID",
+  );
+  if (release.raw.toString("utf8") !== canonicalReleaseJson(release.value)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_MANIFEST_SOURCE_INVALID");
+  }
+  const previous = current.value;
+  if (previous.promotion_id !== parameters.promotion_id
+    || previous.promotion_generation !== parameters.promotion_generation
+    || previous.checkpoint_id !== expectedCheckpoint
+    || previous.checkpoint_ordinal !== (expectedCheckpoint === "COMPOSE_DEPLOYMENT_RECEIPT" ? 9 : 10)
+    || previous.checkpoint_status !== "COMMITTED" || previous.journal_status !== "IN_PROGRESS"
+    || previous.receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || previous.intent_sha256 !== parameters.promotion_intent_sha256
+    || previous.original_authorization_sha256 !== parameters.promotion_original_authorization_sha256
+    || previous.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || previous.database_binding_sha256 !== parameters.database_binding_sha256
+    || previous.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || previous.recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || previous.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || previous.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || previous.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || previous.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || previous.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || Date.parse(parameters.verification_created_at) < Date.parse(previous.recorded_at)
+    || Date.parse(parameters.verification_expires_at) > Date.parse(previous.promotion_expires_at)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_CURRENT_MISMATCH");
+  }
+  assertPostdeployDeploymentArtifacts(parameters, previous, deployment.value, transfer.value, release.value, context);
+  return Object.freeze({
+    previous, deploymentResult: deployment.value, transfer: transfer.value, manifest: release.value,
+  });
+}
+
+async function verifyPostdeployRuntimeSources(context, filesystemRoot) {
+  return verifyPostdeployCommonSources(context, filesystemRoot, "COMPOSE_DEPLOYMENT_RECEIPT");
+}
+
+async function verifyPostdeployIdentitySources(context, filesystemRoot) {
+  const sources = await verifyPostdeployCommonSources(context, filesystemRoot, "POST_DEPLOY_RUNTIME_CONFIGURATION");
+  const parameters = context.parameters;
+  const runtimeIntent = await readAuthorizedSource(
+    parameters.runtime_probe_intent_source, filesystemRoot, validateUatPromotionPostdeployRuntimeIntent,
+    "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RUNTIME_INTENT_SOURCE_INVALID",
+  );
+  const runtimeResult = await readAuthorizedSource(
+    parameters.runtime_probe_result_source, filesystemRoot,
+    (value) => validateRuntimeConfigurationProbeReceipt(value, { now: new Date(parameters.verification_created_at) }),
+    "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RUNTIME_RESULT_SOURCE_INVALID",
+  );
+  const runtimeReceipt = await readAuthorizedSource(
+    parameters.runtime_probe_receipt_source, filesystemRoot,
+    (value) => validateRuntimeConfigurationProbeReceipt(value, { now: new Date(parameters.verification_created_at) }),
+    "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RUNTIME_RECEIPT_SOURCE_INVALID",
+  );
+  if (!runtimeResult.raw.equals(runtimeReceipt.raw)
+    || runtimeResult.raw.toString("utf8") !== canonicalRuntimeConfigurationProbeJson(runtimeResult.value)
+    || runtimeIntent.value.verification_operation_id !== parameters.runtime_probe_operation_id
+    || runtimeIntent.value.postdeploy_runtime_intent_sha256 !== parameters.runtime_probe_intent_sha256
+    || runtimeIntent.value.execution_authorization_sha256 !== sources.previous.checkpoint_authorization_sha256
+    || runtimeIntent.value.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || runtimeIntent.value.promotion_id !== parameters.promotion_id
+    || runtimeIntent.value.promotion_generation !== parameters.promotion_generation
+    || runtimeIntent.value.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || runtimeIntent.value.previous_checkpoint_receipt_sha256 !== sources.previous.previous_checkpoint_receipt_sha256
+    || runtimeIntent.value.deployment_operation_id !== parameters.deployment_operation_id
+    || runtimeIntent.value.deployment_result_sha256 !== parameters.deployment_result_sha256
+    || runtimeIntent.value.fence_transfer_sha256 !== parameters.fence_transfer_sha256
+    || runtimeIntent.value.runtime_configuration_sha256 !== parameters.runtime_configuration_sha256
+    || runtimeIntent.value.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || runtimeIntent.value.database_binding_sha256 !== parameters.database_binding_sha256
+    || runtimeIntent.value.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || runtimeIntent.value.preupgrade_recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || runtimeIntent.value.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || runtimeIntent.value.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || runtimeIntent.value.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || runtimeIntent.value.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || runtimeIntent.value.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || runtimeIntent.value.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256
+    || sources.previous.checkpoint_evidence_sha256 !== parameters.runtime_probe_result_sha256
+    || parameters.runtime_configuration_sha256 !== runtimeResult.value.runtime_configuration_sha256) {
+    reject("UAT_PROMOTION_POSTDEPLOY_IDENTITY_RUNTIME_BINDING_INVALID");
+  }
+  const probeContext = { ...context, original_authorization_sha256: runtimeIntent.value.execution_authorization_sha256 };
+  assertRuntimeProbeBinding(
+    runtimeResult.value, parameters, probeContext, sources.deploymentResult, sources.transfer,
+    sources.manifest, new Date(parameters.verification_created_at),
+    runtimeIntent.value.created_at, runtimeIntent.value.expires_at,
+  );
+  return Object.freeze({ ...sources, runtimeIntent: runtimeIntent.value, runtimeProbe: runtimeResult.value });
+}
+
 async function ensureDirectory(directory, parent, mode, code) {
   await trustedDirectory(parent, new Set([0o700, 0o750, 0o755]), code);
   let created = false;
@@ -2029,7 +2406,7 @@ async function ensureMarker(file, raw, allowCreate, code) {
   await trustedMarker(file, raw, 0o400, 0, code);
 }
 
-async function ensureRawFile(file, raw, finalMode, validator, code) {
+async function ensureRawFile(file, raw, finalMode, validator, code, canonicalizer = canonicalClusterJson) {
   let metadata = await lstat(file).catch((error) => error?.code === "ENOENT" ? null : reject(code));
   if (metadata !== null && metadata.isFile() && !metadata.isSymbolicLink() && metadata.uid === 0 && metadata.gid === 0
     && metadata.nlink === 1 && new Set([0o600, finalMode]).has(metadata.mode & 0o7777)
@@ -2039,7 +2416,7 @@ async function ensureRawFile(file, raw, finalMode, validator, code) {
     try { existing = await handle.readFile(); } finally { await handle.close(); }
     if (raw.subarray(0, existing.length).equals(existing)) {
       if (existing.length === raw.length && (metadata.mode & 0o7777) === finalMode) {
-        const trusted = await trustedJsonFile(file, finalMode, validator, code);
+        const trusted = await trustedJsonFile(file, finalMode, validator, code, 0, true, canonicalizer);
         if (trusted?.raw.equals(raw)) return;
       }
       await unlink(file).catch(() => reject(code));
@@ -2054,7 +2431,7 @@ async function ensureRawFile(file, raw, finalMode, validator, code) {
     await handle.writeFile(raw); await handle.chown(0, 0); await handle.chmod(finalMode); await handle.sync();
   } catch { reject(code); }
   finally { await handle?.close().catch(() => undefined); }
-  const stored = await trustedJsonFile(file, finalMode, validator, code);
+  const stored = await trustedJsonFile(file, finalMode, validator, code, 0, true, canonicalizer);
   if (!stored?.raw.equals(raw)) reject(code);
 }
 
@@ -2075,7 +2452,7 @@ async function layout(filesystemRoot, initialize) {
   if (initialize) {
     const state = await ensureDirectory(stateRoot, stateParent, 0o700, "UAT_PROMOTION_STATE_ROOT_INVALID");
     await ensureMarker(path.join(stateRoot, UAT_PROMOTION_STATE_MARKER), Buffer.from(UAT_PROMOTION_STATE_MARKER_VALUE), state.created, "UAT_PROMOTION_STATE_MARKER_INVALID");
-    for (const name of ["generations", "history", "receipts", "intents", "grants", "results", "executions", "active-fences", "fence-transfers", "recoveries", "quarantine"]) {
+    for (const name of ["generations", "history", "receipts", "intents", "grants", "results", "executions", "active-fences", "fence-transfers", "recoveries", "containments", "quarantine"]) {
       await ensureDirectory(path.join(stateRoot, name), stateRoot, 0o700, "UAT_PROMOTION_STATE_ROOT_INVALID");
     }
   } else {
@@ -2083,7 +2460,7 @@ async function layout(filesystemRoot, initialize) {
     for (const name of ["generations", "history", "receipts", "intents", "recoveries", "quarantine"]) {
       await trustedDirectory(path.join(stateRoot, name), new Set([0o700]), "UAT_PROMOTION_STATE_ROOT_INVALID");
     }
-    for (const name of ["grants", "results", "executions", "active-fences", "fence-transfers"]) {
+    for (const name of ["grants", "results", "executions", "active-fences", "fence-transfers", "containments"]) {
       await ensureDirectory(path.join(stateRoot, name), stateRoot, 0o700, "UAT_PROMOTION_STATE_ROOT_INVALID");
     }
     await ensureMarker(path.join(stateRoot, UAT_PROMOTION_STATE_MARKER), Buffer.from(UAT_PROMOTION_STATE_MARKER_VALUE), false, "UAT_PROMOTION_STATE_MARKER_INVALID");
@@ -2095,7 +2472,8 @@ async function layout(filesystemRoot, initialize) {
     grants: path.join(stateRoot, "grants"), results: path.join(stateRoot, "results"),
     executions: path.join(stateRoot, "executions"), activeFences: path.join(stateRoot, "active-fences"),
     fenceTransfers: path.join(stateRoot, "fence-transfers"),
-    recoveries: path.join(stateRoot, "recoveries"), quarantine: path.join(stateRoot, "quarantine"),
+    recoveries: path.join(stateRoot, "recoveries"), containments: path.join(stateRoot, "containments"),
+    quarantine: path.join(stateRoot, "quarantine"),
     current: physicalPath(UAT_PROMOTION_CURRENT_FILE, filesystemRoot),
   });
 }
@@ -2318,7 +2696,9 @@ function createIntent(context) {
       QUIESCE_UAT_WRITERS: "IMPLEMENTED",
       AUTHORIZE_UAT_PROMOTION_MIGRATION: "IMPLEMENTED",
       RUN_UAT_PROMOTION_MIGRATION: "IMPLEMENTED",
-      DEPLOY_UAT_RELEASE: "PARTIAL",
+      DEPLOY_UAT_RELEASE: "IMPLEMENTED",
+      VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION: "IMPLEMENTED",
+      VERIFY_UAT_POSTDEPLOY_IDENTITY: "IMPLEMENTED",
       ROLLBACK_UAT_RELEASE: "NOT_IMPLEMENTED",
       RECOVER_UAT_PROMOTION: "IMPLEMENTED",
     },
@@ -2346,14 +2726,18 @@ export function validateUatPromotionIntent(value) {
     || value.runtime_binding_sha256 !== value.parameters.current_runtime_identity_source.sha256
     || value.recovery_binding_sha256 !== recoveryBinding(value.parameters)
     || !same(value.checkpoint_order, CHECKPOINT_ORDER)
-    || value.adapter_statuses?.BEGIN_UAT_PROMOTION !== "IMPLEMENTED"
-    || value.adapter_statuses?.CAPTURE_UAT_PROMOTION_SNAPSHOT !== "IMPLEMENTED"
-    || value.adapter_statuses?.QUIESCE_UAT_WRITERS !== "IMPLEMENTED"
-    || value.adapter_statuses?.AUTHORIZE_UAT_PROMOTION_MIGRATION !== "IMPLEMENTED"
-    || value.adapter_statuses?.RUN_UAT_PROMOTION_MIGRATION !== "IMPLEMENTED"
-    || value.adapter_statuses?.DEPLOY_UAT_RELEASE !== "PARTIAL"
-    || value.adapter_statuses?.RECOVER_UAT_PROMOTION !== "IMPLEMENTED"
-    || Object.entries(value.adapter_statuses ?? {}).filter(([operation]) => !new Set(["BEGIN_UAT_PROMOTION", "CAPTURE_UAT_PROMOTION_SNAPSHOT", "QUIESCE_UAT_WRITERS", "AUTHORIZE_UAT_PROMOTION_MIGRATION", "RUN_UAT_PROMOTION_MIGRATION", "DEPLOY_UAT_RELEASE", "RECOVER_UAT_PROMOTION"]).has(operation)).some(([, status]) => status !== "NOT_IMPLEMENTED")
+    || !same(value.adapter_statuses, {
+      BEGIN_UAT_PROMOTION: "IMPLEMENTED",
+      CAPTURE_UAT_PROMOTION_SNAPSHOT: "IMPLEMENTED",
+      QUIESCE_UAT_WRITERS: "IMPLEMENTED",
+      AUTHORIZE_UAT_PROMOTION_MIGRATION: "IMPLEMENTED",
+      RUN_UAT_PROMOTION_MIGRATION: "IMPLEMENTED",
+      DEPLOY_UAT_RELEASE: "IMPLEMENTED",
+      VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION: "IMPLEMENTED",
+      VERIFY_UAT_POSTDEPLOY_IDENTITY: "IMPLEMENTED",
+      ROLLBACK_UAT_RELEASE: "NOT_IMPLEMENTED",
+      RECOVER_UAT_PROMOTION: "IMPLEMENTED",
+    })
     || clusterSha256(bodyWithout(value, "intent_sha256")) !== value.intent_sha256) reject("UAT_PROMOTION_INTENT_BINDING_INVALID");
   return value;
 }
@@ -2809,6 +3193,245 @@ export function validateUatPromotionComposeDeploymentIntent(value) {
   return value;
 }
 
+function postdeployPlanBinding(parameters, operation, extra = {}) {
+  return clusterSha256({
+    operation,
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    previous_checkpoint_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    deployment_operation_id: parameters.deployment_operation_id,
+    deployment_result_sha256: parameters.deployment_result_sha256,
+    fence_transfer_sha256: parameters.fence_transfer_sha256,
+    compose_deployment_binding_sha256: parameters.compose_deployment_binding_sha256,
+    release_manifest_sha256: parameters.release_manifest_sha256,
+    compose_project_root_sha256: sha256(Buffer.from(parameters.compose_project_root, "utf8")),
+    runtime_policy_sha256: parameters.runtime_policy_sha256,
+    selectors: {
+      caddy: parameters.caddy_container, postgres: parameters.postgres_container,
+      web: parameters.web_container, worker: parameters.worker_container,
+    },
+    ...extra,
+  });
+}
+
+function createPostdeployRuntimeIntent(context, sources) {
+  const parameters = context.parameters;
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT,
+    execution_scope: "FRESH_FOUR_SERVICE_RUNTIME_CONFIGURATION_PROBE_ONLY",
+    verification_operation_id: context.operation_id,
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    created_at: parameters.verification_created_at,
+    expires_at: parameters.verification_expires_at,
+    execution_authorization_sha256: context.original_authorization_sha256,
+    supervisor_bundle_sha256: context.supervisor_bundle_sha256,
+    parameters,
+    promotion_intent_sha256: parameters.promotion_intent_sha256,
+    previous_checkpoint_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    deployment_operation_id: parameters.deployment_operation_id,
+    deployment_result_sha256: parameters.deployment_result_sha256,
+    fence_transfer_sha256: parameters.fence_transfer_sha256,
+    runtime_configuration_sha256: sources.deploymentResult.runtime_configuration_sha256,
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: parameters.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: parameters.migration_fence_binding_sha256,
+    migration_result_binding_sha256: parameters.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: parameters.compose_deployment_binding_sha256,
+    verification_plan_sha256: postdeployPlanBinding(parameters, "POSTDEPLOY_RUNTIME_CONFIGURATION", {
+      probe_id: parameters.probe_id,
+      probe_path: `${parameters.probe_root}/${parameters.probe_id}.runtime-configuration-probe.json`,
+      runtime_configuration_sha256: sources.deploymentResult.runtime_configuration_sha256,
+    }),
+  };
+  return Object.freeze(validateUatPromotionPostdeployRuntimeIntent({
+    ...body, postdeploy_runtime_intent_sha256: clusterSha256(body),
+  }));
+}
+
+export function validateUatPromotionPostdeployRuntimeIntent(value) {
+  const code = "UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "execution_scope", "verification_operation_id", "promotion_id",
+    "promotion_generation", "created_at", "expires_at", "execution_authorization_sha256",
+    "supervisor_bundle_sha256", "parameters", "promotion_intent_sha256",
+    "previous_checkpoint_receipt_sha256", "deployment_operation_id", "deployment_result_sha256",
+    "fence_transfer_sha256", "runtime_configuration_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+    "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+    "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+    "migration_result_binding_sha256", "compose_deployment_binding_sha256",
+    "verification_plan_sha256", "postdeploy_runtime_intent_sha256",
+  ], code);
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT
+    || value.execution_scope !== "FRESH_FOUR_SERVICE_RUNTIME_CONFIGURATION_PROBE_ONLY") reject(code);
+  validateUatPromotionPostdeployRuntimeParameters(value.parameters);
+  for (const field of ["verification_operation_id", "promotion_id", "deployment_operation_id"]) identifier(value[field], code);
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  iso(value.created_at, code); iso(value.expires_at, code);
+  for (const field of [
+    "execution_authorization_sha256", "supervisor_bundle_sha256", "promotion_intent_sha256",
+    "previous_checkpoint_receipt_sha256", "deployment_result_sha256", "fence_transfer_sha256",
+    "runtime_configuration_sha256", "candidate_binding_sha256", "database_binding_sha256",
+    "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "verification_plan_sha256", "postdeploy_runtime_intent_sha256",
+  ]) digest(value[field], code);
+  const parameters = value.parameters;
+  if (value.verification_operation_id !== parameters.probe_id
+    || value.promotion_id !== parameters.promotion_id
+    || value.promotion_generation !== parameters.promotion_generation
+    || value.created_at !== parameters.verification_created_at || value.expires_at !== parameters.verification_expires_at
+    || value.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || value.previous_checkpoint_receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || value.deployment_operation_id !== parameters.deployment_operation_id
+    || value.deployment_result_sha256 !== parameters.deployment_result_sha256
+    || value.fence_transfer_sha256 !== parameters.fence_transfer_sha256
+    || value.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || value.database_binding_sha256 !== parameters.database_binding_sha256
+    || value.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || value.preupgrade_recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || value.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || value.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || value.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || value.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || value.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || value.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256
+    || value.verification_plan_sha256 !== postdeployPlanBinding(parameters, "POSTDEPLOY_RUNTIME_CONFIGURATION", {
+      probe_id: parameters.probe_id,
+      probe_path: `${parameters.probe_root}/${parameters.probe_id}.runtime-configuration-probe.json`,
+      runtime_configuration_sha256: value.runtime_configuration_sha256,
+    })
+    || clusterSha256(bodyWithout(value, "postdeploy_runtime_intent_sha256")) !== value.postdeploy_runtime_intent_sha256) {
+    reject("UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_BINDING_INVALID");
+  }
+  return value;
+}
+
+function createPostdeployIdentityIntent(context, sources) {
+  const parameters = context.parameters;
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT,
+    execution_scope: "POSTDEPLOY_RECEIPT_AND_RELEASE_IDENTITY_PUBLICATION_ONLY",
+    verification_operation_id: context.operation_id,
+    promotion_id: parameters.promotion_id,
+    promotion_generation: parameters.promotion_generation,
+    created_at: parameters.verification_created_at,
+    expires_at: parameters.verification_expires_at,
+    execution_authorization_sha256: context.original_authorization_sha256,
+    supervisor_bundle_sha256: context.supervisor_bundle_sha256,
+    parameters,
+    promotion_intent_sha256: parameters.promotion_intent_sha256,
+    previous_checkpoint_receipt_sha256: parameters.previous_checkpoint_receipt_sha256,
+    deployment_operation_id: parameters.deployment_operation_id,
+    deployment_result_sha256: parameters.deployment_result_sha256,
+    fence_transfer_sha256: parameters.fence_transfer_sha256,
+    runtime_probe_operation_id: parameters.runtime_probe_operation_id,
+    runtime_probe_intent_sha256: parameters.runtime_probe_intent_sha256,
+    runtime_probe_result_sha256: parameters.runtime_probe_result_sha256,
+    runtime_configuration_sha256: sources.runtimeProbe.runtime_configuration_sha256,
+    candidate_binding_sha256: parameters.candidate_binding_sha256,
+    database_binding_sha256: parameters.database_binding_sha256,
+    runtime_binding_sha256: parameters.runtime_binding_sha256,
+    preupgrade_recovery_binding_sha256: parameters.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: parameters.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: parameters.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: parameters.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: parameters.migration_fence_binding_sha256,
+    migration_result_binding_sha256: parameters.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: parameters.compose_deployment_binding_sha256,
+    verification_plan_sha256: postdeployPlanBinding(parameters, "POSTDEPLOY_IDENTITY", {
+      runtime_probe_operation_id: parameters.runtime_probe_operation_id,
+      runtime_probe_intent_sha256: parameters.runtime_probe_intent_sha256,
+      runtime_probe_result_sha256: parameters.runtime_probe_result_sha256,
+      runtime_configuration_sha256: sources.runtimeProbe.runtime_configuration_sha256,
+      postdeploy_receipt_path: `${parameters.postdeploy_root}/${parameters.run_id}.postdeploy-receipt.json`,
+      release_identity_path: RELEASE_IDENTITY_FILE,
+    }),
+  };
+  return Object.freeze(validateUatPromotionPostdeployIdentityIntent({
+    ...body, postdeploy_identity_intent_sha256: clusterSha256(body),
+  }));
+}
+
+export function validateUatPromotionPostdeployIdentityIntent(value) {
+  const code = "UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "execution_scope", "verification_operation_id", "promotion_id",
+    "promotion_generation", "created_at", "expires_at", "execution_authorization_sha256",
+    "supervisor_bundle_sha256", "parameters", "promotion_intent_sha256",
+    "previous_checkpoint_receipt_sha256", "deployment_operation_id", "deployment_result_sha256",
+    "fence_transfer_sha256", "runtime_probe_operation_id", "runtime_probe_intent_sha256",
+    "runtime_probe_result_sha256", "runtime_configuration_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+    "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+    "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+    "migration_result_binding_sha256", "compose_deployment_binding_sha256",
+    "verification_plan_sha256", "postdeploy_identity_intent_sha256",
+  ], code);
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT
+    || value.execution_scope !== "POSTDEPLOY_RECEIPT_AND_RELEASE_IDENTITY_PUBLICATION_ONLY") reject(code);
+  validateUatPromotionPostdeployIdentityParameters(value.parameters);
+  for (const field of [
+    "verification_operation_id", "promotion_id", "deployment_operation_id", "runtime_probe_operation_id",
+  ]) identifier(value[field], code);
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  iso(value.created_at, code); iso(value.expires_at, code);
+  for (const field of [
+    "execution_authorization_sha256", "supervisor_bundle_sha256", "promotion_intent_sha256",
+    "previous_checkpoint_receipt_sha256", "deployment_result_sha256", "fence_transfer_sha256",
+    "runtime_probe_intent_sha256", "runtime_probe_result_sha256", "runtime_configuration_sha256",
+    "candidate_binding_sha256", "database_binding_sha256", "runtime_binding_sha256",
+    "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+    "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+    "migration_fence_binding_sha256", "migration_result_binding_sha256",
+    "compose_deployment_binding_sha256", "verification_plan_sha256", "postdeploy_identity_intent_sha256",
+  ]) digest(value[field], code);
+  const parameters = value.parameters;
+  if (value.verification_operation_id !== parameters.run_id || value.promotion_id !== parameters.promotion_id
+    || value.promotion_generation !== parameters.promotion_generation
+    || value.created_at !== parameters.verification_created_at || value.expires_at !== parameters.verification_expires_at
+    || value.promotion_intent_sha256 !== parameters.promotion_intent_sha256
+    || value.previous_checkpoint_receipt_sha256 !== parameters.previous_checkpoint_receipt_sha256
+    || value.deployment_operation_id !== parameters.deployment_operation_id
+    || value.deployment_result_sha256 !== parameters.deployment_result_sha256
+    || value.fence_transfer_sha256 !== parameters.fence_transfer_sha256
+    || value.runtime_probe_operation_id !== parameters.runtime_probe_operation_id
+    || value.runtime_probe_intent_sha256 !== parameters.runtime_probe_intent_sha256
+    || value.runtime_probe_result_sha256 !== parameters.runtime_probe_result_sha256
+    || value.runtime_configuration_sha256 !== parameters.runtime_configuration_sha256
+    || value.candidate_binding_sha256 !== parameters.candidate_binding_sha256
+    || value.database_binding_sha256 !== parameters.database_binding_sha256
+    || value.runtime_binding_sha256 !== parameters.runtime_binding_sha256
+    || value.preupgrade_recovery_binding_sha256 !== parameters.preupgrade_recovery_binding_sha256
+    || value.promotion_snapshot_binding_sha256 !== parameters.promotion_snapshot_binding_sha256
+    || value.writer_quiesce_binding_sha256 !== parameters.writer_quiesce_binding_sha256
+    || value.migration_authorization_binding_sha256 !== parameters.migration_authorization_binding_sha256
+    || value.migration_fence_binding_sha256 !== parameters.migration_fence_binding_sha256
+    || value.migration_result_binding_sha256 !== parameters.migration_result_binding_sha256
+    || value.compose_deployment_binding_sha256 !== parameters.compose_deployment_binding_sha256
+    || value.verification_plan_sha256 !== postdeployPlanBinding(parameters, "POSTDEPLOY_IDENTITY", {
+      runtime_probe_operation_id: parameters.runtime_probe_operation_id,
+      runtime_probe_intent_sha256: parameters.runtime_probe_intent_sha256,
+      runtime_probe_result_sha256: parameters.runtime_probe_result_sha256,
+      runtime_configuration_sha256: value.runtime_configuration_sha256,
+      postdeploy_receipt_path: `${parameters.postdeploy_root}/${parameters.run_id}.postdeploy-receipt.json`,
+      release_identity_path: RELEASE_IDENTITY_FILE,
+    })
+    || clusterSha256(bodyWithout(value, "postdeploy_identity_intent_sha256")) !== value.postdeploy_identity_intent_sha256) {
+    reject("UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_BINDING_INVALID");
+  }
+  return value;
+}
+
 function intentFile(paths, intent) { return path.join(paths.intents, `${intent.promotion_id}.${intent.intent_sha256}.json`); }
 function snapshotIntentFile(paths, intent) { return path.join(paths.intents, `${intent.snapshot_operation_id}.${intent.snapshot_intent_sha256}.json`); }
 function quiesceIntentFile(paths, intent) { return path.join(paths.intents, `${intent.quiesce_operation_id}.${intent.quiesce_intent_sha256}.json`); }
@@ -2820,6 +3443,12 @@ function migrationExecutionIntentFile(paths, intent) {
 }
 function composeDeploymentIntentFile(paths, intent) {
   return path.join(paths.intents, `${intent.deployment_operation_id}.${intent.compose_deployment_intent_sha256}.json`);
+}
+function postdeployRuntimeIntentFile(paths, intent) {
+  return path.join(paths.intents, `${intent.verification_operation_id}.${intent.postdeploy_runtime_intent_sha256}.json`);
+}
+function postdeployIdentityIntentFile(paths, intent) {
+  return path.join(paths.intents, `${intent.verification_operation_id}.${intent.postdeploy_identity_intent_sha256}.json`);
 }
 function migrationGrantFile(paths, operationId, grantSha256) {
   return path.join(paths.grants, `${operationId}.${grantSha256}.json`);
@@ -3923,6 +4552,420 @@ async function commitComposeDeployment(context, intent, result, transfer, source
   });
 }
 
+function postdeployIntentDigest(intent) {
+  return intent.postdeploy_runtime_intent_sha256 ?? intent.postdeploy_identity_intent_sha256;
+}
+
+function postdeployIntentFile(paths, intent) {
+  return intent.contract === UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT
+    ? postdeployRuntimeIntentFile(paths, intent) : postdeployIdentityIntentFile(paths, intent);
+}
+
+function postdeployIntentValidator(operation) {
+  return operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? validateUatPromotionPostdeployRuntimeIntent : validateUatPromotionPostdeployIdentityIntent;
+}
+
+function validateAnyUatPromotionIntent(value) {
+  const validators = new Map([
+    [UAT_PROMOTION_INTENT_CONTRACT, validateUatPromotionIntent],
+    [UAT_PROMOTION_SNAPSHOT_INTENT_CONTRACT, validateUatPromotionSnapshotIntent],
+    [UAT_PROMOTION_QUIESCE_INTENT_CONTRACT, validateUatPromotionQuiesceIntent],
+    [UAT_PROMOTION_MIGRATION_AUTHORIZATION_INTENT_CONTRACT, validateUatPromotionMigrationAuthorizationIntent],
+    [UAT_PROMOTION_MIGRATION_EXECUTION_INTENT_CONTRACT, validateUatPromotionMigrationExecutionIntent],
+    [UAT_PROMOTION_COMPOSE_DEPLOYMENT_INTENT_CONTRACT, validateUatPromotionComposeDeploymentIntent],
+    [UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT, validateUatPromotionPostdeployRuntimeIntent],
+    [UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT, validateUatPromotionPostdeployIdentityIntent],
+  ]);
+  const validator = validators.get(value?.contract);
+  if (!validator) reject("UAT_PROMOTION_INTENT_INVALID");
+  return validator(value);
+}
+
+async function assertNoOtherPendingPostdeployIntent(paths, current, context) {
+  const expectedContract = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? UAT_PROMOTION_POSTDEPLOY_RUNTIME_INTENT_CONTRACT : UAT_PROMOTION_POSTDEPLOY_IDENTITY_INTENT_CONTRACT;
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  for (const name of names) {
+    const stored = await trustedJsonFile(
+      path.join(paths.intents, name), 0o400, validateAnyUatPromotionIntent,
+      "UAT_PROMOTION_INTENT_INVALID",
+    );
+    const intent = stored.value;
+    if (intent.contract === expectedContract
+      && intent.promotion_id === current.promotion_id
+      && intent.promotion_generation === current.promotion_generation
+      && intent.previous_checkpoint_receipt_sha256 === current.receipt_sha256
+      && intent.verification_operation_id !== context.operation_id) {
+      reject("UAT_PROMOTION_POSTDEPLOY_RECOVERY_REQUIRED");
+    }
+  }
+}
+
+async function assertNoCommittedPostdeployAnomaly(paths) {
+  const names = await strictNames(
+    paths.containments, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_ROOT_INVALID",
+  );
+  for (const name of names) {
+    const stored = await trustedJsonFile(
+      path.join(paths.containments, name), 0o400, validatePostdeployContainment,
+      "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_INVALID",
+    );
+    if (name !== `${stored.value.operation_id}.${stored.value.containment_sha256}.json`) {
+      reject("UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_INVALID");
+    }
+    if (stored.value.status === "POSTDEPLOY_COMMITTED_SUPERVISOR_ANOMALY") {
+      reject("UAT_PROMOTION_POSTDEPLOY_ANOMALY_REQUIRES_REVIEW");
+    }
+  }
+}
+
+async function preparePostdeployCheckpoint(context, options) {
+  await repositoryPolicy(options.siteRoot);
+  const paths = await layout(options.filesystemRoot, false);
+  if ((await readdir(paths.quarantine)).length !== 0) reject("UAT_PROMOTION_QUARANTINE_PRESENT");
+  await assertNoCommittedPostdeployAnomaly(paths);
+  const sources = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? await verifyPostdeployRuntimeSources(context, options.filesystemRoot)
+    : await verifyPostdeployIdentitySources(context, options.filesystemRoot);
+  await assertNoOtherPendingPostdeployIntent(paths, sources.previous, context);
+  const intent = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? createPostdeployRuntimeIntent(context, sources) : createPostdeployIdentityIntent(context, sources);
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length > 1 || matches.length === 1 && matches[0] !== path.basename(postdeployIntentFile(paths, intent))) {
+    reject("UAT_PROMOTION_POSTDEPLOY_OPERATION_ID_REUSED");
+  }
+  const chain = await committedChain(paths);
+  if (chain.current?.value.receipt_sha256 !== sources.previous.receipt_sha256) {
+    reject("UAT_PROMOTION_POSTDEPLOY_PREVIOUS_CHANGED");
+  }
+  const raw = Buffer.from(canonicalClusterJson(intent));
+  if (matches.length === 1) {
+    const existing = await trustedJsonFile(
+      postdeployIntentFile(paths, intent), 0o400, postdeployIntentValidator(context.operation),
+      "UAT_PROMOTION_POSTDEPLOY_INTENT_INVALID",
+    );
+    if (!existing?.raw.equals(raw)) reject("UAT_PROMOTION_POSTDEPLOY_INTENT_CONFLICT");
+    return Object.freeze({
+      result: "ALREADY_PREPARED", promotion_id: intent.promotion_id,
+      intent_sha256: postdeployIntentDigest(intent), verification_plan_sha256: intent.verification_plan_sha256,
+    });
+  }
+  await ensureRawFile(
+    postdeployIntentFile(paths, intent), raw, 0o400, postdeployIntentValidator(context.operation),
+    "UAT_PROMOTION_POSTDEPLOY_INTENT_CONFLICT",
+  );
+  await syncDirectory(paths.intents, "UAT_PROMOTION_INTENT_SYNC_FAILED");
+  return Object.freeze({
+    result: "PREPARED", promotion_id: intent.promotion_id,
+    intent_sha256: postdeployIntentDigest(intent), verification_plan_sha256: intent.verification_plan_sha256,
+  });
+}
+
+async function loadStoredPostdeployIntent(context, paths) {
+  const names = await strictNames(
+    paths.intents, /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json$/u,
+    new Set(), "UAT_PROMOTION_INTENT_ROOT_INVALID",
+  );
+  const matches = names.filter((name) => operationArtifactMatches(name, context.operation_id));
+  if (matches.length !== 1) reject("UAT_PROMOTION_POSTDEPLOY_INTENT_MISSING");
+  const stored = await trustedJsonFile(
+    path.join(paths.intents, matches[0]), 0o400, postdeployIntentValidator(context.operation),
+    "UAT_PROMOTION_POSTDEPLOY_INTENT_INVALID",
+  );
+  const expectedDigest = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? stored?.value.postdeploy_runtime_intent_sha256 : stored?.value.postdeploy_identity_intent_sha256;
+  if (!stored || matches[0] !== `${context.operation_id}.${expectedDigest}.json`
+    || expectedDigest !== (context.expected_intent_sha256 ?? expectedDigest)
+    || stored.value.execution_authorization_sha256 !== context.original_authorization_sha256
+    || stored.value.supervisor_bundle_sha256 !== context.supervisor_bundle_sha256
+    || !same(stored.value.parameters, context.parameters)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_INTENT_BINDING_INVALID");
+  }
+  return stored.value;
+}
+
+async function loadPostdeployIntent(context, paths, sources) {
+  const expected = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? createPostdeployRuntimeIntent(context, sources) : createPostdeployIdentityIntent(context, sources);
+  const stored = await loadStoredPostdeployIntent(context, paths);
+  if (postdeployIntentDigest(stored) !== postdeployIntentDigest(expected)
+    || !same(stored, expected)) reject("UAT_PROMOTION_POSTDEPLOY_INTENT_BINDING_INVALID");
+  return stored;
+}
+
+async function loadRuntimeProbeResult(context, intent, filesystemRoot, now) {
+  const parameters = intent.parameters;
+  const logical = `${parameters.probe_root}/${parameters.probe_id}.runtime-configuration-probe.json`;
+  await trustedAncestors(parameters.probe_root, filesystemRoot, "UAT_PROMOTION_POSTDEPLOY_RUNTIME_ROOT_INVALID");
+  const root = physicalPath(parameters.probe_root, filesystemRoot);
+  await trustedDirectory(root, new Set([0o700]), "UAT_PROMOTION_POSTDEPLOY_RUNTIME_ROOT_INVALID");
+  await trustedMarker(
+    path.join(root, RUNTIME_PROBE_MARKER), Buffer.from(RUNTIME_PROBE_MARKER_VALUE),
+    0o400, 0, "UAT_PROMOTION_POSTDEPLOY_RUNTIME_ROOT_INVALID",
+  );
+  const stored = await trustedJsonFile(
+    physicalPath(logical, filesystemRoot), 0o400,
+    (value) => validateRuntimeConfigurationProbeReceipt(value, { now }),
+    "UAT_PROMOTION_POSTDEPLOY_RUNTIME_RESULT_INVALID", 0, false,
+  );
+  if (!stored || stored.raw.toString("utf8") !== canonicalRuntimeConfigurationProbeJson(stored.value)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_RUNTIME_RESULT_INVALID");
+  }
+  assertRuntimeProbeBinding(
+    stored.value, parameters, context, context._deploymentResult, context._transfer,
+    context._manifest, now,
+  );
+  return Object.freeze({ ...stored, sha256: sha256(stored.raw) });
+}
+
+function validatePostdeployIdentityEvidence(value) {
+  const code = "UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "promotion_id", "verification_operation_id",
+    "execution_authorization_sha256", "runtime_probe_result_sha256", "deployment_result_sha256",
+    "fence_transfer_sha256", "postdeploy_receipt_sha256", "release_identity_sha256",
+    "postdeploy_receipt", "release_identity", "evidence_sha256",
+  ], code);
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT) reject(code);
+  for (const field of ["promotion_id", "verification_operation_id"]) identifier(value[field], code);
+  for (const field of [
+    "execution_authorization_sha256", "runtime_probe_result_sha256", "deployment_result_sha256",
+    "fence_transfer_sha256", "postdeploy_receipt_sha256", "release_identity_sha256", "evidence_sha256",
+  ]) digest(value[field], code);
+  validatePostDeployReceipt(value.postdeploy_receipt);
+  validateReleaseIdentity(value.release_identity);
+  if (sha256(Buffer.from(canonicalReleaseJson(value.postdeploy_receipt))) !== value.postdeploy_receipt_sha256
+    || sha256(Buffer.from(canonicalReleaseJson(value.release_identity))) !== value.release_identity_sha256
+    || clusterSha256(bodyWithout(value, "evidence_sha256")) !== value.evidence_sha256) reject(code);
+  return value;
+}
+
+function canonicalPostdeployIdentityEvidenceJson(value) {
+  return canonicalReleaseJson(value);
+}
+
+function assertPostdeployReceiptAndIdentityBinding(receipt, identity, intent, sources) {
+  const parameters = intent.parameters;
+  const expectedIdentity = buildReleaseIdentityFromPostDeployReceipt({
+    receipt, receiptSha256: sha256(Buffer.from(canonicalReleaseJson(receipt))),
+  });
+  if (!same(identity, expectedIdentity)
+    || receipt.run_id !== parameters.run_id
+    || receipt.result !== "PASS"
+    || receipt.control.supervisor_bundle_sha256 !== intent.supervisor_bundle_sha256
+    || receipt.control.authorization_sha256 !== intent.execution_authorization_sha256
+    || !same(receipt.deployment, { class: "UAT", id: parameters.deployment_id, compose_project: parameters.compose_project })
+    || receipt.release.manifest_sha256 !== parameters.release_manifest_sha256
+    || receipt.source.application_version !== sources.manifest.source.package_version
+    || receipt.source.git_commit !== sources.manifest.source.git_commit
+    || receipt.source.git_tree !== sources.manifest.source.git_tree
+    || receipt.migrations.head !== sources.manifest.migrations.head
+    || receipt.migrations.manifest_sha256 !== sources.manifest.migrations.allowlist_sha256
+    || receipt.runtime_policy_sha256 !== parameters.runtime_policy_sha256
+    || receipt.runtime_configuration_sha256 !== parameters.runtime_configuration_sha256
+    || !same(receipt.services, sources.runtimeProbe.services)
+    || receipt.readiness.migration_head !== sources.manifest.migrations.head
+    || receipt.readiness.migration_manifest_sha256 !== sources.manifest.migrations.allowlist_sha256
+    || Date.parse(receipt.generated_at) < Date.parse(sources.runtimeProbe.probed_at)
+    || Date.parse(receipt.generated_at) < Date.parse(parameters.verification_created_at)
+    || Date.parse(receipt.generated_at) >= Date.parse(parameters.verification_expires_at)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_IDENTITY_RESULT_BINDING_INVALID");
+  }
+}
+
+async function loadPostdeployIdentityEvidence(context, intent, sources, filesystemRoot) {
+  const parameters = intent.parameters;
+  const receiptLogical = `${parameters.postdeploy_root}/${parameters.run_id}.postdeploy-receipt.json`;
+  await trustedAncestors(POSTDEPLOY_ROOT, filesystemRoot, "UAT_PROMOTION_POSTDEPLOY_IDENTITY_ROOT_INVALID");
+  const postdeployRoot = physicalPath(parameters.postdeploy_root, filesystemRoot);
+  await trustedDirectory(postdeployRoot, new Set([0o750]), "UAT_PROMOTION_POSTDEPLOY_IDENTITY_ROOT_INVALID");
+  await trustedMarker(
+    path.join(postdeployRoot, RELEASE_ARTIFACT_MARKER), Buffer.from(RELEASE_ARTIFACT_MARKER_VALUE),
+    0o440, 0, "UAT_PROMOTION_POSTDEPLOY_IDENTITY_ROOT_INVALID",
+  );
+  const receipt = await trustedJsonFile(
+    physicalPath(receiptLogical, filesystemRoot), 0o440, validatePostDeployReceipt,
+    "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RECEIPT_INVALID", 0, false,
+  );
+  const identityRoot = physicalPath(parameters.identity_root, filesystemRoot);
+  await trustedAncestors(path.dirname(parameters.identity_root), filesystemRoot, "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RELEASE_IDENTITY_INVALID");
+  await trustedDirectory(
+    identityRoot, new Set([0o750]), "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RELEASE_IDENTITY_INVALID",
+    parameters.reader_gid,
+  );
+  await trustedMarker(
+    path.join(identityRoot, RELEASE_IDENTITY_ROOT_MARKER), Buffer.from(RELEASE_IDENTITY_ROOT_MARKER_VALUE),
+    0o440, parameters.reader_gid, "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RELEASE_IDENTITY_INVALID",
+  );
+  const identityStored = await trustedJsonFile(
+    physicalPath(RELEASE_IDENTITY_FILE, filesystemRoot), 0o440, validateReleaseIdentity,
+    "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RELEASE_IDENTITY_INVALID", parameters.reader_gid, false,
+  );
+  if (!receipt || !identityStored
+    || receipt.raw.toString("utf8") !== canonicalReleaseJson(receipt.value)
+    || identityStored.raw.toString("utf8") !== canonicalReleaseJson(identityStored.value)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_IDENTITY_RESULT_INVALID");
+  }
+  assertPostdeployReceiptAndIdentityBinding(receipt.value, identityStored.value, intent, sources);
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_CONTRACT,
+    promotion_id: intent.promotion_id,
+    verification_operation_id: intent.verification_operation_id,
+    execution_authorization_sha256: intent.execution_authorization_sha256,
+    runtime_probe_result_sha256: intent.runtime_probe_result_sha256,
+    deployment_result_sha256: intent.deployment_result_sha256,
+    fence_transfer_sha256: intent.fence_transfer_sha256,
+    postdeploy_receipt_sha256: sha256(receipt.raw),
+    release_identity_sha256: sha256(identityStored.raw),
+    postdeploy_receipt: receipt.value,
+    release_identity: identityStored.value,
+  };
+  return Object.freeze(validatePostdeployIdentityEvidence({ ...body, evidence_sha256: clusterSha256(body) }));
+}
+
+function createPostdeployCheckpointReceipt(context, intent, evidenceSha256, recordedAt, previous) {
+  return createNextUatPromotionCheckpointReceipt(previous, {
+    checkpoint_id: context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+      ? "POST_DEPLOY_RUNTIME_CONFIGURATION" : "POST_DEPLOY_IDENTITY",
+    checkpoint_status: "COMMITTED",
+    journal_status: "IN_PROGRESS",
+    recorded_at: recordedAt,
+    checkpoint_evidence_sha256: evidenceSha256,
+    checkpoint_authorization_sha256: context.original_authorization_sha256,
+    intent_sha256: intent.promotion_intent_sha256,
+    candidate_binding_sha256: intent.candidate_binding_sha256,
+    database_binding_sha256: intent.database_binding_sha256,
+    runtime_binding_sha256: intent.runtime_binding_sha256,
+    recovery_binding_sha256: intent.preupgrade_recovery_binding_sha256,
+    promotion_snapshot_binding_sha256: intent.promotion_snapshot_binding_sha256,
+    writer_quiesce_binding_sha256: intent.writer_quiesce_binding_sha256,
+    migration_authorization_binding_sha256: intent.migration_authorization_binding_sha256,
+    migration_fence_binding_sha256: intent.migration_fence_binding_sha256,
+    migration_result_binding_sha256: intent.migration_result_binding_sha256,
+    compose_deployment_binding_sha256: intent.compose_deployment_binding_sha256,
+  });
+}
+
+async function postdeployCheckpointCandidateState(paths, intent, previous, receipt) {
+  const name = receiptName(receipt);
+  const receiptRaw = Buffer.from(canonicalClusterJson(receipt));
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  if (current?.value.receipt_sha256 === receipt.receipt_sha256) {
+    const chain = await committedChain(paths);
+    if (chain.current?.value.receipt_sha256 !== receipt.receipt_sha256) {
+      reject("UAT_PROMOTION_POSTDEPLOY_COMMITTED_STATE_MISMATCH");
+    }
+    return Object.freeze({ committed: true, history: true, receipt: true, current: true, receiptRaw, chain });
+  }
+  const chain = await committedChain(paths, { history: new Set([name]), receipts: new Set([name]) });
+  if (chain.current?.value.receipt_sha256 !== previous.receipt_sha256
+    || chain.current.value.intent_sha256 !== intent.promotion_intent_sha256
+    || chain.current.value.checkpoint_ordinal !== (receipt.checkpoint_ordinal - 1)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_PREVIOUS_CHANGED");
+  }
+  const history = await trustedJsonFile(
+    historyFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_HISTORY_INVALID",
+  );
+  const storedReceipt = await trustedJsonFile(
+    receiptFile(paths, receipt), 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_RECEIPT_INVALID",
+  );
+  const historyDone = history?.raw.equals(receiptRaw) ?? false;
+  const receiptDone = storedReceipt?.raw.equals(receiptRaw) ?? false;
+  if (history !== null && !historyDone || storedReceipt !== null && !receiptDone) {
+    reject("UAT_PROMOTION_POSTDEPLOY_PUBLICATION_CONFLICT");
+  }
+  if (receiptDone && !historyDone) reject("UAT_PROMOTION_POSTDEPLOY_PUBLICATION_STAGE_ORDER_INVALID");
+  return Object.freeze({ committed: false, history: historyDone, receipt: receiptDone, current: false, receiptRaw, chain });
+}
+
+async function commitPostdeployCheckpoint(context, intent, sources, evidence, paths, options) {
+  const runtime = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION";
+  const evidenceSha256 = runtime ? evidence.sha256 : evidence.evidence_sha256;
+  const recordedAt = runtime ? evidence.value.probed_at : evidence.postdeploy_receipt.generated_at;
+  const receipt = createPostdeployCheckpointReceipt(context, intent, evidenceSha256, recordedAt, sources.previous);
+  const resultRaw = runtime ? evidence.raw : Buffer.from(canonicalPostdeployIdentityEvidenceJson(evidence));
+  const resultValidator = runtime
+    ? (value) => validateRuntimeConfigurationProbeReceipt(value, { now: options.now ?? new Date() })
+    : validatePostdeployIdentityEvidence;
+  const resultFile = path.join(paths.results, `${context.operation_id}.${evidenceSha256}.json`);
+  await ensureRawFile(
+    resultFile, resultRaw, 0o400, resultValidator, "UAT_PROMOTION_POSTDEPLOY_RESULT_CONFLICT",
+    runtime ? canonicalClusterJson : canonicalPostdeployIdentityEvidenceJson,
+  );
+  await syncDirectory(paths.results, "UAT_PROMOTION_POSTDEPLOY_RESULT_SYNC_FAILED");
+  await options.fault?.(runtime ? "AFTER_POSTDEPLOY_RUNTIME_RESULT" : "AFTER_POSTDEPLOY_IDENTITY_RESULT");
+  let state = await postdeployCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.history) {
+    await ensureRawFile(
+      historyFile(paths, receipt), state.receiptRaw, 0o400, validateUatPromotionCheckpointReceipt,
+      "UAT_PROMOTION_HISTORY_CONFLICT",
+    );
+    await syncDirectory(paths.history, "UAT_PROMOTION_HISTORY_SYNC_FAILED");
+    await options.fault?.(runtime ? "AFTER_POSTDEPLOY_RUNTIME_HISTORY" : "AFTER_POSTDEPLOY_IDENTITY_HISTORY");
+  }
+  state = await postdeployCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.receipt) {
+    await ensureRawFile(
+      receiptFile(paths, receipt), state.receiptRaw, 0o400, validateUatPromotionCheckpointReceipt,
+      "UAT_PROMOTION_RECEIPT_CONFLICT",
+    );
+    await syncDirectory(paths.receipts, "UAT_PROMOTION_RECEIPT_SYNC_FAILED");
+    await options.fault?.(runtime ? "AFTER_POSTDEPLOY_RUNTIME_RECEIPT" : "AFTER_POSTDEPLOY_IDENTITY_RECEIPT");
+  }
+  state = await postdeployCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.current) {
+    const temporary = path.join(paths.stateRoot, `.current.${context.operation_id}.${receipt.receipt_sha256}.tmp`);
+    await atomicAlias(
+      paths.current, temporary, state.receiptRaw, 0o400, validateUatPromotionCheckpointReceipt,
+      state.chain.current?.raw ?? null, "UAT_PROMOTION_CURRENT_PUBLICATION",
+    );
+    await options.fault?.(runtime ? "AFTER_POSTDEPLOY_RUNTIME_CURRENT" : "AFTER_POSTDEPLOY_IDENTITY_CURRENT");
+  }
+  state = await postdeployCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  if (!state.committed) reject("UAT_PROMOTION_POSTDEPLOY_COMMIT_INCOMPLETE");
+  const common = {
+    result: "COMMITTED", promotion_id: intent.promotion_id,
+    intent_sha256: postdeployIntentDigest(intent), receipt_sha256: receipt.receipt_sha256,
+  };
+  return runtime ? Object.freeze({ ...common, runtime_probe_result_sha256: evidenceSha256 })
+    : Object.freeze({
+      ...common, postdeploy_identity_evidence_sha256: evidenceSha256,
+      postdeploy_receipt_sha256: evidence.postdeploy_receipt_sha256,
+      release_identity_sha256: evidence.release_identity_sha256,
+    });
+}
+
+async function executePostdeployCheckpoint(context, options) {
+  const paths = await layout(options.filesystemRoot, false);
+  const sources = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? await verifyPostdeployRuntimeSources(context, options.filesystemRoot)
+    : await verifyPostdeployIdentitySources(context, options.filesystemRoot);
+  const intent = await loadPostdeployIntent(context, paths, sources);
+  if (context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION") {
+    const resultContext = Object.freeze({ ...context,
+      _deploymentResult: sources.deploymentResult, _transfer: sources.transfer, _manifest: sources.manifest,
+    });
+    const evidence = await loadRuntimeProbeResult(
+      resultContext, intent, options.filesystemRoot, options.now ?? new Date(),
+    );
+    return commitPostdeployCheckpoint(context, intent, sources, evidence, paths, options);
+  }
+  const evidence = await loadPostdeployIdentityEvidence(context, intent, sources, options.filesystemRoot);
+  return commitPostdeployCheckpoint(context, intent, sources, evidence, paths, options);
+}
+
 function recoveryPlan(context, decision, reason) {
   const body = {
     schema_version: 3,
@@ -3948,7 +4991,7 @@ function validateRecoveryPlan(value) {
     "decision", "reason", "recovery_sha256",
   ], "UAT_PROMOTION_RECOVERY_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_RECOVERY_CONTRACT
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT"]).has(value.original_operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(value.original_operation)
     || !new Set(["RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"]).has(value.decision)
     || (value.decision === "QUARANTINE") !== (typeof value.reason === "string")) reject("UAT_PROMOTION_RECOVERY_INVALID");
   identifier(value.execution_authorization_id, "UAT_PROMOTION_RECOVERY_INVALID");
@@ -3975,7 +5018,94 @@ function recoverableStateFailure(error) {
     "UAT_PROMOTION_MIGRATION_AUTHORIZATION_",
     "UAT_PROMOTION_MIGRATION_EXECUTION_", "UAT_PROMOTION_MIGRATION_GRANT_", "UAT_PROMOTION_MIGRATION_RESULT_",
     "UAT_PROMOTION_COMPOSE_DEPLOYMENT_", "UAT_PROMOTION_ACTIVE_FENCE_TRANSFER_",
+    "UAT_PROMOTION_POSTDEPLOY_", "RUNTIME_CONFIGURATION_PROBE_", "POSTDEPLOY_", "RELEASE_",
   ].some((prefix) => error.code.startsWith(prefix));
+}
+
+async function alreadyCommittedPostdeployResult(context, paths, intent) {
+  const chain = await committedChain(paths);
+  const current = chain.current?.value;
+  const runtime = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION";
+  const expectedCheckpoint = runtime ? "POST_DEPLOY_RUNTIME_CONFIGURATION" : "POST_DEPLOY_IDENTITY";
+  if (current?.checkpoint_id !== expectedCheckpoint
+    || current.previous_checkpoint_receipt_sha256 !== intent.previous_checkpoint_receipt_sha256
+    || current.checkpoint_authorization_sha256 !== intent.execution_authorization_sha256
+    || current.compose_deployment_binding_sha256 !== intent.compose_deployment_binding_sha256) {
+    reject("UAT_PROMOTION_POSTDEPLOY_COMMITTED_STATE_MISMATCH");
+  }
+  const resultFile = path.join(paths.results, `${intent.verification_operation_id}.${current.checkpoint_evidence_sha256}.json`);
+  if (runtime) {
+    const stored = await trustedJsonFile(
+      resultFile, 0o400,
+      (value) => validateRuntimeConfigurationProbeReceipt(value, { now: new Date(value.probed_at) }),
+      "UAT_PROMOTION_POSTDEPLOY_RUNTIME_RESULT_INVALID", 0, false,
+    );
+    if (!stored || sha256(stored.raw) !== current.checkpoint_evidence_sha256
+      || stored.raw.toString("utf8") !== canonicalRuntimeConfigurationProbeJson(stored.value)) {
+      reject("UAT_PROMOTION_POSTDEPLOY_RUNTIME_RESULT_INVALID");
+    }
+    return Object.freeze({
+      result: "ALREADY_COMMITTED", promotion_id: intent.promotion_id,
+      intent_sha256: postdeployIntentDigest(intent), receipt_sha256: current.receipt_sha256,
+      runtime_probe_result_sha256: current.checkpoint_evidence_sha256,
+    });
+  }
+  const stored = await trustedJsonFile(
+    resultFile, 0o400, validatePostdeployIdentityEvidence,
+    "UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_INVALID", 0, true,
+    canonicalPostdeployIdentityEvidenceJson,
+  );
+  if (!stored || stored.value.evidence_sha256 !== current.checkpoint_evidence_sha256) {
+    reject("UAT_PROMOTION_POSTDEPLOY_IDENTITY_EVIDENCE_INVALID");
+  }
+  return Object.freeze({
+    result: "ALREADY_COMMITTED", promotion_id: intent.promotion_id,
+    intent_sha256: postdeployIntentDigest(intent), receipt_sha256: current.receipt_sha256,
+    postdeploy_identity_evidence_sha256: stored.value.evidence_sha256,
+    postdeploy_receipt_sha256: stored.value.postdeploy_receipt_sha256,
+    release_identity_sha256: stored.value.release_identity_sha256,
+  });
+}
+
+async function assessPostdeployRecovery(context, paths, options) {
+  const storedIntent = await loadStoredPostdeployIntent(context, paths);
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  const expectedCheckpoint = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? "POST_DEPLOY_RUNTIME_CONFIGURATION" : "POST_DEPLOY_IDENTITY";
+  if (current?.value.checkpoint_id === expectedCheckpoint
+    && current.value.previous_checkpoint_receipt_sha256 === storedIntent.previous_checkpoint_receipt_sha256
+    && current.value.checkpoint_authorization_sha256 === storedIntent.execution_authorization_sha256
+    && current.value.compose_deployment_binding_sha256 === storedIntent.compose_deployment_binding_sha256) {
+    await alreadyCommittedPostdeployResult(context, paths, storedIntent);
+    return "ALREADY_COMMITTED";
+  }
+  if ((options.now ?? new Date()).getTime() >= Date.parse(context.parameters.verification_expires_at)) {
+    reject("UAT_PROMOTION_POSTDEPLOY_AUTHORIZATION_WINDOW_EXPIRED");
+  }
+  const sources = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? await verifyPostdeployRuntimeSources(context, options.filesystemRoot)
+    : await verifyPostdeployIdentitySources(context, options.filesystemRoot);
+  const intent = await loadPostdeployIntent(context, paths, sources);
+  let evidence;
+  if (context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION") {
+    const resultContext = Object.freeze({ ...context,
+      _deploymentResult: sources.deploymentResult, _transfer: sources.transfer, _manifest: sources.manifest,
+    });
+    evidence = await loadRuntimeProbeResult(
+      resultContext, intent, options.filesystemRoot, options.now ?? new Date(),
+    );
+  } else {
+    evidence = await loadPostdeployIdentityEvidence(context, intent, sources, options.filesystemRoot);
+  }
+  const evidenceSha256 = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? evidence.sha256 : evidence.evidence_sha256;
+  const recordedAt = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    ? evidence.value.probed_at : evidence.postdeploy_receipt.generated_at;
+  const receipt = createPostdeployCheckpointReceipt(context, intent, evidenceSha256, recordedAt, sources.previous);
+  const state = await postdeployCheckpointCandidateState(paths, intent, sources.previous, receipt);
+  return state.committed ? "ALREADY_COMMITTED" : "RESUME_PUBLICATION";
 }
 
 async function prepareRecovery(context, options) {
@@ -4090,6 +5220,8 @@ async function prepareRecovery(context, options) {
         );
         if (state.committed) decision = "ALREADY_COMMITTED";
       }
+    } else if (new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)) {
+      decision = await assessPostdeployRecovery(context, paths, options);
     } else {
       const storedIntent = await loadStoredComposeDeploymentIntent(context, paths);
       const result = await loadComposeDeploymentResult(paths, storedIntent);
@@ -4149,7 +5281,7 @@ function validateQuarantine(value) {
     "intent_sha256", "recovery_sha256", "reason", "preservation", "quarantine_sha256",
   ], "UAT_PROMOTION_QUARANTINE_INVALID");
   if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_QUARANTINE_CONTRACT || value.status !== "QUARANTINED"
-    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT"]).has(value.operation)
+    || !new Set(["BEGIN", "CAPTURE_SNAPSHOT", "QUIESCE_WRITERS", "MIGRATION_AUTHORIZATION", "MIGRATION_EXECUTION", "COMPOSE_DEPLOYMENT", "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(value.operation)
     || value.preservation !== "FILES_LEFT_IN_PLACE_NO_AUTOMATIC_DELETE" || typeof value.reason !== "string" || value.reason.length < 4) reject("UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.operation_id, "UAT_PROMOTION_QUARANTINE_INVALID");
   identifier(value.promotion_id, "UAT_PROMOTION_QUARANTINE_INVALID");
@@ -4253,6 +5385,12 @@ async function executeRecovery(context, options) {
       result = await commitMigrationExecution(
         context, artifacts.intent, migrationResult, sources, paths, options,
       );
+    } else if (new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)
+      && plan.decision === "ALREADY_COMMITTED") {
+      const intent = await loadStoredPostdeployIntent(context, paths);
+      result = await alreadyCommittedPostdeployResult(context, paths, intent);
+    } else if (new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)) {
+      result = await executePostdeployCheckpoint(context, options);
     } else if (plan.decision === "ALREADY_COMMITTED") {
       const intent = await loadStoredComposeDeploymentIntent(context, paths);
       const deploymentResult = await loadComposeDeploymentResult(paths, intent);
@@ -4306,12 +5444,203 @@ async function executeRecovery(context, options) {
   return Object.freeze({ result: "QUARANTINED", promotion_id: context.parameters.promotion_id, intent_sha256: plan.intent_sha256, recovery_sha256: plan.recovery_sha256, quarantine_sha256: quarantine.quarantine_sha256 });
 }
 
+function validatePostdeployContainment(value) {
+  const code = "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "status", "contained_at", "operation", "operation_id",
+    "promotion_id", "intent_sha256", "execution_authorization_sha256",
+    "preserved_checkpoint_receipt_sha256", "deployment_result_sha256", "fence_transfer_sha256",
+    "observed_checkpoint_id", "observed_checkpoint_ordinal", "external_artifact_state",
+    "failure_stage", "failure_code", "preservation", "containment_sha256",
+  ], code);
+  const runtime = value.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION";
+  const contained = value.status === "POSTDEPLOY_FAILURE_CONTAINED_JOURNAL_UNCHANGED";
+  const committedAnomaly = value.status === "POSTDEPLOY_COMMITTED_SUPERVISOR_ANOMALY";
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT
+    || (!contained && !committedAnomaly)
+    || !new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(value.operation)
+    || !new Set(["ABSENT", "TRUSTED_FINAL_ARTIFACT_PRESENT", "UNTRUSTED_OR_PARTIAL"]).has(value.external_artifact_state)
+    || contained && (value.observed_checkpoint_id !== (runtime ? "COMPOSE_DEPLOYMENT_RECEIPT" : "POST_DEPLOY_RUNTIME_CONFIGURATION")
+      || value.observed_checkpoint_ordinal !== (runtime ? 9 : 10)
+      || value.preservation !== "PREDECESSOR_CHECKPOINT_RESULT_TRANSFER_FENCE_AND_DATABASE_HANDOFF_LEFT_UNCHANGED_NO_ROLLBACK_NO_DELETE_NO_DATABASE_ACTION")
+    || committedAnomaly && (value.observed_checkpoint_id !== (runtime ? "POST_DEPLOY_RUNTIME_CONFIGURATION" : "POST_DEPLOY_IDENTITY")
+      || value.observed_checkpoint_ordinal !== (runtime ? 10 : 11)
+      || value.preservation !== "COMMITTED_POSTDEPLOY_CHECKPOINT_LEFT_UNCHANGED_NO_ROLLBACK_NO_DELETE_NO_DATABASE_ACTION"
+      || !new Set(["JOURNAL_EXECUTION", "RESULT_CROSSCHECK"]).has(value.failure_stage))
+    || value.failure_stage === "RESULT_CROSSCHECK" && !committedAnomaly) reject(code);
+  validatePostdeployFailure(value.failure_stage, value.failure_code);
+  for (const field of ["operation_id", "promotion_id", "observed_checkpoint_id"]) identifier(value[field], code);
+  iso(value.contained_at, code);
+  for (const field of [
+    "intent_sha256", "execution_authorization_sha256", "preserved_checkpoint_receipt_sha256",
+    "deployment_result_sha256", "fence_transfer_sha256", "containment_sha256",
+  ]) digest(value[field], code);
+  if (clusterSha256(bodyWithout(value, "containment_sha256")) !== value.containment_sha256) reject(code);
+  return value;
+}
+
+async function postdeployExternalArtifactState(context, intent, options) {
+  try {
+    if (context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION") {
+      const sources = await verifyPostdeployRuntimeSources(context, options.filesystemRoot);
+      const resultContext = Object.freeze({ ...context,
+        _deploymentResult: sources.deploymentResult, _transfer: sources.transfer, _manifest: sources.manifest,
+      });
+      await loadRuntimeProbeResult(resultContext, intent, options.filesystemRoot, options.now ?? new Date());
+      return "TRUSTED_FINAL_ARTIFACT_PRESENT";
+    }
+    const sources = await verifyPostdeployIdentitySources(context, options.filesystemRoot);
+    await loadPostdeployIdentityEvidence(context, intent, sources, options.filesystemRoot);
+    return "TRUSTED_FINAL_ARTIFACT_PRESENT";
+  } catch (error) {
+    const parameters = context.parameters;
+    const logical = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION"
+      ? `${parameters.probe_root}/${parameters.probe_id}.runtime-configuration-probe.json`
+      : `${parameters.postdeploy_root}/${parameters.run_id}.postdeploy-receipt.json`;
+    const metadata = await lstat(physicalPath(logical, options.filesystemRoot)).catch((failure) => {
+      if (failure?.code === "ENOENT") return null;
+      return Object.freeze({ present: true });
+    });
+    if (metadata !== null) return "UNTRUSTED_OR_PARTIAL";
+    if (context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION") {
+      try {
+        await trustedAncestors(parameters.probe_root, options.filesystemRoot, "UAT_PROMOTION_POSTDEPLOY_RUNTIME_ROOT_INVALID");
+        const probeRoot = physicalPath(parameters.probe_root, options.filesystemRoot);
+        await trustedDirectory(probeRoot, new Set([0o700]), "UAT_PROMOTION_POSTDEPLOY_RUNTIME_ROOT_INVALID");
+        await trustedMarker(
+          path.join(probeRoot, RUNTIME_PROBE_MARKER), Buffer.from(RUNTIME_PROBE_MARKER_VALUE),
+          0o400, 0, "UAT_PROMOTION_POSTDEPLOY_RUNTIME_ROOT_INVALID",
+        );
+      } catch { return "UNTRUSTED_OR_PARTIAL"; }
+      const entries = await readdir(physicalPath(parameters.probe_root, options.filesystemRoot)).catch((failure) => (
+        failure?.code === "ENOENT" ? [] : ["__UNTRUSTED_ROOT__"]
+      ));
+      return entries.some((name) => name.startsWith(`.${parameters.probe_id}.`) && name.endsWith(".tmp"))
+        || entries.includes("__UNTRUSTED_ROOT__") ? "UNTRUSTED_OR_PARTIAL" : "ABSENT";
+    }
+    try {
+      await trustedAncestors(parameters.postdeploy_root, options.filesystemRoot, "UAT_PROMOTION_POSTDEPLOY_IDENTITY_ROOT_INVALID");
+      const postdeployRoot = physicalPath(parameters.postdeploy_root, options.filesystemRoot);
+      await trustedDirectory(postdeployRoot, new Set([0o750]), "UAT_PROMOTION_POSTDEPLOY_IDENTITY_ROOT_INVALID");
+      await trustedMarker(
+        path.join(postdeployRoot, RELEASE_ARTIFACT_MARKER), Buffer.from(RELEASE_ARTIFACT_MARKER_VALUE),
+        0o440, 0, "UAT_PROMOTION_POSTDEPLOY_IDENTITY_ROOT_INVALID",
+      );
+      await trustedAncestors(
+        path.dirname(parameters.identity_root), options.filesystemRoot,
+        "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RELEASE_IDENTITY_INVALID",
+      );
+      const identityRoot = physicalPath(parameters.identity_root, options.filesystemRoot);
+      await trustedDirectory(
+        identityRoot, new Set([0o750]), "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RELEASE_IDENTITY_INVALID",
+        parameters.reader_gid,
+      );
+      await trustedMarker(
+        path.join(identityRoot, RELEASE_IDENTITY_ROOT_MARKER), Buffer.from(RELEASE_IDENTITY_ROOT_MARKER_VALUE),
+        0o440, parameters.reader_gid, "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RELEASE_IDENTITY_INVALID",
+      );
+    } catch { return "UNTRUSTED_OR_PARTIAL"; }
+    const preparedReceipt = `${parameters.postdeploy_root}/.${parameters.run_id}.postdeploy-receipt.prepared.json`;
+    const transaction = `${parameters.identity_root}/${RELEASE_IDENTITY_PUBLISH_LOCK}`;
+    const partialMetadata = await Promise.all([preparedReceipt, transaction].map(async (candidate) => (
+      lstat(physicalPath(candidate, options.filesystemRoot)).catch((failure) => (
+        failure?.code === "ENOENT" ? null : Object.freeze({ present: true })
+      ))
+    )));
+    if (partialMetadata.some((item) => item !== null)) return "UNTRUSTED_OR_PARTIAL";
+    try {
+      const identityRoot = physicalPath(parameters.identity_root, options.filesystemRoot);
+      await trustedDirectory(identityRoot, new Set([0o750]), "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RELEASE_IDENTITY_INVALID", parameters.reader_gid);
+      const identity = await trustedJsonFile(
+        physicalPath(RELEASE_IDENTITY_FILE, options.filesystemRoot), 0o440, validateReleaseIdentity,
+        "UAT_PROMOTION_POSTDEPLOY_IDENTITY_RELEASE_IDENTITY_INVALID", parameters.reader_gid, false,
+      );
+      if (identity?.value.authorization_sha256 === intent.execution_authorization_sha256) {
+        return "UNTRUSTED_OR_PARTIAL";
+      }
+    } catch { return "UNTRUSTED_OR_PARTIAL"; }
+    return "ABSENT";
+  }
+}
+
+async function recordPostdeployContainment(context, options) {
+  if (context.execution_mode !== "ORIGINAL"
+    || !new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)) {
+    reject("UAT_PROMOTION_PHASE_INVALID");
+  }
+  const paths = await layout(options.filesystemRoot, false);
+  const intent = await loadStoredPostdeployIntent(context, paths);
+  const current = await trustedJsonFile(
+    paths.current, 0o400, validateUatPromotionCheckpointReceipt, "UAT_PROMOTION_CURRENT_INVALID",
+  );
+  if (!current) reject("UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CHECKPOINT_CHANGED");
+  const runtime = context.operation === "POSTDEPLOY_RUNTIME_CONFIGURATION";
+  const predecessor = current.value.receipt_sha256 === intent.previous_checkpoint_receipt_sha256
+    && current.value.checkpoint_ordinal === (runtime ? 9 : 10)
+    && current.value.checkpoint_id === (runtime ? "COMPOSE_DEPLOYMENT_RECEIPT" : "POST_DEPLOY_RUNTIME_CONFIGURATION");
+  let status, preservation;
+  if (predecessor) {
+    status = "POSTDEPLOY_FAILURE_CONTAINED_JOURNAL_UNCHANGED";
+    preservation = "PREDECESSOR_CHECKPOINT_RESULT_TRANSFER_FENCE_AND_DATABASE_HANDOFF_LEFT_UNCHANGED_NO_ROLLBACK_NO_DELETE_NO_DATABASE_ACTION";
+  } else {
+    await alreadyCommittedPostdeployResult(context, paths, intent);
+    status = "POSTDEPLOY_COMMITTED_SUPERVISOR_ANOMALY";
+    preservation = "COMMITTED_POSTDEPLOY_CHECKPOINT_LEFT_UNCHANGED_NO_ROLLBACK_NO_DELETE_NO_DATABASE_ACTION";
+  }
+  const failure = validatePostdeployFailure(options.failureStage, options.failureCode);
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONTRACT,
+    status,
+    contained_at: (options.now ?? new Date()).toISOString(),
+    operation: context.operation,
+    operation_id: context.operation_id,
+    promotion_id: intent.promotion_id,
+    intent_sha256: postdeployIntentDigest(intent),
+    execution_authorization_sha256: context.original_authorization_sha256,
+    preserved_checkpoint_receipt_sha256: current.value.receipt_sha256,
+    deployment_result_sha256: intent.deployment_result_sha256,
+    fence_transfer_sha256: intent.fence_transfer_sha256,
+    observed_checkpoint_id: current.value.checkpoint_id,
+    observed_checkpoint_ordinal: current.value.checkpoint_ordinal,
+    external_artifact_state: await postdeployExternalArtifactState(context, intent, options),
+    failure_stage: failure.stage,
+    failure_code: failure.code,
+    preservation,
+  };
+  const containment = Object.freeze(validatePostdeployContainment({
+    ...body, containment_sha256: clusterSha256(body),
+  }));
+  await ensureRawFile(
+    path.join(paths.containments, `${context.operation_id}.${containment.containment_sha256}.json`),
+    Buffer.from(canonicalClusterJson(containment)), 0o400, validatePostdeployContainment,
+    "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_CONFLICT",
+  );
+  await syncDirectory(paths.containments, "UAT_PROMOTION_POSTDEPLOY_CONTAINMENT_SYNC_FAILED");
+  return Object.freeze({
+    result: predecessor ? "CONTAINED" : "COMMITTED_ANOMALY_RECORDED", promotion_id: intent.promotion_id,
+    intent_sha256: postdeployIntentDigest(intent), containment_sha256: containment.containment_sha256,
+  });
+}
+
 export async function runUatPromotionTransactionPhase(contextInput, phase, options = {}) {
   const context = validateUatPromotionContext(contextInput);
   const filesystemRoot = path.resolve(options.filesystemRoot || "/");
   const siteRoot = path.resolve(options.siteRoot || SITE_ROOT);
   if ((filesystemRoot !== "/" || siteRoot !== SITE_ROOT) && options.allowTestRoot !== true) reject("UAT_PROMOTION_TEST_ROOT_NOT_EXPLICIT");
   const resolved = { filesystemRoot, siteRoot, fault: options.fault };
+  if (phase === "contain") {
+    const failure = validatePostdeployFailure(options.failureStage, options.failureCode);
+    resolved.failureStage = failure.stage;
+    resolved.failureCode = failure.code;
+  } else if (options.failureStage !== undefined || options.failureCode !== undefined) {
+    reject("UAT_PROMOTION_POSTDEPLOY_FAILURE_CLASSIFICATION_INVALID");
+  }
+  if (options.now !== undefined) {
+    if (options.allowTestRoot !== true || filesystemRoot === "/" || !(options.now instanceof Date)
+      || Number.isNaN(options.now.getTime())) reject("UAT_PROMOTION_TEST_TIME_NOT_EXPLICIT");
+    resolved.now = options.now;
+  }
   if (options.snapshotPolicyValidator || options.snapshotActivationValidator || options.snapshotReadinessValidator) {
     if (options.allowTestRoot !== true || filesystemRoot === "/") reject("UAT_PROMOTION_TEST_VALIDATOR_NOT_EXPLICIT");
     resolved.snapshotPolicyValidator = options.snapshotPolicyValidator;
@@ -4329,7 +5658,8 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
     if (context.operation === "QUIESCE_WRITERS") return prepareQuiesce(context, resolved);
     if (context.operation === "MIGRATION_AUTHORIZATION") return prepareMigrationAuthorization(context, resolved);
     if (context.operation === "MIGRATION_EXECUTION") return prepareMigrationExecution(context, resolved);
-    return prepareComposeDeployment(context, resolved);
+    if (context.operation === "COMPOSE_DEPLOYMENT") return prepareComposeDeployment(context, resolved);
+    return preparePostdeployCheckpoint(context, resolved);
   }
   const paths = await layout(filesystemRoot, false);
   if (phase === "execute") {
@@ -4362,6 +5692,9 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
       );
       return commitMigrationExecution(context, artifacts.intent, result, sources, paths, resolved);
     }
+    if (new Set(["POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"]).has(context.operation)) {
+      return executePostdeployCheckpoint(context, resolved);
+    }
     const sources = await verifyComposeDeploymentSources(context, filesystemRoot);
     const intent = await loadComposeDeploymentIntent(context, paths, sources);
     const result = await loadComposeDeploymentResult(paths, intent);
@@ -4376,11 +5709,12 @@ export async function runUatPromotionTransactionPhase(contextInput, phase, optio
     if (context.execution_mode !== "RECOVERY") reject("UAT_PROMOTION_PHASE_INVALID");
     return executeRecovery(context, resolved);
   }
+  if (phase === "contain") return recordPostdeployContainment(context, resolved);
   reject("UAT_PROMOTION_PHASE_INVALID");
 }
 
 function assertSupervisorControl(context, phase) {
-  const consumed = new Set(["execute", "recover-execute"]).has(phase) ? "YES" : "NO";
+  const consumed = new Set(["execute", "recover-execute", "contain"]).has(phase) ? "YES" : "NO";
   if (process.getuid?.() !== 0 || process.env.ERP_RELEASE_SUPERVISOR_LAUNCHED !== "YES"
     || process.env.ERP_RELEASE_GATE_LOCK_HELD !== "YES"
     || process.env.ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED !== consumed
@@ -4422,11 +5756,20 @@ async function main(argumentsList) {
     execute: "COMMIT_UAT_PROMOTION_JOURNAL_AFTER_AUTHORIZATION",
     "recover-prepare": "PREPARE_UAT_PROMOTION_RECOVERY",
     "recover-execute": "EXECUTE_UAT_PROMOTION_RECOVERY_AFTER_AUTHORIZATION",
+    contain: "CONTAIN_FAILED_UAT_PROMOTION_POSTDEPLOY_OPERATION",
   };
   if (argumentsList.length !== 2 || confirmations[argumentsList[0]] !== argumentsList[1]) reject("UAT_PROMOTION_USAGE_INVALID");
   const context = validateUatPromotionContext(await readContext());
   assertSupervisorControl(context, argumentsList[0]);
-  process.stdout.write(canonicalClusterJson(await runUatPromotionTransactionPhase(context, argumentsList[0])));
+  const options = {};
+  if (argumentsList[0] === "contain") {
+    options.failureStage = process.env.ERP_UAT_PROMOTION_POSTDEPLOY_FAILURE_STAGE;
+    options.failureCode = process.env.ERP_UAT_PROMOTION_POSTDEPLOY_FAILURE_CODE;
+  } else if (process.env.ERP_UAT_PROMOTION_POSTDEPLOY_FAILURE_STAGE !== undefined
+    || process.env.ERP_UAT_PROMOTION_POSTDEPLOY_FAILURE_CODE !== undefined) {
+    reject("UAT_PROMOTION_POSTDEPLOY_FAILURE_CLASSIFICATION_INVALID");
+  }
+  process.stdout.write(canonicalClusterJson(await runUatPromotionTransactionPhase(context, argumentsList[0], options)));
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

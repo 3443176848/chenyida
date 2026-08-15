@@ -9,6 +9,7 @@ import ipaddress
 import json
 import os
 import re
+import signal
 import shutil
 import shlex
 import stat
@@ -77,8 +78,8 @@ UAT_PROMOTION_STATE_ROOT = Path("/var/lib/chenyida-erp/uat-promotion-transaction
 UAT_PROMOTION_CURRENT_FILE = UAT_PROMOTION_STATE_ROOT / "current.json"
 UAT_PROMOTION_ACTIVE_FENCES_ROOT = UAT_PROMOTION_STATE_ROOT / "active-fences"
 UAT_PROMOTION_FENCE_TRANSFERS_ROOT = UAT_PROMOTION_STATE_ROOT / "fence-transfers"
-UAT_PROMOTION_POLICY_FILE_SHA256 = "16c998ddea1b94010bb605c03c18ecc3e2f7dfeab913a3d8cc1c01f70b069585"
-UAT_PROMOTION_POLICY_SHA256 = "7ff7f23c11caafecadda4bc3a5086b0892d72a37a90ce3e0081f84e18df01359"
+UAT_PROMOTION_POLICY_FILE_SHA256 = "e25ffc7b9176b2cc94c0d0bb87ced077671a1cd5481ce7f2c9c8f44ad442b4d0"
+UAT_PROMOTION_POLICY_SHA256 = "b82f0181a7d016560f580e769fc10e8e9c2acf3a3224c11f7336ddb99c564a44"
 UAT_PROMOTION_RECOVERY_READINESS_FILE = Path("/var/lib/chenyida-erp/backup-status/recovery-readiness.json")
 UAT_PROMOTION_CANDIDATE_RECEIPTS_ROOT = Path("/var/lib/chenyida-erp/release-candidate-snapshots/receipts")
 UAT_PROMOTION_STATE_MARKER = ".chenyida-erp-uat-promotion-transactions-v1"
@@ -219,6 +220,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/selfhost-release-manifest-contract.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-release-migration-allowlist.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-postdeploy-runtime-configuration-probe.test.mjs": "0444",
+    "chenyida_erp_site/tests/selfhost-uat-promotion-transaction-journal.test.mjs": "0444",
     "chenyida_erp_site/tests/selfhost-backup-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-cluster-recovery-postgres.sh": "0555",
     "chenyida_erp_site/tests/selfhost-postgresql-cluster-recovery-policy-v2-activation.test.mjs": "0444",
@@ -238,6 +240,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/tests/test_release_supervisor_monitoring_projection.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_cluster_policy_activation.py": "0444",
     "chenyida_erp_site/tests/test_release_supervisor_runtime_secret_file.py": "0444",
+    "chenyida_erp_site/tests/test_release_supervisor_uat_promotion.py": "0444",
 }
 
 ENTRYPOINTS = {
@@ -337,6 +340,8 @@ UAT_PROMOTION_OPERATIONS = {
     "AUTHORIZE_UAT_PROMOTION_MIGRATION": "MIGRATION_AUTHORIZATION",
     "RUN_UAT_PROMOTION_MIGRATION": "MIGRATION_EXECUTION",
     "DEPLOY_UAT_RELEASE": "COMPOSE_DEPLOYMENT",
+    "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION": "POSTDEPLOY_RUNTIME_CONFIGURATION",
+    "VERIFY_UAT_POSTDEPLOY_IDENTITY": "POSTDEPLOY_IDENTITY",
     "RECOVER_UAT_PROMOTION": "RECOVER",
 }
 
@@ -347,7 +352,16 @@ UAT_PROMOTION_CONFIRMATIONS = {
     "AUTHORIZE_UAT_PROMOTION_MIGRATION": "AUTHORIZE_EXACT_UAT_PROMOTION_MIGRATION_APPROVAL_ONLY_NO_SQL",
     "RUN_UAT_PROMOTION_MIGRATION": "AUTHORIZE_RUN_EXACT_UAT_PROMOTION_MIGRATION",
     "DEPLOY_UAT_RELEASE": "AUTHORIZE_DEPLOY_EXACT_UAT_RELEASE_WEB_WORKER_ONLY",
+    "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION": "AUTHORIZE_VERIFY_EXACT_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
+    "VERIFY_UAT_POSTDEPLOY_IDENTITY": "AUTHORIZE_VERIFY_EXACT_UAT_POSTDEPLOY_IDENTITY",
     "RECOVER_UAT_PROMOTION": "AUTHORIZE_RECOVER_EXACT_UAT_PROMOTION",
+}
+
+UAT_PROMOTION_POSTDEPLOY_FAILURE_CODES = {
+    "POST_AUTHORIZATION_SOURCE_RECHECK": "UAT_PROMOTION_POSTDEPLOY_POST_AUTHORIZATION_SOURCE_RECHECK_FAILED",
+    "EXTERNAL_CONTROL": "UAT_PROMOTION_POSTDEPLOY_EXTERNAL_CONTROL_FAILED",
+    "JOURNAL_EXECUTION": "UAT_PROMOTION_POSTDEPLOY_JOURNAL_EXECUTION_FAILED",
+    "RESULT_CROSSCHECK": "UAT_PROMOTION_POSTDEPLOY_RESULT_CROSSCHECK_FAILED",
 }
 
 UAT_PROMOTION_BASE_PARAMETER_FIELDS = {
@@ -441,6 +455,33 @@ UAT_PROMOTION_COMPOSE_DEPLOYMENT_PARAMETER_FIELDS = {
     "database_system_identifier", "database_marker", "control_role", "deployment_created_at",
     "deployment_expires_at", "requester_identity_sha256", "approver_identity_sha256",
     "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+}
+
+UAT_PROMOTION_POSTDEPLOY_COMMON_PARAMETER_FIELDS = {
+    "promotion_state_root", "promotion_id", "promotion_generation", "previous_checkpoint_receipt_sha256",
+    "promotion_intent_sha256", "promotion_original_authorization_sha256", "candidate_binding_sha256",
+    "database_binding_sha256", "runtime_binding_sha256", "preupgrade_recovery_binding_sha256",
+    "promotion_snapshot_binding_sha256", "writer_quiesce_binding_sha256",
+    "migration_authorization_binding_sha256", "migration_fence_binding_sha256",
+    "migration_result_binding_sha256", "compose_deployment_binding_sha256", "current_checkpoint_source",
+    "deployment_operation_id", "deployment_result_sha256", "deployment_result_source",
+    "fence_transfer_sha256", "fence_transfer_source", "release_manifest", "release_manifest_sha256",
+    "release_manifest_source", "deployment_class", "deployment_id", "compose_project",
+    "compose_project_root", "runtime_guard_contract", "runtime_guard_mode", "runtime_policy_sha256",
+    "reader_gid", "caddy_container", "postgres_container", "web_container", "worker_container",
+    "verification_created_at", "verification_expires_at", "requester_identity_sha256",
+    "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+}
+
+UAT_PROMOTION_POSTDEPLOY_RUNTIME_PARAMETER_FIELDS = UAT_PROMOTION_POSTDEPLOY_COMMON_PARAMETER_FIELDS | {
+    "probe_root", "probe_id",
+}
+
+UAT_PROMOTION_POSTDEPLOY_IDENTITY_PARAMETER_FIELDS = UAT_PROMOTION_POSTDEPLOY_COMMON_PARAMETER_FIELDS | {
+    "runtime_probe_operation_id", "runtime_probe_intent_sha256", "runtime_probe_intent_source",
+    "runtime_probe_result_sha256", "runtime_probe_result_source", "runtime_probe_receipt",
+    "runtime_probe_receipt_sha256", "runtime_probe_receipt_source", "runtime_configuration_sha256",
+    "postdeploy_root", "identity_root", "run_id",
 }
 
 RUNTIME_PRIVILEGE_BASE_PARAMETER_FIELDS = {
@@ -984,6 +1025,58 @@ def verify_uat_promotion_compose_deployment_sources(parameters: dict[str, Any]) 
     return {
         name: verify_authorized_projection_source(
             source, "SUPERVISOR_UAT_PROMOTION_COMPOSE_DEPLOYMENT_SOURCE_CHANGED",
+        )
+        for name, source in sources.items()
+    }
+
+
+def verify_uat_promotion_postdeploy_sources(parameters: dict[str, Any], operation: str) -> dict[str, bytes]:
+    trusted_owned_directory(
+        UAT_PROMOTION_STATE_ROOT, 0, 0, {0o700}, "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+    )
+    trusted_owned_marker(
+        UAT_PROMOTION_STATE_ROOT / UAT_PROMOTION_STATE_MARKER, UAT_PROMOTION_STATE_MARKER_VALUE,
+        0, 0, {0o400}, "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+    )
+    for name in ("intents", "results", "fence-transfers"):
+        trusted_owned_directory(
+            UAT_PROMOTION_STATE_ROOT / name, 0, 0, {0o700},
+            "SUPERVISOR_UAT_PROMOTION_STATE_ROOT_INVALID",
+        )
+    manifest_parent = Path(parameters["release_manifest_source"]["path"]).parent
+    trusted_owned_directory(
+        manifest_parent, 0, 0, {0o750}, "SUPERVISOR_UAT_PROMOTION_MANIFEST_ROOT_INVALID",
+    )
+    trusted_owned_marker(
+        manifest_parent / RELEASE_ARTIFACT_MARKER, RELEASE_ARTIFACT_MARKER_VALUE,
+        0, 0, {0o440}, "SUPERVISOR_UAT_PROMOTION_MANIFEST_ROOT_INVALID",
+    )
+    sources = {
+        "current": parameters["current_checkpoint_source"],
+        "deployment": parameters["deployment_result_source"],
+        "transfer": parameters["fence_transfer_source"],
+        "manifest": parameters["release_manifest_source"],
+    }
+    identity = operation == "VERIFY_UAT_POSTDEPLOY_IDENTITY" \
+        or operation == "RECOVER_UAT_PROMOTION" \
+        and parameters.get("original_operation") == "POSTDEPLOY_IDENTITY"
+    if identity:
+        trusted_owned_directory(
+            RUNTIME_PROBE_ROOT, 0, 0, {0o700}, "SUPERVISOR_UAT_PROMOTION_RUNTIME_PROBE_ROOT_INVALID",
+        )
+        trusted_owned_marker(
+            RUNTIME_PROBE_ROOT / ".chenyida-erp-runtime-probe-root-v1",
+            b"chenyida-erp-runtime-probe-root/v1\n", 0, 0, {0o400},
+            "SUPERVISOR_UAT_PROMOTION_RUNTIME_PROBE_ROOT_INVALID",
+        )
+        sources |= {
+            "runtime_intent": parameters["runtime_probe_intent_source"],
+            "runtime_result": parameters["runtime_probe_result_source"],
+            "runtime_receipt": parameters["runtime_probe_receipt_source"],
+        }
+    return {
+        name: verify_authorized_projection_source(
+            source, "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_CHANGED",
         )
         for name, source in sources.items()
     }
@@ -2024,7 +2117,156 @@ def validate_uat_promotion_compose_deployment_parameters(
     return parameters
 
 
+def validate_uat_promotion_postdeploy_parameters(
+        parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    recovery = operation == "RECOVER_UAT_PROMOTION"
+    original_operation = parameters.get("original_operation") if isinstance(parameters, dict) else None
+    runtime = operation == "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION" \
+        or recovery and original_operation == "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    identity = operation == "VERIFY_UAT_POSTDEPLOY_IDENTITY" \
+        or recovery and original_operation == "POSTDEPLOY_IDENTITY"
+    if not runtime and not identity:
+        reject("SUPERVISOR_UAT_PROMOTION_OPERATION_INVALID")
+    expected_fields = set(
+        UAT_PROMOTION_POSTDEPLOY_RUNTIME_PARAMETER_FIELDS if runtime
+        else UAT_PROMOTION_POSTDEPLOY_IDENTITY_PARAMETER_FIELDS
+    )
+    if recovery:
+        expected_fields |= UAT_PROMOTION_RECOVERY_PARAMETER_FIELDS
+    parameters = exact_fields(
+        parameters, expected_fields, "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_PARAMETERS_INVALID",
+    )
+    if parameters["promotion_state_root"] != str(UAT_PROMOTION_STATE_ROOT):
+        reject("SUPERVISOR_UAT_PROMOTION_STATE_PATH_INVALID")
+    identifier_fields = ["promotion_id", "deployment_operation_id"]
+    identifier_fields += ["probe_id"] if runtime else ["runtime_probe_operation_id", "run_id"]
+    for field in identifier_fields:
+        if not isinstance(parameters[field], str) or not IDENTIFIER.fullmatch(parameters[field]):
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_IDENTIFIER_INVALID")
+    if not isinstance(parameters["promotion_generation"], int) \
+            or isinstance(parameters["promotion_generation"], bool) \
+            or not 1 <= parameters["promotion_generation"] <= 1_000_000 \
+            or not isinstance(parameters["reader_gid"], int) or isinstance(parameters["reader_gid"], bool) \
+            or not 1 <= parameters["reader_gid"] <= 2**31 - 1:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_INTEGER_INVALID")
+    digest_fields = {
+        "previous_checkpoint_receipt_sha256", "promotion_intent_sha256",
+        "promotion_original_authorization_sha256", "candidate_binding_sha256", "database_binding_sha256",
+        "runtime_binding_sha256", "preupgrade_recovery_binding_sha256", "promotion_snapshot_binding_sha256",
+        "writer_quiesce_binding_sha256", "migration_authorization_binding_sha256",
+        "migration_fence_binding_sha256", "migration_result_binding_sha256",
+        "compose_deployment_binding_sha256", "deployment_result_sha256", "fence_transfer_sha256",
+        "release_manifest_sha256", "runtime_policy_sha256", "requester_identity_sha256",
+        "approver_identity_sha256", "executor_identity_sha256", "policy_file_sha256", "policy_sha256",
+    }
+    if identity:
+        digest_fields |= {
+            "runtime_probe_intent_sha256", "runtime_probe_result_sha256",
+            "runtime_probe_receipt_sha256", "runtime_configuration_sha256",
+        }
+    if recovery:
+        digest_fields |= {"expected_intent_sha256", "original_authorization_sha256"}
+    for field in digest_fields:
+        if not isinstance(parameters[field], str) or not SHA256.fullmatch(parameters[field]) \
+                or parameters[field] == "0" * 64:
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_DIGEST_INVALID")
+    if parameters["policy_file_sha256"] != UAT_PROMOTION_POLICY_FILE_SHA256 \
+            or parameters["policy_sha256"] != UAT_PROMOTION_POLICY_SHA256 \
+            or parameters["runtime_guard_contract"] != RUNTIME_GUARD_CONTRACT \
+            or parameters["runtime_guard_mode"] != POST_DEPLOY_RUNTIME_GUARD_MODE \
+            or parameters["runtime_policy_sha256"] != RUNTIME_POLICY_SHA256:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_POLICY_INVALID")
+    if len({parameters["requester_identity_sha256"], parameters["approver_identity_sha256"],
+            parameters["executor_identity_sha256"]}) != 3:
+        reject("SUPERVISOR_UAT_PROMOTION_ACTORS_INVALID")
+    expected_containers = {
+        "caddy_container": "chenyida-erp-caddy-1", "postgres_container": "chenyida-erp-postgres-1",
+        "web_container": "chenyida-erp-web-1", "worker_container": "chenyida-erp-worker-1",
+    }
+    if parameters["deployment_class"] != "UAT" or parameters["deployment_id"] != RUNTIME_COMPOSE_PROJECT \
+            or parameters["compose_project"] != RUNTIME_COMPOSE_PROJECT \
+            or any(parameters[field] != value for field, value in expected_containers.items()):
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_TARGET_INVALID")
+    manifest = Path(absolute_path(
+        parameters["release_manifest"], "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_PATH_INVALID",
+    ))
+    absolute_path(parameters["compose_project_root"], "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_PATH_INVALID")
+    if manifest.name != "release-manifest.json" or manifest.parent.parent != RELEASE_ARTIFACT_ROOT_BASE:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_PATH_INVALID")
+    created = parse_time(parameters["verification_created_at"], "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_TIME_INVALID")
+    expires = parse_time(parameters["verification_expires_at"], "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_TIME_INVALID")
+    if expires <= created or expires - created > timedelta(minutes=15):
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_TIME_INVALID")
+    deployment_result_path = UAT_PROMOTION_STATE_ROOT / "results" \
+        / f"{parameters['deployment_operation_id']}.{parameters['deployment_result_sha256']}.json"
+    transfer_path = UAT_PROMOTION_FENCE_TRANSFERS_ROOT \
+        / f"{parameters['deployment_operation_id']}.{parameters['fence_transfer_sha256']}.json"
+    sources = {
+        "current": validate_uat_promotion_source(
+            parameters["current_checkpoint_source"], UAT_PROMOTION_CURRENT_FILE, {"0400"}, 0,
+            "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_INVALID",
+        ),
+        "deployment": validate_uat_promotion_source(
+            parameters["deployment_result_source"], deployment_result_path, {"0400"}, 0,
+            "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_INVALID",
+        ),
+        "transfer": validate_uat_promotion_source(
+            parameters["fence_transfer_source"], transfer_path, {"0400"}, 0,
+            "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_INVALID",
+        ),
+        "manifest": validate_uat_promotion_source(
+            parameters["release_manifest_source"], manifest, {"0440"}, 0,
+            "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_INVALID",
+        ),
+    }
+    bindings = {"manifest": parameters["release_manifest_sha256"]}
+    if any(sources[name]["sha256"] != expected for name, expected in bindings.items()):
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_BINDING_INVALID")
+    if runtime:
+        if len(parameters["probe_id"]) > 101 or Path(parameters["probe_root"]) != RUNTIME_PROBE_ROOT:
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_PATH_INVALID")
+    else:
+        runtime_intent_path = UAT_PROMOTION_STATE_ROOT / "intents" \
+            / f"{parameters['runtime_probe_operation_id']}.{parameters['runtime_probe_intent_sha256']}.json"
+        runtime_result_path = UAT_PROMOTION_STATE_ROOT / "results" \
+            / f"{parameters['runtime_probe_operation_id']}.{parameters['runtime_probe_result_sha256']}.json"
+        runtime_receipt_path = RUNTIME_PROBE_ROOT \
+            / f"{parameters['runtime_probe_operation_id']}.runtime-configuration-probe.json"
+        if parameters["runtime_probe_receipt"] != str(runtime_receipt_path) \
+                or parameters["runtime_probe_receipt_sha256"] != parameters["runtime_probe_result_sha256"] \
+                or parameters["postdeploy_root"] != str(POSTDEPLOY_ROOT_BASE / parameters["run_id"]) \
+                or parameters["identity_root"] != str(RELEASE_IDENTITY_ROOT) or len(parameters["run_id"]) > 101:
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_PATH_INVALID")
+        identity_sources = {
+            "runtime_intent": validate_uat_promotion_source(
+                parameters["runtime_probe_intent_source"], runtime_intent_path, {"0400"}, 0,
+                "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_INVALID",
+            ),
+            "runtime_result": validate_uat_promotion_source(
+                parameters["runtime_probe_result_source"], runtime_result_path, {"0400"}, 0,
+                "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_INVALID",
+            ),
+            "runtime_receipt": validate_uat_promotion_source(
+                parameters["runtime_probe_receipt_source"], runtime_receipt_path, {"0400"}, 0,
+                "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_INVALID",
+            ),
+        }
+        if identity_sources["runtime_result"]["sha256"] != parameters["runtime_probe_result_sha256"] \
+                or identity_sources["runtime_receipt"]["sha256"] != parameters["runtime_probe_receipt_sha256"]:
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_SOURCE_BINDING_INVALID")
+    if recovery:
+        original_id = parameters["original_operation_id"]
+        if not isinstance(original_id, str) or not IDENTIFIER.fullmatch(original_id) \
+                or original_id in (parameters["promotion_id"], parameters["deployment_operation_id"]):
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_IDENTIFIER_INVALID")
+    return parameters
+
+
 def validate_uat_promotion_parameters(parameters: Any, operation: str | None = None) -> dict[str, Any]:
+    if operation in ("VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY") \
+            or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) \
+            and parameters.get("original_operation") in ("POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"):
+        return validate_uat_promotion_postdeploy_parameters(parameters, operation)
     if operation == "CAPTURE_UAT_PROMOTION_SNAPSHOT" \
             or operation == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) and parameters.get("original_operation") == "CAPTURE_SNAPSHOT":
         return validate_uat_promotion_snapshot_parameters(parameters, operation)
@@ -2294,11 +2536,17 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "MIGRATION_EXECUTION"
         compose_deployment_operation = operation == "DEPLOY_UAT_RELEASE" \
             or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "COMPOSE_DEPLOYMENT"
+        postdeploy_runtime_operation = operation == "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION" \
+            or operation == "RECOVER_UAT_PROMOTION" \
+            and parameters.get("original_operation") == "POSTDEPLOY_RUNTIME_CONFIGURATION"
+        postdeploy_identity_operation = operation == "VERIFY_UAT_POSTDEPLOY_IDENTITY" \
+            or operation == "RECOVER_UAT_PROMOTION" and parameters.get("original_operation") == "POSTDEPLOY_IDENTITY"
         window_created = parse_time(
             parameters["snapshot_created_at"] if snapshot_operation else parameters["quiesce_created_at"] if quiesce_operation
             else parameters["authorization_created_at"] if migration_authorization_operation
             else parameters["execution_created_at"] if migration_execution_operation
             else parameters["deployment_created_at"] if compose_deployment_operation
+            else parameters["verification_created_at"] if postdeploy_runtime_operation or postdeploy_identity_operation
             else parameters["promotion_created_at"],
             "SUPERVISOR_UAT_PROMOTION_TIME_INVALID",
         )
@@ -2307,6 +2555,7 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
             else parameters["authorization_expires_at"] if migration_authorization_operation
             else parameters["execution_expires_at"] if migration_execution_operation
             else parameters["deployment_expires_at"] if compose_deployment_operation
+            else parameters["verification_expires_at"] if postdeploy_runtime_operation or postdeploy_identity_operation
             else parameters["promotion_expires_at"],
             "SUPERVISOR_UAT_PROMOTION_TIME_INVALID",
         )
@@ -2344,6 +2593,20 @@ def validate_authorization(value: Any, expected_bundle_digest: str, now: datetim
                 parameters["promotion_id"], parameters["migration_operation_id"])
                 or sha256(canonical_json(value)) == parameters["migration_execution_authorization_sha256"]
                 or abs(window_created - created) > timedelta(minutes=5)
+                or window_created > now + timedelta(minutes=5) or window_expires > expires):
+            reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
+        elif operation == "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION" and (
+                value["authorization_id"] != parameters["probe_id"]
+                or value["authorization_id"] in (parameters["promotion_id"], parameters["deployment_operation_id"])
+                or abs(window_created - created) > timedelta(minutes=5)
+                or window_created > now + timedelta(minutes=5) or window_expires > expires):
+            reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
+        elif operation == "VERIFY_UAT_POSTDEPLOY_IDENTITY" and (
+                value["authorization_id"] != parameters["run_id"]
+                or value["authorization_id"] in (
+                    parameters["promotion_id"], parameters["deployment_operation_id"],
+                    parameters["runtime_probe_operation_id"],
+                ) or abs(window_created - created) > timedelta(minutes=5)
                 or window_created > now + timedelta(minutes=5) or window_expires > expires):
             reject("SUPERVISOR_UAT_PROMOTION_TIME_INVALID")
     return value
@@ -2465,6 +2728,7 @@ def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
 def validate_runtime_secret_boundary(bundle_root: Path, operation: str) -> None:
     if operation not in (
         "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY",
+        "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION", "VERIFY_UAT_POSTDEPLOY_IDENTITY",
         "RUN_UAT_PROMOTION_MIGRATION", *RUNTIME_PRIVILEGE_OPERATIONS,
     ):
         return
@@ -2866,6 +3130,8 @@ def validate_original_uat_promotion_authorization_consumed(parameters: dict[str,
         "MIGRATION_AUTHORIZATION": "AUTHORIZE_UAT_PROMOTION_MIGRATION",
         "MIGRATION_EXECUTION": "RUN_UAT_PROMOTION_MIGRATION",
         "COMPOSE_DEPLOYMENT": "DEPLOY_UAT_RELEASE",
+        "POSTDEPLOY_RUNTIME_CONFIGURATION": "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
+        "POSTDEPLOY_IDENTITY": "VERIFY_UAT_POSTDEPLOY_IDENTITY",
     }.get(parameters["original_operation"])
     if raw != canonical_json(value) or value["contract"] != UAT_PROMOTION_AUTHORIZATION_CONTRACT \
         or value["authorization_id"] != original_id or value["operation"] != expected_operation:
@@ -2876,6 +3142,8 @@ def validate_original_uat_promotion_authorization_consumed(parameters: dict[str,
         else UAT_PROMOTION_MIGRATION_AUTHORIZATION_PARAMETER_FIELDS if parameters["original_operation"] == "MIGRATION_AUTHORIZATION" \
         else UAT_PROMOTION_MIGRATION_EXECUTION_PARAMETER_FIELDS if parameters["original_operation"] == "MIGRATION_EXECUTION" \
         else UAT_PROMOTION_COMPOSE_DEPLOYMENT_PARAMETER_FIELDS if parameters["original_operation"] == "COMPOSE_DEPLOYMENT" \
+        else UAT_PROMOTION_POSTDEPLOY_RUNTIME_PARAMETER_FIELDS if parameters["original_operation"] == "POSTDEPLOY_RUNTIME_CONFIGURATION" \
+        else UAT_PROMOTION_POSTDEPLOY_IDENTITY_PARAMETER_FIELDS if parameters["original_operation"] == "POSTDEPLOY_IDENTITY" \
         else UAT_PROMOTION_BASE_PARAMETER_FIELDS
     if any(original_parameters[field] != parameters[field] for field in fields):
         reject("SUPERVISOR_UAT_PROMOTION_ORIGINAL_AUTHORIZATION_INVALID")
@@ -2931,6 +3199,98 @@ def assert_no_runtime_privilege_interlock(bundle_root: Path) -> None:
         reject("SUPERVISOR_RUNTIME_PRIVILEGE_RECOVERY_REQUIRED")
 
 
+def assert_no_uat_postdeploy_committed_anomaly() -> None:
+    containment_root = UAT_PROMOTION_STATE_ROOT / "containments"
+    try:
+        metadata = os.lstat(containment_root)
+    except FileNotFoundError:
+        return
+    except OSError:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_ANOMALY_INTERLOCK_INVALID")
+    if not stat.S_ISDIR(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode) \
+            or metadata.st_uid != 0 or metadata.st_gid != 0 or stat.S_IMODE(metadata.st_mode) != 0o700:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_ANOMALY_INTERLOCK_INVALID")
+    try:
+        names = sorted(os.listdir(containment_root))
+    except OSError:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_ANOMALY_INTERLOCK_INVALID")
+    if len(names) > 20_000 or any(
+            not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json", name)
+            for name in names):
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_ANOMALY_INTERLOCK_INVALID")
+    fields = {
+        "schema_version", "contract", "status", "contained_at", "operation", "operation_id",
+        "promotion_id", "intent_sha256", "execution_authorization_sha256",
+        "preserved_checkpoint_receipt_sha256", "deployment_result_sha256", "fence_transfer_sha256",
+        "observed_checkpoint_id", "observed_checkpoint_ordinal", "external_artifact_state",
+        "failure_stage", "failure_code", "preservation", "containment_sha256",
+    }
+    for name in names:
+        raw, _ = trusted_regular_file(
+            containment_root / name, 0o400,
+            code="SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_ANOMALY_INTERLOCK_INVALID",
+        )
+        value = strict_json(raw, "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_ANOMALY_INTERLOCK_INVALID")
+        body = {key: item for key, item in value.items() if key != "containment_sha256"} \
+            if isinstance(value, dict) else {}
+        runtime = isinstance(value, dict) and value.get("operation") == "POSTDEPLOY_RUNTIME_CONFIGURATION"
+        contained = isinstance(value, dict) \
+            and value.get("status") == "POSTDEPLOY_FAILURE_CONTAINED_JOURNAL_UNCHANGED"
+        committed_anomaly = isinstance(value, dict) \
+            and value.get("status") == "POSTDEPLOY_COMMITTED_SUPERVISOR_ANOMALY"
+        if not isinstance(value, dict) or set(value) != fields or raw != canonical_json(value) \
+                or value.get("schema_version") != 1 \
+                or value.get("contract") != "chenyida-erp-uat-promotion-postdeploy-containment/v1" \
+                or value.get("status") not in {
+                    "POSTDEPLOY_FAILURE_CONTAINED_JOURNAL_UNCHANGED",
+                    "POSTDEPLOY_COMMITTED_SUPERVISOR_ANOMALY",
+                } \
+                or value.get("operation") not in {
+                    "POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY",
+                } \
+                or any(not isinstance(value.get(field), str) or not IDENTIFIER.fullmatch(value[field])
+                       for field in ("operation_id", "promotion_id", "observed_checkpoint_id")) \
+                or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field])
+                       for field in (
+                           "intent_sha256", "execution_authorization_sha256",
+                           "preserved_checkpoint_receipt_sha256", "deployment_result_sha256",
+                           "fence_transfer_sha256", "containment_sha256",
+                       )) \
+                or not isinstance(value.get("observed_checkpoint_ordinal"), int) \
+                or isinstance(value.get("observed_checkpoint_ordinal"), bool) \
+                or not isinstance(value.get("contained_at"), str) or not ISO_UTC.fullmatch(value["contained_at"]) \
+                or value.get("external_artifact_state") not in {
+                    "ABSENT", "TRUSTED_FINAL_ARTIFACT_PRESENT", "UNTRUSTED_OR_PARTIAL",
+                } \
+                or contained and (
+                    value.get("observed_checkpoint_id") != (
+                        "COMPOSE_DEPLOYMENT_RECEIPT" if runtime else "POST_DEPLOY_RUNTIME_CONFIGURATION"
+                    )
+                    or value.get("observed_checkpoint_ordinal") != (9 if runtime else 10)
+                    or value.get("preservation") != (
+                        "PREDECESSOR_CHECKPOINT_RESULT_TRANSFER_FENCE_AND_DATABASE_HANDOFF_"
+                        "LEFT_UNCHANGED_NO_ROLLBACK_NO_DELETE_NO_DATABASE_ACTION"
+                    )
+                ) \
+                or committed_anomaly and (
+                    value.get("observed_checkpoint_id") != (
+                        "POST_DEPLOY_RUNTIME_CONFIGURATION" if runtime else "POST_DEPLOY_IDENTITY"
+                    )
+                    or value.get("observed_checkpoint_ordinal") != (10 if runtime else 11)
+                    or value.get("preservation") != (
+                        "COMMITTED_POSTDEPLOY_CHECKPOINT_LEFT_UNCHANGED_NO_ROLLBACK_NO_DELETE_NO_DATABASE_ACTION"
+                    )
+                    or value.get("failure_stage") not in {"JOURNAL_EXECUTION", "RESULT_CROSSCHECK"}
+                ) \
+                or value.get("failure_stage") == "RESULT_CROSSCHECK" and not committed_anomaly \
+                or UAT_PROMOTION_POSTDEPLOY_FAILURE_CODES.get(value.get("failure_stage")) != value.get("failure_code") \
+                or sha256(canonical_json(body)) != value["containment_sha256"] \
+                or name != f"{value['operation_id']}.{value['containment_sha256']}.json":
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_ANOMALY_INTERLOCK_INVALID")
+        if value["status"] == "POSTDEPLOY_COMMITTED_SUPERVISOR_ANOMALY":
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_ANOMALY_REQUIRES_REVIEW")
+
+
 def assert_no_uat_migration_execution_interlock(
         authorization: dict[str, Any], authorization_digest: str | None = None) -> None:
     try:
@@ -2946,6 +3306,7 @@ def assert_no_uat_migration_execution_interlock(
         UAT_PROMOTION_STATE_ROOT / UAT_PROMOTION_STATE_MARKER, UAT_PROMOTION_STATE_MARKER_VALUE,
         0, 0, {0o400}, "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID",
     )
+    assert_no_uat_postdeploy_committed_anomaly()
     active_records: list[dict[str, Any]] = []
     try:
         active_metadata = os.lstat(UAT_PROMOTION_ACTIVE_FENCES_ROOT)
@@ -3115,22 +3476,50 @@ def assert_no_uat_migration_execution_interlock(
     if len(names) > 20_000 or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.[0-9a-f]{64}\.json", name) for name in names):
         reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
     execution_intents: list[dict[str, Any]] = []
+    postdeploy_intents: list[dict[str, Any]] = []
     for name in names:
         raw, _ = trusted_regular_file(
             intents_root / name, 0o400, code="SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID",
         )
         value = strict_json(raw, "SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
-        if not isinstance(value, dict) or value.get("contract") != "chenyida-erp-uat-promotion-migration-execution-intent/v1":
+        if not isinstance(value, dict):
             continue
-        if raw != canonical_json(value) or value.get("schema_version") != 1 \
+        if value.get("contract") == "chenyida-erp-uat-promotion-migration-execution-intent/v1":
+            if raw != canonical_json(value) or value.get("schema_version") != 1 \
                 or not isinstance(value.get("migration_operation_id"), str) \
                 or not IDENTIFIER.fullmatch(value["migration_operation_id"]) \
                 or not isinstance(value.get("execution_authorization_sha256"), str) \
                 or not SHA256.fullmatch(value["execution_authorization_sha256"]) \
                 or name != f"{value['migration_operation_id']}.{value.get('migration_execution_intent_sha256')}.json":
+                reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
+            execution_intents.append(value)
+            continue
+        postdeploy_contracts = {
+            "chenyida-erp-uat-promotion-postdeploy-runtime-intent/v1": (
+                "POSTDEPLOY_RUNTIME_CONFIGURATION", "postdeploy_runtime_intent_sha256",
+            ),
+            "chenyida-erp-uat-promotion-postdeploy-identity-intent/v1": (
+                "POSTDEPLOY_IDENTITY", "postdeploy_identity_intent_sha256",
+            ),
+        }
+        binding = postdeploy_contracts.get(value.get("contract"))
+        if binding is None:
+            continue
+        original_operation, digest_field = binding
+        if raw != canonical_json(value) or value.get("schema_version") != 1 \
+                or not isinstance(value.get("verification_operation_id"), str) \
+                or not IDENTIFIER.fullmatch(value["verification_operation_id"]) \
+                or not isinstance(value.get("execution_authorization_sha256"), str) \
+                or not SHA256.fullmatch(value["execution_authorization_sha256"]) \
+                or not isinstance(value.get(digest_field), str) or not SHA256.fullmatch(value[digest_field]) \
+                or name != f"{value['verification_operation_id']}.{value[digest_field]}.json":
             reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_INTERLOCK_INVALID")
-        execution_intents.append(value)
-    if not execution_intents:
+        postdeploy_intents.append({
+            "operation": original_operation,
+            "operation_id": value["verification_operation_id"],
+            "execution_authorization_sha256": value["execution_authorization_sha256"],
+        })
+    if not execution_intents and not postdeploy_intents:
         return
     try:
         current_raw, _ = trusted_regular_file(
@@ -3147,20 +3536,42 @@ def assert_no_uat_migration_execution_interlock(
         intent for intent in execution_intents
         if intent["execution_authorization_sha256"] not in current["authorization_sha256_chain"]
     ]
-    if not pending:
-        return
     parameters = authorization.get("parameters") if isinstance(authorization, dict) else None
-    same_pending_run = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
-        and authorization.get("operation") == "RUN_UAT_PROMOTION_MIGRATION" and len(pending) == 1 \
-        and authorization.get("authorization_id") == pending[0]["migration_operation_id"] \
-        and authorization_digest == pending[0]["execution_authorization_sha256"]
-    recovery_allowed = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
+    if pending:
+        same_pending_run = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
+            and authorization.get("operation") == "RUN_UAT_PROMOTION_MIGRATION" and len(pending) == 1 \
+            and authorization.get("authorization_id") == pending[0]["migration_operation_id"] \
+            and authorization_digest == pending[0]["execution_authorization_sha256"]
+        recovery_allowed = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
+            and authorization.get("operation") == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) \
+            and parameters.get("original_operation") == "MIGRATION_EXECUTION" and len(pending) == 1 \
+            and parameters.get("original_operation_id") == pending[0]["migration_operation_id"] \
+            and parameters.get("original_authorization_sha256") == pending[0]["execution_authorization_sha256"]
+        if not same_pending_run and not recovery_allowed:
+            reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_REQUIRED")
+    pending_postdeploy = [
+        intent for intent in postdeploy_intents
+        if intent["execution_authorization_sha256"] not in current["authorization_sha256_chain"]
+    ]
+    if not pending_postdeploy:
+        return
+    operation_names = {
+        "POSTDEPLOY_RUNTIME_CONFIGURATION": "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION",
+        "POSTDEPLOY_IDENTITY": "VERIFY_UAT_POSTDEPLOY_IDENTITY",
+    }
+    same_pending_postdeploy = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
+        and len(pending_postdeploy) == 1 \
+        and authorization.get("operation") == operation_names[pending_postdeploy[0]["operation"]] \
+        and authorization.get("authorization_id") == pending_postdeploy[0]["operation_id"] \
+        and authorization_digest == pending_postdeploy[0]["execution_authorization_sha256"]
+    postdeploy_recovery_allowed = authorization.get("contract") == UAT_PROMOTION_AUTHORIZATION_CONTRACT \
         and authorization.get("operation") == "RECOVER_UAT_PROMOTION" and isinstance(parameters, dict) \
-        and parameters.get("original_operation") == "MIGRATION_EXECUTION" and len(pending) == 1 \
-        and parameters.get("original_operation_id") == pending[0]["migration_operation_id"] \
-        and parameters.get("original_authorization_sha256") == pending[0]["execution_authorization_sha256"]
-    if not same_pending_run and not recovery_allowed:
-        reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_RECOVERY_REQUIRED")
+        and len(pending_postdeploy) == 1 \
+        and parameters.get("original_operation") == pending_postdeploy[0]["operation"] \
+        and parameters.get("original_operation_id") == pending_postdeploy[0]["operation_id"] \
+        and parameters.get("original_authorization_sha256") == pending_postdeploy[0]["execution_authorization_sha256"]
+    if not same_pending_postdeploy and not postdeploy_recovery_allowed:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_RECOVERY_REQUIRED")
 
 
 def _docker(arguments: list[str], *, timeout: int, stdout: int = subprocess.PIPE) -> subprocess.CompletedProcess[bytes]:
@@ -3441,11 +3852,17 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
         or recovery and parameters.get("original_operation") == "MIGRATION_EXECUTION"
     compose_deployment = authorization["operation"] == "DEPLOY_UAT_RELEASE" \
         or recovery and parameters.get("original_operation") == "COMPOSE_DEPLOYMENT"
+    postdeploy_runtime = authorization["operation"] == "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION" \
+        or recovery and parameters.get("original_operation") == "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    postdeploy_identity = authorization["operation"] == "VERIFY_UAT_POSTDEPLOY_IDENTITY" \
+        or recovery and parameters.get("original_operation") == "POSTDEPLOY_IDENTITY"
     parameter_fields = UAT_PROMOTION_SNAPSHOT_PARAMETER_FIELDS if snapshot \
         else UAT_PROMOTION_QUIESCE_PARAMETER_FIELDS if quiesce \
         else UAT_PROMOTION_MIGRATION_AUTHORIZATION_PARAMETER_FIELDS if migration_authorization \
         else UAT_PROMOTION_MIGRATION_EXECUTION_PARAMETER_FIELDS if migration_execution \
         else UAT_PROMOTION_COMPOSE_DEPLOYMENT_PARAMETER_FIELDS if compose_deployment \
+        else UAT_PROMOTION_POSTDEPLOY_RUNTIME_PARAMETER_FIELDS if postdeploy_runtime \
+        else UAT_PROMOTION_POSTDEPLOY_IDENTITY_PARAMETER_FIELDS if postdeploy_identity \
         else UAT_PROMOTION_BASE_PARAMETER_FIELDS
     promotion_parameters = {field: parameters[field] for field in parameter_fields}
     return {
@@ -3455,7 +3872,9 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
         "operation": "CAPTURE_SNAPSHOT" if snapshot else "QUIESCE_WRITERS" if quiesce \
             else "MIGRATION_AUTHORIZATION" if migration_authorization \
             else "MIGRATION_EXECUTION" if migration_execution \
-            else "COMPOSE_DEPLOYMENT" if compose_deployment else "BEGIN",
+            else "COMPOSE_DEPLOYMENT" if compose_deployment \
+            else "POSTDEPLOY_RUNTIME_CONFIGURATION" if postdeploy_runtime \
+            else "POSTDEPLOY_IDENTITY" if postdeploy_identity else "BEGIN",
         "execution_mode": "RECOVERY" if recovery else "ORIGINAL",
         "execution_authorization_id": authorization["authorization_id"],
         "execution_authorization_sha256": authorization_digest,
@@ -3468,17 +3887,24 @@ def uat_promotion_context(authorization: dict[str, Any], authorization_digest: s
 
 
 def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[str, Any], phase: str,
-                             lock_descriptor: int) -> dict[str, Any]:
+                             lock_descriptor: int, *, failure_stage: str | None = None,
+                             failure_code: str | None = None) -> dict[str, Any]:
     confirmations = {
         "prepare": "PREPARE_UAT_PROMOTION_DURABLE_INTENT",
         "execute": "COMMIT_UAT_PROMOTION_JOURNAL_AFTER_AUTHORIZATION",
         "recover-prepare": "PREPARE_UAT_PROMOTION_RECOVERY",
         "recover-execute": "EXECUTE_UAT_PROMOTION_RECOVERY_AFTER_AUTHORIZATION",
+        "contain": "CONTAIN_FAILED_UAT_PROMOTION_POSTDEPLOY_OPERATION",
     }
     if phase not in confirmations:
         reject("SUPERVISOR_UAT_PROMOTION_RUNNER_PHASE_INVALID")
+    if phase == "contain":
+        if UAT_PROMOTION_POSTDEPLOY_FAILURE_CODES.get(failure_stage) != failure_code:
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_FAILURE_CLASSIFICATION_INVALID")
+    elif failure_stage is not None or failure_code is not None:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_FAILURE_CLASSIFICATION_INVALID")
     publisher = bundle_root / "chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs"
-    consumed = phase in ("execute", "recover-execute")
+    consumed = phase in ("execute", "recover-execute", "contain")
     environment = {
         "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
         "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
@@ -3489,6 +3915,9 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
         "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES" if consumed else "NO",
         "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED": "YES" if context["execution_mode"] == "RECOVERY" else "NO",
     }
+    if phase == "contain":
+        environment["ERP_UAT_PROMOTION_POSTDEPLOY_FAILURE_STAGE"] = failure_stage
+        environment["ERP_UAT_PROMOTION_POSTDEPLOY_FAILURE_CODE"] = failure_code
     try:
         result = subprocess.run(
             [str(node_path), "--max-old-space-size=64", "--disable-proto=throw", str(publisher), phase, confirmations[phase]],
@@ -3510,6 +3939,9 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
         elif context["operation"] == "COMPOSE_DEPLOYMENT":
             expected_fields = {"result", "promotion_id", "intent_sha256", "deployment_plan_sha256"}
             digest_fields = {"intent_sha256", "deployment_plan_sha256"}
+        elif context["operation"] in ("POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"):
+            expected_fields = {"result", "promotion_id", "intent_sha256", "verification_plan_sha256"}
+            digest_fields = {"intent_sha256", "verification_plan_sha256"}
         else:
             expected_fields = {"result", "promotion_id", "intent_sha256", "receipt_sha256"}
             digest_fields = {"intent_sha256", "receipt_sha256"}
@@ -3523,12 +3955,26 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
         elif context["operation"] == "COMPOSE_DEPLOYMENT":
             expected_fields |= {"deployment_result_sha256", "fence_transfer_sha256"}
             digest_fields |= {"deployment_result_sha256", "fence_transfer_sha256"}
+        elif context["operation"] == "POSTDEPLOY_RUNTIME_CONFIGURATION":
+            expected_fields.add("runtime_probe_result_sha256")
+            digest_fields.add("runtime_probe_result_sha256")
+        elif context["operation"] == "POSTDEPLOY_IDENTITY":
+            expected_fields |= {
+                "postdeploy_identity_evidence_sha256", "postdeploy_receipt_sha256", "release_identity_sha256",
+            }
+            digest_fields |= {
+                "postdeploy_identity_evidence_sha256", "postdeploy_receipt_sha256", "release_identity_sha256",
+            }
     elif phase == "recover-prepare":
         expected_results = {"RECOVERY_PREPARED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "recovery_sha256", "decision"}
         digest_fields = {"intent_sha256", "recovery_sha256"}
         if value.get("decision") not in {"RESUME_PUBLICATION", "ALREADY_COMMITTED", "QUARANTINE"}:
             reject("SUPERVISOR_UAT_PROMOTION_RUNNER_RESPONSE_INVALID")
+    elif phase == "contain":
+        expected_results = {"CONTAINED", "COMMITTED_ANOMALY_RECORDED"}
+        expected_fields = {"result", "promotion_id", "intent_sha256", "containment_sha256"}
+        digest_fields = {"intent_sha256", "containment_sha256"}
     elif value.get("result") in {"COMMITTED", "ALREADY_COMMITTED"}:
         expected_results = {"COMMITTED", "ALREADY_COMMITTED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "receipt_sha256", "recovery_sha256"}
@@ -3539,6 +3985,16 @@ def run_uat_promotion_runner(node_path: Path, bundle_root: Path, context: dict[s
         elif context["operation"] == "COMPOSE_DEPLOYMENT":
             expected_fields |= {"deployment_result_sha256", "fence_transfer_sha256"}
             digest_fields |= {"deployment_result_sha256", "fence_transfer_sha256"}
+        elif context["operation"] == "POSTDEPLOY_RUNTIME_CONFIGURATION":
+            expected_fields.add("runtime_probe_result_sha256")
+            digest_fields.add("runtime_probe_result_sha256")
+        elif context["operation"] == "POSTDEPLOY_IDENTITY":
+            expected_fields |= {
+                "postdeploy_identity_evidence_sha256", "postdeploy_receipt_sha256", "release_identity_sha256",
+            }
+            digest_fields |= {
+                "postdeploy_identity_evidence_sha256", "postdeploy_receipt_sha256", "release_identity_sha256",
+            }
     else:
         expected_results = {"QUARANTINED"}
         expected_fields = {"result", "promotion_id", "intent_sha256", "recovery_sha256", "quarantine_sha256"}
@@ -3698,6 +4154,114 @@ def run_uat_promotion_compose_deployment_control(
     return value
 
 
+def run_uat_promotion_postdeploy_control(
+        node_path: Path, bundle_root: Path, context: dict[str, Any], lock_descriptor: int) -> dict[str, Any]:
+    if context["execution_mode"] != "ORIGINAL" \
+            or context["operation"] not in ("POSTDEPLOY_RUNTIME_CONFIGURATION", "POSTDEPLOY_IDENTITY"):
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_INVALID")
+    parameters = context["parameters"]
+    runtime = context["operation"] == "POSTDEPLOY_RUNTIME_CONFIGURATION"
+    entrypoint = bundle_root / "chenyida_erp_site/scripts" / (
+        "probe-postdeploy-runtime-configuration.sh" if runtime else "write-release-identity.sh"
+    )
+    command = [str(entrypoint)]
+    command += [
+        "--release-manifest", parameters["release_manifest"],
+        "--release-manifest-sha256", parameters["release_manifest_sha256"],
+    ]
+    if runtime:
+        command += [
+            "--probe-root", parameters["probe_root"], "--probe-id", parameters["probe_id"],
+        ]
+    else:
+        command += [
+            "--postdeploy-root", parameters["postdeploy_root"],
+            "--identity-root", parameters["identity_root"],
+            "--run-id", parameters["run_id"],
+        ]
+    command += [
+        "--reader-gid", str(parameters["reader_gid"]),
+        "--runtime-guard-contract", parameters["runtime_guard_contract"],
+        "--runtime-guard-mode", parameters["runtime_guard_mode"],
+        "--runtime-policy-sha256", parameters["runtime_policy_sha256"],
+    ]
+    if not runtime:
+        command += ["--runtime-configuration-sha256", parameters["runtime_configuration_sha256"]]
+    command += [
+        "--deployment-class", parameters["deployment_class"],
+        "--deployment-id", parameters["deployment_id"],
+        "--compose-project", parameters["compose_project"],
+        "--compose-project-root", parameters["compose_project_root"],
+        "--caddy-container", parameters["caddy_container"],
+        "--postgres-container", parameters["postgres_container"],
+        "--web-container", parameters["web_container"],
+        "--worker-container", parameters["worker_container"],
+        "--confirm", "PROBE_EXACT_POSTDEPLOY_RUNTIME_CONFIGURATION" if runtime
+        else "VERIFY_AND_PUBLISH_EXACT_POSTDEPLOY_IDENTITY",
+    ]
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+        "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": context["supervisor_bundle_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": context["execution_authorization_sha256"],
+        "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES",
+        "ERP_RELEASE_SUPERVISOR_ORIGINAL_AUTHORIZATION_CONSUMED": "NO",
+        "ERP_RELEASE_SUPERVISOR_NODE_RUNTIME": str(node_path),
+    }
+    try:
+        process = subprocess.Popen(
+            command, env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, pass_fds=(lock_descriptor,), start_new_session=True,
+        )
+        try:
+            stdout, stderr = process.communicate(timeout=8 * 60)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                process.communicate(timeout=30)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.communicate()
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_FAILED")
+        result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    except (OSError, subprocess.SubprocessError):
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_FAILED")
+    if result.returncode != 0 or result.stderr != b"" or len(result.stdout) < 2 or len(result.stdout) > 64 * 1024:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_FAILED")
+    value = strict_json(result.stdout, "SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_RESPONSE_INVALID")
+    if result.stdout != canonical_json(value) or not isinstance(value, dict):
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_RESPONSE_INVALID")
+    if runtime:
+        expected = {"result", "probe_file", "probe_sha256", "runtime_configuration_sha256"}
+        if set(value) != expected or value.get("result") != "PROBED" \
+                or value.get("probe_file") != str(RUNTIME_PROBE_ROOT / f"{parameters['probe_id']}.runtime-configuration-probe.json") \
+                or any(not isinstance(value.get(field), str) or not SHA256.fullmatch(value[field])
+                       for field in ("probe_sha256", "runtime_configuration_sha256")):
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_RESPONSE_INVALID")
+    else:
+        if value.get("result") == "COMMITTED":
+            expected = {"result", "receipt_file", "receipt_sha256"}
+            if set(value) != expected or value.get("receipt_file") != f"{parameters['run_id']}.postdeploy-receipt.json":
+                reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_RESPONSE_INVALID")
+        elif value.get("result") == "ALREADY_PUBLISHED":
+            expected = {"result", "receipt_sha256"}
+            if set(value) != expected:
+                reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_RESPONSE_INVALID")
+        else:
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_RESPONSE_INVALID")
+        if not isinstance(value.get("receipt_sha256"), str) or not SHA256.fullmatch(value["receipt_sha256"]):
+            reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_CONTROL_RESPONSE_INVALID")
+    return value
+
+
 def cleanup_uat_promotion_migration_container(control: dict[str, Any], context: dict[str, Any]) -> None:
     template = "|".join([
         "{{.Id}}", "{{.Name}}", '{{index .Config.Labels "chenyida.erp.uat-migration-operation"}}',
@@ -3716,6 +4280,18 @@ def cleanup_uat_promotion_migration_container(control: dict[str, Any], context: 
         reject("SUPERVISOR_UAT_PROMOTION_MIGRATION_CONTAINER_CLEANUP_FAILED")
 
 
+def record_uat_promotion_postdeploy_failure(
+        node_path: Path, bundle_root: Path, context: dict[str, Any], lock_descriptor: int,
+        failure_stage: str) -> dict[str, Any]:
+    failure_code = UAT_PROMOTION_POSTDEPLOY_FAILURE_CODES.get(failure_stage)
+    if failure_code is None:
+        reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_FAILURE_CLASSIFICATION_INVALID")
+    return run_uat_promotion_runner(
+        node_path, bundle_root, context, "contain", lock_descriptor,
+        failure_stage=failure_stage, failure_code=failure_code,
+    )
+
+
 def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path, authorization: dict[str, Any],
                                     authorization_digest: str, lock_descriptor: int | None = None) -> dict[str, Any]:
     owns_lock = lock_descriptor is None
@@ -3729,6 +4305,8 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
         migration_authorization = authorization["operation"] == "AUTHORIZE_UAT_PROMOTION_MIGRATION"
         migration_execution = authorization["operation"] == "RUN_UAT_PROMOTION_MIGRATION"
         compose_deployment = authorization["operation"] == "DEPLOY_UAT_RELEASE"
+        postdeploy_runtime = authorization["operation"] == "VERIFY_UAT_POSTDEPLOY_RUNTIME_CONFIGURATION"
+        postdeploy_identity = authorization["operation"] == "VERIFY_UAT_POSTDEPLOY_IDENTITY"
         if recovery:
             validate_original_uat_promotion_authorization_consumed(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -3743,6 +4321,8 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_migration_execution_sources(authorization["parameters"])
         elif compose_deployment:
             verify_uat_promotion_compose_deployment_sources(authorization["parameters"])
+        elif postdeploy_runtime or postdeploy_identity:
+            verify_uat_promotion_postdeploy_sources(authorization["parameters"], authorization["operation"])
         else:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -3762,6 +4342,8 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_migration_execution_sources(authorization["parameters"])
         elif compose_deployment:
             verify_uat_promotion_compose_deployment_sources(authorization["parameters"])
+        elif postdeploy_runtime or postdeploy_identity:
+            verify_uat_promotion_postdeploy_sources(authorization["parameters"], authorization["operation"])
         elif not recovery:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -3777,6 +4359,15 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
             verify_uat_promotion_migration_execution_sources(authorization["parameters"])
         elif compose_deployment:
             verify_uat_promotion_compose_deployment_sources(authorization["parameters"])
+        elif postdeploy_runtime or postdeploy_identity:
+            try:
+                verify_uat_promotion_postdeploy_sources(authorization["parameters"], authorization["operation"])
+            except SupervisorError as failure:
+                record_uat_promotion_postdeploy_failure(
+                    node_path, bundle_root, context, lock_descriptor,
+                    "POST_AUTHORIZATION_SOURCE_RECHECK",
+                )
+                raise failure
         elif not recovery:
             validate_uat_promotion_source_documents(
                 authorization["parameters"], authorization["supervisor_bundle_sha256"],
@@ -3805,6 +4396,23 @@ def run_uat_promotion_authorization(bundle_root: Path, authorization_path: Path,
                     or committed.get("fence_transfer_sha256") != control["fence_transfer_sha256"]:
                 reject("SUPERVISOR_UAT_PROMOTION_COMPOSE_DEPLOYMENT_RESULT_BINDING_INVALID")
             return committed
+        if postdeploy_runtime or postdeploy_identity:
+            failure_stage = "EXTERNAL_CONTROL"
+            try:
+                control = run_uat_promotion_postdeploy_control(node_path, bundle_root, context, lock_descriptor)
+                failure_stage = "JOURNAL_EXECUTION"
+                committed = run_uat_promotion_runner(node_path, bundle_root, context, "execute", lock_descriptor)
+                failure_stage = "RESULT_CROSSCHECK"
+                if postdeploy_runtime and committed.get("runtime_probe_result_sha256") != control["probe_sha256"]:
+                    reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_RESULT_BINDING_INVALID")
+                if postdeploy_identity and committed.get("postdeploy_receipt_sha256") != control["receipt_sha256"]:
+                    reject("SUPERVISOR_UAT_PROMOTION_POSTDEPLOY_RESULT_BINDING_INVALID")
+                return committed
+            except SupervisorError as failure:
+                record_uat_promotion_postdeploy_failure(
+                    node_path, bundle_root, context, lock_descriptor, failure_stage,
+                )
+                raise failure
         return run_uat_promotion_runner(
             node_path, bundle_root, context, "recover-execute" if recovery else "execute", lock_descriptor,
         )
@@ -4214,6 +4822,67 @@ def parse_cli(arguments: list[str]) -> tuple[str, Path]:
     return arguments[1], Path(arguments[3])
 
 
+def run_direct_postdeploy_authorization(
+        bundle_root: Path, authorization_path: Path, authorization: dict[str, Any],
+        authorization_digest: str, lock_descriptor: int) -> None:
+    operation = authorization["operation"]
+    if operation not in (
+            "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"):
+        reject("SUPERVISOR_POSTDEPLOY_OPERATION_INVALID")
+    runtime_root: Path | None = None
+    try:
+        runtime_root, node_path = prepare_runtime_privilege_node(authorization_digest)
+        verify_candidate(authorization["parameters"], bundle_root, lock_descriptor)
+        if operation == "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
+            validate_runtime_probe_receipt(authorization["parameters"], authorization["supervisor_bundle_sha256"])
+        command = command_for(bundle_root, authorization)
+        consume_authorization(authorization_path, authorization, authorization_digest)
+        environment = {
+            "PATH": SAFE_PATH,
+            "LC_ALL": "C",
+            "LANG": "C",
+            "TZ": "UTC",
+            "HOME": "/nonexistent",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": "/dev/null",
+            "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES",
+            "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+            "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+            "ERP_RELEASE_SUPERVISOR_SITE_ROOT": str(bundle_root / "chenyida_erp_site"),
+            "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": authorization["supervisor_bundle_sha256"],
+            "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_SHA256": authorization_digest,
+            "ERP_RELEASE_SUPERVISOR_AUTHORIZATION_CONSUMED": "YES",
+            "ERP_RELEASE_SUPERVISOR_NODE_RUNTIME": str(node_path),
+        }
+        try:
+            process = subprocess.Popen(
+                command, env=environment, stdin=subprocess.DEVNULL,
+                pass_fds=(lock_descriptor,), start_new_session=True,
+            )
+            try:
+                returncode = process.wait(timeout=15 * 60)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                try:
+                    process.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    process.wait()
+                reject("SUPERVISOR_POSTDEPLOY_ENTRYPOINT_TIMEOUT")
+        except (OSError, subprocess.SubprocessError):
+            reject("SUPERVISOR_POSTDEPLOY_ENTRYPOINT_FAILED")
+        if returncode != 0:
+            reject("SUPERVISOR_POSTDEPLOY_ENTRYPOINT_FAILED")
+    finally:
+        cleanup_runtime_privilege_node(runtime_root)
+
+
 def main() -> None:
     if os.getuid() != 0 or Path(os.path.realpath(sys.argv[0])) != LAUNCHER_PATH:
         reject("SUPERVISOR_LAUNCHER_CONTEXT_INVALID")
@@ -4271,6 +4940,12 @@ def main() -> None:
         if authorization["operation"] == "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY":
             validate_runtime_probe_receipt(authorization["parameters"], bundle_digest)
         assert_no_runtime_privilege_interlock(bundle_root)
+        if authorization["operation"] in (
+                "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION", "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"):
+            run_direct_postdeploy_authorization(
+                bundle_root, authorization_path, authorization, authorization_digest, lock_descriptor,
+            )
+            return
         consume_authorization(authorization_path, authorization, authorization_digest)
         site_root = bundle_root / "chenyida_erp_site"
         command = command_for(bundle_root, authorization)
