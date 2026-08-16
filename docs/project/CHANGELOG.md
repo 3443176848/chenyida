@@ -4,6 +4,16 @@
 
 ## 2026-08-16
 
+### SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83 - `docs: attribute resource stop line and request bounded remediation`
+
+- 调度/范围：TASK82收口后自动启动唯一只读任务；不读取进程argv/env、日志、数据库、Volume、备份或凭据正文，不修改Swap/systemd/服务/Docker daemon/网络，不启动build、全量测试、PG/Compose或数据任务。
+- 进程/cgroup归因：152个进程VmSwap合计约747MiB。长期Codex进程RSS约1.29GiB/VmSwap约324MiB，session cgroup约2.01GiB memory/317MiB Swap；Docker daemon cgroup约102MiB Swap，PostgreSQL/Web/Worker/Caddy约194/43/48/5MiB Swap，全部cgroup OOM/kill为0。
+- 稳定窗口：首段60秒Swap净降20KiB、无pswpout/kswapd增长；容量读取后第二段60秒仅增长44KiB，PSI始终0、`oom_kill=2`不变、容器identity/health/restart/OOM不变。最终Swap仍约82.7%，不得以低PSI放宽≤80%硬门。
+- 磁盘：根盘60GiB中约50GiB已用/11GiB可用、inode5%。Docker有75镜像/28.07GB、192项Build Cache/10.79GB、277卷/733.3MB；BuildKit private可回收至少约7.87GB且最后访问≥41小时。镜像和Volume虽被Docker标记部分reclaimable，但未列为清理目标。
+- 决策：D-158拒绝swapoff/swapon、扩Swap、ERP/PostgreSQL/Docker重启或以PSI替代硬门。最低业务影响路径为项目负责人侧重启长期Codex运行时，再专项授权仅执行`docker builder prune --force --filter until=24h`；禁止system/image/volume prune及任何服务/数据变化。
+- 验证/资源：只读Git、版本/Migration、free/df/uptime/vmstat/PSI、Docker stats/Compose ps/inspect、cgroup、两段60秒和受限容量检查完成；未创建临时文件/容器。最终available约1.1GiB、Swap约848MiB/1GiB、根盘约11GiB，四服务running、Web/PostgreSQL healthy、restart0/OOM false。
+- 治理：TASK83转`DONE`，新增`SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84`为`BLOCKED`并回到零`DOING`；TASK70继续BLOCKED。等待唯一最小外部动作/授权，不自动扩大到host或UAT。
+
 ### SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82 - `feat: add fixed UAT rollback capability handlers` / `build: refresh release supervisor bundle manifest` / `docs: close UAT rollback handlers and start resource attribution`
 
 - 调度/范围：从TASK81最终Supervisor提交`7a1ef56`/tree`cf81fb7b`启动唯一active task；三名智能体分别只读复核数据迁移、应用测试和运维安全边界，主智能体唯一写入。只实现仓库/fake-root处理器，不连接数据库、不读Volume/备份、不运行Compose或真实回退。

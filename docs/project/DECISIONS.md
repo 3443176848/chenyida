@@ -3186,6 +3186,40 @@
 - 拒绝无限重试、覆盖旧intent/result、用新观察改写旧attempt，或在漂移后仍称contain成功；也拒绝自动删除candidate数据库/Volume以“清理”unknown状态。
 - 拒绝把gateway存在、15/15静态SUPPORTED、fake-root containment或当前bundle描述为固定executor已激活、真实回退已验或可投产。
 
+## D-158 资源停止线不得以低PSI或扩大Swap绕过，先释放Codex运行时并只清理BuildKit cache
+
+- 日期：2026-08-16
+- 状态：`ACCEPTED / READ-ONLY ATTRIBUTION COMPLETE / EXTERNAL REMEDIATION REQUIRED / NO HOST MUTATION / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK83进程/cgroup只读归因、两段60秒稳定窗口、Docker容量摘要和低资源保护规则
+- 确认边界：只确认压力来源与恢复顺序；不授权kill/restart、Swap/内核/systemd/Docker daemon修改、prune、镜像/容器/卷删除或任何UAT/生产/数据动作
+
+### Context
+
+- TASK82收口后Swap约85.2%，超过不可放宽的80%硬线；根盘约11GiB，仅高于10GiB最低值约1GiB，无法安全启动隔离PostgreSQL、Compose、候选build或完整发布门。
+- 两段60秒窗口的memory PSI为0、OOM不增且Swap基本稳定，说明不是当前持续失控；但长期驻留的Codex session约317MiB Swap/2.01GiB memory，Docker/四ERP容器也持有大量历史换出页。低PSI不能证明重任务启动后仍安全。
+- BuildKit约10.79GB、其中private至少约7.87GB可回收；Docker同时把13.81GB镜像和380.1MB卷标为部分reclaimable，但这些可能包含历史回退/证据镜像或受保护边界，不能随缓存一并删除。
+
+### Decision
+
+1. Swap使用率≤80%继续作为独立硬门；不得用PSI=0、60秒增长低、available暂时高于768MiB或服务healthy替代。
+2. 最低业务影响的内存恢复先由项目负责人从客户端重启长期Codex运行时。当前智能体不得自行kill，因为无法保证任务回复、状态持久化或自动重连；不得为释放Swap重启ERP、PostgreSQL、Docker daemon或其他systemd服务。
+3. 磁盘恢复只允许在专项授权后执行一次`docker builder prune --force --filter until=24h`，目标限于超过24小时未访问且标记reclaimable的BuildKit cache。cache可重建，执行前后必须验证有引用镜像、容器和四个受保护卷集合未变。
+4. 明确禁止`docker system prune`、image prune、volume prune、镜像/容器/Volume删除，以及清理`/root/.codex`、日志或用户文件。
+5. `swapoff/swapon`在当前约1GiB available下可能把约848MiB换出页压回RAM并跌破768MiB；增加Swap只稀释比例而掩盖压力。两者均拒绝作为当前恢复方案。
+6. 重连和BuildKit-only清理后重新完成60秒资源门。仅当available≥768MiB、Swap≤80%、60秒Swap增长≤256MiB、根盘>10GiB、Load/OOM/restart/health均通过，TASK70才能从BLOCKED转DOING；任何一项失败继续停止。
+
+### Consequences
+
+- TASK83转DONE，TASK84登记为`BLOCKED / OWNER-SIDE CODEX RUNTIME RESTART + BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED`，当前零DOING；这正是所有安全仓库调查完成后留下的最小外部阻断。
+- 两段稳定窗口和进程/cgroup/Docker容量证据进入治理文档；未创建临时资源，未修改host、服务、Swap、Docker对象、数据库或Volume。
+- 系统继续`PRODUCTION NO-GO`。即使TASK84解除资源门，也只允许进入TASK70隔离动态验证，不自动获得A1—A8、真实数据、UAT/生产或切换授权。
+
+### Rejected alternatives
+
+- 拒绝因“Swap只是冷页”而修改80%阈值，或在available尚未触线时抢跑重任务。
+- 拒绝用重启PostgreSQL/Worker/Docker、清理所有reclaimable镜像/卷或全局prune换取资源余量。
+- 拒绝让当前智能体自行终止Codex进程并假定会自动重连，也拒绝未授权执行BuildKit删除。
+
 ## D-157 UAT回退能力采用逐副作用耐久回执与派生身份，仓库handler不得解除动态能力阻断
 
 - 日期：2026-08-16

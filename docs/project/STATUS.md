@@ -2,17 +2,28 @@
 
 最后更新时间：2026-08-16（Asia/Shanghai）
 
-## SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83（执行中；只读归因资源停止线）
+## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（阻塞；等待最小资源恢复动作）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / READ-ONLY RESOURCE ATTRIBUTION / NO HOST MUTATION / PRODUCTION NO-GO | 唯一active task；归因Swap>80%、内存/OOM和根盘压力，形成自然解除或最小专项授权入口 |
-| 严格代码起点 | PASS / CONTROLLED | `aa777324b08d06a27b1ade72a01d8d850b9a1688`/tree`a734aa13e4cb732ffc3726b56e9a62d82c34f3d0`；156文件bundle`3674e011…35fb`，用户未跟踪报告继续不读不改不提交 |
-| 依赖 | PASS / TASK82 REPOSITORY HANDLERS COMPLETE | 仓库/fake-root handler已闭合；真实PG17/Compose动态证明、host activation和人工UAT仍缺失 |
-| 起点资源 | STOP LINE ACTIVE | available约1.2GiB、Swap897MiB/1GiB、根盘约11GiB、Load`0.24/0.22/0.18`，宿主`oom_kill=2`；四服务running、Web/PostgreSQL healthy、restart0/OOM false |
-| 诊断边界 | READ ONLY | 不读取argv/env/log/数据库/Volume/备份正文，不修改Swap、systemd、服务、Docker daemon、网络或持久数据，不启动重任务 |
-| 动态验收 | BLOCKED / TASK70 | Swap超过80%硬线；Compose/隔离PostgreSQL/可丢弃文件域验收不得由静态或fake-root测试替代 |
-| 系统是否可用 | NO | 仍缺资源恢复、动态回退、host激活、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换 |
+| 当前状态 | BLOCKED / OWNER-SIDE CODEX RUNTIME RESTART + BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED / PRODUCTION NO-GO | 当前零DOING；智能体不能安全自重启，BuildKit删除需要专项授权 |
+| 解除条件 | EXTERNAL / MINIMAL | 项目负责人从客户端重启Codex运行时，并授权仅执行`docker builder prune --force --filter until=24h`；不授权ERP/Docker服务或Swap变化 |
+| 保护范围 | EXACT | 禁止system/image/volume prune、镜像/容器/卷删除、`/root/.codex`/日志清理、host重启及任何UAT/生产/数据动作 |
+| 获权后验证 | FAIL CLOSED | 重连核对Git/服务/受保护卷，BuildKit-only清理后完成60秒窗口；仅当available≥768MiB、Swap≤80%、根盘>10GiB及OOM/restart/health通过，TASK70才转DOING |
+| 系统是否可用 | NO | 资源门、动态回退、host激活、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
+
+## SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83（完成；只读归因与恢复入口已固定）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / READ-ONLY RESOURCE ATTRIBUTION COMPLETE / EXTERNAL REMEDIATION REQUIRED / NO HOST MUTATION / PRODUCTION NO-GO | TASK83已释放active slot；TASK84与TASK70均BLOCKED，当前零DOING |
+| 起点/结论 | STOP LINE CONFIRMED | 起点available约1.2GiB、Swap约85.2%；最终复核available约1.1GiB、Swap约82.7%，根盘约11GiB。PSI/OOM低不能替代Swap≤80%硬门 |
+| 归因 | PASS / NON-SENSITIVE | Codex session约2.01GiB memory/317MiB Swap；Docker daemon约102MiB Swap；PG/Web/Worker/Caddy约194/43/48/5MiB Swap，全部cgroup OOM/kill为0。未读取argv/env/log正文 |
+| 稳定窗口 | PASS / HARD GATE STILL FAIL | 两段各60秒：首段Swap净降20KiB且无kswapd增长；第二段增长44KiB，PSI始终0、`oom_kill=2`不变、容器identity/restart/health不变 |
+| 磁盘 | PASS / CLEANUP NOT AUTHORIZED | root约11GiB可用、inode5%；BuildKit 10.79GB中private至少约7.87GB可回收，最后访问≥41小时。镜像/Volume不列为目标且未删除 |
+| 决策 | PASS / D-158 | 先由owner侧重启Codex，再只清理>24h BuildKit cache；拒绝swapoff/扩Swap、ERP/PostgreSQL/Docker重启和任何广域prune |
+| 临时资源/运行面 | CLEAN / UNCHANGED | 未创建临时文件/容器，未修改host、Swap、服务、Docker对象、数据库、Volume或UAT；四服务running、Web/PostgreSQL healthy、restart0/OOM false |
+| 系统是否可用 | NO | 归因不解除停止线；TASK70和全部重任务继续禁止 |
 
 ## SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82（完成；仓库处理器与物化边界通过）
 

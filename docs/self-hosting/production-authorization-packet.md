@@ -39,7 +39,7 @@
 | 恢复能力 | V2 合成/双集群隔离合同已通过；真实异机目标、当前四域副本和真实恢复回执不存在 | 不能宣称故障后可恢复 |
 | 监控 | D-137—D-141内容寻址installer、三身份、unit/timer、state/outbox/delivery、权威投影、V2 policy激活、target-bound egress和远端ACK仓库合同已验；未安装host，base unit默认deny-all，真实渠道/值班演练不存在 | 不能宣称持续监控或告警已启用；须按A5a专项授权安装并激活真实target/credential/网络 |
 
-TASK82收口只读资源快照：available memory约1.2 GiB、Swap约897 MiB/1 GiB、根盘可用约11 GiB、Load`0.24/0.22/0.18`；四个项目UAT容器restart 0/OOM false，Web/PostgreSQL healthy且当前仍running，宿主`oom_kill=2`无任务内增量。Swap超过80%硬线且根盘接近10 GiB下限，当前不得启动新的build、全量测试或数据库重任务；TASK83先只读归因，未来执行仍须重新预检。
+TASK83收口只读资源快照：available memory约1.1 GiB、Swap约848 MiB/1 GiB（约82.7%）、根盘可用约11 GiB；四个项目UAT容器restart 0/OOM false，Web/PostgreSQL healthy且当前仍running，宿主`oom_kill=2`无任务内增量。两段60秒PSI均为0且Swap基本稳定，但硬线仍失败；长期Codex session约317MiB Swap/2.01GiB memory，BuildKit private至少约7.87GB可回收。当前不得启动新的build、全量测试或数据库重任务；TASK84等待owner侧Codex重启和BuildKit-only专项授权。
 
 本节已由TASK82刷新到D-157不可变链，但仍不是可消费授权。`3674e011…35fb`和`59ea1084…7c0`可作A1/A5设计复核输入；机器审计证明BEGIN/RECOVER、promotion-bound四域snapshot、精确Compose writer持续静默、checkpoint 7—15控制平面、root受信gateway、fixed executor/activation及仓库handler边界已闭合，但动态能力/host activation、隔离回退演练和人工UAT三项条件仍令`UAT_PROMOTION_EXECUTOR_NOT_READY`。当前并未连接真实数据库、运行Migration/Compose/postdeploy/人工UAT/finalization/rollback或生成actual checkpoint 8—15回执；active fence、transfer、postdeploy binding、合成cross-role result、仓库final/rollback result只是合同/fixture，不是当前UAT事实。TASK70动态证明和最终候选仍未完成，当前不应请求安装，A1/A5a均未授予。A3必须在候选输入变化收口后重建Web/Worker，并把最终同一对象锚定为批准私有registry完整digest；A2再使用对应精确快照、reservation/receipt摘要、借用runtime和新鲜正式安全证据。TASK57本机对象不得冒充当前候选或外部锚点。
 
@@ -302,13 +302,14 @@ TASK53已完成首次晋升自锁修复，TASK54关闭原异机传输合同，TA
 25. `DONE / TASK80`：canonical runtime gateway、root-owned descriptor执行、完整writer/数据库/Volume观察、最多三次containment intent/attempt receipt及漂移保全已闭合；source`dff6793`→Supervisor`3509a71`形成145文件bundle`b3ecdf11…ab7e5`。固定executor/activation故意缺失，未执行真实restore、Compose、数据库或UAT/生产回退。
 26. `DONE / TASK81`：九阶段/十三检查closed catalog、trusted-FD manifest v2、fixed executor、content-addressed activation v2、Supervisor v7和installer联锁已闭合；source`57f1f4a`→Supervisor`7a1ef56`形成149文件bundle`bd8cf7c3…3fc1`。缺失UAT-capable handler时先于授权消费失败；未安装host或执行真实restore、Compose、数据库或UAT/生产回退。
 27. `DONE / TASK82`：UAT专用数据库/四文件域/前代运行面/postverify handler、逐副作用耐久receipt及派生身份边界已在仓库/fake-root闭合；source`c2f071c`→Supervisor`aa77732`形成156文件bundle`3674e011…35fb`。未安装host或运行真实restore、Compose、数据库或UAT/生产回退，catalog继续BLOCKED。
-28. `DOING / TASK83`：只读归因Swap>80%、内存/OOM和根盘压力，形成自然解除或最小host专项授权入口；不修改Swap、systemd、服务、Docker daemon或数据。
+28. `DONE / TASK83`：两段60秒只读窗口和进程/cgroup/容量归因完成；Swap仍约82.7%，BuildKit private至少约7.87GB可回收。未修改Swap、systemd、服务、Docker对象或数据。
+29. `BLOCKED / TASK84`：等待项目负责人从客户端重启Codex运行时并授权仅清理超过24小时的BuildKit cache；禁止ERP/Docker服务重启、system/image/volume prune和Swap修改。获权后仍须60秒资源门通过。
 
 后续调度按对A1/A2、恢复和运行安全的影响选择最高优先级，保持一次一个正式任务编号。
 
 ## 14. 当前最小外部请求
 
-当前不需要项目负责人立即批准host或数据动作：D-135—D-157快照、reservation、monitor host delivery、权威projection、V2 cluster policy、逐代激活、target-bound egress、授权矩阵、跨岗UAT双层证据、晋升审计、checkpoint 4—15控制平面、runtime gateway、fixed executor/activation v2及仓库rollback handlers已完成，但当前镜像已失效且回退仍缺动态证明/host activation、隔离回退演练和人工UAT。A2仍被最终镜像、A1和A3阻断，A6另被TASK70/A4d/A5a及actual数据库围栏/部署/postdeploy/人工跨岗回执阻断；A4真实链缺目标/策略/真实数据授权，A5a还缺真实target/credential、实际安装、账号/systemd/网络授权和值班输入。持续交付负责人已按第13节第28项启动TASK83；TASK70等待资源门。项目负责人若愿意并行准备非秘密外部信息，最小输入仍是A4a的三个故障域/RPO/RTO/加密/保留/责任人，未来A3的私有Git/registry目标名称，或A5a渠道类型/非秘密目标与值班责任人；A7d仍需要业务负责人逐项确认职责分离、全员只读范围和legacy grant处置。密码、Token和密钥仍只放root-only文件，不发聊天。
+当前需要项目负责人完成一项最小资源恢复：从客户端重启长期Codex运行时，并明确授权只执行`docker builder prune --force --filter until=24h`；不授权ERP/Docker服务重启、镜像/容器/卷删除、Swap或其他host变化。D-135—D-158快照、reservation、monitor host delivery、权威projection、V2 cluster policy、逐代激活、target-bound egress、授权矩阵、跨岗UAT双层证据、晋升审计、checkpoint 4—15控制平面、runtime gateway、fixed executor/activation v2及仓库rollback handlers已完成，但当前镜像已失效且回退仍缺动态证明/host activation、隔离回退演练和人工UAT。A2仍被最终镜像、A1和A3阻断，A6另被TASK70/A4d/A5a及actual数据库围栏/部署/postdeploy/人工跨岗回执阻断；A4真实链缺目标/策略/真实数据授权，A5a还缺真实target/credential、实际安装、账号/systemd/网络授权和值班输入。密码、Token和密钥仍只放root-only文件，不发聊天。
 
 第一个host变更请求最终仍是A1，但须等全部安全仓库变化收口并重建最终bundle/镜像后才请求；在此之前系统安全保持：UAT继续alpha.42/0040、历史候选和诊断证据只读保留但不可授权、正式入口失败关闭、无真实员工使用。
 
