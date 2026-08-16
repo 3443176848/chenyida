@@ -3186,6 +3186,44 @@
 - 拒绝无限重试、覆盖旧intent/result、用新观察改写旧attempt，或在漂移后仍称contain成功；也拒绝自动删除candidate数据库/Volume以“清理”unknown状态。
 - 拒绝把gateway存在、15/15静态SUPPORTED、fake-root containment或当前bundle描述为固定executor已激活、真实回退已验或可投产。
 
+## D-157 UAT回退能力采用逐副作用耐久回执与派生身份，仓库handler不得解除动态能力阻断
+
+- 日期：2026-08-16
+- 状态：`ACCEPTED / REPOSITORY HANDLERS AND FAKE-ROOT VERIFIED / DYNAMIC PG17 AND HOST ACTIVATION BLOCKED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK82三路只读复核、固定executor/runtime gateway边界、PostgreSQL与四文件域恢复语义、前代运行面激活及201项轻量fake-root回归
+- 确认边界：只确认仓库固定handler、物化规则和失败关闭证据；不确认或授权host安装/激活、真实数据库/卷读取、restore、Compose、UAT/生产回退或人工UAT
+
+### Context
+
+- TASK81已能内容寻址安装fixed executor，但catalog只声明能力名称；若handler只在单一终态写receipt，外部副作用提交后进程崩溃会留下无法区分“未执行”与“已提交未回执”的窗口，自动重试可能重复restore、数据库rename或服务激活。
+- PostgreSQL、uploads、attachments和backup_status不能原地覆盖active/candidate；回退运行配置也不能被错误要求等于历史前代配置摘要。postverify若复用预激活事实，会把服务启动后的session、ACL、Migration或identity漂移遗漏。
+- 当前宿主Swap持续超过80%，且仓库没有可信host activation或隔离PG17双rename证明。把源码存在直接解释成`SUPPORTED`会绕过资源、运行身份和真实副作用边界。
+
+### Decision
+
+1. 九个stage和十三个check各自使用固定schema、固定FD、固定argv及PREPARE/EXECUTE/PROBE/CONTAIN协议；禁止shell、自由路径、自由SQL、自由环境扩展和operator tag。
+2. 幂等身份至少绑定`action`与`execution_mode`。每个外部副作用先持久化intent和started，再逐项写不可覆盖receipt；terminal必须绑定完整有序receipt集合。receipt前缀、timeout、signal、daemon、输出越界或身份漂移一律typed UNKNOWN并保全。
+3. commit-before-receipt不得盲目重放。数据库switch只在当前layout精确为`NEW_SEALED`且OID/marker与restore intents一致时补写`RECOVERED_COMMITTED`；release unseal只在精确`NEW_RELEASED`时恢复。观察摘要必须非零并进入追加链。
+4. PostgreSQL restore只物化新staging身份；switch从独立管理库以一个显式事务执行`active→quarantine`和`staging→active`，并在操作前拒绝连接、prepared transaction、OID/name/marker漂移。PG17事务、锁和故障窗口必须由TASK70动态证明，不能仅依赖文档或mock。
+5. uploads、attachments、backup_status只恢复到与active/candidate均不重叠的新卷；内容摘要、条目、owner/group/mode、目录及隔离读写探针必须同时闭合。backup_status历史快照不得成为回退后当前actual-offhost就绪证明。
+6. 前代Web/Worker只接受execution package固定的完整registry digest及已验证本机content identity；禁止pull、build、latest和任意tag。Caddy、PostgreSQL容器、网络和受保护卷必须不变。历史`predecessor_runtime_configuration_sha256`与派生`rollback_runtime_configuration_sha256`分别绑定。
+7. postactivation必须重新读取数据库内容、完整46项Migration ledger、live ACL/default privileges、角色、session、数据库/服务identity和layout；writer session仅允许Web 0—10、Worker 0—4且unexpected为0，不能复用preactivation证据。
+8. 卷helper镜像证据必须绑定source labels、archive config、SBOM、固定漏洞政策、受信且稳定的Trivy数据库树、零漏洞和跨阶段资源门。没有外部registry锚点或Trivy数据库更新回执时明确记录限制，不得提升为正式证据。
+9. catalog继续`BLOCKED_MISSING_UAT_CAPABLE_HANDLERS`，直到隔离动态证明、内容身份和host activation全部闭合；activation publisher、gateway、Supervisor、机器审计及fixture不得以仓库文件存在解除阻断。
+
+### Consequences
+
+- feature source`c2f071ce474460e2be7aa3e0911a34fcfe948f08`/tree`3e262bd047f76747c4822f5f12322db170dbb90f`→manifest-only`aa777324b08d06a27b1ade72a01d8d850b9a1688`/tree`a734aa13e4cb732ffc3726b56e9a62d82c34f3d0`形成156文件canonical链；manifest raw SHA-256为`3674e01121b09bf11014f1bcc68fd9743c4d2b60f340aa9f3089731d46c235fb`。
+- inventory为262/238/24；最终轻量组合201/201、manifest后installer21/21、生成制品self/source/inventory链、语法、敏感信息和diff门通过，数据/应用/运维三路复核均未发现残留P0/P1。
+- 收口available约1.2GiB、Swap897/1024MiB、根盘约11GiB，宿主`oom_kill=2`无任务内增量；四服务running、Web/PostgreSQL healthy、restart0/OOM false。未运行Node全量、build、Docker/Compose/PostgreSQL、Migration、backup/restore、部署、真实UAT或回退。
+- TASK82仓库范围完成，但TASK70仍受资源停止线和动态证明阻断。下一任务TASK83只读归因资源；系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝以单一终态receipt、control层dangling intent或“幂等命令”猜测副作用结果，也拒绝在UNKNOWN后自动重放restore、rename、unseal或service activation。
+- 拒绝覆盖active/candidate卷、复用TEST-only目标、把旧backup_status当新就绪证据，或让派生运行态伪装成历史前代哈希。
+- 拒绝因fake-root、静态catalog、源码摘要或当前容器healthy而跳过隔离PG17/文件域动态演练、host activation和人工UAT。
+
 ## D-156 固定回退执行器先闭合身份与激活事务，缺少UAT能力处理器时不得消费授权
 
 - 日期：2026-08-16

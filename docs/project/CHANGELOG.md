@@ -4,6 +4,19 @@
 
 ## 2026-08-16
 
+### SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82 - `feat: add fixed UAT rollback capability handlers` / `build: refresh release supervisor bundle manifest` / `docs: close UAT rollback handlers and start resource attribution`
+
+- 调度/范围：从TASK81最终Supervisor提交`7a1ef56`/tree`cf81fb7b`启动唯一active task；三名智能体分别只读复核数据迁移、应用测试和运维安全边界，主智能体唯一写入。只实现仓库/fake-root处理器，不连接数据库、不读Volume/备份、不运行Compose或真实回退。
+- 边界决策：D-157固定PREPARE/EXECUTE/PROBE/CONTAIN、逐动作幂等键和逐副作用耐久intent/started/receipt/probe/terminal链。commit-before-receipt只能凭精确OID/marker/layout或release状态补写`RECOVERED_COMMITTED`，receipt前缀、漂移、超时、signal、daemon及输出越界保持typed UNKNOWN并保全。
+- 数据库/运行态：PG staging restore与active/quarantine双rename只使用独立管理库、固定SQL/FD和新身份；pre/postactivation分别重新读取数据库内容、46项Migration ledger、ACL/default privileges、角色、session及服务identity。双rename事务/锁/故障窗口仍须TASK70在隔离PG17动态证明，证明前catalog不得提升。
+- 文件域/镜像：uploads、attachments、backup_status只恢复到互不相交的新卷，内容及owner/group/mode/读写探针均须闭合；backup_status历史快照不冒充当前异机就绪。固定Wolfi helper镜像绑定source labels、SBOM、Trivy数据库树身份/新鲜度、零漏洞和跨阶段60秒资源门；无外部registry/Trivy更新回执时证据明确降级且不授权。
+- 前代服务/恢复：Web/Worker仅接受execution package固定registry digest和本机content identity，禁止pull/build/latest；Caddy/PostgreSQL/网络/保护卷不变。派生runtime hash与历史predecessor hash分别绑定，postverify读取live state而非复用预激活事实。
+- 审计/发布链：release inventory为262/238/24，raw SHA-256`74094fe2…1b4`；跨岗/回退审计raw SHA-256为`50cf7b9c…7135`/`d93a1b24…8083`。source`c2f071c`/tree`3e262bd0`→Supervisor`aa77732`/tree`a734aa13`形成156文件/7,285,043-byte链，manifest raw SHA-256为`3674e011…35fb`，逐blob和唯一父子拓扑通过。
+- 验证：最终轻量组合201/201通过，manifest生成后installer再验21/21；11 Python、7 JSON、2 POSIX shell解析、262 inventory零漂移、两生成制品self/source/inventory链、35文件高置信敏感信息和diff门通过。三路最终复核均未发现残留P0/P1。
+- 资源/边界：未运行Node全量、build、Docker/Compose/PostgreSQL、Migration、backup/restore、镜像构建/扫描、部署、真实UAT、回退或业务写。收口available约1.2GiB、Swap897/1024MiB、根盘约11GiB、Load`0.24/0.22/0.18`；四服务running、Web/PostgreSQL healthy、restart0/OOM false，宿主`oom_kill=2`无任务内增量，无任务临时容器/manifest temp残留。
+- 数据库/API：无Schema、Migration或普通业务API变化；新增的是root固定处理器、PG/卷恢复与postverify合同、helper镜像证据、runtime adapter和发布联锁。真实A4/A6/A7、账号、员工UAT、数据库和生产动作均未授权。
+- 治理：TASK82转`DONE`并新增D-157；catalog保持`BLOCKED_MISSING_UAT_CAPABLE_HANDLERS`，TASK70继续等待Swap≤80%和动态证明。自动启动`SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83`为唯一`DOING`，只读归因资源停止线。
+
 ### SELFHOST-UAT-PROMOTION-ROLLBACK-FIXED-EXECUTOR-81 - `feat: add fixed UAT rollback executor boundary` / `build: bind fixed UAT rollback executor bundle` / `docs: close fixed rollback executor and start capability handlers`
 
 - 调度/范围：从TASK80最终Supervisor提交`3509a71`/tree`c7d063db`启动唯一active task；只在仓库、fake-root和断网轻量测试中实现fixed executor与activation，不连接真实数据库、不读取Volume/备份、不运行Compose或UAT/生产回退。
