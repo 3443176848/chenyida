@@ -4,9 +4,9 @@
 
 ## 1. 审计结论
 
-- artifact SHA-256：`6c3cdcebeb023db9c6bd405e68a70243a843de8c3e56a331c13fec02728c29b5`
-- source manifest SHA-256：`9057cf5678f5f103231c04dcfb195452ae7b0cc0d7782ef16f0b205e1db04faa`（34文件）
-- release inventory SHA-256：`a5fa5cfdd6e3bd7dff6fb5a5b60588189af81445064ddc09add4a95d243c69b3`（262项）
+- artifact SHA-256：`e2d57cc84807cd3ac5bac0685751af949bf27b998c0f32afd99a73e5dae02364`
+- source manifest SHA-256：`b4ca700641d3ea071892e29db5992f79673f4b156e35eca10426ef6c092e12b9`（34文件）
+- release inventory SHA-256：`74094fe2a98de757ecab741aa81858666f42d58df4f13fdde5bec082f13251b4`（262项）
 - 执行判定：`UAT_PROMOTION_EXECUTOR_NOT_READY`；检查点缺口=0，全部阻塞=3，P0=2，P1=1，may_start=`false`。
 - 仓库检查点控制链与受信回退网关已闭合，但真实运行时执行器/激活、隔离回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。
 
@@ -68,11 +68,11 @@
 | `chenyida_erp_site/compose.yml` | `2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa` |
 | `chenyida_erp_site/db/index.ts` | `918aa029fbd9bb5532d2be60e848b0517a43bf783d2bdc1e88a880f02effb4dd` |
 | `chenyida_erp_site/db/runtime-connection.ts` | `c2ee0b707a25719e5b7280e762a7e89a147d50e37d5531c9d22534a4656f8cd7` |
-| `chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json` | `5f75fccbe26d836acec9d27f4243d9c079327881448fbc9210709974c96b6668` |
+| `chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json` | `50cf7b9cfe5baf0c563d3f6a828d78f4cea56cbff6bbdb76b54084f104537135` |
 | `chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json` | `c1fe967ab455af92ee385925dab53fcfa59ad6db97ca266d4971fbd632eb8075` |
 | `chenyida_erp_site/scripts/backup-recovery-readiness-v4.mjs` | `a0bf58d1f0afa7b5d5b98caf239f034bad910cfa2023fdc8b62b22630e45adda` |
 | `chenyida_erp_site/scripts/backup-selfhost.sh` | `adb7047631660c20a01c56d6c0393c08e67db5502a3eeeb64f2eaf392daf902a` |
-| `chenyida_erp_site/scripts/install-release-supervisor.py` | `e28634660b5707a678f30516250e82247baa9fc527c1035e64a8831b0814f26b` |
+| `chenyida_erp_site/scripts/install-release-supervisor.py` | `9494592df62154cee0e2cd29a4efe4d3ba06675d40bb6a0f521e2c9ce50f6b2b` |
 | `chenyida_erp_site/scripts/migrate-postgres.ts` | `46a4aa004307c5b9f26a0b30fd0a3ac3581489eb1f3f88a3bfb5fa614b4d9642` |
 | `chenyida_erp_site/scripts/postdeploy-release-contract.mjs` | `45ae8b59ee0cce8d8a48d673e8b4dc36868b7a068d2b0982e9c711951b47098c` |
 | `chenyida_erp_site/scripts/postdeploy-release-verifier.mjs` | `4de8085198e3e500a109a5092ea0309ba77f8dbf9ebbdeab1990b2d815c15d32` |
@@ -80,21 +80,21 @@
 | `chenyida_erp_site/scripts/release-candidate-snapshot.py` | `296f61efb552a5fdd327e7b60b567a4dc2a569f9ec1c93bd57ef4dfe0f4fe98d` |
 | `chenyida_erp_site/scripts/release-gate-runner.mjs` | `172c99a33bac72f78b58453e11cca1632e2ad4f461b42f40ff264e11dc92077d` |
 | `chenyida_erp_site/scripts/release-lifecycle-contract.mjs` | `3b6945a9b7374abf3f892492bf3811b7b105e435ca4ab43020d53bba0d0e8f1e` |
-| `chenyida_erp_site/scripts/release-manifest-contract.mjs` | `87849ca1a1a4b5de4dfa1794c66503145385cf00a71f0bbc54401e9b132e7129` |
+| `chenyida_erp_site/scripts/release-manifest-contract.mjs` | `3d819c9ced89c80b26f285b40699326aad8f71184ba7de07dd66831b3a8434cc` |
 | `chenyida_erp_site/scripts/release-migration-authorization.ts` | `ee700cb7e1ce438f06114c54d8d4d17be9c630003307df7140932d86bce54f4e` |
-| `chenyida_erp_site/scripts/release-supervisor-launcher.py` | `119cf364d6dcdec6800763827fc102f9573a20b31d465a6806312a79ff6b6753` |
+| `chenyida_erp_site/scripts/release-supervisor-launcher.py` | `96dd8b3b5ee2e976e8161dc9146c3d8185fe467c15bf63910a282436c75e9831` |
 | `chenyida_erp_site/scripts/restore-selfhost.sh` | `c648db054afdcec661ffc293eec71f3087315412aa222078aabea3a4de102b22` |
 | `chenyida_erp_site/scripts/uat-promotion-compose-deployment-contract.mjs` | `7769e7a3cc7009c3268f4edc0ccd1258ddf5fa2ebc6843512d90153b35365094` |
 | `chenyida_erp_site/scripts/uat-promotion-compose-deployment-control.mjs` | `d61a94e0413eb8738f6f90a34aee3af2334fa16f14f49cb43b16c045a15aac5d` |
 | `chenyida_erp_site/scripts/uat-promotion-cross-role-evidence-contract.mjs` | `9895be140ca89af62e4a848b9cc8bf175f7736cd60c8b481ac085c98041da766` |
 | `chenyida_erp_site/scripts/uat-promotion-migration-control.py` | `16f5eb7fa1e8639056af8cceb51aac54ec1f55f8d299cc1807c30057b9e13f73` |
 | `chenyida_erp_site/scripts/uat-promotion-migration-execution-contract.mjs` | `c859a89c79f81c51f8f75d2c61b7ed2ee1884a8868b1349d0b99f7973d176ac2` |
-| `chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs` | `adf0853174bb5047f34ebaad5416844d25266a57fe4850906ab2d796905e06e2` |
-| `chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs` | `ba6635a61e40e16772a4d0aec129e9c9afde35e3fb99840b5c7000588d2b8ee9` |
-| `chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor-contract.mjs` | `fc2bdbcbaa8b5299a96b0d77df578b9d1a71af7fccdb41728523562013de97ca` |
-| `chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py` | `0cbdd508589902a782a23e7b11b20eacd5a07ef04e6b2f3f2a51a8f9cf574c03` |
+| `chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs` | `d8e5ca6471f447385997cdd7a0ce86368982e422c9e8f35b032858225dedb621` |
+| `chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs` | `2ceb8edeb04db858e3b9978f76febc3613f9ce56ba844fd8a1208a43c4c0a654` |
+| `chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor-contract.mjs` | `22e595519c17a18425bc4e393269bea3d125dae9f4cccf3ef03e04a8084408c0` |
+| `chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py` | `71e4f10cff046a0dd90a7e10fcdf96520834805ddd5a7c2979cdb94a203f0cf8` |
 | `chenyida_erp_site/scripts/uat-promotion-rollback-runtime-activation-publisher.mjs` | `0efff23ad47431090a01be9a543ab9de2a5c7e59f1d94bcba59c041d79d80f74` |
-| `chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py` | `453c45cbfd8546789dc4e18d848ceb87a3f2b7daf33b97b9dae9e7762ca79745` |
-| `chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs` | `94fe427e08e84c605850963203a40e59544f505eb30ea7e4909adfba1705ff92` |
+| `chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py` | `d68611af48daf32ada0a4b85aec0f24b3c04b33ac2a40fe5239cb4a3ed084e90` |
+| `chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs` | `037288a8f086cb925d154bf830561f1bcec030b3ec50d0c1198ed701fad55229` |
 | `chenyida_erp_site/scripts/uat-promotion-transaction-journal.mjs` | `bf192c88b674cebaa780c96883948d1e8616e443a732a2d4e8ee05176bb78766` |
-| `chenyida_erp_site/tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs` | `0f67c939fd713712a8f8ce0c31c695c21855c49805ebd0bf155849ecf5f68b0e` |
+| `chenyida_erp_site/tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs` | `943f51b319f62ce487214de8bd8ba241e29dcf044e600abc2bcc88ecc19c1c54` |

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import { canonicalClusterJson, clusterSha256 } from "./postgresql-cluster-recovery-contract.mjs";
 import {
@@ -18,7 +19,7 @@ import {
 } from "./uat-promotion-rollback-contract.mjs";
 
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_PLAN_CONTRACT =
-  "chenyida-erp-uat-promotion-rollback-runtime-plan/v1";
+  "chenyida-erp-uat-promotion-rollback-runtime-plan/v3";
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_CONTRACT =
   UAT_ROLLBACK_RUNTIME_ACTIVATION_ALIAS_CONTRACT;
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_REQUEST_CONTRACT =
@@ -27,12 +28,22 @@ export const UAT_PROMOTION_ROLLBACK_RUNTIME_RESPONSE_CONTRACT =
   "chenyida-erp-uat-promotion-rollback-runtime-response/v1";
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_OBSERVATION_CONTRACT =
   "chenyida-erp-uat-promotion-rollback-runtime-observation/v1";
+export const UAT_PROMOTION_ROLLBACK_HANDLER_UNKNOWN_CONTRACT =
+  "chenyida-erp-uat-promotion-rollback-handler-unknown/v1";
+export const UAT_PROMOTION_ROLLBACK_RUNTIME_PROJECTION_CONTRACT =
+  "chenyida-erp-uat-promotion-rollback-runtime-projection/v2";
+export const UAT_PROMOTION_ROLLBACK_RECONCILIATION_AUTHORITY_CONTRACT =
+  "chenyida-erp-uat-promotion-rollback-reconciliation-authority/v1";
+export const UAT_PROMOTION_ROLLBACK_COMPOSE_OVERLAY_CONTRACT =
+  "chenyida-erp-uat-promotion-rollback-compose-overlay/v1";
 
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_FILE =
   UAT_ROLLBACK_RUNTIME_ACTIVATION_FILE;
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_EXECUTOR =
   UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE;
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_DOCKER = "/usr/bin/docker";
+export const UAT_PROMOTION_ROLLBACK_RUNTIME_COMPOSE_PLUGIN =
+  "/usr/libexec/docker/cli-plugins/docker-compose";
 
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS = Object.freeze({
   PREFLIGHT: 120,
@@ -42,6 +53,14 @@ export const UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS = Object.freeze({
   PROBE: 300,
   CONTAIN: 300,
 });
+export const UAT_PROMOTION_ROLLBACK_POSTGRES_CONTENT_PROBE_TIMEOUT_SECONDS = 1200;
+
+export function uatPromotionRollbackRuntimeTimeoutSeconds(action, label = null) {
+  if (action === "PROBE" && label === "POSTGRESQL_CONTENT") {
+    return UAT_PROMOTION_ROLLBACK_POSTGRES_CONTENT_PROBE_TIMEOUT_SECONDS;
+  }
+  return UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS[action];
+}
 
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_ACTION_MATRIX = Object.freeze({
   ROLLBACK_EXECUTION: Object.freeze({
@@ -76,7 +95,9 @@ export const UAT_PROMOTION_ROLLBACK_RUNTIME_ACTION_MATRIX = Object.freeze({
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_STAGE_SOURCE_ROLES = Object.freeze({
   PRECONDITION_RECHECK: Object.freeze([
     "snapshot_readiness", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
-    "snapshot_policy", "snapshot_policy_activation", "predecessor_postdeploy_receipt",
+    "snapshot_policy", "snapshot_policy_activation", "snapshot_runtime_privilege_access",
+    "snapshot_runtime_privilege_compiled_catalog", "snapshot_runtime_privilege_policy",
+    "snapshot_runtime_privilege_operator_policy", "predecessor_postdeploy_receipt",
     "predecessor_release_manifest", "candidate_deployment_result", "candidate_postdeploy_identity",
     "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
   ]),
@@ -84,6 +105,8 @@ export const UAT_PROMOTION_ROLLBACK_RUNTIME_STAGE_SOURCE_ROLES = Object.freeze({
   POSTGRESQL_RESTORE: Object.freeze([
     "snapshot_readiness", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
     "snapshot_postgresql", "snapshot_policy", "snapshot_policy_activation",
+    "snapshot_runtime_privilege_access", "snapshot_runtime_privilege_compiled_catalog",
+    "snapshot_runtime_privilege_policy", "snapshot_runtime_privilege_operator_policy",
   ]),
   UPLOADS_RESTORE: Object.freeze(["snapshot_manifest", "snapshot_uploads"]),
   ATTACHMENTS_RESTORE: Object.freeze(["snapshot_manifest", "snapshot_attachments"]),
@@ -92,8 +115,12 @@ export const UAT_PROMOTION_ROLLBACK_RUNTIME_STAGE_SOURCE_ROLES = Object.freeze({
     "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
   ]),
   WEB_WORKER_PREDECESSOR_ACTIVATION: Object.freeze([
-    "predecessor_postdeploy_receipt", "predecessor_release_manifest", "compose_file",
-    "compose_release_file", "deployment_environment", "runtime_policy",
+    "snapshot_postgresql", "snapshot_manifest", "snapshot_migrations",
+    "snapshot_reconciliation", "snapshot_policy_activation", "snapshot_runtime_privilege_access",
+    "snapshot_runtime_privilege_compiled_catalog", "snapshot_runtime_privilege_policy",
+    "snapshot_runtime_privilege_operator_policy", "predecessor_postdeploy_receipt",
+    "predecessor_release_manifest", "compose_file", "compose_release_file",
+    "deployment_environment", "runtime_policy",
   ]),
   PROTECTED_RESOURCE_RECHECK: Object.freeze(["candidate_deployment_result", "candidate_postdeploy_identity"]),
 });
@@ -101,6 +128,8 @@ export const UAT_PROMOTION_ROLLBACK_RUNTIME_STAGE_SOURCE_ROLES = Object.freeze({
 export const UAT_PROMOTION_ROLLBACK_RUNTIME_CHECK_SOURCE_ROLES = Object.freeze({
   POSTGRESQL_CONTENT: Object.freeze([
     "snapshot_postgresql", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
+    "snapshot_runtime_privilege_access", "snapshot_runtime_privilege_compiled_catalog",
+    "snapshot_runtime_privilege_policy", "snapshot_runtime_privilege_operator_policy",
   ]),
   UPLOADS_CONTENT: Object.freeze(["snapshot_uploads", "snapshot_manifest", "snapshot_reconciliation"]),
   ATTACHMENTS_CONTENT: Object.freeze([
@@ -115,15 +144,22 @@ export const UAT_PROMOTION_ROLLBACK_RUNTIME_CHECK_SOURCE_ROLES = Object.freeze({
   WEB_IDENTITY: Object.freeze(["predecessor_postdeploy_receipt", "predecessor_release_manifest"]),
   WORKER_IDENTITY: Object.freeze(["predecessor_postdeploy_receipt", "predecessor_release_manifest"]),
   RUNTIME_CONFIGURATION: Object.freeze(["deployment_environment", "runtime_policy"]),
-  STRICT_RELEASE_IDENTITY: Object.freeze(["predecessor_postdeploy_receipt", "predecessor_release_manifest"]),
-  HEALTH: Object.freeze(["predecessor_postdeploy_receipt"]),
+  STRICT_RELEASE_IDENTITY: Object.freeze([
+    "predecessor_postdeploy_receipt", "predecessor_release_manifest", "deployment_environment",
+  ]),
+  HEALTH: Object.freeze([
+    "predecessor_postdeploy_receipt", "predecessor_release_manifest",
+    "candidate_deployment_result", "deployment_environment",
+  ]),
   PROTECTED_RESOURCES: Object.freeze(["candidate_deployment_result", "candidate_postdeploy_identity"]),
 });
 
 const PACKAGE_SOURCE_ROLES = Object.freeze([
   "snapshot_readiness", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
   "snapshot_postgresql", "snapshot_uploads", "snapshot_attachments", "snapshot_backup_status",
-  "snapshot_policy", "snapshot_policy_activation", "predecessor_postdeploy_receipt",
+  "snapshot_policy", "snapshot_policy_activation", "snapshot_runtime_privilege_access",
+  "snapshot_runtime_privilege_compiled_catalog", "snapshot_runtime_privilege_policy",
+  "snapshot_runtime_privilege_operator_policy", "predecessor_postdeploy_receipt",
   "predecessor_release_manifest", "candidate_deployment_result", "candidate_postdeploy_identity",
   "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
   "runtime_adapter_activation",
@@ -152,12 +188,23 @@ const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/u;
 const CONTAINER_ID = /^[0-9a-f]{64}$/u;
 const IMAGE_DIGEST = /^sha256:[0-9a-f]{64}$/u;
 const IMAGE_REFERENCE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?(?:\/[a-z0-9]+(?:[._-][a-z0-9]+)*)+@sha256:[0-9a-f]{64}$/u;
+const COMMIT = /^[0-9a-f]{40}$/u;
+const VERSION = /^0\.1\.0-alpha\.\d+$/u;
 const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u;
 const DATABASE_IDENTIFIER = /^[a-z][a-z0-9_]{0,62}$/u;
 const DOCKER_NAME = /^[a-z0-9][a-z0-9_.-]{0,127}$/u;
 const OPERATION_LABELS = new Set([
   ...Object.keys(UAT_PROMOTION_ROLLBACK_RUNTIME_ACTION_MATRIX.ROLLBACK_EXECUTION),
   ...Object.keys(UAT_PROMOTION_ROLLBACK_RUNTIME_ACTION_MATRIX.ROLLBACK_POSTVERIFY),
+]);
+const HANDLER_UNKNOWN_REASONS = new Set([
+  "DURABLE_STATE_MISSING", "DURABLE_STATE_DIVERGED", "SIDE_EFFECT_OUTCOME_UNKNOWN",
+  "COMMIT_OUTCOME_UNKNOWN", "TARGET_IDENTITY_DRIFT", "SOURCE_IDENTITY_DRIFT",
+  "TOOL_TIMEOUT", "TOOL_SIGNAL", "TOOL_OUTPUT_LIMIT", "TOOL_DAEMON_LEFT_RUNNING",
+  "ACTION_DEADLINE_EXHAUSTED", "PROBE_INCONCLUSIVE", "CONTAINMENT_INCOMPLETE",
+]);
+const HANDLER_UNKNOWN_PHASES = new Set([
+  "BEFORE_SIDE_EFFECT", "AFTER_SIDE_EFFECT", "COMMIT_BOUNDARY", "PROBE", "CONTAINMENT",
 ]);
 
 export class UatPromotionRollbackRuntimeError extends Error {
@@ -481,22 +528,153 @@ function validateTargets(value, operationId, code) {
   return value;
 }
 
-function validateTool(value, expectedPath, code) {
+function validateTool(value, expectedPath, expectedMode, code) {
   exactKeys(value, ["path", "sha256", "uid", "gid", "mode"], code);
   if (absolute(value.path, code) !== expectedPath || value.uid !== 0 || value.gid !== 0
-    || value.mode !== "0555") reject(code);
+    || value.mode !== expectedMode) reject(code);
   digest(value.sha256, code);
   return value;
+}
+
+function validateHelperImage(value, code) {
+  exactKeys(value, [
+    "image_reference", "image_config_digest", "application_version", "git_commit", "git_tree",
+    "image_role", "platform", "protocol", "contract_sha256", "evidence_run_id",
+    "backup_status_reader_gid",
+    "build_provenance_sha256",
+    "sbom_evidence_sha256", "security_evidence_sha256", "supervisor_bundle_sha256",
+  ], code);
+  string(value.image_reference, IMAGE_REFERENCE, code);
+  string(value.image_config_digest, IMAGE_DIGEST, code);
+  string(value.application_version, VERSION, code);
+  string(value.git_commit, COMMIT, code);
+  string(value.git_tree, COMMIT, code);
+  string(value.evidence_run_id, IDENTIFIER, code);
+  integer(value.backup_status_reader_gid, 1, 0x7fffffff, code);
+  if (value.git_commit === value.git_tree || value.image_role !== "volume-restore-helper"
+    || value.platform !== "linux/amd64"
+    || value.protocol !== "chenyida-erp-volume-helper/v1"
+    || value.contract_sha256 !== "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d"
+    || value.evidence_run_id.length > 80) reject(code);
+  for (const field of [
+    "contract_sha256", "build_provenance_sha256", "sbom_evidence_sha256",
+    "security_evidence_sha256", "supervisor_bundle_sha256",
+  ]) digest(value[field], code);
+  if (new Set([
+    value.build_provenance_sha256, value.sbom_evidence_sha256,
+    value.security_evidence_sha256, value.supervisor_bundle_sha256,
+  ]).size !== 4 || value.image_reference.endsWith(value.image_config_digest.slice(7))) reject(code);
+  return value;
+}
+
+export function validateUatPromotionRollbackReconciliationAuthority(value, plan = null) {
+  const code = "UAT_PROMOTION_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "authority_id", "status", "environment",
+    "promotion_id", "promotion_generation", "rollback_operation_id", "deployment_id",
+    "approval_reference_sha256", "requester_identity_sha256", "approver_identity_sha256",
+    "approved_at", "expires_at", "one_time", "mutation_scope", "authority_sha256",
+  ], code);
+  if (value.schema_version !== 1
+    || value.contract !== UAT_PROMOTION_ROLLBACK_RECONCILIATION_AUTHORITY_CONTRACT
+    || value.status !== "AUTHORIZED" || value.environment !== "UAT"
+    || value.deployment_id !== "chenyida-erp" || value.one_time !== true) reject(code);
+  string(value.authority_id, IDENTIFIER, code);
+  string(value.promotion_id, IDENTIFIER, code);
+  string(value.rollback_operation_id, IDENTIFIER, code);
+  integer(value.promotion_generation, 1, 1_000_000, code);
+  for (const field of [
+    "approval_reference_sha256", "requester_identity_sha256", "approver_identity_sha256",
+  ]) digest(value[field], code);
+  if (new Set([
+    value.approval_reference_sha256,
+    value.requester_identity_sha256,
+    value.approver_identity_sha256,
+  ]).size !== 3) reject(code);
+  const approved = Date.parse(instant(value.approved_at, code));
+  const expires = Date.parse(instant(value.expires_at, code));
+  if (expires <= approved || expires - approved > 24 * 60 * 60 * 1000) reject(code);
+  exactKeys(value.mutation_scope, [
+    "active_database", "staging_database", "candidate_quarantine_database",
+    "database_local_only", "allow_staging_database_create",
+    "allow_staging_logical_restore", "allow_staging_privilege_reconcile",
+    "allow_atomic_database_switch", "allow_active_database_unseal", "allow_role_create",
+    "allow_role_alter", "allow_membership_change", "allow_password_change",
+    "allow_tablespace_acl_change",
+  ], code);
+  for (const field of [
+    "active_database", "staging_database", "candidate_quarantine_database",
+  ]) string(value.mutation_scope[field], DATABASE_IDENTIFIER, code);
+  for (const field of [
+    "database_local_only", "allow_staging_database_create", "allow_staging_logical_restore",
+    "allow_staging_privilege_reconcile", "allow_atomic_database_switch",
+    "allow_active_database_unseal",
+  ]) if (value.mutation_scope[field] !== true) reject(code);
+  for (const field of [
+    "allow_role_create", "allow_role_alter", "allow_membership_change",
+    "allow_password_change", "allow_tablespace_acl_change",
+  ]) if (value.mutation_scope[field] !== false) reject(code);
+  if (clusterSha256(without(value, "authority_sha256")) !== value.authority_sha256) reject(code);
+  if (plan !== null && (value.promotion_id !== plan.promotion_id
+    || value.promotion_generation !== plan.promotion_generation
+    || value.rollback_operation_id !== plan.rollback_operation_id
+    || value.deployment_id !== plan.deployment.id
+    || value.mutation_scope.active_database !== plan.targets.database.active
+    || value.mutation_scope.staging_database !== plan.targets.database.staging
+    || value.mutation_scope.candidate_quarantine_database
+      !== plan.targets.database.candidate_quarantine)) reject(code);
+  return value;
+}
+
+export function createUatPromotionRollbackReconciliationAuthority(input) {
+  const targets = deriveUatPromotionRollbackRuntimeTargets(input.rollback_operation_id);
+  const body = {
+    schema_version: 1,
+    contract: UAT_PROMOTION_ROLLBACK_RECONCILIATION_AUTHORITY_CONTRACT,
+    authority_id: input.authority_id,
+    status: "AUTHORIZED",
+    environment: "UAT",
+    promotion_id: input.promotion_id,
+    promotion_generation: input.promotion_generation,
+    rollback_operation_id: input.rollback_operation_id,
+    deployment_id: "chenyida-erp",
+    approval_reference_sha256: input.approval_reference_sha256,
+    requester_identity_sha256: input.requester_identity_sha256,
+    approver_identity_sha256: input.approver_identity_sha256,
+    approved_at: input.approved_at,
+    expires_at: input.expires_at,
+    one_time: true,
+    mutation_scope: {
+      active_database: targets.database.active,
+      staging_database: targets.database.staging,
+      candidate_quarantine_database: targets.database.candidate_quarantine,
+      database_local_only: true,
+      allow_staging_database_create: true,
+      allow_staging_logical_restore: true,
+      allow_staging_privilege_reconcile: true,
+      allow_atomic_database_switch: true,
+      allow_active_database_unseal: true,
+      allow_role_create: false,
+      allow_role_alter: false,
+      allow_membership_change: false,
+      allow_password_change: false,
+      allow_tablespace_acl_change: false,
+    },
+  };
+  return Object.freeze(validateUatPromotionRollbackReconciliationAuthority({
+    ...body, authority_sha256: clusterSha256(body),
+  }));
 }
 
 export function validateUatPromotionRollbackRuntimePlan(value) {
   const code = "UAT_PROMOTION_ROLLBACK_RUNTIME_PLAN_INVALID";
   exactKeys(value, [
     "schema_version", "contract", "promotion_id", "promotion_generation", "rollback_operation_id",
-    "deployment", "candidate", "predecessor", "targets", "toolchain", "timeouts",
+    "deployment", "candidate", "predecessor", "targets", "reconciliation_authority",
+    "toolchain", "helpers", "timeouts",
     "max_output_bytes", "source_bindings", "action_matrix", "runtime_plan_sha256",
   ], code);
-  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_ROLLBACK_RUNTIME_PLAN_CONTRACT) reject(code);
+  if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_ROLLBACK_RUNTIME_PLAN_CONTRACT) reject(code);
   string(value.promotion_id, IDENTIFIER, code);
   string(value.rollback_operation_id, IDENTIFIER, code);
   integer(value.promotion_generation, 1, 1_000_000, code);
@@ -523,24 +701,37 @@ export function validateUatPromotionRollbackRuntimePlan(value) {
   digest(value.candidate.protected_resources_sha256, code);
   exactKeys(value.predecessor, [
     "release_manifest_sha256", "postdeploy_receipt_sha256", "runtime_configuration_sha256",
-    "web_image", "worker_image",
+    "web_image", "web_image_config_digest", "worker_image", "worker_image_config_digest",
   ], code);
   for (const field of [
     "release_manifest_sha256", "postdeploy_receipt_sha256", "runtime_configuration_sha256",
   ]) digest(value.predecessor[field], code);
   for (const field of ["web_image", "worker_image"]) string(value.predecessor[field], IMAGE_REFERENCE, code);
+  for (const field of ["web_image_config_digest", "worker_image_config_digest"]) {
+    string(value.predecessor[field], IMAGE_DIGEST, code);
+  }
   validateTargets(value.targets, value.rollback_operation_id, code);
+  try { validateUatPromotionRollbackReconciliationAuthority(value.reconciliation_authority, value); }
+  catch { reject(code); }
   for (const domain of ["uploads", "attachments", "backup_status"]) {
     if (value.targets.volumes[domain].target === value.candidate.volumes[domain].name) reject(code);
   }
-  exactKeys(value.toolchain, ["executor", "docker"], code);
-  validateTool(value.toolchain.executor, UAT_PROMOTION_ROLLBACK_RUNTIME_EXECUTOR, code);
-  validateTool(value.toolchain.docker, UAT_PROMOTION_ROLLBACK_RUNTIME_DOCKER, code);
+  exactKeys(value.toolchain, ["executor", "docker", "compose_plugin"], code);
+  validateTool(value.toolchain.executor, UAT_PROMOTION_ROLLBACK_RUNTIME_EXECUTOR, "0555", code);
+  validateTool(value.toolchain.docker, UAT_PROMOTION_ROLLBACK_RUNTIME_DOCKER, "0755", code);
+  validateTool(
+    value.toolchain.compose_plugin, UAT_PROMOTION_ROLLBACK_RUNTIME_COMPOSE_PLUGIN, "0755", code,
+  );
+  exactKeys(value.helpers, ["volume_restore"], code);
+  validateHelperImage(value.helpers.volume_restore, code);
   exactKeys(value.timeouts, Object.keys(UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS), code);
   if (!same(value.timeouts, UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS)) reject(code);
   if (value.max_output_bytes !== 4 * 1024 * 1024) reject(code);
   exactKeys(value.source_bindings, [
     "snapshot_objects_sha256", "snapshot_reconciliation_sha256", "deployment_environment_sha256",
+    "snapshot_manifest_sha256", "snapshot_policy_sha256",
+    "runtime_privilege_access_sha256", "runtime_privilege_compiled_catalog_sha256",
+    "runtime_privilege_policy_sha256", "runtime_privilege_operator_policy_sha256",
     "compose_file_sha256", "compose_release_file_sha256", "runtime_policy_sha256",
   ], code);
   for (const item of Object.values(value.source_bindings)) digest(item, code);
@@ -551,7 +742,7 @@ export function validateUatPromotionRollbackRuntimePlan(value) {
 
 export function createUatPromotionRollbackRuntimePlan(input) {
   const body = {
-    schema_version: 1,
+    schema_version: 3,
     contract: UAT_PROMOTION_ROLLBACK_RUNTIME_PLAN_CONTRACT,
     ...input,
     targets: deriveUatPromotionRollbackRuntimeTargets(input.rollback_operation_id),
@@ -563,6 +754,101 @@ export function createUatPromotionRollbackRuntimePlan(input) {
     ...body,
     runtime_plan_sha256: clusterSha256(body),
   }));
+}
+
+export function createUatPromotionRollbackComposeOverlay(planInput) {
+  const plan = validateUatPromotionRollbackRuntimePlan(planInput);
+  const target = plan.targets.volumes;
+  const content = [
+    "x-chenyida-erp-rollback:",
+    `  contract: ${UAT_PROMOTION_ROLLBACK_COMPOSE_OVERLAY_CONTRACT}`,
+    `  operation-id: ${plan.rollback_operation_id}`,
+    `  runtime-plan-sha256: ${plan.runtime_plan_sha256}`,
+    "services:",
+    "  web:",
+    `    image: ${JSON.stringify(plan.predecessor.web_image)}`,
+    "    environment:",
+    `      ERP_RUNTIME_IMAGE_REFERENCE: ${JSON.stringify(plan.predecessor.web_image)}`,
+    `      ERP_RUNTIME_IMAGE_CONFIG_DIGEST: ${JSON.stringify(plan.predecessor.web_image_config_digest)}`,
+    "    labels:",
+    `      chenyida.erp.uat-rollback-operation: ${plan.rollback_operation_id}`,
+    `      chenyida.erp.uat-rollback-runtime-plan: ${plan.runtime_plan_sha256}`,
+    "    volumes:",
+    "      - type: volume", "        source: erp_uploads", "        target: /data/chenyida-erp/uploads",
+    "      - type: volume", "        source: erp_attachments", "        target: /data/chenyida-erp/attachments",
+    "      - type: volume", "        source: erp_backup_status", "        target: /data/chenyida-erp/backup-status",
+    "        read_only: true",
+    "  worker:",
+    `    image: ${JSON.stringify(plan.predecessor.worker_image)}`,
+    "    environment:",
+    `      ERP_RUNTIME_IMAGE_REFERENCE: ${JSON.stringify(plan.predecessor.worker_image)}`,
+    `      ERP_RUNTIME_IMAGE_CONFIG_DIGEST: ${JSON.stringify(plan.predecessor.worker_image_config_digest)}`,
+    "    labels:",
+    `      chenyida.erp.uat-rollback-operation: ${plan.rollback_operation_id}`,
+    `      chenyida.erp.uat-rollback-runtime-plan: ${plan.runtime_plan_sha256}`,
+    "    volumes:",
+    "      - type: volume", "        source: erp_uploads", "        target: /data/chenyida-erp/uploads",
+    "      - type: volume", "        source: erp_attachments", "        target: /data/chenyida-erp/attachments",
+    "volumes:",
+    "  erp_uploads:", "    external: true", `    name: ${target.uploads.target}`,
+    "  erp_attachments:", "    external: true", `    name: ${target.attachments.target}`,
+    "  erp_backup_status:", "    external: true", `    name: ${target.backup_status.target}`,
+    "",
+  ].join("\n");
+  return Object.freeze({
+    contract: UAT_PROMOTION_ROLLBACK_COMPOSE_OVERLAY_CONTRACT,
+    content,
+    compose_rollback_overlay_sha256: createHash("sha256").update(content).digest("hex"),
+  });
+}
+
+export function deriveUatPromotionRollbackRuntimeProjection(planInput) {
+  const plan = validateUatPromotionRollbackRuntimePlan(planInput);
+  const overlay = createUatPromotionRollbackComposeOverlay(plan);
+  const body = {
+    schema_version: 2,
+    contract: UAT_PROMOTION_ROLLBACK_RUNTIME_PROJECTION_CONTRACT,
+    rollback_operation_id: plan.rollback_operation_id,
+    runtime_plan_sha256: plan.runtime_plan_sha256,
+    predecessor_runtime_configuration_sha256: plan.predecessor.runtime_configuration_sha256,
+    compose_rollback_overlay_sha256: overlay.compose_rollback_overlay_sha256,
+    database: {
+      active: plan.targets.database.active,
+      restored_staging: plan.targets.database.staging,
+      retained_candidate_quarantine: plan.targets.database.candidate_quarantine,
+    },
+    services: {
+      caddy: { disposition: "PRESERVE_EXACT_CANDIDATE", identity: plan.candidate.services.caddy },
+      postgres: { disposition: "PRESERVE_EXACT_CANDIDATE", identity: plan.candidate.services.postgres },
+      web: {
+        disposition: "RECREATE_FROM_PREDECESSOR_DIGEST",
+        image_reference: plan.predecessor.web_image,
+        image_config_digest: plan.predecessor.web_image_config_digest,
+      },
+      worker: {
+        disposition: "RECREATE_FROM_PREDECESSOR_DIGEST",
+        image_reference: plan.predecessor.worker_image,
+        image_config_digest: plan.predecessor.worker_image_config_digest,
+      },
+    },
+    volumes: Object.fromEntries(["uploads", "attachments", "backup_status"].map((domain) => [domain, {
+      active: plan.targets.volumes[domain].target,
+      retained_candidate: plan.candidate.volumes[domain],
+    }])),
+    network_disposition: "PRESERVE_EXISTING_COMPOSE_NETWORKS",
+    activation_argv_template: [
+      "/proc/self/fd/{compose_plugin_fd}", "--ansi", "never", "--progress", "quiet",
+      "--project-name", "chenyida-erp",
+      "--project-directory", plan.deployment.compose_project_root,
+      "--env-file", "/proc/self/fd/{deployment_environment_fd}",
+      "-f", "/proc/self/fd/{compose_fd}", "-f", "/proc/self/fd/{compose_release_fd}",
+      "-f", "/proc/self/fd/{rollback_overlay_fd}", "up", "--detach", "--no-deps",
+      "--pull", "never", "--no-build", "--force-recreate", "web", "worker",
+    ],
+  };
+  return Object.freeze({
+    ...body, rollback_runtime_projection_sha256: clusterSha256(body),
+  });
 }
 
 export function validateUatPromotionRollbackRuntimeActivation(
@@ -647,7 +933,9 @@ export function validateUatPromotionRollbackRuntimeRequest(value) {
   const executionDeadline = Date.parse(instant(value.execution_deadline, code));
   const authorizationExpires = Date.parse(instant(value.authorization_expires_at, code));
   const actionDeadline = Date.parse(instant(value.action_deadline, code));
-  const maximumActionMs = UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS[value.action] * 1_000;
+  const maximumActionMs = uatPromotionRollbackRuntimeTimeoutSeconds(
+    value.action, value.label,
+  ) * 1_000;
   if (actionDeadline <= requested || actionDeadline > authorizationExpires
     || value.execution_mode === "ORIGINAL" && actionDeadline > executionDeadline
     || actionDeadline - requested > maximumActionMs
@@ -669,6 +957,35 @@ export function createUatPromotionRollbackRuntimeRequest(input) {
   }));
 }
 
+export function validateUatPromotionRollbackHandlerUnknown(value, request = null) {
+  const code = "UAT_PROMOTION_ROLLBACK_HANDLER_UNKNOWN_INVALID";
+  exactKeys(value, [
+    "schema_version", "contract", "operation", "operation_id", "label", "request_action",
+    "uncertain_action", "idempotency_key", "reason_code", "phase", "state_sequence",
+    "last_event_sha256", "side_effects_started", "containment_required", "observed_at",
+    "unknown_sha256",
+  ], code);
+  if (value.schema_version !== 1 || value.contract !== UAT_PROMOTION_ROLLBACK_HANDLER_UNKNOWN_CONTRACT
+    || !new Set(["ROLLBACK_EXECUTION", "ROLLBACK_POSTVERIFY"]).has(value.operation)
+    || !new Set(["PREPARE", "EXECUTE", "PROBE", "CONTAIN"]).has(value.request_action)
+    || !new Set(["PREPARE", "EXECUTE", "PROBE", "CONTAIN"]).has(value.uncertain_action)
+    || !HANDLER_UNKNOWN_REASONS.has(value.reason_code)
+    || !HANDLER_UNKNOWN_PHASES.has(value.phase)
+    || typeof value.side_effects_started !== "boolean" || value.containment_required !== true) reject(code);
+  string(value.operation_id, IDENTIFIER, code);
+  string(value.label, /^[A-Z][A-Z0-9_]{1,79}$/u, code);
+  digest(value.idempotency_key, code);
+  digest(value.last_event_sha256, code, true);
+  integer(value.state_sequence, 0, 1_000_000, code);
+  instant(value.observed_at, code);
+  digest(value.unknown_sha256, code);
+  if (clusterSha256(without(value, "unknown_sha256")) !== value.unknown_sha256) reject(code);
+  if (request !== null && (value.operation !== request.operation
+    || value.operation_id !== request.operation_id || value.label !== request.label
+    || value.request_action !== request.action)) reject(code);
+  return value;
+}
+
 export function validateUatPromotionRollbackRuntimeResponse(value, request = null) {
   const code = "UAT_PROMOTION_ROLLBACK_RUNTIME_RESPONSE_INVALID";
   const allowedStatuses = {
@@ -680,8 +997,8 @@ export function validateUatPromotionRollbackRuntimeResponse(value, request = nul
       "SAFE_TO_EXECUTE", "EXACT_RESULT_ALREADY_DURABLE",
       "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT", "BLOCKED_TARGET_IDENTITY_MISMATCH",
     ]),
-    PREPARE: new Set(["PREPARED"]),
-    EXECUTE: new Set(["COMMITTED", "ALREADY_COMMITTED"]),
+    PREPARE: new Set(["PREPARED", "PARTIAL_OR_UNKNOWN"]),
+    EXECUTE: new Set(["COMMITTED", "ALREADY_COMMITTED", "PARTIAL_OR_UNKNOWN"]),
     PROBE: new Set(["COMMITTED", "VERIFIED", "PARTIAL_OR_UNKNOWN", "CONTAINED"]),
     CONTAIN: new Set(["CONTAINED", "STALE_INTENT"]),
   };
@@ -718,14 +1035,20 @@ export function validateUatPromotionRollbackRuntimeResponse(value, request = nul
       || value.output.target_state !== value.status) reject(code);
     validateUatPromotionRollbackRuntimeObservation(value.output.observed);
   }
-  if (value.action === "PREPARE") {
+  const labelUnknown = value.label !== null && value.status === "PARTIAL_OR_UNKNOWN";
+  if (labelUnknown) {
+    exactKeys(value.output, ["unknown"], code);
+    const unknown = validateUatPromotionRollbackHandlerUnknown(value.output.unknown, request);
+    if (unknown.idempotency_key !== value.idempotency_key) reject(code);
+  }
+  if (value.action === "PREPARE" && !labelUnknown) {
     exactKeys(value.output, ["record_intent"], code);
     const intent = value.operation === "ROLLBACK_EXECUTION"
       ? validateUatPromotionRollbackStageIntent(value.output.record_intent)
       : validateUatPromotionRollbackCheckIntent(value.output.record_intent);
     if (request !== null && !same(intent, request.payload.record_intent)) reject(code);
   }
-  if (value.action === "EXECUTE" || value.action === "PROBE" && value.label !== null) {
+  if (!labelUnknown && (value.action === "EXECUTE" || value.action === "PROBE" && value.label !== null)) {
     exactKeys(value.output, ["record"], code);
     const result = value.operation === "ROLLBACK_EXECUTION"
       ? validateUatPromotionRollbackStageResult(value.output.record)
@@ -762,8 +1085,10 @@ export function validateUatPromotionRollbackRuntimeResponse(value, request = nul
       ? "chenyida-erp.rollback.runtime-observation.v1"
       : `chenyida-erp.rollback.${request.label.toLowerCase().replaceAll("_", "-")}.v1`;
     const expectedIdempotencyKey = clusterSha256({
-      contract: "chenyida-erp-uat-promotion-rollback-idempotency-key/v1",
+      contract: "chenyida-erp-uat-promotion-rollback-idempotency-key/v2",
       operation_id: request.operation_id,
+      execution_mode: request.execution_mode,
+      action: request.action,
       label: request.label,
       record_intent_sha256: request.record_intent_sha256,
       runtime_plan_sha256: request.runtime_plan_sha256,

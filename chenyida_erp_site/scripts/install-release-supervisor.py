@@ -73,13 +73,13 @@ UAT_ROLLBACK_RUNTIME_ACTIVATION_FILE = UAT_ROLLBACK_RUNTIME_STATE_ROOT / "activa
 UAT_ROLLBACK_RUNTIME_CURRENT_FILE = UAT_ROLLBACK_RUNTIME_STATE_ROOT / "current-v2.json"
 UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE = Path("/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1")
 UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256 = \
-    "1089c159743a1480c28af322c83b295ead42c8555f6320911f1102115b494b04"
+    "f788b9eef1d677535e0a907504ff10c56e60d7007b7e62f4dc3a01561b4384a1"
 UAT_ROLLBACK_RUNTIME_CAPABILITY_STATUS = "BLOCKED_MISSING_UAT_CAPABLE_HANDLERS"
 UAT_ROLLBACK_RUNTIME_UNAVAILABLE_CAPABILITIES = [
     "ATTACHMENTS_CONTENT", "ATTACHMENTS_RESTORE", "BACKUP_STATUS_CONTENT",
     "BACKUP_STATUS_RESTORE", "CADDY_IDENTITY", "HEALTH", "MIGRATION_HEAD",
     "POSTGRESQL_CONTENT", "POSTGRESQL_RESTORE", "POSTGRES_IDENTITY",
-    "RUNTIME_CONFIGURATION", "STRICT_RELEASE_IDENTITY", "UPLOADS_CONTENT",
+    "STRICT_RELEASE_IDENTITY", "UPLOADS_CONTENT",
     "UPLOADS_RESTORE", "WEB_IDENTITY", "WEB_WORKER_PREDECESSOR_ACTIVATION",
     "WORKER_IDENTITY", "WRITER_CONTAINMENT",
 ]
@@ -99,7 +99,7 @@ ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 MAX_JSON_BYTES = 1024 * 1024
 MAX_BUNDLE_FILE_BYTES = 8 * 1024 * 1024
 MAX_BUNDLE_BYTES = 32 * 1024 * 1024
-MAX_BUNDLE_FILES = 149
+MAX_BUNDLE_FILES = 156
 RECEIPT_CONTRACT = "chenyida-erp-release-supervisor-install-receipt/v2"
 JOURNAL_CONTRACT = "chenyida-erp-release-supervisor-install-journal/v2"
 
@@ -1148,10 +1148,13 @@ def assert_no_uat_rollback_runtime_activation_interlock(
         if not isinstance(item, str) or not SHA256.fullmatch(item):
             reject(invalid)
         plan, _ = self_hashed(state_root / "plans" / f"{item}.json", "runtime_plan_sha256")
+        plan_version = (plan.get("schema_version"), plan.get("contract"))
         if plan["runtime_plan_sha256"] != item \
-                or plan.get("schema_version") != 1 \
-                or plan.get("contract") \
-                    != "chenyida-erp-uat-promotion-rollback-runtime-plan/v1" \
+                or plan_version not in {
+                    (1, "chenyida-erp-uat-promotion-rollback-runtime-plan/v1"),
+                    (2, "chenyida-erp-uat-promotion-rollback-runtime-plan/v2"),
+                    (3, "chenyida-erp-uat-promotion-rollback-runtime-plan/v3"),
+                } \
                 or plan.get("toolchain", {}).get("executor", {}).get("sha256") \
                     not in executor_digests \
                 or canonical_json(plan) != canonical_json(plan_values[item]):

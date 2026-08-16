@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,12 +8,20 @@ import test from "node:test";
 
 const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
 const compose = await readFile(new URL("../compose.yml", import.meta.url), "utf8");
+const volumeHelper = await readFile(new URL("../scripts/volume-restore-helper.sh", import.meta.url), "utf8");
+const volumeHelperContract = JSON.parse(await readFile(new URL("../operations/volume-restore-helper-contract-v1.json", import.meta.url), "utf8"));
 const sourcePackage = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const runtimePackagePath = "/tmp/chenyida-runtime-package.json";
 const nodeBase = "node@sha256:6c74791e557ce11fc957704f6d4fe134a7bc8d6f5ca4403205b2966bd488f6b3";
 const runtimeBase = "cgr.dev/chainguard/wolfi-base@sha256:5f3cb6adc6057b4084b8a1844ea16069d5d6be5a48da5a4856495b9a44bce4ed";
 const runtimeNodePackage = "nodejs-22-minimal=22.23.2-r1";
 const dockerfileFrontend = "docker.io/docker/dockerfile:1.7@sha256:b5f3b260a9678e1d83d2fce86eeddf79420b79147eaba2a25986f47133d73720";
+
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
 
 function generatorScript() {
   const match = dockerfile.match(/^RUN node --input-type=module -e '([^']+)'$/m);
@@ -99,8 +108,10 @@ test("build args fail closed and become OCI plus baked runtime identity in both 
       assert.notEqual(runReleaseValidator(script, version, commit).status, 0);
     }
   }
-  assert.equal((dockerfile.match(/^ARG ERP_BUILD_VERSION$/gm) || []).length, 3);
-  assert.equal((dockerfile.match(/^ARG ERP_BUILD_REVISION$/gm) || []).length, 3);
+  assert.equal((dockerfile.match(/^ARG ERP_BUILD_VERSION$/gm) || []).length, 4);
+  assert.equal((dockerfile.match(/^ARG ERP_BUILD_REVISION$/gm) || []).length, 4);
+  assert.equal((dockerfile.match(/^ARG ERP_BUILD_TREE$/gm) || []).length, 1);
+  assert.equal((dockerfile.match(/^ARG ERP_VOLUME_HELPER_CONTRACT_SHA256$/gm) || []).length, 1);
   assert.equal((dockerfile.match(/^LABEL org\.opencontainers\.image\.version=\$ERP_BUILD_VERSION org\.opencontainers\.image\.revision=\$ERP_BUILD_REVISION$/gm) || []).length, 2);
   assert.equal((dockerfile.match(/ERP_RUNTIME_BUILD_VERSION=\$ERP_BUILD_VERSION ERP_RUNTIME_GIT_COMMIT=\$ERP_BUILD_REVISION/g) || []).length, 2);
   assert.match(compose, /x-release-build-args: &release-build-args/);
@@ -127,6 +138,7 @@ test("pinned build and runtime bases keep migrations root-owned and final proces
       "dependencies AS worker-dependencies",
       `${runtimeBase} AS web`,
       `${runtimeBase} AS worker`,
+      `${runtimeBase} AS volume-restore-helper`,
     ],
   );
 
@@ -138,7 +150,10 @@ test("pinned build and runtime bases keep migrations root-owned and final proces
   assert.match(webStage, /find \.\/drizzle-postgres -type d -exec chmod 0555/);
   assert.match(webStage, /find \.\/drizzle-postgres -type f -exec chmod 0444/);
 
-  const workerStage = dockerfile.slice(dockerfile.indexOf(`FROM ${runtimeBase} AS worker`));
+  const workerStage = dockerfile.slice(
+    dockerfile.indexOf(`FROM ${runtimeBase} AS worker`),
+    dockerfile.indexOf(`FROM ${runtimeBase} AS volume-restore-helper`),
+  );
   assert.match(workerStage, /^RUN apk add --no-cache --repository=https:\/\/apk\.cgr\.dev\/chainguard nodejs-22-minimal=22\.23\.2-r1/m);
   assert.match(workerStage, /^COPY --from=worker-dependencies --chown=65532:65532 \/app\/node_modules \.\/node_modules$/m);
   assert.match(workerStage, /^COPY --from=dependencies --chown=65532:65532 \/tmp\/chenyida-runtime-package\.json \.\/package\.json$/m);
@@ -156,13 +171,39 @@ test("pinned build and runtime bases keep migrations root-owned and final proces
 test("candidate build pins its frontend and base while isolating the application build", () => {
   assert.equal(dockerfile.split("\n", 1)[0], `# syntax=${dockerfileFrontend}`);
   assert.equal((dockerfile.match(new RegExp(`^FROM ${nodeBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} AS `, "gm")) || []).length, 1);
-  assert.equal((dockerfile.match(new RegExp(`^FROM ${runtimeBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} AS `, "gm")) || []).length, 2);
+  assert.equal((dockerfile.match(new RegExp(`^FROM ${runtimeBase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} AS `, "gm")) || []).length, 3);
   assert.equal((dockerfile.match(/npm ci .*--no-audit --no-fund/g) || []).length, 1);
   assert.match(dockerfile, /^RUN --network=none NODE_OPTIONS=--max-old-space-size=1024 npm run build$/m);
   assert.match(dockerfile, /^RUN --network=none NODE_OPTIONS=--max-old-space-size=1024 npm prune --omit=dev --ignore-scripts --no-audit --no-fund$/m);
   assert.equal((dockerfile.match(new RegExp(`apk add --no-cache --repository=https:\\/\\/apk\\.cgr\\.dev\\/chainguard ${runtimeNodePackage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "g")) || []).length, 2);
   assert.equal((dockerfile.match(/\[ "\$\(node --version\)" = "v22\.23\.2" \]/g) || []).length, 2);
   assert.doesNotMatch(dockerfile, /FROM node:22-bookworm-slim(?:\s|$)/);
+});
+
+test("volume restore helper has a fixed root-only opcode toolchain and semantic contract", () => {
+  const { contract_sha256: contractSha256, ...body } = volumeHelperContract;
+  assert.equal(createHash("sha256").update(`${canonical(body)}\n`).digest("hex"), contractSha256);
+  assert.deepEqual(volumeHelperContract.toolchain, {
+    gnutar: "1.35-r11", gzip: "1.14-r8", coreutils: "9.11-r3", findutils: "4.11.0-r1",
+  });
+  const helperStage = dockerfile.slice(dockerfile.indexOf(`FROM ${runtimeBase} AS volume-restore-helper`));
+  assert.match(helperStage, /gnutar=1\.35-r11 gzip=1\.14-r8 coreutils=9\.11-r3 findutils=4\.11\.0-r1/);
+  assert.match(helperStage, new RegExp(contractSha256));
+  assert.match(helperStage, /io\.chenyida\.erp\.image-role=volume-restore-helper/);
+  assert.match(helperStage, /io\.chenyida\.erp\.volume-helper\.protocol=chenyida-erp-volume-helper\/v1/);
+  assert.match(helperStage, /^USER 0:0$/m);
+  assert.match(helperStage, /^ENTRYPOINT \["\/usr\/local\/bin\/chenyida-erp-volume-helper"\]$/m);
+  assert.match(helperStage, /^CMD \["unsupported"\]$/m);
+  assert.match(volumeHelper, /^\(set -o pipefail\)/m);
+  assert.match(volumeHelper, /capacity\)/);
+  assert.match(volumeHelper, /restore\)/);
+  assert.match(volumeHelper, /reconcile-uploads\|reconcile-attachments\)/);
+  assert.match(volumeHelper, /reconcile-backup-status\)/);
+  assert.match(volumeHelper, /probe\)/);
+  assert.match(volumeHelper, /--restrict --no-same-owner --no-same-permissions/);
+  assert.equal((volumeHelper.match(/-printf '%P\\0' \| sort -z \| while IFS= read -r -d '' relative/g) || []).length, 2);
+  assert.doesNotMatch(volumeHelper, /-printf '%P\\n'/);
+  assert.doesNotMatch(volumeHelper, /\beval\b|\bsh -c\b|\bbash -c\b/);
 });
 
 test("Compose uses readiness for Web and the exact process lease check for Worker", () => {

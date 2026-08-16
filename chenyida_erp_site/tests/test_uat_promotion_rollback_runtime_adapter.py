@@ -1,6 +1,7 @@
 import copy
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -20,11 +21,24 @@ ACTIVATION_PATH = "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime
 CURRENT_PATH = "/var/lib/chenyida-erp-release-supervisor/uat-rollback-runtime-adapter/current-v2.json"
 EXECUTOR_PATH = "/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1"
 DOCKER_PATH = "/usr/bin/docker"
+COMPOSE_PLUGIN_PATH = "/usr/libexec/docker/cli-plugins/docker-compose"
 LOCK_PATH = "/run/lock/chenyida-erp-release-gate-v1.lock"
+
+
+def load_adapter():
+    spec = importlib.util.spec_from_file_location("uat_rollback_runtime_adapter", ADAPTER_SOURCE)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+ADAPTER = load_adapter()
 ROLES = (
     "snapshot_readiness", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
     "snapshot_postgresql", "snapshot_uploads", "snapshot_attachments", "snapshot_backup_status",
-    "snapshot_policy", "snapshot_policy_activation", "predecessor_postdeploy_receipt",
+    "snapshot_policy", "snapshot_policy_activation", "snapshot_runtime_privilege_access",
+    "snapshot_runtime_privilege_compiled_catalog", "snapshot_runtime_privilege_policy",
+    "snapshot_runtime_privilege_operator_policy", "predecessor_postdeploy_receipt",
     "predecessor_release_manifest", "candidate_deployment_result", "candidate_postdeploy_identity",
     "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
     "runtime_adapter_activation",
@@ -39,14 +53,14 @@ CHECKS = (
     "MIGRATION_HEAD", "CADDY_IDENTITY", "POSTGRES_IDENTITY", "WEB_IDENTITY", "WORKER_IDENTITY",
     "RUNTIME_CONFIGURATION", "STRICT_RELEASE_IDENTITY", "HEALTH", "PROTECTED_RESOURCES",
 )
-EXECUTOR_CATALOG_SHA256 = "1089c159743a1480c28af322c83b295ead42c8555f6320911f1102115b494b04"
+EXECUTOR_CATALOG_SHA256 = "f788b9eef1d677535e0a907504ff10c56e60d7007b7e62f4dc3a01561b4384a1"
 UNAVAILABLE_CAPABILITIES = sorted({
     "WRITER_CONTAINMENT", "POSTGRESQL_RESTORE", "UPLOADS_RESTORE",
     "ATTACHMENTS_RESTORE", "BACKUP_STATUS_RESTORE",
     "WEB_WORKER_PREDECESSOR_ACTIVATION", "POSTGRESQL_CONTENT",
     "UPLOADS_CONTENT", "ATTACHMENTS_CONTENT", "BACKUP_STATUS_CONTENT",
     "MIGRATION_HEAD", "CADDY_IDENTITY", "POSTGRES_IDENTITY", "WEB_IDENTITY",
-    "WORKER_IDENTITY", "RUNTIME_CONFIGURATION", "STRICT_RELEASE_IDENTITY", "HEALTH",
+    "WORKER_IDENTITY", "STRICT_RELEASE_IDENTITY", "HEALTH",
 })
 
 
@@ -133,12 +147,13 @@ while True:
     manifest_raw.extend(chunk)
 fd_manifest = json.loads(manifest_raw)
 manifest_body = {key: value for key, value in fd_manifest.items() if key != "manifest_sha256"}
-if fd_manifest.get("contract") != "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v2" \
+if fd_manifest.get("schema_version") != 3 \
+        or fd_manifest.get("contract") != "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v3" \
         or fd_manifest.get("manifest_sha256") != sha(manifest_body) \
         or fd_manifest.get("executor", {}).get("path") != sys.argv[0] \
         or sorted(fd_manifest.get("sources", {})) != sorted(request["source_roles"]):
     raise SystemExit(90)
-for item in [fd_manifest["executor"], fd_manifest["docker"],
+for item in [fd_manifest["executor"], fd_manifest["docker"], fd_manifest["compose_plugin"],
              *fd_manifest["activation_chain"].values(), *fd_manifest["sources"].values()]:
     with open(item["path"], "rb") as trusted_handle:
         if hashlib.sha256(trusted_handle.read()).hexdigest() != item["sha256"]:
@@ -165,7 +180,9 @@ if MODE == "SWAP_SOURCE_BACK":
 if MODE == "SWAP_EXECUTOR_BACK":
     swap_named_path_back(fd_manifest["executor"]["path"], 0o555)
 if MODE == "SWAP_DOCKER_BACK":
-    swap_named_path_back(fd_manifest["docker"]["path"], 0o555)
+    swap_named_path_back(fd_manifest["docker"]["path"], 0o755)
+if MODE == "SWAP_COMPOSE_PLUGIN_BACK":
+    swap_named_path_back(fd_manifest["compose_plugin"]["path"], 0o755)
 if MODE in {"LEADER_EXIT_WITH_CHILD", "DETACHED_DAEMON"}:
     child = subprocess.Popen(
         ["/usr/bin/python3", "-c", "import time; time.sleep(60)"],
@@ -183,6 +200,8 @@ if MODE == "OVERSIZE":
     os.write(1, b"x" * (4 * 1024 * 1024 + 1))
     time.sleep(60)
 package = request["payload"]["execution_package"]
+with open(fd_manifest["sources"]["runtime_adapter_activation"]["path"], encoding="utf-8") as handle:
+    runtime_plan = json.load(handle)["plan"]
 status = {
     "PREFLIGHT": "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT"
         if request["execution_mode"] == "RECOVERY" else "SAFE_TO_EXECUTE",
@@ -217,13 +236,7 @@ if request["action"] in {"PREFLIGHT", "RECHECK"} \
         }
         for service in ("caddy", "postgres", "web", "worker")
     }
-    volumes = {
-        domain: {
-            "domain": domain, "name": f"chenyida-erp_erp_{domain}",
-            "identity_sha256": hashlib.sha256(f"volume:{domain}".encode()).hexdigest(),
-        }
-        for domain in ("uploads", "attachments", "backup_status")
-    }
+    volumes = runtime_plan["candidate"]["volumes"]
     writer_members = [
         {
             "writer_key": service,
@@ -337,6 +350,126 @@ sys.stdout.buffer.write(canonical(body))
 '''
 
 
+def actual_volume_document(domain):
+    name = f"chenyida-erp_erp_{domain}"
+    index = {"uploads": 1, "attachments": 2, "backup_status": 3}[domain]
+    return {
+        "CreatedAt": f"2026-08-16T02:03:0{index}.123456789Z",
+        "Driver": "local", "Labels": None,
+        "Mountpoint": f"/var/lib/docker/volumes/{name}/_data",
+        "Name": name, "Options": None, "Scope": "local",
+    }
+
+
+def actual_volume_identity(domain):
+    value = actual_volume_document(domain)
+    projection = {
+        "name": value["Name"], "driver": value["Driver"], "scope": value["Scope"],
+        "mountpoint": value["Mountpoint"], "created_at": value["CreatedAt"],
+        "labels": {}, "options": {},
+    }
+    return sha(projection)
+
+
+ACTUAL_DOCKER_TEMPLATE = r'''#!/usr/bin/python3
+import hashlib
+import json
+import sys
+
+def digest(value):
+    return hashlib.sha256(value.encode()).hexdigest()
+
+def emit(value):
+    sys.stdout.write(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
+
+services = ("caddy", "postgres", "web", "worker")
+by_service = {service: {
+    "container_id": digest(f"container:{service}"),
+    "image_reference": f"registry.example.com/chenyida/{service}@sha256:{digest(f'ref:{service}')}",
+    "image_digest": f"sha256:{digest(f'image:{service}')}",
+} for service in services}
+by_id = {item["container_id"]: (service, item) for service, item in by_service.items()}
+arguments = sys.argv[1:]
+
+if arguments and arguments[0] == "ps":
+    if any(item == "label=com.docker.compose.project=chenyida-erp" for item in arguments):
+        sys.stdout.write("\n".join(sorted(by_id)) + "\n")
+    raise SystemExit(0)
+
+if arguments[:3] == ["inspect", "--type", "container"]:
+    identifiers = arguments[arguments.index("--") + 1:]
+    for identifier in identifiers:
+        service, item = by_id[identifier]
+        networks = {
+            "caddy": {"chenyida-erp_edge": {}},
+            "postgres": {"chenyida-erp_backend": {}},
+            "web": {"chenyida-erp_backend": {}, "chenyida-erp_edge": {}},
+            "worker": {"chenyida-erp_backend": {}},
+        }[service]
+        mounts = []
+        if service in {"web", "worker"}:
+            for domain, destination in (
+                ("uploads", "/data/chenyida-erp/uploads"),
+                ("attachments", "/data/chenyida-erp/attachments"),
+            ):
+                mounts.append({
+                    "Type": "volume", "Name": f"chenyida-erp_erp_{domain}",
+                    "Destination": destination, "RW": True,
+                })
+        if service == "web":
+            mounts.append({
+                "Type": "volume", "Name": "chenyida-erp_erp_backup_status",
+                "Destination": "/data/chenyida-erp/backup-status", "RW": False,
+            })
+        emit([
+            identifier, f"/chenyida-erp-{service}-1", item["image_digest"],
+            item["image_reference"], {
+                "com.docker.compose.project": "chenyida-erp",
+                "com.docker.compose.service": service,
+            }, "running", None if service == "caddy" else {"Status": "healthy"},
+            0, False, mounts, networks, "65532:65532", True, ["ALL"], None,
+            ["no-new-privileges:true"], next(iter(networks)),
+        ])
+    raise SystemExit(0)
+
+if arguments[:2] == ["volume", "ls"]:
+    selected = next(item for item in arguments if item.startswith("name=^"))[6:-1]
+    if selected in {
+        "chenyida-erp_erp_uploads", "chenyida-erp_erp_attachments",
+        "chenyida-erp_erp_backup_status",
+    }:
+        sys.stdout.write(selected + "\n")
+    raise SystemExit(0)
+
+if arguments[:2] == ["volume", "inspect"]:
+    name = arguments[-1]
+    domain = name.removeprefix("chenyida-erp_erp_")
+    index = {"uploads": 1, "attachments": 2, "backup_status": 3}[domain]
+    emit({
+        "CreatedAt": f"2026-08-16T02:03:0{index}.123456789Z",
+        "Driver": "local", "Labels": None,
+        "Mountpoint": f"/var/lib/docker/volumes/{name}/_data",
+        "Name": name, "Options": None, "Scope": "local",
+    })
+    raise SystemExit(0)
+
+if arguments and arguments[0] == "exec":
+    emit({
+        "system_identifier": "7612345678901234567",
+        "databases": [{
+            "name": "chenyida_erp", "oid": "16384",
+            "marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp",
+            "allow_connections": True, "connection_limit": 64,
+            "default_transaction_read_only": False,
+            "writer_sessions": 0, "prepared_xacts": 0,
+        }],
+    })
+    raise SystemExit(0)
+
+raise SystemExit(97)
+'''
+
+
 class RuntimeAdapterFixture:
     def __init__(self, mode="NORMAL", *, expired_runtime=False):
         self.temporary = tempfile.TemporaryDirectory(prefix="uat-rollback-adapter-", dir="/tmp")
@@ -365,8 +498,16 @@ class RuntimeAdapterFixture:
         self.executor.chmod(0o555)
         self.docker = self.physical(DOCKER_PATH)
         self.docker.parent.mkdir(parents=True, exist_ok=True)
-        self.docker.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
-        self.docker.chmod(0o555)
+        self.docker.write_text(
+            ACTUAL_DOCKER_TEMPLATE if mode == "ACTUAL_FIXED_EXECUTOR"
+            else "#!/bin/sh\nexit 99\n",
+            encoding="utf-8",
+        )
+        self.docker.chmod(0o755)
+        self.compose_plugin = self.physical(COMPOSE_PLUGIN_PATH)
+        self.compose_plugin.parent.mkdir(parents=True, exist_ok=True)
+        self.compose_plugin.write_text("#!/bin/sh\nexit 98\n", encoding="utf-8")
+        self.compose_plugin.chmod(0o755)
         self.lock = self.physical(LOCK_PATH)
         self.lock.parent.mkdir(parents=True, exist_ok=True)
         self.lock.write_bytes(b"")
@@ -465,9 +606,38 @@ class RuntimeAdapterFixture:
             "class": "UAT", "id": "chenyida-erp", "compose_project": "chenyida-erp",
             "compose_project_root": "/opt/erp/chenyida_erp_site", "database": database,
         }
-        plan = {
+        targets = derive_targets(self.operation_id)
+        reconciliation_authority_body = {
             "schema_version": 1,
-            "contract": "chenyida-erp-uat-promotion-rollback-runtime-plan/v1",
+            "contract": "chenyida-erp-uat-promotion-rollback-reconciliation-authority/v1",
+            "authority_id": "runtime-adapter-reconciliation-001",
+            "status": "AUTHORIZED", "environment": "UAT",
+            "promotion_id": "promotion-runtime-adapter-001", "promotion_generation": 1,
+            "rollback_operation_id": self.operation_id, "deployment_id": "chenyida-erp",
+            "approval_reference_sha256": hashlib.sha256(b"reconciliation-approval").hexdigest(),
+            "requester_identity_sha256": hashlib.sha256(b"reconciliation-requester").hexdigest(),
+            "approver_identity_sha256": hashlib.sha256(b"reconciliation-approver").hexdigest(),
+            "approved_at": timestamp(created), "expires_at": timestamp(deadline), "one_time": True,
+            "mutation_scope": {
+                "active_database": targets["database"]["active"],
+                "staging_database": targets["database"]["staging"],
+                "candidate_quarantine_database": targets["database"]["candidate_quarantine"],
+                "database_local_only": True, "allow_staging_database_create": True,
+                "allow_staging_logical_restore": True,
+                "allow_staging_privilege_reconcile": True,
+                "allow_atomic_database_switch": True, "allow_active_database_unseal": True,
+                "allow_role_create": False, "allow_role_alter": False,
+                "allow_membership_change": False, "allow_password_change": False,
+                "allow_tablespace_acl_change": False,
+            },
+        }
+        reconciliation_authority = {
+            **reconciliation_authority_body,
+            "authority_sha256": sha(reconciliation_authority_body),
+        }
+        plan = {
+            "schema_version": 3,
+            "contract": "chenyida-erp-uat-promotion-rollback-runtime-plan/v3",
             "promotion_id": "promotion-runtime-adapter-001", "promotion_generation": 1,
             "rollback_operation_id": self.operation_id,
             "deployment": deployment,
@@ -484,7 +654,7 @@ class RuntimeAdapterFixture:
                 "volumes": {
                     domain: {
                         "domain": domain, "name": f"chenyida-erp_erp_{domain}",
-                        "identity_sha256": hashlib.sha256(f"volume:{domain}".encode()).hexdigest(),
+                        "identity_sha256": actual_volume_identity(domain),
                     }
                     for domain in ("uploads", "attachments", "backup_status")
                 },
@@ -494,9 +664,13 @@ class RuntimeAdapterFixture:
                 "release_manifest_sha256": predecessor["release_manifest_sha256"],
                 "postdeploy_receipt_sha256": sources["predecessor_postdeploy_receipt"]["sha256"],
                 "runtime_configuration_sha256": predecessor["runtime_configuration_sha256"],
-                "web_image": predecessor["web_image"], "worker_image": predecessor["worker_image"],
+                "web_image": predecessor["web_image"],
+                "web_image_config_digest": f"sha256:{'6' * 64}",
+                "worker_image": predecessor["worker_image"],
+                "worker_image_config_digest": f"sha256:{'7' * 64}",
             },
-            "targets": derive_targets(self.operation_id),
+            "targets": targets,
+            "reconciliation_authority": reconciliation_authority,
             "toolchain": {
                 "executor": {
                     "path": EXECUTOR_PATH, "sha256": sha_bytes(self.executor.read_bytes()),
@@ -504,7 +678,32 @@ class RuntimeAdapterFixture:
                 },
                 "docker": {
                     "path": DOCKER_PATH, "sha256": sha_bytes(self.docker.read_bytes()),
-                    "uid": 0, "gid": 0, "mode": "0555",
+                    "uid": 0, "gid": 0, "mode": "0755",
+                },
+                "compose_plugin": {
+                    "path": COMPOSE_PLUGIN_PATH,
+                    "sha256": sha_bytes(self.compose_plugin.read_bytes()),
+                    "uid": 0, "gid": 0, "mode": "0755",
+                },
+            },
+            "helpers": {
+                "volume_restore": {
+                    "image_reference": f"registry.example.com/chenyida/volume-helper@sha256:{'e' * 64}",
+                    "image_config_digest": f"sha256:{'f' * 64}",
+                    "application_version": "0.1.0-alpha.47",
+                    "git_commit": "1" * 40,
+                    "git_tree": "2" * 40,
+                    "image_role": "volume-restore-helper",
+                    "platform": "linux/amd64",
+                    "protocol": "chenyida-erp-volume-helper/v1",
+                    "contract_sha256":
+                        "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d",
+                    "evidence_run_id": "helper-evidence-fixture",
+                    "backup_status_reader_gid": 1000,
+                    "build_provenance_sha256": sha("helper-build-provenance"),
+                    "sbom_evidence_sha256": sha("helper-sbom-evidence"),
+                    "security_evidence_sha256": sha("helper-security-evidence"),
+                    "supervisor_bundle_sha256": self.bundle_sha,
                 },
             },
             "timeouts": {
@@ -516,6 +715,16 @@ class RuntimeAdapterFixture:
                 "snapshot_objects_sha256": sha(snapshot_objects),
                 "snapshot_reconciliation_sha256": sources["snapshot_reconciliation"]["sha256"],
                 "deployment_environment_sha256": sources["deployment_environment"]["sha256"],
+                "snapshot_manifest_sha256": sources["snapshot_manifest"]["sha256"],
+                "snapshot_policy_sha256": sources["snapshot_policy"]["sha256"],
+                "runtime_privilege_access_sha256":
+                    sources["snapshot_runtime_privilege_access"]["sha256"],
+                "runtime_privilege_compiled_catalog_sha256":
+                    sources["snapshot_runtime_privilege_compiled_catalog"]["sha256"],
+                "runtime_privilege_policy_sha256":
+                    sources["snapshot_runtime_privilege_policy"]["sha256"],
+                "runtime_privilege_operator_policy_sha256":
+                    sources["snapshot_runtime_privilege_operator_policy"]["sha256"],
                 "compose_file_sha256": sources["compose_file"]["sha256"],
                 "compose_release_file_sha256": sources["compose_release_file"]["sha256"],
                 "runtime_policy_sha256": sources["runtime_policy"]["sha256"],
@@ -631,8 +840,8 @@ class RuntimeAdapterFixture:
         }
         reconciliation["binding_sha256"] = sha(reconciliation)
         package = {
-            "schema_version": 2,
-            "contract": "chenyida-erp-uat-promotion-rollback-execution-package/v2",
+            "schema_version": 3,
+            "contract": "chenyida-erp-uat-promotion-rollback-execution-package/v3",
             "promotion_id": plan["promotion_id"], "promotion_generation": 1,
             "rollback_operation_id": self.operation_id,
             "created_at": timestamp(created), "execution_deadline": timestamp(deadline),
@@ -783,12 +992,80 @@ class RuntimeAdapterFixture:
 
 
 class UatPromotionRollbackRuntimeAdapterTest(unittest.TestCase):
-    def test_actual_fixed_executor_validates_gateway_manifest_then_reports_capability_blocker(self):
+    def test_postgresql_content_probe_gets_the_same_twenty_minute_adapter_budget(self):
+        fixture = RuntimeAdapterFixture()
+        self.addCleanup(fixture.close)
+        request = copy.deepcopy(fixture.request)
+        requested = datetime.fromisoformat(request["requested_at"].replace("Z", "+00:00"))
+        request["action"] = "PROBE"
+        request["operation"] = "ROLLBACK_POSTVERIFY"
+        request["label"] = "POSTGRESQL_CONTENT"
+        request["source_roles"] = list(ADAPTER.derive_source_roles(
+            request["action"], request["operation"], request["label"],
+        ))
+        request["action_deadline"] = timestamp(requested + timedelta(minutes=20))
+        request["request_sha256"] = sha(without(request, "request_sha256"))
+
+        validated = ADAPTER.validate_request(
+            request, request["action"], request["operation_id"], request["label"],
+        )
+
+        self.assertIs(validated, request)
+        self.assertEqual(ADAPTER.action_timeout_seconds("PROBE", "POSTGRESQL_CONTENT"), 1200)
+        self.assertEqual(
+            ADAPTER.bounded_executor_timeout_seconds(request, requested), 1200,
+        )
+
+    def test_non_postgresql_probe_cannot_reuse_the_twenty_minute_adapter_budget(self):
+        fixture = RuntimeAdapterFixture()
+        self.addCleanup(fixture.close)
+        request = copy.deepcopy(fixture.request)
+        requested = datetime.fromisoformat(request["requested_at"].replace("Z", "+00:00"))
+        request["action"] = "PROBE"
+        request["operation"] = "ROLLBACK_POSTVERIFY"
+        request["label"] = "HEALTH"
+        request["source_roles"] = list(ADAPTER.derive_source_roles(
+            request["action"], request["operation"], request["label"],
+        ))
+        request["action_deadline"] = timestamp(requested + timedelta(minutes=20))
+        request["request_sha256"] = sha(without(request, "request_sha256"))
+
+        with self.assertRaisesRegex(
+            ADAPTER.AdapterError, "ROLLBACK_RUNTIME_REQUEST_TIME_INVALID",
+        ):
+            ADAPTER.validate_request(
+                request, request["action"], request["operation_id"], request["label"],
+            )
+        self.assertEqual(ADAPTER.action_timeout_seconds("PROBE", "HEALTH"), 300)
+        self.assertEqual(
+            ADAPTER.bounded_executor_timeout_seconds(request, requested), 300,
+        )
+
+    def test_runtime_configuration_uses_the_same_internal_argv_binding_as_executor(self):
+        self.assertEqual(
+            ADAPTER.fixed_argv_template({"label": "RUNTIME_CONFIGURATION"}),
+            ["EXECUTOR_INTERNAL", "RUNTIME_CONFIGURATION"],
+        )
+
+    def test_actual_fixed_executor_reaches_operation_preflight_through_gateway_manifest(self):
         fixture = RuntimeAdapterFixture(mode="ACTUAL_FIXED_EXECUTOR")
         self.addCleanup(fixture.close)
         result = fixture.invoke()
-        self.assertNotEqual(result.returncode, 0)
-        self.assertEqual(result.stderr, b"ROLLBACK_RUNTIME_UAT_CAPABILITY_UNAVAILABLE\n")
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+        self.assertEqual(result.stderr, b"")
+        response = json.loads(result.stdout)
+        self.assertEqual(response["status"], "SAFE_TO_EXECUTE")
+        self.assertEqual(
+            response["output"]["observed"]["active_generation"], "CANDIDATE",
+        )
+        self.assertEqual(
+            response["output"]["observed"],
+            response["output"]["observed"] | {
+                "observation_sha256": sha(without(
+                    response["output"]["observed"], "observation_sha256",
+                )),
+            },
+        )
 
     def test_fake_root_preflight_binds_activation_plan_tools_and_target(self):
         fixture = RuntimeAdapterFixture()
@@ -896,6 +1173,13 @@ class UatPromotionRollbackRuntimeAdapterTest(unittest.TestCase):
         result = fixture.invoke()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(b"ROLLBACK_RUNTIME_DOCKER_CHANGED", result.stderr)
+
+    def test_compose_plugin_swap_back_uses_the_open_descriptor_and_fails_named_path_recheck(self):
+        fixture = RuntimeAdapterFixture(mode="SWAP_COMPOSE_PLUGIN_BACK")
+        self.addCleanup(fixture.close)
+        result = fixture.invoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b"ROLLBACK_RUNTIME_COMPOSE_PLUGIN_CHANGED", result.stderr)
 
     def test_unexpected_writer_cannot_reuse_a_known_nonwriter_service_identity(self):
         fixture = RuntimeAdapterFixture(mode="CONFLICTING_WRITER_SERVICE_ID")

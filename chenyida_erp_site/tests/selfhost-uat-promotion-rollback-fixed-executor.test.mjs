@@ -20,6 +20,7 @@ import {
   createUatRollbackRuntimeActivationIntent,
   createUatRollbackRuntimeActivationObjects,
   fixedUatRollbackHandler,
+  uatRollbackFixedExecutorIdempotencyKey,
   validateUatRollbackFixedExecutorCatalog,
   validateUatRollbackRuntimeActivationAlias,
 } from "../scripts/uat-promotion-rollback-fixed-executor-contract.mjs";
@@ -30,7 +31,9 @@ import {
 } from "../scripts/uat-promotion-rollback-runtime-activation-publisher.mjs";
 import {
   UAT_PROMOTION_ROLLBACK_RUNTIME_DOCKER,
+  UAT_PROMOTION_ROLLBACK_RUNTIME_COMPOSE_PLUGIN,
   UAT_PROMOTION_ROLLBACK_RUNTIME_EXECUTOR,
+  createUatPromotionRollbackReconciliationAuthority,
   createUatPromotionRollbackRuntimePlan,
 } from "../scripts/uat-promotion-rollback-runtime-contract.mjs";
 
@@ -65,8 +68,20 @@ function runtimePlan(operationId, executorSha256) {
       release_manifest_sha256: digest("predecessor-manifest"),
       postdeploy_receipt_sha256: digest("predecessor-receipt"),
       runtime_configuration_sha256: digest("predecessor-runtime"),
-      web_image: image("predecessor-web"), worker_image: image("predecessor-worker"),
+      web_image: image("predecessor-web"),
+      web_image_config_digest: `sha256:${digest("predecessor-web-config")}`,
+      worker_image: image("predecessor-worker"),
+      worker_image_config_digest: `sha256:${digest("predecessor-worker-config")}`,
     },
+    reconciliation_authority: createUatPromotionRollbackReconciliationAuthority({
+      authority_id: `reconciliation-${operationId}`,
+      promotion_id: "promotion-fixed-executor-001", promotion_generation: 1,
+      rollback_operation_id: operationId,
+      approval_reference_sha256: digest(`approval:${operationId}`),
+      requester_identity_sha256: digest(`requester:${operationId}`),
+      approver_identity_sha256: digest(`approver:${operationId}`),
+      approved_at: "2026-08-15T03:00:00.000Z", expires_at: "2026-08-16T03:00:00.000Z",
+    }),
     toolchain: {
       executor: {
         path: UAT_PROMOTION_ROLLBACK_RUNTIME_EXECUTOR,
@@ -74,12 +89,40 @@ function runtimePlan(operationId, executorSha256) {
       },
       docker: {
         path: UAT_PROMOTION_ROLLBACK_RUNTIME_DOCKER,
-        sha256: digest("docker-binary"), uid: 0, gid: 0, mode: "0555",
+        sha256: digest("docker-binary"), uid: 0, gid: 0, mode: "0755",
+      },
+      compose_plugin: {
+        path: UAT_PROMOTION_ROLLBACK_RUNTIME_COMPOSE_PLUGIN,
+        sha256: digest("compose-plugin-binary"), uid: 0, gid: 0, mode: "0755",
+      },
+    },
+    helpers: {
+      volume_restore: {
+        image_reference: image("volume-restore-helper"),
+        image_config_digest: `sha256:${digest("volume-restore-helper-config")}`,
+        application_version: "0.1.0-alpha.47",
+        git_commit: "1".repeat(40), git_tree: "2".repeat(40),
+        image_role: "volume-restore-helper", platform: "linux/amd64",
+        protocol: "chenyida-erp-volume-helper/v1",
+        contract_sha256: "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d",
+        evidence_run_id: "helper-evidence-fixture",
+        backup_status_reader_gid: 1000,
+        build_provenance_sha256: digest("helper-build-provenance"),
+        sbom_evidence_sha256: digest("helper-sbom-evidence"),
+        security_evidence_sha256: digest("helper-security-evidence"),
+        supervisor_bundle_sha256: digest("helper-supervisor-bundle"),
       },
     },
     source_bindings: {
       snapshot_objects_sha256: digest("snapshot-objects"),
       snapshot_reconciliation_sha256: digest("snapshot-reconciliation"),
+      snapshot_manifest_sha256: digest("snapshot-manifest"),
+      snapshot_policy_sha256: digest("snapshot-policy"),
+      runtime_privilege_access_sha256: digest("runtime-privilege-access"),
+      runtime_privilege_compiled_catalog_sha256:
+        digest("runtime-privilege-compiled-catalog"),
+      runtime_privilege_policy_sha256: digest("runtime-privilege-policy"),
+      runtime_privilege_operator_policy_sha256: digest("runtime-privilege-operator-policy"),
       deployment_environment_sha256: digest("deployment-environment"),
       compose_file_sha256: digest("compose-file"),
       compose_release_file_sha256: digest("compose-release-file"),
@@ -211,6 +254,26 @@ test("fixed catalog is an exact 9-stage/13-check closed set with no TEST restore
     "BLOCKED_MISSING_UAT_CAPABLE_HANDLERS");
   assert.ok(UAT_ROLLBACK_FIXED_EXECUTOR_CATALOG.forbidden_tools.every((tool) =>
     !UAT_ROLLBACK_FIXED_EXECUTOR_CATALOG.handlers.some((entry) => entry.argv_template.includes(tool))));
+});
+
+test("fixed handler idempotency is isolated by action and execution mode", () => {
+  const request = {
+    operation: "ROLLBACK_EXECUTION",
+    operation_id: "rollback-idempotency-001",
+    execution_mode: "ORIGINAL",
+    action: "PREPARE",
+    label: "POSTGRESQL_RESTORE",
+    record_intent_sha256: digest("record-intent"),
+    runtime_plan_sha256: digest("runtime-plan"),
+    previous_result_sha256: UAT_ROLLBACK_ZERO_SHA256,
+  };
+  const prepared = uatRollbackFixedExecutorIdempotencyKey(request);
+  const executed = uatRollbackFixedExecutorIdempotencyKey({ ...request, action: "EXECUTE" });
+  const probed = uatRollbackFixedExecutorIdempotencyKey({ ...request, action: "PROBE" });
+  const recovered = uatRollbackFixedExecutorIdempotencyKey({
+    ...request, execution_mode: "RECOVERY", action: "PROBE",
+  });
+  assert.equal(new Set([prepared, executed, probed, recovered]).size, 4);
 });
 
 test("activation objects bind plan, executor, actors, generation, and every immutable digest", async () => {

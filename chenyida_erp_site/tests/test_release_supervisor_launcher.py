@@ -23,16 +23,56 @@ def utc(value):
 def uat_rollback_activation_authorization(bundle_digest, now, *, recovery=False):
     activation_id = "uat-rollback-runtime-activation-001"
     source_sha256 = "1" * 64
-    plan = {
+    target_token = supervisor.sha256(supervisor.canonical_json({
+        "contract": "chenyida-erp-uat-promotion-rollback-target-derivation/v1",
+        "operation_id": "rollback-001",
+    }))[:16]
+    targets = {
+        "database": {
+            "active": "chenyida_erp",
+            "staging": f"chenyida_erp_rb_{target_token}",
+            "candidate_quarantine": f"chenyida_erp_candidate_{target_token}",
+        },
+    }
+    reconciliation_body = {
         "schema_version": 1,
-        "contract": "chenyida-erp-uat-promotion-rollback-runtime-plan/v1",
+        "contract": "chenyida-erp-uat-promotion-rollback-reconciliation-authority/v1",
+        "authority_id": "uat-rollback-reconciliation-001",
+        "status": "AUTHORIZED", "environment": "UAT",
+        "promotion_id": "promotion-001", "promotion_generation": 1,
+        "rollback_operation_id": "rollback-001", "deployment_id": "chenyida-erp",
+        "approval_reference_sha256": "b" * 64,
+        "requester_identity_sha256": "c" * 64,
+        "approver_identity_sha256": "d" * 64,
+        "approved_at": utc(now - timedelta(minutes=2)),
+        "expires_at": utc(now + timedelta(minutes=11)), "one_time": True,
+        "mutation_scope": {
+            "active_database": targets["database"]["active"],
+            "staging_database": targets["database"]["staging"],
+            "candidate_quarantine_database": targets["database"]["candidate_quarantine"],
+            "database_local_only": True, "allow_staging_database_create": True,
+            "allow_staging_logical_restore": True, "allow_staging_privilege_reconcile": True,
+            "allow_atomic_database_switch": True, "allow_active_database_unseal": True,
+            "allow_role_create": False, "allow_role_alter": False,
+            "allow_membership_change": False, "allow_password_change": False,
+            "allow_tablespace_acl_change": False,
+        },
+    }
+    reconciliation_authority = {
+        **reconciliation_body,
+        "authority_sha256": supervisor.sha256(supervisor.canonical_json(reconciliation_body)),
+    }
+    plan = {
+        "schema_version": 3,
+        "contract": "chenyida-erp-uat-promotion-rollback-runtime-plan/v3",
         "promotion_id": "promotion-001",
         "promotion_generation": 1,
         "rollback_operation_id": "rollback-001",
         "deployment": {},
         "candidate": {},
         "predecessor": {},
-        "targets": {},
+        "targets": targets,
+        "reconciliation_authority": reconciliation_authority,
         "toolchain": {
             "executor": {
                 "path": str(supervisor.UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE),
@@ -40,7 +80,31 @@ def uat_rollback_activation_authorization(bundle_digest, now, *, recovery=False)
             },
             "docker": {
                 "path": "/usr/bin/docker", "sha256": "2" * 64,
-                "uid": 0, "gid": 0, "mode": "0555",
+                "uid": 0, "gid": 0, "mode": "0755",
+            },
+            "compose_plugin": {
+                "path": "/usr/libexec/docker/cli-plugins/docker-compose", "sha256": "8" * 64,
+                "uid": 0, "gid": 0, "mode": "0755",
+            },
+        },
+        "helpers": {
+            "volume_restore": {
+                "image_reference": f"registry.example.invalid/chenyida/volume-helper@sha256:{'9' * 64}",
+                "image_config_digest": f"sha256:{'a' * 64}",
+                "application_version": "0.1.0-alpha.47",
+                "git_commit": "1" * 40,
+                "git_tree": "2" * 40,
+                "image_role": "volume-restore-helper",
+                "platform": "linux/amd64",
+                "protocol": "chenyida-erp-volume-helper/v1",
+                "contract_sha256":
+                    "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d",
+                "evidence_run_id": "helper-evidence-fixture",
+                "backup_status_reader_gid": 1000,
+                "build_provenance_sha256": supervisor.sha256(b"helper-build-provenance"),
+                "sbom_evidence_sha256": supervisor.sha256(b"helper-sbom-evidence"),
+                "security_evidence_sha256": supervisor.sha256(b"helper-security-evidence"),
+                "supervisor_bundle_sha256": bundle_digest,
             },
         },
         "timeouts": {},
@@ -319,6 +383,39 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
             self.assertEqual(operation_command[operation_command.index("--git-tree") + 1], "b" * 40)
             self.assertEqual(operation_command[operation_command.index("--candidate-snapshot-receipt-sha256") + 1], "0" * 64)
             self.assertEqual(operation_command[operation_command.index("--test-runtime-root") + 1], "/opt/erp")
+        helper_parameters = {
+            "repository_root": "/opt/erp",
+            "git_commit": "a" * 40,
+            "git_tree": "b" * 40,
+            "manifest_commit": "c" * 40,
+            "manifest_tree": "d" * 40,
+            "artifact_root": "/var/lib/chenyida-erp/release-artifacts/helper-fixture",
+            "run_id": "helper-fixture",
+            "trivy_db_directory": "/var/lib/chenyida-erp/trivy-db",
+        }
+        supervisor.validate_parameters("CREATE_VOLUME_HELPER_IMAGE_EVIDENCE", helper_parameters)
+        helper_command = supervisor.command_for(Path("/trusted/bundle"), {
+            "operation": "CREATE_VOLUME_HELPER_IMAGE_EVIDENCE",
+            "parameters": helper_parameters,
+        })
+        self.assertEqual(
+            helper_command[0],
+            "/trusted/bundle/chenyida_erp_site/scripts/build-volume-restore-helper-image.sh",
+        )
+        for name, value in helper_parameters.items():
+            self.assertEqual(helper_command[helper_command.index(f"--{name.replace('_', '-')}") + 1], value)
+        self.assertEqual(
+            helper_command[-2:],
+            ["--confirm", "BUILD_AND_SCAN_EXACT_VOLUME_RESTORE_HELPER"],
+        )
+        self.assertNotIn("/bin/sh", helper_command)
+        for mutation in (
+            {**helper_parameters, "artifact_root": "/var/lib/chenyida-erp/release-artifacts/other"},
+            {**helper_parameters, "manifest_commit": helper_parameters["git_commit"]},
+            {**helper_parameters, "unexpected": "field"},
+        ):
+            with self.assertRaises(supervisor.SupervisorError):
+                supervisor.validate_parameters("CREATE_VOLUME_HELPER_IMAGE_EVIDENCE", mutation)
         postdeploy_parameters = {
             "release_manifest": "/var/lib/chenyida-erp/release-artifacts/fixture/release-manifest.json",
             "release_manifest_sha256": "2" * 64,
@@ -407,6 +504,55 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
         with patch.object(supervisor.subprocess, "run", return_value=bad):
             with self.assertRaisesRegex(supervisor.SupervisorError, "SUPERVISOR_CANDIDATE_SNAPSHOT_INVALID"):
                 supervisor.verify_candidate_snapshot(parameters, bundle_root, 9)
+
+    def test_volume_helper_candidate_verifier_requires_manifest_only_direct_child(self):
+        repository = self.temporary / "helper-candidate"
+        repository.mkdir(mode=0o755)
+
+        def git(*arguments):
+            return supervisor.subprocess.run(
+                ["/usr/bin/git", "-C", str(repository), *arguments],
+                stdin=supervisor.subprocess.DEVNULL,
+                stdout=supervisor.subprocess.PIPE,
+                stderr=supervisor.subprocess.PIPE,
+                check=True,
+                text=True,
+            ).stdout.strip()
+
+        git("init")
+        site = repository / "chenyida_erp_site"
+        site.mkdir()
+        source = site / "source.txt"
+        source.write_text("source\n", encoding="utf-8")
+        git("add", "chenyida_erp_site/source.txt")
+        git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+            "commit", "-m", "source")
+        source_commit = git("rev-parse", "HEAD^{commit}")
+        source_tree = git("rev-parse", "HEAD^{tree}")
+
+        manifest_raw = b'{"fixture":true}\n'
+        manifest = site / "release" / "release-supervisor-bundle-v1.json"
+        manifest.parent.mkdir()
+        manifest.write_bytes(manifest_raw)
+        git("add", "chenyida_erp_site/release/release-supervisor-bundle-v1.json")
+        git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+            "commit", "-m", "manifest")
+        manifest_commit = git("rev-parse", "HEAD^{commit}")
+        manifest_tree = git("rev-parse", "HEAD^{tree}")
+        bundle_root = self.temporary / supervisor.sha256(manifest_raw)
+        bundle_root.mkdir()
+        parameters = {
+            "repository_root": str(repository),
+            "git_commit": source_commit,
+            "git_tree": source_tree,
+            "manifest_commit": manifest_commit,
+            "manifest_tree": manifest_tree,
+        }
+        supervisor.verify_candidate(parameters, bundle_root, 9)
+        with self.assertRaisesRegex(
+                supervisor.SupervisorError,
+                "SUPERVISOR_VOLUME_HELPER_EVIDENCE_SOURCE_CHAIN_INVALID"):
+            supervisor.verify_candidate(parameters, self.temporary / ("f" * 64), 9)
 
     def test_authorization_rejects_extra_command_field_and_noncanonical_json(self):
         pending = self.temporary / "pending"
@@ -829,6 +975,9 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
                 supervisor, "verify_uat_rollback_runtime_activation_executor_source",
                 side_effect=lambda *_: events.append("source"),
             ), patch.object(
+                supervisor, "verify_uat_rollback_runtime_volume_helper_evidence",
+                side_effect=lambda *_: events.append("evidence"),
+            ), patch.object(
                 supervisor, "prepare_runtime_privilege_node",
                 side_effect=lambda *_: (
                     events.append("node") or (Path("/tmp/runtime"), Path("/tmp/runtime/node"))
@@ -847,7 +996,54 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
                 authorization, "8" * 64, 51,
             )
         self.assertEqual(result, blocked)
-        self.assertEqual(events, ["source", "node", "prepare", "cleanup"])
+        self.assertEqual(events, ["source", "evidence", "node", "prepare", "cleanup"])
+
+    def test_uat_rollback_runtime_helper_evidence_verifier_is_exact_and_lock_bound(self):
+        authorization = uat_rollback_activation_authorization(
+            "a" * 64, datetime(2026, 8, 15, 3, 0, tzinfo=timezone.utc),
+        )
+        helper = authorization["parameters"]["plan"]["helpers"]["volume_restore"]
+        expected = {
+            "result": "VERIFIED", "run_id": helper["evidence_run_id"],
+            "image_reference": helper["image_reference"],
+            "image_config_digest": helper["image_config_digest"],
+            "build_provenance_sha256": helper["build_provenance_sha256"],
+            "sbom_evidence_sha256": helper["sbom_evidence_sha256"],
+            "security_evidence_sha256": helper["security_evidence_sha256"],
+            "supervisor_bundle_sha256": helper["supervisor_bundle_sha256"],
+        }
+        completed = supervisor.subprocess.CompletedProcess(
+            [], 0, supervisor.canonical_json(expected), b"",
+        )
+        bundle_root = Path("/trusted/bundle")
+        with patch.object(supervisor.subprocess, "run", return_value=completed) as run:
+            supervisor.verify_uat_rollback_runtime_volume_helper_evidence(
+                authorization["parameters"], bundle_root, 51,
+            )
+        command = run.call_args.args[0]
+        self.assertEqual(command[:3], [
+            "/usr/bin/python3",
+            "/trusted/bundle/chenyida_erp_site/scripts/volume-helper-image-evidence.py",
+            "verify",
+        ])
+        self.assertEqual(
+            command[command.index("--artifact-root") + 1],
+            "/var/lib/chenyida-erp/release-artifacts/helper-evidence-fixture",
+        )
+        self.assertEqual(run.call_args.kwargs["pass_fds"], (51,))
+        self.assertEqual(run.call_args.kwargs["env"]["ERP_RELEASE_GATE_LOCK_FD"], "51")
+        substituted = {**expected, "security_evidence_sha256": "f" * 64}
+        with patch.object(
+                supervisor.subprocess, "run",
+                return_value=supervisor.subprocess.CompletedProcess(
+                    [], 0, supervisor.canonical_json(substituted), b"",
+                )):
+            with self.assertRaisesRegex(
+                    supervisor.SupervisorError,
+                    "SUPERVISOR_UAT_ROLLBACK_RUNTIME_HELPER_EVIDENCE_INVALID"):
+                supervisor.verify_uat_rollback_runtime_volume_helper_evidence(
+                    authorization["parameters"], bundle_root, 51,
+                )
 
     def test_uat_rollback_runtime_recovery_binds_exact_consumed_original_authorization(self):
         now = datetime(2026, 8, 15, 3, 0, tzinfo=timezone.utc)
@@ -898,6 +1094,9 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
                 supervisor, "verify_uat_rollback_runtime_activation_executor_source",
                 side_effect=lambda *_: events.append("source"),
             ), patch.object(
+                supervisor, "verify_uat_rollback_runtime_volume_helper_evidence",
+                side_effect=lambda *_: events.append("evidence"),
+            ), patch.object(
                 supervisor, "prepare_runtime_privilege_node",
                 return_value=(Path("/tmp/runtime"), Path("/tmp/runtime/node")),
             ), patch.object(
@@ -910,7 +1109,10 @@ class ReleaseSupervisorLauncherTest(unittest.TestCase):
                 authorization, "8" * 64, 51,
             )
         self.assertEqual(result["result"], "COMMITTED")
-        self.assertEqual(events, ["source", "prepare", "source", "consume", "source", "execute"])
+        self.assertEqual(events, [
+            "source", "evidence", "prepare", "source", "evidence", "consume",
+            "source", "evidence", "execute",
+        ])
 
 
 if __name__ == "__main__":

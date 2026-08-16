@@ -102,7 +102,7 @@ UAT_ROLLBACK_RUNTIME_EXECUTOR_SOURCE = Path(
     "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py"
 )
 UAT_ROLLBACK_RUNTIME_EXECUTOR_CATALOG_SHA256 = \
-    "1089c159743a1480c28af322c83b295ead42c8555f6320911f1102115b494b04"
+    "f788b9eef1d677535e0a907504ff10c56e60d7007b7e62f4dc3a01561b4384a1"
 RELEASE_IDENTITY_FILE = RELEASE_IDENTITY_ROOT / "release-identity.json"
 MONITORING_PROJECTION_CONTRACT = "chenyida-erp-monitoring-projection-publication/v1"
 MONITORING_PROJECTION_MARKER = ".chenyida-erp-monitoring-projection-v1"
@@ -126,6 +126,8 @@ IMAGE_REFERENCE = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*(?::[0-9]+)?(?:/[a-z
 ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 
 BUNDLE_FILES: dict[str, str] = {
+    "chenyida_erp_site/.dockerignore": "0444",
+    "chenyida_erp_site/Dockerfile": "0444",
     "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-collector.service": "0444",
     "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-collector.timer": "0444",
     "chenyida_erp_site/deployment/systemd/chenyida-erp-monitor-continuity.service": "0444",
@@ -147,6 +149,8 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/operations/runtime-secret-file-policy-v1.json": "0444",
     "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json": "0444",
     "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json": "0444",
+    "chenyida_erp_site/operations/volume-helper-vulnerability-policy-v1.json": "0444",
+    "chenyida_erp_site/operations/volume-restore-helper-contract-v1.json": "0444",
     "chenyida_erp_site/release/release-gate-plan-v2.json": "0444",
     "chenyida_erp_site/release/monitoring-host-delivery-bundle-v1.json": "0444",
     "chenyida_erp_site/release/release-test-inventory-v1.json": "0444",
@@ -156,6 +160,7 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/backup-recovery-contract.mjs": "0444",
     "chenyida_erp_site/scripts/backup-recovery-readiness-v3.mjs": "0444",
     "chenyida_erp_site/scripts/backup-recovery-readiness-v4.mjs": "0444",
+    "chenyida_erp_site/scripts/build-volume-restore-helper-image.sh": "0555",
     "chenyida_erp_site/scripts/check-credentials.mjs": "0444",
     "chenyida_erp_site/scripts/container-runtime-policy-test.py": "0444",
     "chenyida_erp_site/scripts/container-runtime-policy.py": "0444",
@@ -228,6 +233,8 @@ BUNDLE_FILES: dict[str, str] = {
     "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py": "0444",
     "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-activation-publisher.mjs": "0444",
     "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs": "0444",
+    "chenyida_erp_site/scripts/volume-helper-image-evidence.py": "0555",
+    "chenyida_erp_site/scripts/volume-restore-helper.sh": "0555",
     "chenyida_erp_site/tools/ops-monitoring/backup-projection.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/collector.mjs": "0444",
     "chenyida_erp_site/tools/ops-monitoring/components-projection.mjs": "0444",
@@ -279,6 +286,8 @@ BUNDLE_FILES: dict[str, str] = {
 
 ENTRYPOINTS = {
     "CREATE_IMAGE_EVIDENCE": "chenyida_erp_site/scripts/create-release-image-evidence.sh",
+    "CREATE_VOLUME_HELPER_IMAGE_EVIDENCE":
+        "chenyida_erp_site/scripts/build-volume-restore-helper-image.sh",
     "RUN_RELEASE_GATE": "chenyida_erp_site/scripts/run-release-gate.sh",
     "CREATE_RELEASE_MANIFEST": "chenyida_erp_site/scripts/create-release-manifest.sh",
     "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION": "chenyida_erp_site/scripts/probe-postdeploy-runtime-configuration.sh",
@@ -292,6 +301,8 @@ ENTRYPOINTS = {
 
 CONFIRMATIONS = {
     "CREATE_IMAGE_EVIDENCE": "AUTHORIZE_CREATE_TRIVY_IMAGE_EVIDENCE",
+    "CREATE_VOLUME_HELPER_IMAGE_EVIDENCE":
+        "AUTHORIZE_BUILD_AND_SCAN_EXACT_VOLUME_RESTORE_HELPER",
     "RUN_RELEASE_GATE": "AUTHORIZE_RUN_EXACT_RELEASE_GATE",
     "CREATE_RELEASE_MANIFEST": "AUTHORIZE_CREATE_IMMUTABLE_RELEASE_MANIFEST",
     "PROBE_POST_DEPLOY_RUNTIME_CONFIGURATION": "AUTHORIZE_PROBE_EXACT_POST_DEPLOY_RUNTIME_CONFIGURATION",
@@ -660,6 +671,10 @@ PARAMETER_FIELDS = {
         "repository_root", "git_commit", "git_tree", "artifact_root", "run_id",
         "web_image", "worker_image", "trivy_db_directory",
     } | SNAPSHOT_PARAMETER_FIELDS,
+    "CREATE_VOLUME_HELPER_IMAGE_EVIDENCE": {
+        "repository_root", "git_commit", "git_tree", "manifest_commit", "manifest_tree",
+        "artifact_root", "run_id", "trivy_db_directory",
+    },
     "RUN_RELEASE_GATE": {
         "repository_root", "git_commit", "git_tree", "artifact_root", "run_id",
         "runtime_guard_contract", "runtime_guard_mode", "gate_plan_sha256",
@@ -3028,7 +3043,7 @@ def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
             reject("SUPERVISOR_AUTHORIZATION_IMAGE_INVALID")
     if "web_image" in parameters and parameters["web_image"] == parameters["worker_image"]:
         reject("SUPERVISOR_AUTHORIZATION_IMAGE_INVALID")
-    for key in ("git_commit", "git_tree"):
+    for key in ("git_commit", "git_tree", "manifest_commit", "manifest_tree"):
         if key in parameters and (not isinstance(parameters[key], str) or not GIT_OBJECT.fullmatch(parameters[key])):
             reject("SUPERVISOR_AUTHORIZATION_GIT_INVALID")
     for key in ("release_manifest_sha256", "runtime_probe_receipt_sha256", "candidate_snapshot_receipt_sha256", "gate_plan_sha256", "runtime_policy_sha256", "runtime_configuration_sha256", "monitoring_bundle_sha256", "host_config_sha256", "runtime_sha256", "previous_activation_sha256", "supervisor_bundle_sha256", "rollback_target_activation_sha256", "expected_active_sha256"):
@@ -3080,6 +3095,17 @@ def validate_parameters(operation: str, parameters: Any) -> dict[str, Any]:
             reject("SUPERVISOR_AUTHORIZATION_POSTDEPLOY_PATH_INVALID")
     if operation in ("PUBLISH_MONITORING_COMPONENTS_PROJECTION", "PUBLISH_MONITORING_BACKUP_PROJECTION"):
         validate_monitoring_projection_parameters(operation, parameters)
+    if operation == "CREATE_VOLUME_HELPER_IMAGE_EVIDENCE":
+        if parameters["git_commit"] == parameters["git_tree"] \
+                or parameters["manifest_commit"] == parameters["manifest_tree"] \
+                or len({parameters["git_commit"], parameters["git_tree"],
+                        parameters["manifest_commit"], parameters["manifest_tree"]}) != 4 \
+                or Path(parameters["artifact_root"]) \
+                    != RELEASE_ARTIFACT_ROOT_BASE / parameters["run_id"] \
+                or Path(parameters["trivy_db_directory"]) == Path("/") \
+                or Path(parameters["trivy_db_directory"]).is_relative_to(
+                    Path(parameters["repository_root"])):
+            reject("SUPERVISOR_VOLUME_HELPER_EVIDENCE_PARAMETERS_INVALID")
     return parameters
 
 
@@ -3216,24 +3242,134 @@ def validate_uat_rollback_runtime_activation_parameters(
     plan = exact_fields(parameters["plan"], {
         "schema_version", "contract", "promotion_id", "promotion_generation",
         "rollback_operation_id", "deployment", "candidate", "predecessor", "targets",
-        "toolchain", "timeouts", "max_output_bytes", "source_bindings", "action_matrix",
+        "reconciliation_authority", "toolchain", "helpers", "timeouts",
+        "max_output_bytes", "source_bindings", "action_matrix",
         "runtime_plan_sha256",
     }, "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
-    if plan["schema_version"] != 1 \
-            or plan["contract"] != "chenyida-erp-uat-promotion-rollback-runtime-plan/v1" \
+    if plan["schema_version"] != 3 \
+            or plan["contract"] != "chenyida-erp-uat-promotion-rollback-runtime-plan/v3" \
             or not isinstance(plan["runtime_plan_sha256"], str) \
             or not SHA256.fullmatch(plan["runtime_plan_sha256"]) \
             or sha256(canonical_json({key: item for key, item in plan.items()
                                       if key != "runtime_plan_sha256"})) != plan["runtime_plan_sha256"]:
         reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
-    toolchain = exact_fields(plan["toolchain"], {"executor", "docker"},
+    helper = exact_fields(plan.get("helpers"), {"volume_restore"},
+                          "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_HELPER_INVALID")
+    helper = exact_fields(helper["volume_restore"], {
+        "image_reference", "image_config_digest", "application_version", "git_commit",
+        "git_tree", "image_role", "platform", "protocol", "contract_sha256",
+        "evidence_run_id", "backup_status_reader_gid", "build_provenance_sha256",
+        "sbom_evidence_sha256",
+        "security_evidence_sha256",
+        "supervisor_bundle_sha256",
+    }, "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_HELPER_INVALID")
+    if helper["supervisor_bundle_sha256"] != expected_bundle_digest \
+            or helper["image_role"] != "volume-restore-helper" \
+            or helper["platform"] != "linux/amd64" \
+            or helper["protocol"] != "chenyida-erp-volume-helper/v1" \
+            or helper["contract_sha256"] \
+                != "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d" \
+            or not isinstance(helper["evidence_run_id"], str) \
+            or not IDENTIFIER.fullmatch(helper["evidence_run_id"]) \
+            or len(helper["evidence_run_id"]) > 80 \
+            or isinstance(helper["backup_status_reader_gid"], bool) \
+            or not isinstance(helper["backup_status_reader_gid"], int) \
+            or not 1 <= helper["backup_status_reader_gid"] <= 2**31 - 1 \
+            or not isinstance(helper["application_version"], str) \
+            or not re.fullmatch(r"0\.1\.0-alpha\.\d+", helper["application_version"]) \
+            or any(not isinstance(helper[field], str) or not GIT_OBJECT.fullmatch(helper[field])
+                   for field in ("git_commit", "git_tree")) \
+            or helper["git_commit"] == helper["git_tree"] \
+            or any(not isinstance(helper[field], str) or not SHA256.fullmatch(helper[field])
+                   or helper[field] == "0" * 64 for field in (
+                       "contract_sha256", "build_provenance_sha256", "sbom_evidence_sha256",
+                       "security_evidence_sha256", "supervisor_bundle_sha256")) \
+            or len({helper[field] for field in (
+                "build_provenance_sha256", "sbom_evidence_sha256",
+                "security_evidence_sha256", "supervisor_bundle_sha256",
+            )}) != 4:
+        reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_HELPER_INVALID")
+    reconciliation = exact_fields(plan["reconciliation_authority"], {
+        "schema_version", "contract", "authority_id", "status", "environment",
+        "promotion_id", "promotion_generation", "rollback_operation_id", "deployment_id",
+        "approval_reference_sha256", "requester_identity_sha256", "approver_identity_sha256",
+        "approved_at", "expires_at", "one_time", "mutation_scope", "authority_sha256",
+    }, "SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID")
+    if reconciliation["schema_version"] != 1 \
+            or reconciliation["contract"] \
+                != "chenyida-erp-uat-promotion-rollback-reconciliation-authority/v1" \
+            or reconciliation["status"] != "AUTHORIZED" \
+            or reconciliation["environment"] != "UAT" \
+            or reconciliation["deployment_id"] != "chenyida-erp" \
+            or reconciliation["one_time"] is not True \
+            or not isinstance(reconciliation["authority_id"], str) \
+            or not IDENTIFIER.fullmatch(reconciliation["authority_id"]) \
+            or sha256(canonical_json({key: item for key, item in reconciliation.items()
+                                      if key != "authority_sha256"})) \
+                != reconciliation["authority_sha256"]:
+        reject("SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID")
+    actor_digests = {
+        reconciliation["approval_reference_sha256"],
+        reconciliation["requester_identity_sha256"],
+        reconciliation["approver_identity_sha256"],
+    }
+    if len(actor_digests) != 3 or any(
+            not isinstance(item, str) or not SHA256.fullmatch(item) for item in actor_digests):
+        reject("SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID")
+    reconciliation_approved = parse_time(
+        reconciliation["approved_at"],
+        "SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID",
+    )
+    reconciliation_expires = parse_time(
+        reconciliation["expires_at"],
+        "SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID",
+    )
+    if reconciliation_expires <= reconciliation_approved \
+            or reconciliation_expires - reconciliation_approved > timedelta(hours=24) \
+            or reconciliation_approved > parse_time(
+                parameters["approved_at"],
+                "SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID",
+            ) \
+            or reconciliation_expires < parse_time(
+                parameters["expires_at"],
+                "SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID",
+            ):
+        reject("SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID")
+    scope = exact_fields(reconciliation["mutation_scope"], {
+        "active_database", "staging_database", "candidate_quarantine_database",
+        "database_local_only", "allow_staging_database_create",
+        "allow_staging_logical_restore", "allow_staging_privilege_reconcile",
+        "allow_atomic_database_switch", "allow_active_database_unseal", "allow_role_create",
+        "allow_role_alter", "allow_membership_change", "allow_password_change",
+        "allow_tablespace_acl_change",
+    }, "SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID")
+    targets = plan.get("targets", {}).get("database", {})
+    if reconciliation["promotion_id"] != plan["promotion_id"] \
+            or reconciliation["promotion_generation"] != plan["promotion_generation"] \
+            or reconciliation["rollback_operation_id"] != plan["rollback_operation_id"] \
+            or scope["active_database"] != targets.get("active") \
+            or scope["staging_database"] != targets.get("staging") \
+            or scope["candidate_quarantine_database"] != targets.get("candidate_quarantine") \
+            or any(scope[field] is not True for field in (
+                "database_local_only", "allow_staging_database_create",
+                "allow_staging_logical_restore", "allow_staging_privilege_reconcile",
+                "allow_atomic_database_switch", "allow_active_database_unseal",
+            )) \
+            or any(scope[field] is not False for field in (
+                "allow_role_create", "allow_role_alter", "allow_membership_change",
+                "allow_password_change", "allow_tablespace_acl_change",
+            )):
+        reject("SUPERVISOR_UAT_ROLLBACK_RECONCILIATION_AUTHORITY_INVALID")
+    toolchain = exact_fields(plan["toolchain"], {"executor", "docker", "compose_plugin"},
                              "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
-    for name, expected_path in (
-            ("executor", str(UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE)), ("docker", "/usr/bin/docker")):
+    for name, expected_path, expected_mode in (
+            ("executor", str(UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE), "0555"),
+            ("docker", "/usr/bin/docker", "0755"),
+            ("compose_plugin", "/usr/libexec/docker/cli-plugins/docker-compose", "0755")):
         tool = exact_fields(toolchain[name], {"path", "sha256", "uid", "gid", "mode"},
                             "SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
         if tool["path"] != expected_path or tool["uid"] != 0 or tool["gid"] != 0 \
-                or tool["mode"] != "0555" or not isinstance(tool["sha256"], str) \
+                or tool["mode"] != expected_mode or not isinstance(tool["sha256"], str) \
                 or not SHA256.fullmatch(tool["sha256"]):
             reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_PLAN_INVALID")
     if toolchain["executor"]["sha256"] != source["sha256"]:
@@ -3549,7 +3685,14 @@ def verify_candidate(parameters: dict[str, Any], bundle_root: Path, lock_descrip
             reject("SUPERVISOR_CANDIDATE_GIT_INVALID")
         return result.stdout.strip()
 
-    if git("rev-parse", "--show-toplevel") != str(repository) or git("rev-parse", "--verify", "HEAD^{commit}") != parameters["git_commit"] or git("rev-parse", "--verify", "HEAD^{tree}") != parameters["git_tree"]:
+    source_manifest_chain = "manifest_commit" in parameters
+    expected_head_commit = parameters["manifest_commit"] if source_manifest_chain \
+        else parameters["git_commit"]
+    expected_head_tree = parameters["manifest_tree"] if source_manifest_chain \
+        else parameters["git_tree"]
+    if git("rev-parse", "--show-toplevel") != str(repository) \
+            or git("rev-parse", "--verify", "HEAD^{commit}") != expected_head_commit \
+            or git("rev-parse", "--verify", "HEAD^{tree}") != expected_head_tree:
         reject("SUPERVISOR_CANDIDATE_GIT_MISMATCH")
     if subprocess.run([*git_prefix, "diff", "--quiet", "--no-ext-diff", "--no-textconv", "--"], env=environment, stdin=subprocess.DEVNULL, check=False).returncode != 0:
         reject("SUPERVISOR_CANDIDATE_DIRTY")
@@ -3557,6 +3700,29 @@ def verify_candidate(parameters: dict[str, Any], bundle_root: Path, lock_descrip
         reject("SUPERVISOR_CANDIDATE_DIRTY")
     if git("ls-files", "--others", "--exclude-standard", "--", "chenyida_erp_site"):
         reject("SUPERVISOR_CANDIDATE_DIRTY")
+    if source_manifest_chain:
+        source_commit = parameters["git_commit"]
+        manifest_commit = parameters["manifest_commit"]
+        if git("rev-parse", "--verify", f"{source_commit}^{{tree}}") != parameters["git_tree"] \
+                or git("rev-list", "--parents", "-n", "1", manifest_commit).split() \
+                    != [manifest_commit, source_commit] \
+                or git("diff", "--name-status", "--no-renames", source_commit,
+                       manifest_commit, "--") \
+                    not in {
+                        "A\tchenyida_erp_site/release/release-supervisor-bundle-v1.json",
+                        "M\tchenyida_erp_site/release/release-supervisor-bundle-v1.json",
+                    }:
+            reject("SUPERVISOR_VOLUME_HELPER_EVIDENCE_SOURCE_CHAIN_INVALID")
+        manifest_path = "chenyida_erp_site/release/release-supervisor-bundle-v1.json"
+        result = subprocess.run(
+            [*git_prefix, "show", f"{manifest_commit}:{manifest_path}"], env=environment,
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode != 0 or not 2 <= len(result.stdout) <= MAX_JSON_BYTES \
+                or sha256(result.stdout) != bundle_root.name:
+            reject("SUPERVISOR_VOLUME_HELPER_EVIDENCE_SOURCE_CHAIN_INVALID")
+        return
     verify_candidate_snapshot(parameters, bundle_root, lock_descriptor)
 
 
@@ -3589,6 +3755,16 @@ def command_for(bundle_root: Path, authorization: dict[str, Any]) -> list[str]:
         ]
     elif operation == "CREATE_IMAGE_EVIDENCE":
         command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--candidate-snapshot-receipt", parameters["candidate_snapshot_receipt"], "--candidate-snapshot-receipt-sha256", parameters["candidate_snapshot_receipt_sha256"], "--test-runtime-root", parameters["test_runtime_root"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--trivy-db-directory", parameters["trivy_db_directory"], "--confirm", "CREATE_TRIVY_IMAGE_EVIDENCE"]
+    elif operation == "CREATE_VOLUME_HELPER_IMAGE_EVIDENCE":
+        command += [
+            "--repository-root", parameters["repository_root"],
+            "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"],
+            "--manifest-commit", parameters["manifest_commit"],
+            "--manifest-tree", parameters["manifest_tree"],
+            "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"],
+            "--trivy-db-directory", parameters["trivy_db_directory"],
+            "--confirm", "BUILD_AND_SCAN_EXACT_VOLUME_RESTORE_HELPER",
+        ]
     elif operation == "RUN_RELEASE_GATE":
         command += ["--repository-root", parameters["repository_root"], "--git-commit", parameters["git_commit"], "--git-tree", parameters["git_tree"], "--candidate-snapshot-receipt", parameters["candidate_snapshot_receipt"], "--candidate-snapshot-receipt-sha256", parameters["candidate_snapshot_receipt_sha256"], "--test-runtime-root", parameters["test_runtime_root"], "--artifact-root", parameters["artifact_root"], "--run-id", parameters["run_id"], "--runtime-guard-contract", parameters["runtime_guard_contract"], "--runtime-guard-mode", parameters["runtime_guard_mode"], "--gate-plan-sha256", parameters["gate_plan_sha256"], "--web-image", parameters["web_image"], "--worker-image", parameters["worker_image"], "--sbom-evidence", parameters["sbom_evidence"], "--security-evidence", parameters["security_evidence"], "--confirm", "RUN_EXACT_RELEASE_GATE"]
     elif operation == "CREATE_RELEASE_MANIFEST":
@@ -3996,6 +4172,57 @@ def verify_uat_rollback_runtime_activation_executor_source(
             or stat.S_IMODE(metadata.st_mode) != int(source["mode"], 8) \
             or metadata.st_nlink != source["nlink"]:
         reject("SUPERVISOR_UAT_ROLLBACK_RUNTIME_ACTIVATION_EXECUTOR_SOURCE_INVALID")
+
+
+def verify_uat_rollback_runtime_volume_helper_evidence(
+        parameters: dict[str, Any], bundle_root: Path, lock_descriptor: int) -> None:
+    code = "SUPERVISOR_UAT_ROLLBACK_RUNTIME_HELPER_EVIDENCE_INVALID"
+    helper = parameters["plan"]["helpers"]["volume_restore"]
+    artifact_root = RELEASE_ARTIFACT_ROOT_BASE / helper["evidence_run_id"]
+    verifier = bundle_root / "chenyida_erp_site/scripts/volume-helper-image-evidence.py"
+    command = [
+        "/usr/bin/python3", str(verifier), "verify",
+        "--artifact-root", str(artifact_root),
+        "--run-id", helper["evidence_run_id"],
+        "--image-reference", helper["image_reference"],
+        "--image-config-digest", helper["image_config_digest"],
+        "--application-version", helper["application_version"],
+        "--git-commit", helper["git_commit"], "--git-tree", helper["git_tree"],
+        "--build-provenance-sha256", helper["build_provenance_sha256"],
+        "--sbom-evidence-sha256", helper["sbom_evidence_sha256"],
+        "--security-evidence-sha256", helper["security_evidence_sha256"],
+        "--supervisor-bundle-sha256", helper["supervisor_bundle_sha256"],
+        "--confirm", "VERIFY_EXACT_VOLUME_HELPER_IMAGE_EVIDENCE",
+    ]
+    environment = {
+        "PATH": SAFE_PATH, "LC_ALL": "C", "LANG": "C", "TZ": "UTC",
+        "PYTHONDONTWRITEBYTECODE": "1", "PYTHONHASHSEED": "0",
+        "ERP_RELEASE_SUPERVISOR_LAUNCHED": "YES", "ERP_RELEASE_GATE_LOCK_HELD": "YES",
+        "ERP_RELEASE_GATE_LOCK_FD": str(lock_descriptor),
+        "ERP_RELEASE_SUPERVISOR_BUNDLE_SHA256": helper["supervisor_bundle_sha256"],
+    }
+    try:
+        result = subprocess.run(
+            command, env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, check=False, timeout=60, pass_fds=(lock_descriptor,),
+        )
+    except (OSError, subprocess.SubprocessError):
+        reject(code)
+    if result.returncode != 0 or result.stderr != b"" \
+            or not 2 <= len(result.stdout) <= 8192:
+        reject(code)
+    value = strict_json(result.stdout, code)
+    expected = {
+        "result": "VERIFIED", "run_id": helper["evidence_run_id"],
+        "image_reference": helper["image_reference"],
+        "image_config_digest": helper["image_config_digest"],
+        "build_provenance_sha256": helper["build_provenance_sha256"],
+        "sbom_evidence_sha256": helper["sbom_evidence_sha256"],
+        "security_evidence_sha256": helper["security_evidence_sha256"],
+        "supervisor_bundle_sha256": helper["supervisor_bundle_sha256"],
+    }
+    if result.stdout != canonical_json(value) or value != expected:
+        reject(code)
 
 
 def validate_original_uat_rollback_runtime_activation_authorization_consumed(
@@ -4930,6 +5157,9 @@ def run_uat_rollback_runtime_activation_authorization(
         verify_uat_rollback_runtime_activation_executor_source(
             authorization["parameters"], authorization["supervisor_bundle_sha256"],
         )
+        verify_uat_rollback_runtime_volume_helper_evidence(
+            authorization["parameters"], bundle_root, lock_descriptor,
+        )
         runtime_root, node_path = prepare_runtime_privilege_node(authorization_digest)
         context = uat_rollback_runtime_activation_context(authorization, authorization_digest)
         prepared = run_uat_rollback_runtime_activation_publisher(
@@ -4941,9 +5171,15 @@ def run_uat_rollback_runtime_activation_authorization(
         verify_uat_rollback_runtime_activation_executor_source(
             authorization["parameters"], authorization["supervisor_bundle_sha256"],
         )
+        verify_uat_rollback_runtime_volume_helper_evidence(
+            authorization["parameters"], bundle_root, lock_descriptor,
+        )
         consume_authorization(authorization_path, authorization, authorization_digest)
         verify_uat_rollback_runtime_activation_executor_source(
             authorization["parameters"], authorization["supervisor_bundle_sha256"],
+        )
+        verify_uat_rollback_runtime_volume_helper_evidence(
+            authorization["parameters"], bundle_root, lock_descriptor,
         )
         return run_uat_rollback_runtime_activation_publisher(
             node_path, bundle_root, context, "recover-execute" if recovery else "execute",

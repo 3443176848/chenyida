@@ -31,10 +31,12 @@ ACTIVATION_FILE = Path(
 )
 EXECUTOR_FILE = Path("/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1")
 DOCKER_FILE = Path("/usr/bin/docker")
+COMPOSE_PLUGIN_FILE = Path("/usr/libexec/docker/cli-plugins/docker-compose")
 GLOBAL_LOCK = Path("/run/lock/chenyida-erp-release-gate-v1.lock")
 SUPERVISOR_BUNDLE_ROOT = Path("/usr/local/libexec/chenyida-erp-release-supervisor/bundles")
 REQUEST_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-request/v1"
 RESPONSE_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-response/v1"
+HANDLER_UNKNOWN_CONTRACT = "chenyida-erp-uat-promotion-rollback-handler-unknown/v1"
 ACTIVATION_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-activation/v2"
 ACTIVATION_CURRENT_CONTRACT = \
     "chenyida-erp-uat-promotion-rollback-runtime-activation-current/v2"
@@ -42,11 +44,11 @@ ACTIVATION_RECEIPT_CONTRACT = \
     "chenyida-erp-uat-promotion-rollback-runtime-activation-receipt/v2"
 ACTIVATION_HISTORY_CONTRACT = \
     "chenyida-erp-uat-promotion-rollback-runtime-activation-history/v2"
-FD_MANIFEST_CONTRACT = "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v2"
-EXECUTOR_CATALOG_SHA256 = "1089c159743a1480c28af322c83b295ead42c8555f6320911f1102115b494b04"
+FD_MANIFEST_CONTRACT = "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v3"
+EXECUTOR_CATALOG_SHA256 = "f788b9eef1d677535e0a907504ff10c56e60d7007b7e62f4dc3a01561b4384a1"
 EXECUTOR_CAPABILITY_STATUS = "BLOCKED_MISSING_UAT_CAPABLE_HANDLERS"
-PLAN_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-plan/v1"
-PACKAGE_CONTRACT = "chenyida-erp-uat-promotion-rollback-execution-package/v2"
+PLAN_CONTRACT = "chenyida-erp-uat-promotion-rollback-runtime-plan/v3"
+PACKAGE_CONTRACT = "chenyida-erp-uat-promotion-rollback-execution-package/v3"
 MAX_BYTES = 4 * 1024 * 1024
 ZERO_SHA256 = "0" * 64
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -68,6 +70,32 @@ TIMEOUTS = {
     "PREFLIGHT": 120, "RECHECK": 120, "PREPARE": 120,
     "EXECUTE": 1800, "PROBE": 300, "CONTAIN": 300,
 }
+
+
+def action_timeout_seconds(action: str, label: str | None) -> int:
+    """Return the end-to-end runtime budget for one fixed handler action."""
+    if action == "PROBE" and label == "POSTGRESQL_CONTENT":
+        return 1200
+    return TIMEOUTS[action]
+
+
+def bounded_executor_timeout_seconds(
+        request: dict[str, Any], observed_at: datetime,
+) -> float:
+    """Bound the child process by both its capability budget and signed deadline."""
+    deadline = instant(request["action_deadline"], "ROLLBACK_RUNTIME_REQUEST_TIME_INVALID")
+    remaining = (deadline - observed_at).total_seconds()
+    if remaining <= 0:
+        reject("ROLLBACK_RUNTIME_REQUEST_TIME_INVALID")
+    return max(
+        0.001,
+        min(
+            float(action_timeout_seconds(request["action"], request["label"])),
+            remaining,
+        ),
+    )
+
+
 STAGES = (
     "PRECONDITION_RECHECK",
     "WRITER_CONTAINMENT",
@@ -94,6 +122,15 @@ CHECKS = (
     "HEALTH",
     "PROTECTED_RESOURCES",
 )
+HANDLER_UNKNOWN_REASONS = {
+    "DURABLE_STATE_MISSING", "DURABLE_STATE_DIVERGED", "SIDE_EFFECT_OUTCOME_UNKNOWN",
+    "COMMIT_OUTCOME_UNKNOWN", "TARGET_IDENTITY_DRIFT", "SOURCE_IDENTITY_DRIFT",
+    "TOOL_TIMEOUT", "TOOL_SIGNAL", "TOOL_OUTPUT_LIMIT", "TOOL_DAEMON_LEFT_RUNNING",
+    "ACTION_DEADLINE_EXHAUSTED", "PROBE_INCONCLUSIVE", "CONTAINMENT_INCOMPLETE",
+}
+HANDLER_UNKNOWN_PHASES = {
+    "BEFORE_SIDE_EFFECT", "AFTER_SIDE_EFFECT", "COMMIT_BOUNDARY", "PROBE", "CONTAINMENT",
+}
 ACTION_MATRIX = {
     "ROLLBACK_EXECUTION": {stage: ["PREPARE", "EXECUTE", "PROBE"] for stage in STAGES},
     "ROLLBACK_POSTVERIFY": {check: ["PREPARE", "PROBE"] for check in CHECKS},
@@ -110,6 +147,10 @@ PACKAGE_SOURCE_ROLES = (
     "snapshot_backup_status",
     "snapshot_policy",
     "snapshot_policy_activation",
+    "snapshot_runtime_privilege_access",
+    "snapshot_runtime_privilege_compiled_catalog",
+    "snapshot_runtime_privilege_policy",
+    "snapshot_runtime_privilege_operator_policy",
     "predecessor_postdeploy_receipt",
     "predecessor_release_manifest",
     "candidate_deployment_result",
@@ -124,7 +165,9 @@ SOURCE_FIELDS = {"path", "sha256", "bytes", "device", "inode", "uid", "gid", "mo
 STAGE_SOURCE_ROLES = {
     "PRECONDITION_RECHECK": (
         "snapshot_readiness", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
-        "snapshot_policy", "snapshot_policy_activation", "predecessor_postdeploy_receipt",
+        "snapshot_policy", "snapshot_policy_activation", "snapshot_runtime_privilege_access",
+        "snapshot_runtime_privilege_compiled_catalog", "snapshot_runtime_privilege_policy",
+        "snapshot_runtime_privilege_operator_policy", "predecessor_postdeploy_receipt",
         "predecessor_release_manifest", "candidate_deployment_result", "candidate_postdeploy_identity",
         "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
     ),
@@ -132,6 +175,8 @@ STAGE_SOURCE_ROLES = {
     "POSTGRESQL_RESTORE": (
         "snapshot_readiness", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
         "snapshot_postgresql", "snapshot_policy", "snapshot_policy_activation",
+        "snapshot_runtime_privilege_access", "snapshot_runtime_privilege_compiled_catalog",
+        "snapshot_runtime_privilege_policy", "snapshot_runtime_privilege_operator_policy",
     ),
     "UPLOADS_RESTORE": ("snapshot_manifest", "snapshot_uploads"),
     "ATTACHMENTS_RESTORE": ("snapshot_manifest", "snapshot_attachments"),
@@ -140,14 +185,20 @@ STAGE_SOURCE_ROLES = {
         "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
     ),
     "WEB_WORKER_PREDECESSOR_ACTIVATION": (
-        "predecessor_postdeploy_receipt", "predecessor_release_manifest", "compose_file",
-        "compose_release_file", "deployment_environment", "runtime_policy",
+        "snapshot_postgresql", "snapshot_manifest", "snapshot_migrations",
+        "snapshot_reconciliation", "snapshot_policy_activation",
+        "snapshot_runtime_privilege_access", "snapshot_runtime_privilege_compiled_catalog",
+        "snapshot_runtime_privilege_policy", "snapshot_runtime_privilege_operator_policy",
+        "predecessor_postdeploy_receipt", "predecessor_release_manifest",
+        "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
     ),
     "PROTECTED_RESOURCE_RECHECK": ("candidate_deployment_result", "candidate_postdeploy_identity"),
 }
 CHECK_SOURCE_ROLES = {
     "POSTGRESQL_CONTENT": (
         "snapshot_postgresql", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
+        "snapshot_runtime_privilege_access", "snapshot_runtime_privilege_compiled_catalog",
+        "snapshot_runtime_privilege_policy", "snapshot_runtime_privilege_operator_policy",
     ),
     "UPLOADS_CONTENT": ("snapshot_uploads", "snapshot_manifest", "snapshot_reconciliation"),
     "ATTACHMENTS_CONTENT": ("snapshot_attachments", "snapshot_manifest", "snapshot_reconciliation"),
@@ -158,8 +209,14 @@ CHECK_SOURCE_ROLES = {
     "WEB_IDENTITY": ("predecessor_postdeploy_receipt", "predecessor_release_manifest"),
     "WORKER_IDENTITY": ("predecessor_postdeploy_receipt", "predecessor_release_manifest"),
     "RUNTIME_CONFIGURATION": ("deployment_environment", "runtime_policy"),
-    "STRICT_RELEASE_IDENTITY": ("predecessor_postdeploy_receipt", "predecessor_release_manifest"),
-    "HEALTH": ("predecessor_postdeploy_receipt",),
+    "STRICT_RELEASE_IDENTITY": (
+        "predecessor_postdeploy_receipt", "predecessor_release_manifest",
+        "deployment_environment",
+    ),
+    "HEALTH": (
+        "predecessor_postdeploy_receipt", "predecessor_release_manifest",
+        "candidate_deployment_result", "deployment_environment",
+    ),
     "PROTECTED_RESOURCES": ("candidate_deployment_result", "candidate_postdeploy_identity"),
 }
 
@@ -395,11 +452,11 @@ def trusted_source(
 
 
 def trusted_tool(
-    tool: Any, expected_path: Path, root: Path | None, code: str,
+    tool: Any, expected_path: Path, expected_mode: str, root: Path | None, code: str,
 ) -> tuple[Path, tuple[Any, ...], int]:
     exact(tool, {"path", "sha256", "uid", "gid", "mode"}, code)
     if tool.get("path") != str(expected_path) or tool.get("uid") != 0 or tool.get("gid") != 0 \
-            or tool.get("mode") != "0555":
+            or tool.get("mode") != expected_mode:
         reject(code)
     expected_sha = digest(tool.get("sha256"), code)
     target = physical(expected_path, root)
@@ -410,7 +467,8 @@ def trusted_tool(
     except OSError:
         reject(code)
     if not stat.S_ISREG(metadata.st_mode) or stat.S_ISLNK(metadata.st_mode) or metadata.st_uid != 0 \
-            or metadata.st_gid != 0 or metadata.st_nlink != 1 or mode_text(metadata) != "0555":
+            or metadata.st_gid != 0 or metadata.st_nlink != 1 \
+            or mode_text(metadata) != expected_mode:
         reject(code)
     hashed = hashlib.sha256()
     try:
@@ -661,7 +719,8 @@ def validate_request(value: Any, cli_action: str, cli_operation_id: str, cli_lab
     action_deadline = instant(request["action_deadline"], "ROLLBACK_RUNTIME_REQUEST_TIME_INVALID")
     if action_deadline <= requested or action_deadline > authorization_expires \
             or request["execution_mode"] == "ORIGINAL" and action_deadline > execution_deadline \
-            or (action_deadline - requested).total_seconds() > TIMEOUTS[request["action"]] \
+            or (action_deadline - requested).total_seconds() \
+                > action_timeout_seconds(request["action"], request["label"]) \
             or datetime.now(timezone.utc) >= action_deadline:
         reject("ROLLBACK_RUNTIME_REQUEST_TIME_INVALID")
     operation = request["operation"]
@@ -867,7 +926,7 @@ def validate_package(request: dict[str, Any]) -> dict[str, Any]:
         "compose_project_root", "restore_strategies", "sources", "source_set_sha256",
         "package_sha256",
     }, code)
-    if package.get("schema_version") != 2 or package.get("contract") != PACKAGE_CONTRACT \
+    if package.get("schema_version") != 3 or package.get("contract") != PACKAGE_CONTRACT \
             or package.get("package_sha256") != request["execution_package_sha256"] \
             or sha256_value(without(package, "package_sha256")) != package.get("package_sha256") \
             or package.get("source_set_sha256") != request["source_set_sha256"] \
@@ -931,14 +990,88 @@ def validate_package(request: dict[str, Any]) -> dict[str, Any]:
     return package
 
 
+def validate_reconciliation_authority(
+        value: Any, plan: dict[str, Any], package: dict[str, Any],
+) -> dict[str, Any]:
+    code = "ROLLBACK_RUNTIME_RECONCILIATION_AUTHORITY_INVALID"
+    authority = exact(value, {
+        "schema_version", "contract", "authority_id", "status", "environment",
+        "promotion_id", "promotion_generation", "rollback_operation_id", "deployment_id",
+        "approval_reference_sha256", "requester_identity_sha256", "approver_identity_sha256",
+        "approved_at", "expires_at", "one_time", "mutation_scope", "authority_sha256",
+    }, code)
+    if authority.get("schema_version") != 1 \
+            or authority.get("contract") \
+                != "chenyida-erp-uat-promotion-rollback-reconciliation-authority/v1" \
+            or authority.get("status") != "AUTHORIZED" \
+            or authority.get("environment") != "UAT" \
+            or authority.get("deployment_id") != "chenyida-erp" \
+            or authority.get("one_time") is not True \
+            or sha256_value(without(authority, "authority_sha256")) \
+                != authority.get("authority_sha256"):
+        reject(code)
+    matching_string(authority.get("authority_id"), IDENTIFIER, code)
+    matching_string(authority.get("promotion_id"), IDENTIFIER, code)
+    matching_string(authority.get("rollback_operation_id"), IDENTIFIER, code)
+    safe_integer(authority.get("promotion_generation"), 1, 1_000_000, code)
+    actor_digests = {
+        authority.get("approval_reference_sha256"),
+        authority.get("requester_identity_sha256"),
+        authority.get("approver_identity_sha256"),
+    }
+    for item in actor_digests:
+        digest(item, code)
+    if len(actor_digests) != 3:
+        reject(code)
+    approved = instant(authority.get("approved_at"), code)
+    expires = instant(authority.get("expires_at"), code)
+    if expires <= approved or expires - approved > timedelta(hours=24) \
+            or expires < instant(package.get("execution_deadline"), code):
+        reject(code)
+    scope = exact(authority.get("mutation_scope"), {
+        "active_database", "staging_database", "candidate_quarantine_database",
+        "database_local_only", "allow_staging_database_create",
+        "allow_staging_logical_restore", "allow_staging_privilege_reconcile",
+        "allow_atomic_database_switch", "allow_active_database_unseal", "allow_role_create",
+        "allow_role_alter", "allow_membership_change", "allow_password_change",
+        "allow_tablespace_acl_change",
+    }, code)
+    for field in ("active_database", "staging_database", "candidate_quarantine_database"):
+        matching_string(scope.get(field), DATABASE_IDENTIFIER, code)
+    for field in (
+        "database_local_only", "allow_staging_database_create",
+        "allow_staging_logical_restore", "allow_staging_privilege_reconcile",
+        "allow_atomic_database_switch", "allow_active_database_unseal",
+    ):
+        if scope.get(field) is not True:
+            reject(code)
+    for field in (
+        "allow_role_create", "allow_role_alter", "allow_membership_change",
+        "allow_password_change", "allow_tablespace_acl_change",
+    ):
+        if scope.get(field) is not False:
+            reject(code)
+    targets = plan["targets"]["database"]
+    if authority.get("promotion_id") != plan.get("promotion_id") \
+            or authority.get("promotion_generation") != plan.get("promotion_generation") \
+            or authority.get("rollback_operation_id") != plan.get("rollback_operation_id") \
+            or authority.get("deployment_id") != plan["deployment"]["id"] \
+            or scope.get("active_database") != targets["active"] \
+            or scope.get("staging_database") != targets["staging"] \
+            or scope.get("candidate_quarantine_database") != targets["candidate_quarantine"]:
+        reject(code)
+    return authority
+
+
 def validate_plan(plan: Any, package: dict[str, Any]) -> dict[str, Any]:
     required = {
         "schema_version", "contract", "promotion_id", "promotion_generation", "rollback_operation_id",
-        "deployment", "candidate", "predecessor", "targets", "toolchain", "timeouts",
+        "deployment", "candidate", "predecessor", "targets", "reconciliation_authority",
+        "toolchain", "helpers", "timeouts",
         "max_output_bytes", "source_bindings", "action_matrix", "runtime_plan_sha256",
     }
     plan = exact(plan, required, "ROLLBACK_RUNTIME_PLAN_INVALID")
-    if plan.get("schema_version") != 1 or plan.get("contract") != PLAN_CONTRACT \
+    if plan.get("schema_version") != 3 or plan.get("contract") != PLAN_CONTRACT \
             or sha256_value(without(plan, "runtime_plan_sha256")) != plan.get("runtime_plan_sha256") \
             or plan.get("runtime_plan_sha256") != package.get("runtime_plan_sha256") \
             or plan.get("promotion_id") != package.get("promotion_id") \
@@ -988,25 +1121,97 @@ def validate_plan(plan: Any, package: dict[str, Any]) -> dict[str, Any]:
     if len({item["name"] for item in volumes.values()}) != 3 \
             or len({item["identity_sha256"] for item in volumes.values()}) != 3:
         reject("ROLLBACK_RUNTIME_PLAN_INVALID")
+    validate_reconciliation_authority(plan.get("reconciliation_authority"), plan, package)
     digest(candidate.get("protected_resources_sha256"), "ROLLBACK_RUNTIME_PLAN_INVALID")
     predecessor = exact(plan.get("predecessor"), {
         "release_manifest_sha256", "postdeploy_receipt_sha256", "runtime_configuration_sha256",
-        "web_image", "worker_image",
+        "web_image", "web_image_config_digest", "worker_image", "worker_image_config_digest",
     }, "ROLLBACK_RUNTIME_PLAN_INVALID")
-    for field in ("release_manifest_sha256", "postdeploy_receipt_sha256", "runtime_configuration_sha256"):
+    for field in (
+        "release_manifest_sha256", "postdeploy_receipt_sha256", "runtime_configuration_sha256",
+    ):
         digest(predecessor.get(field), "ROLLBACK_RUNTIME_PLAN_INVALID")
     matching_string(predecessor.get("web_image"), IMAGE_REFERENCE, "ROLLBACK_RUNTIME_PLAN_INVALID")
     matching_string(predecessor.get("worker_image"), IMAGE_REFERENCE, "ROLLBACK_RUNTIME_PLAN_INVALID")
-    toolchain = exact(plan.get("toolchain"), {"executor", "docker"}, "ROLLBACK_RUNTIME_PLAN_INVALID")
-    for key, expected_path in (("executor", EXECUTOR_FILE), ("docker", DOCKER_FILE)):
+    matching_string(
+        predecessor.get("web_image_config_digest"), IMAGE_DIGEST,
+        "ROLLBACK_RUNTIME_PLAN_INVALID",
+    )
+    matching_string(
+        predecessor.get("worker_image_config_digest"), IMAGE_DIGEST,
+        "ROLLBACK_RUNTIME_PLAN_INVALID",
+    )
+    toolchain = exact(
+        plan.get("toolchain"), {"executor", "docker", "compose_plugin"},
+        "ROLLBACK_RUNTIME_PLAN_INVALID",
+    )
+    for key, expected_path, expected_mode in (
+        ("executor", EXECUTOR_FILE, "0555"),
+        ("docker", DOCKER_FILE, "0755"),
+        ("compose_plugin", COMPOSE_PLUGIN_FILE, "0755"),
+    ):
         tool = exact(toolchain.get(key), {"path", "sha256", "uid", "gid", "mode"},
                      "ROLLBACK_RUNTIME_PLAN_INVALID")
         if tool.get("path") != str(expected_path) or tool.get("uid") != 0 \
-                or tool.get("gid") != 0 or tool.get("mode") != "0555":
+                or tool.get("gid") != 0 or tool.get("mode") != expected_mode:
             reject("ROLLBACK_RUNTIME_PLAN_INVALID")
         digest(tool.get("sha256"), "ROLLBACK_RUNTIME_PLAN_INVALID")
+    helpers = exact(plan.get("helpers"), {"volume_restore"}, "ROLLBACK_RUNTIME_PLAN_INVALID")
+    volume_helper = exact(
+        helpers.get("volume_restore"), {
+            "image_reference", "image_config_digest", "application_version", "git_commit",
+            "git_tree", "image_role", "platform", "protocol", "contract_sha256",
+            "evidence_run_id", "backup_status_reader_gid", "build_provenance_sha256",
+            "sbom_evidence_sha256",
+            "security_evidence_sha256",
+            "supervisor_bundle_sha256",
+        },
+        "ROLLBACK_RUNTIME_PLAN_INVALID",
+    )
+    matching_string(
+        volume_helper.get("image_reference"), IMAGE_REFERENCE, "ROLLBACK_RUNTIME_PLAN_INVALID",
+    )
+    matching_string(
+        volume_helper.get("image_config_digest"), IMAGE_DIGEST, "ROLLBACK_RUNTIME_PLAN_INVALID",
+    )
+    matching_string(
+        volume_helper.get("application_version"), VERSION, "ROLLBACK_RUNTIME_PLAN_INVALID",
+    )
+    matching_string(volume_helper.get("git_commit"), COMMIT, "ROLLBACK_RUNTIME_PLAN_INVALID")
+    matching_string(volume_helper.get("git_tree"), COMMIT, "ROLLBACK_RUNTIME_PLAN_INVALID")
+    matching_string(
+        volume_helper.get("evidence_run_id"), IDENTIFIER, "ROLLBACK_RUNTIME_PLAN_INVALID",
+    )
+    safe_integer(
+        volume_helper.get("backup_status_reader_gid"), 1, 2**31 - 1,
+        "ROLLBACK_RUNTIME_PLAN_INVALID",
+    )
+    if volume_helper.get("git_commit") == volume_helper.get("git_tree") \
+            or volume_helper.get("image_role") != "volume-restore-helper" \
+            or volume_helper.get("platform") != "linux/amd64" \
+            or volume_helper.get("protocol") != "chenyida-erp-volume-helper/v1" \
+            or volume_helper.get("contract_sha256") \
+                != "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d" \
+            or len(volume_helper["evidence_run_id"]) > 80 \
+            or volume_helper["image_reference"].endswith(
+                volume_helper["image_config_digest"][7:]
+            ):
+        reject("ROLLBACK_RUNTIME_PLAN_INVALID")
+    helper_evidence = {
+        volume_helper.get(field) for field in (
+            "build_provenance_sha256", "sbom_evidence_sha256",
+            "security_evidence_sha256", "supervisor_bundle_sha256",
+        )
+    }
+    if len(helper_evidence) != 4 or any(
+            not isinstance(item, str) or SHA256.fullmatch(item) is None
+            or item == ZERO_SHA256 for item in helper_evidence):
+        reject("ROLLBACK_RUNTIME_PLAN_INVALID")
     bindings = exact(plan.get("source_bindings"), {
         "snapshot_objects_sha256", "snapshot_reconciliation_sha256",
+        "snapshot_manifest_sha256", "snapshot_policy_sha256",
+        "runtime_privilege_access_sha256", "runtime_privilege_compiled_catalog_sha256",
+        "runtime_privilege_policy_sha256", "runtime_privilege_operator_policy_sha256",
         "deployment_environment_sha256", "compose_file_sha256",
         "compose_release_file_sha256", "runtime_policy_sha256",
     }, "ROLLBACK_RUNTIME_PLAN_INVALID")
@@ -1024,6 +1229,16 @@ def validate_plan(plan: Any, package: dict[str, Any]) -> dict[str, Any]:
             or bindings != {
                 "snapshot_objects_sha256": package["snapshot_objects_sha256"],
                 "snapshot_reconciliation_sha256": sources["snapshot_reconciliation"]["sha256"],
+                "snapshot_manifest_sha256": sources["snapshot_manifest"]["sha256"],
+                "snapshot_policy_sha256": sources["snapshot_policy"]["sha256"],
+                "runtime_privilege_access_sha256":
+                    sources["snapshot_runtime_privilege_access"]["sha256"],
+                "runtime_privilege_compiled_catalog_sha256":
+                    sources["snapshot_runtime_privilege_compiled_catalog"]["sha256"],
+                "runtime_privilege_policy_sha256":
+                    sources["snapshot_runtime_privilege_policy"]["sha256"],
+                "runtime_privilege_operator_policy_sha256":
+                    sources["snapshot_runtime_privilege_operator_policy"]["sha256"],
                 "deployment_environment_sha256": sources["deployment_environment"]["sha256"],
                 "compose_file_sha256": sources["compose_file"]["sha256"],
                 "compose_release_file_sha256": sources["compose_release_file"]["sha256"],
@@ -1484,19 +1699,27 @@ def fixed_handler_id(request: dict[str, Any]) -> str:
 def fixed_argv_template(request: dict[str, Any]) -> list[str]:
     internal = {
         "PRECONDITION_RECHECK", "RUNTIME_CONFIGURATION_RESTORE",
-        "PROTECTED_RESOURCE_RECHECK", "PROTECTED_RESOURCES",
+        "PROTECTED_RESOURCE_RECHECK", "RUNTIME_CONFIGURATION",
+        "STRICT_RELEASE_IDENTITY", "PROTECTED_RESOURCES",
     }
     if request["label"] is None:
         return ["EXECUTOR_INTERNAL", "RUNTIME_OBSERVATION"]
     if request["label"] in internal:
         return ["EXECUTOR_INTERNAL", request["label"]]
+    if request["label"] == "WEB_WORKER_PREDECESSOR_ACTIVATION":
+        return [
+            "/proc/self/fd/{compose_plugin_fd}", "FIXED_HANDLER",
+            "WEB_WORKER_PREDECESSOR_ACTIVATION",
+        ]
     return ["/proc/self/fd/{docker_fd}", "FIXED_HANDLER", request["label"]]
 
 
 def fixed_idempotency_key(request: dict[str, Any]) -> str:
     return sha256_value({
-        "contract": "chenyida-erp-uat-promotion-rollback-idempotency-key/v1",
-        "operation_id": request["operation_id"], "label": request["label"],
+        "contract": "chenyida-erp-uat-promotion-rollback-idempotency-key/v2",
+        "operation_id": request["operation_id"],
+        "execution_mode": request["execution_mode"],
+        "action": request["action"], "label": request["label"],
         "record_intent_sha256": request["record_intent_sha256"],
         "runtime_plan_sha256": request["runtime_plan_sha256"],
         "previous_result_sha256": request["previous_result_sha256"],
@@ -1506,6 +1729,7 @@ def fixed_idempotency_key(request: dict[str, Any]) -> str:
 def run_executor(
     executable_handle: tuple[Path, tuple[Any, ...], int],
     docker_handle: tuple[Path, tuple[Any, ...], int],
+    compose_plugin_handle: tuple[Path, tuple[Any, ...], int],
     source_handles: dict[str, tuple[Path, tuple[Any, ...], int]],
     activation: dict[str, Any],
     activation_chain_handles: dict[str, tuple[Path, tuple[Any, ...], int]],
@@ -1516,6 +1740,7 @@ def run_executor(
     deadline = time.monotonic() + timeout_seconds
     executable_descriptor = executable_handle[2]
     docker_descriptor = docker_handle[2]
+    compose_plugin_descriptor = compose_plugin_handle[2]
     executable_path = f"/proc/self/fd/{executable_descriptor}"
     arguments = [executable_path, request["action"].lower(), request["operation_id"]]
     if request["label"] is not None:
@@ -1546,7 +1771,7 @@ def run_executor(
     manifest_read, manifest_write = os.pipe2(getattr(os, "O_CLOEXEC", 0))
     handler_id = fixed_handler_id(request)
     descriptor_manifest_body = {
-        "schema_version": 2,
+        "schema_version": 3,
         "contract": FD_MANIFEST_CONTRACT,
         "request_sha256": request["request_sha256"],
         "action": request["action"], "operation": request["operation"],
@@ -1573,9 +1798,14 @@ def run_executor(
             "installed_executor_sha256": activation["installed_executor_sha256"],
             "runtime_plan_sha256": activation["runtime_plan_sha256"],
             "docker_sha256": _CURRENT_PLAN["toolchain"]["docker"]["sha256"],
+            "compose_plugin_sha256":
+                _CURRENT_PLAN["toolchain"]["compose_plugin"]["sha256"],
         },
         "executor": descriptor_record(executable_handle, str(EXECUTOR_FILE)),
         "docker": descriptor_record(docker_handle, str(DOCKER_FILE)),
+        "compose_plugin": descriptor_record(
+            compose_plugin_handle, str(COMPOSE_PLUGIN_FILE),
+        ),
         "activation_chain": {
             "alias": descriptor_record(source_handles["runtime_adapter_activation"], str(ACTIVATION_FILE)),
             **{
@@ -1589,6 +1819,7 @@ def run_executor(
         },
         "inherited_fds": sorted({
             descriptor, manifest_read, executable_descriptor, docker_descriptor,
+            compose_plugin_descriptor,
             *(handle[2] for handle in source_handles.values()),
             *(handle[2] for handle in activation_chain_handles.values()),
         }),
@@ -1985,13 +2216,14 @@ def validate_response(
             "SAFE_TO_EXECUTE", "EXACT_RESULT_ALREADY_DURABLE",
             "PARTIAL_OR_UNKNOWN_REQUIRES_CONTAINMENT", "BLOCKED_TARGET_IDENTITY_MISMATCH",
         },
-        "PREPARE": {"PREPARED"},
-        "EXECUTE": {"COMMITTED", "ALREADY_COMMITTED"},
+        "PREPARE": {"PREPARED", "PARTIAL_OR_UNKNOWN"},
+        "EXECUTE": {"COMMITTED", "ALREADY_COMMITTED", "PARTIAL_OR_UNKNOWN"},
         "PROBE": {"COMMITTED", "VERIFIED", "PARTIAL_OR_UNKNOWN", "CONTAINED"},
         "CONTAIN": {"CONTAINED", "STALE_INTENT"},
     }
     if status not in allowed[request["action"]]:
         reject("ROLLBACK_RUNTIME_RESPONSE_STATUS_INVALID")
+    label_unknown = request["label"] is not None and status == "PARTIAL_OR_UNKNOWN"
     if request["action"] in {"PREFLIGHT", "RECHECK"}:
         output = exact(response["output"], {
             "result", "execution_package_sha256", "source_set_sha256", "runtime_plan_sha256",
@@ -2072,6 +2304,34 @@ def validate_response(
                         or observed["retained_candidate_volumes"][domain]["identity_sha256"] \
                         != plan["candidate"]["volumes"][domain]["identity_sha256"]:
                     reject("ROLLBACK_RUNTIME_PREFLIGHT_RESPONSE_INVALID")
+    elif label_unknown:
+        output = exact(response["output"], {"unknown"},
+                       "ROLLBACK_RUNTIME_HANDLER_UNKNOWN_INVALID")
+        unknown = exact(output.get("unknown"), {
+            "schema_version", "contract", "operation", "operation_id", "label",
+            "request_action", "uncertain_action", "idempotency_key", "reason_code", "phase",
+            "state_sequence", "last_event_sha256", "side_effects_started",
+            "containment_required", "observed_at", "unknown_sha256",
+        }, "ROLLBACK_RUNTIME_HANDLER_UNKNOWN_INVALID")
+        if unknown.get("schema_version") != 1 \
+                or unknown.get("contract") != HANDLER_UNKNOWN_CONTRACT \
+                or unknown.get("operation") != request["operation"] \
+                or unknown.get("operation_id") != request["operation_id"] \
+                or unknown.get("label") != request["label"] \
+                or unknown.get("request_action") != request["action"] \
+                or unknown.get("uncertain_action") not in {"PREPARE", "EXECUTE", "PROBE", "CONTAIN"} \
+                or unknown.get("idempotency_key") != response["idempotency_key"] \
+                or unknown.get("reason_code") not in HANDLER_UNKNOWN_REASONS \
+                or unknown.get("phase") not in HANDLER_UNKNOWN_PHASES \
+                or isinstance(unknown.get("state_sequence"), bool) \
+                or not isinstance(unknown.get("state_sequence"), int) \
+                or not 0 <= unknown["state_sequence"] <= 1_000_000 \
+                or SHA256.fullmatch(unknown.get("last_event_sha256") or "") is None \
+                or not isinstance(unknown.get("side_effects_started"), bool) \
+                or unknown.get("containment_required") is not True \
+                or sha256_value(without(unknown, "unknown_sha256")) != unknown.get("unknown_sha256"):
+            reject("ROLLBACK_RUNTIME_HANDLER_UNKNOWN_INVALID")
+        instant(unknown.get("observed_at"), "ROLLBACK_RUNTIME_HANDLER_UNKNOWN_INVALID")
     elif request["action"] == "PREPARE":
         output = exact(response["output"], {"record_intent"},
                        "ROLLBACK_RUNTIME_RECORD_RESPONSE_INVALID")
@@ -2084,23 +2344,25 @@ def validate_response(
         label_field = "stage" if request["operation"] == "ROLLBACK_EXECUTION" else "check"
         intent_field = f"{label_field}_intent_sha256"
         result_field = f"{label_field}_result_sha256"
-        contract = f"chenyida-erp-uat-promotion-rollback-{label_field}-result/v2"
+        contract = f"chenyida-erp-uat-promotion-rollback-{label_field}-result/v5"
         expected_status = "COMMITTED" if label_field == "stage" else "VERIFIED"
         fields = {
             "schema_version", "contract", "status", "promotion_id", "promotion_generation",
             "operation_id", "execution_authorization_sha256", "rollback_plan_sha256",
             "execution_package_sha256", "runtime_plan_sha256", "ordinal", label_field,
-            "previous_result_sha256", intent_field, "evidence", "started_at", "completed_at",
-            result_field,
+            "previous_result_sha256", intent_field, "side_effect_receipts_sha256",
+            "evidence", "started_at", "completed_at", result_field,
         }
         result = exact(result, fields, "ROLLBACK_RUNTIME_RECORD_RESPONSE_INVALID")
-        if result.get("schema_version") != 2 or result.get("contract") != contract \
+        if result.get("schema_version") != 5 or result.get("contract") != contract \
                 or result.get("status") != expected_status \
                 or result.get("operation_id") != request["operation_id"] \
                 or result.get(label_field) != request["label"] \
                 or result.get("runtime_plan_sha256") != request["runtime_plan_sha256"] \
                 or result.get("previous_result_sha256") != request["previous_result_sha256"] \
                 or result.get(intent_field) != request["record_intent_sha256"] \
+                or SHA256.fullmatch(result.get("side_effect_receipts_sha256") or "") is None \
+                or result.get("side_effect_receipts_sha256") == ZERO_SHA256 \
                 or not isinstance(result.get("evidence"), dict) \
                 or sha256_value(without(result, result_field)) != result.get(result_field):
             reject("ROLLBACK_RUNTIME_RECORD_RESPONSE_INVALID")
@@ -2164,13 +2426,20 @@ def main(arguments: list[str]) -> None:
         _CURRENT_PLAN = activation["plan"]
         plan = validate_plan(_CURRENT_PLAN, package)
         executor_handle = trusted_tool(
-            plan["toolchain"]["executor"], EXECUTOR_FILE, root, "ROLLBACK_RUNTIME_EXECUTOR_INVALID"
+            plan["toolchain"]["executor"], EXECUTOR_FILE, "0555", root,
+            "ROLLBACK_RUNTIME_EXECUTOR_INVALID",
         )
         opened_handles.append(executor_handle)
         docker_handle = trusted_tool(
-            plan["toolchain"]["docker"], DOCKER_FILE, root, "ROLLBACK_RUNTIME_DOCKER_INVALID"
+            plan["toolchain"]["docker"], DOCKER_FILE, "0755", root,
+            "ROLLBACK_RUNTIME_DOCKER_INVALID",
         )
         opened_handles.append(docker_handle)
+        compose_plugin_handle = trusted_tool(
+            plan["toolchain"]["compose_plugin"], COMPOSE_PLUGIN_FILE, "0755", root,
+            "ROLLBACK_RUNTIME_COMPOSE_PLUGIN_INVALID",
+        )
+        opened_handles.append(compose_plugin_handle)
         source_handles = {"runtime_adapter_activation": activation_handle}
         for role in request["source_roles"]:
             if role == "runtime_adapter_activation":
@@ -2181,11 +2450,9 @@ def main(arguments: list[str]) -> None:
             )
             opened_handles.append(handle)
             source_handles[role] = handle
-        deadline = instant(request["action_deadline"], "ROLLBACK_RUNTIME_REQUEST_TIME_INVALID")
-        remaining = (deadline - datetime.now(timezone.utc)).total_seconds()
-        if remaining <= 0:
-            reject("ROLLBACK_RUNTIME_REQUEST_TIME_INVALID")
-        action_timeout = float(TIMEOUTS[action])
+        action_timeout = bounded_executor_timeout_seconds(
+            request, datetime.now(timezone.utc),
+        )
         if root is not None:
             test_timeout = os.environ.get("CHENYIDA_ERP_ROLLBACK_ADAPTER_TEST_TIMEOUT_MS", "")
             if test_timeout:
@@ -2193,11 +2460,15 @@ def main(arguments: list[str]) -> None:
                     reject("ROLLBACK_RUNTIME_TEST_TIMEOUT_INVALID")
                 action_timeout = min(action_timeout, int(test_timeout) / 1000)
         raw, descriptor_manifest_sha = run_executor(
-            executor_handle, docker_handle, source_handles, activation, activation_chain_handles,
-            request, descriptor, max(0.001, min(action_timeout, remaining)),
+            executor_handle, docker_handle, compose_plugin_handle, source_handles,
+            activation, activation_chain_handles,
+            request, descriptor, action_timeout,
         )
         recheck_open_file(*executor_handle, "ROLLBACK_RUNTIME_EXECUTOR_CHANGED")
         recheck_open_file(*docker_handle, "ROLLBACK_RUNTIME_DOCKER_CHANGED")
+        recheck_open_file(
+            *compose_plugin_handle, "ROLLBACK_RUNTIME_COMPOSE_PLUGIN_CHANGED",
+        )
         for role, handle in source_handles.items():
             recheck_open_file(
                 *handle, f"ROLLBACK_RUNTIME_SOURCE_{role.upper()}_CHANGED",

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
+  UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION,
   UAT_PROMOTION_ROLLBACK_POSTVERIFY_CHECKS,
   UAT_PROMOTION_ROLLBACK_STAGES,
   assertUatPromotionRollbackPostverifyResultMatchesIntent,
@@ -15,10 +16,13 @@ import {
   createUatPromotionRollbackResult,
   createUatPromotionRollbackStageIntent,
   createUatPromotionRollbackStageResult,
+  validateUatPromotionRollbackExecutionPackage,
   validateUatPromotionRollbackPostverifyResult,
   validateUatPromotionRollbackResult,
+  validateUatPromotionRollbackStageResult,
 } from "../scripts/uat-promotion-rollback-contract.mjs";
 import {
+  createUatPromotionRollbackReconciliationAuthority,
   createUatPromotionRollbackRuntimePlan,
   deriveUatPromotionRollbackRuntimeTargets,
 } from "../scripts/uat-promotion-rollback-runtime-contract.mjs";
@@ -30,6 +34,57 @@ import { clusterSha256 } from "../scripts/postgresql-cluster-recovery-contract.m
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const image = (name) => `registry.example.invalid/chenyida/${name}@sha256:${hash(name)}`;
+function preactivationContentProof({ bindingSha256, runtimePlanSha256, reconciliationSha256,
+  reportSha256, migrationHead, migrationManifestSha256, database, restoredOid,
+  quarantineName, quarantineMarker }) {
+  const body = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-rollback-preactivation-content-proof/v1",
+    binding_sha256: bindingSha256,
+    runtime_plan_sha256: runtimePlanSha256,
+    source_reconciliation_sha256: reconciliationSha256,
+    source_database_report_sha256: reportSha256,
+    live_database_report_sha256: reportSha256,
+    migration_head: migrationHead,
+    migration_manifest_sha256: migrationManifestSha256,
+    migration_ledger_sha256: hash("preactivation-migration-ledger"),
+    live_security_state_sha256: hash("preactivation-security-state"),
+    active_allowed_session_role_set_sha256: hash("preactivation-role-set"),
+    active_session_client_policy_sha256: hash("preactivation-client-policy"),
+    active_session_observation_sha256: hash("preactivation-session-observation"),
+    active_writer_session_count: 0,
+    active_database_identity_sha256: clusterSha256({
+      name: database.name, system_identifier: database.system_identifier,
+      oid: restoredOid, marker: database.marker,
+    }),
+    restored_database_oid: restoredOid,
+    restored_database_marker: database.marker,
+    system_identifier: database.system_identifier,
+    active_allow_connections: true,
+    active_connection_limit: 64,
+    active_default_transaction_read_only: false,
+    active_prepared_xacts: 0,
+    candidate_database_quarantine_name: quarantineName,
+    candidate_database_quarantine_oid: database.oid,
+    candidate_database_quarantine_marker: quarantineMarker,
+    candidate_database_quarantine_allow_connections: false,
+    candidate_database_quarantine_connection_limit: 0,
+    candidate_database_quarantine_sessions: 0,
+    candidate_database_quarantine_prepared_xacts: 0,
+    before_observation_sha256: hash("preactivation-before"),
+    after_observation_sha256: hash("preactivation-after"),
+  };
+  return { ...body, proof_sha256: clusterSha256(body) };
+}
+const reconciliationAuthority = () => createUatPromotionRollbackReconciliationAuthority({
+  authority_id: "rollback-reconciliation-authority-001",
+  promotion_id: "promotion-001", promotion_generation: 1,
+  rollback_operation_id: "rollback-uat-release-001",
+  approval_reference_sha256: hash("reconciliation-approval"),
+  requester_identity_sha256: hash("reconciliation-requester"),
+  approver_identity_sha256: hash("reconciliation-approver"),
+  approved_at: "2026-08-15T01:00:00.000Z", expires_at: "2026-08-16T01:00:00.000Z",
+});
 const snapshotObjects = Object.freeze({
   postgresql: { file: "postgresql.dump", sha256: hash("postgresql"), bytes: 4096, entries: null },
   uploads: { file: "uploads.tar.gz", sha256: hash("uploads"), bytes: 128, entries: 2 },
@@ -105,6 +160,12 @@ function executionPackage() {
     }),
     snapshot_policy: source("snapshot-policy.json"),
     snapshot_policy_activation: source("snapshot-policy-activation.json"),
+    snapshot_runtime_privilege_access: source("snapshot-runtime-privilege-access.json"),
+    snapshot_runtime_privilege_compiled_catalog:
+      source("snapshot-runtime-privilege-compiled-catalog.json"),
+    snapshot_runtime_privilege_policy: source("snapshot-runtime-privilege-policy.json"),
+    snapshot_runtime_privilege_operator_policy:
+      source("snapshot-runtime-privilege-operator-policy.json"),
     predecessor_postdeploy_receipt: source("predecessor-postdeploy.json", {
       sha256: hash("predecessor-receipt"),
     }),
@@ -155,20 +216,53 @@ function executionPackage() {
       release_manifest_sha256: predecessor.release_manifest_sha256,
       postdeploy_receipt_sha256: sources.predecessor_postdeploy_receipt.sha256,
       runtime_configuration_sha256: predecessor.runtime_configuration_sha256,
-      web_image: predecessor.web_image, worker_image: predecessor.worker_image,
+      web_image: predecessor.web_image,
+      web_image_config_digest: `sha256:${hash("predecessor-web-config")}`,
+      worker_image: predecessor.worker_image,
+      worker_image_config_digest: `sha256:${hash("predecessor-worker-config")}`,
     },
+    reconciliation_authority: reconciliationAuthority(),
     toolchain: {
       executor: {
         path: "/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1",
         sha256: hash("rollback-executor"), uid: 0, gid: 0, mode: "0555",
       },
       docker: {
-        path: "/usr/bin/docker", sha256: hash("docker"), uid: 0, gid: 0, mode: "0555",
+        path: "/usr/bin/docker", sha256: hash("docker"), uid: 0, gid: 0, mode: "0755",
+      },
+      compose_plugin: {
+        path: "/usr/libexec/docker/cli-plugins/docker-compose",
+        sha256: hash("compose-plugin"), uid: 0, gid: 0, mode: "0755",
+      },
+    },
+    helpers: {
+      volume_restore: {
+        image_reference: image("volume-restore-helper"),
+        image_config_digest: `sha256:${hash("volume-restore-helper-config")}`,
+        application_version: "0.1.0-alpha.47",
+        git_commit: "1".repeat(40), git_tree: "2".repeat(40),
+        image_role: "volume-restore-helper", platform: "linux/amd64",
+        protocol: "chenyida-erp-volume-helper/v1",
+        contract_sha256: "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d",
+        evidence_run_id: "helper-evidence-fixture",
+        backup_status_reader_gid: 1000,
+        build_provenance_sha256: hash("helper-build-provenance"),
+        sbom_evidence_sha256: hash("helper-sbom-evidence"),
+        security_evidence_sha256: hash("helper-security-evidence"),
+        supervisor_bundle_sha256: hash("helper-supervisor-bundle"),
       },
     },
     source_bindings: {
       snapshot_objects_sha256: clusterSha256(snapshotObjects),
       snapshot_reconciliation_sha256: sources.snapshot_reconciliation.sha256,
+      snapshot_manifest_sha256: sources.snapshot_manifest.sha256,
+      snapshot_policy_sha256: sources.snapshot_policy.sha256,
+      runtime_privilege_access_sha256: sources.snapshot_runtime_privilege_access.sha256,
+      runtime_privilege_compiled_catalog_sha256:
+        sources.snapshot_runtime_privilege_compiled_catalog.sha256,
+      runtime_privilege_policy_sha256: sources.snapshot_runtime_privilege_policy.sha256,
+      runtime_privilege_operator_policy_sha256:
+        sources.snapshot_runtime_privilege_operator_policy.sha256,
       deployment_environment_sha256: sources.deployment_environment.sha256,
       compose_file_sha256: sources.compose_file.sha256,
       compose_release_file_sha256: sources.compose_release_file.sha256,
@@ -246,7 +340,14 @@ function service(name, imageField, imageValue) {
   };
 }
 
-function stageEvidence(stage, intent, packageValue) {
+function applicationService(name, imageReference, imageConfigDigest) {
+  return {
+    ...service(name, "image_reference", imageReference),
+    image_config_digest: imageConfigDigest,
+  };
+}
+
+function stageEvidence(stage, intent, packageValue, priorStages = []) {
   const targets = deriveUatPromotionRollbackRuntimeTargets(intent.rollback_operation_id);
   const commonVolume = (domain) => ({
     strategy: packageValue.restore_strategies.file_domains,
@@ -260,6 +361,23 @@ function stageEvidence(stage, intent, packageValue) {
     retained_candidate_volume: `candidate_${domain}_001`,
     retained_candidate_volume_identity_sha256: hash(`candidate-volume:${domain}`),
     runtime_plan_sha256: packageValue.runtime_plan_sha256,
+    domain,
+    manifest_sha256: packageValue.sources.snapshot_manifest.sha256,
+    expected_tree_sha256: packageValue.content_reconciliation.files[domain].tree_sha256,
+    target_volume_marker_sha256: hash(`rollback-volume-marker:${domain}`),
+    target_root_identity_sha256: hash(`rollback-root-identity:${domain}`),
+    metadata_policy_sha256: hash(`rollback-metadata-policy:${domain}`),
+    metadata_state_sha256: hash(`rollback-metadata-state:${domain}`),
+    capacity_receipt_sha256: hash(`rollback-capacity-receipt:${domain}`),
+    volume_restore_receipt_sha256: hash(`rollback-volume-restore-receipt:${domain}`),
+    helper_image_reference: image("rollback-volume-helper"),
+    helper_image_config_digest: `sha256:${hash("rollback-volume-helper-config")}`,
+    archive_inventory_sha256: hash(`rollback-archive-inventory:${domain}`),
+    ...(domain === "backup_status" ? {
+      backup_status_disposition: UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION,
+      current_backup_readiness: false,
+      post_rollback_backup_required: true,
+    } : {}),
   });
   const values = {
     PRECONDITION_RECHECK: {
@@ -301,6 +419,40 @@ function stageEvidence(stage, intent, packageValue) {
       candidate_database_quarantine_name: targets.database.candidate_quarantine,
       candidate_database_quarantine_oid: database.oid,
       runtime_plan_sha256: packageValue.runtime_plan_sha256,
+      manifest_sha256: packageValue.sources.snapshot_manifest.sha256,
+      migration_manifest_sha256: predecessor.migration_manifest_sha256,
+      writer_containment_stage_result_sha256:
+        priorStages[1]?.stage_result_sha256 ?? hash("writer-containment-stage-result-unavailable"),
+      postgres_container_id: hash("candidate-container:postgres"),
+      postgres_image_config_digest: `sha256:${hash("candidate-image:postgres")}`,
+      database_profile_sha256: hash("rollback-database-profile"),
+      capacity_receipt_sha256: hash("rollback-postgresql-capacity-receipt"),
+      restore_receipt_sha256: hash("rollback-postgresql-restore-receipt"),
+      runtime_privilege_access_sha256:
+        packageValue.sources.snapshot_runtime_privilege_access.sha256,
+      runtime_privilege_catalog_sha256: hash("rollback-runtime-privilege-catalog"),
+      runtime_privilege_catalog_artifact_sha256:
+        packageValue.sources.snapshot_runtime_privilege_compiled_catalog.sha256,
+      runtime_privilege_policy_sha256:
+        packageValue.sources.snapshot_runtime_privilege_policy.sha256,
+      runtime_privilege_operator_policy_sha256:
+        packageValue.sources.snapshot_runtime_privilege_operator_policy.sha256,
+      uat_reconciliation_authority_sha256: reconciliationAuthority().authority_sha256,
+      uat_reconciliation_activation_sha256: hash("rollback-reconciliation-activation"),
+      sealed_security_projection_sha256: hash("rollback-sealed-security-projection"),
+      staging_database_marker:
+        `chenyida-erp-uat-rollback/v1:${intent.rollback_operation_id}:RESTORED_STAGING`,
+      candidate_database_quarantine_marker:
+        `chenyida-erp-uat-rollback/v1:${intent.rollback_operation_id}:CANDIDATE_QUARANTINE`,
+      switch_transaction_sha256: hash("rollback-postgresql-switch-transaction"),
+      restored_database_allow_connections_at_commit: false,
+      restored_database_connection_limit_at_commit: 0,
+      restored_database_sessions_at_commit: 0,
+      restored_database_prepared_xacts_at_commit: 0,
+      candidate_database_quarantine_allow_connections_at_commit: false,
+      candidate_database_quarantine_connection_limit_at_commit: 0,
+      candidate_database_quarantine_sessions_at_commit: 0,
+      candidate_database_quarantine_prepared_xacts_at_commit: 0,
     },
     UPLOADS_RESTORE: commonVolume("uploads"),
     ATTACHMENTS_RESTORE: commonVolume("attachments"),
@@ -310,27 +462,68 @@ function stageEvidence(stage, intent, packageValue) {
       compose_release_file_sha256: packageValue.sources.compose_release_file.sha256,
       deployment_environment_sha256: packageValue.sources.deployment_environment.sha256,
       runtime_policy_sha256: packageValue.sources.runtime_policy.sha256,
-      runtime_configuration_sha256: predecessor.runtime_configuration_sha256,
+      predecessor_runtime_configuration_sha256: predecessor.runtime_configuration_sha256,
+      rollback_runtime_projection_sha256: hash("rollback-runtime-projection"),
+      compose_rollback_overlay_sha256: hash("rollback-compose-overlay"),
+      rollback_runtime_configuration_sha256: hash("rollback-runtime-configuration"),
       runtime_plan_sha256: packageValue.runtime_plan_sha256,
     },
     WEB_WORKER_PREDECESSOR_ACTIVATION: {
       strategy: packageValue.restore_strategies.runtime,
-      web: service("web", "image_reference", predecessor.web_image),
-      worker: service("worker", "image_reference", predecessor.worker_image),
+      web: applicationService(
+        "web", predecessor.web_image, `sha256:${hash("predecessor-web-config")}`,
+      ),
+      worker: applicationService(
+        "worker", predecessor.worker_image,
+        `sha256:${hash("predecessor-worker-config")}`,
+      ),
       caddy: service("caddy", "image_digest", `sha256:${hash("caddy")}`),
       postgres: service("postgres", "image_digest", `sha256:${hash("postgres")}`),
       rollback_postdeploy_receipt_sha256: hash("rollback-postdeploy-receipt"),
       rollback_postdeploy_receipt_json: "{}\n",
       release_identity_sha256: hash("restored-release-identity"),
       release_identity_json: "{}\n",
-      runtime_configuration_sha256: predecessor.runtime_configuration_sha256,
+      predecessor_runtime_configuration_sha256: predecessor.runtime_configuration_sha256,
+      rollback_runtime_configuration_sha256: hash("rollback-runtime-configuration"),
+      rollback_runtime_projection_sha256: hash("rollback-runtime-projection"),
+      compose_rollback_overlay_sha256: hash("rollback-compose-overlay"),
       protected_resources_sha256: packageValue.protected_resources_sha256,
       runtime_plan_sha256: packageValue.runtime_plan_sha256,
+      uat_reconciliation_authority_sha256:
+        priorStages[2]?.evidence.uat_reconciliation_authority_sha256
+        ?? reconciliationAuthority().authority_sha256,
+      uat_reconciliation_activation_sha256:
+        priorStages[2]?.evidence.uat_reconciliation_activation_sha256
+        ?? hash("rollback-reconciliation-activation"),
+      sealed_security_projection_sha256:
+        priorStages[2]?.evidence.sealed_security_projection_sha256
+        ?? hash("rollback-sealed-security-projection"),
+      database_unseal_receipt_sha256: hash("rollback-database-unseal-receipt"),
+      compose_invocation_receipt_sha256: hash("rollback-compose-invocation-receipt"),
+      active_database_allow_connections: true,
+      active_database_connection_limit: 64,
+      candidate_database_quarantine_allow_connections: false,
+      candidate_database_quarantine_connection_limit: 0,
+      preactivation_content_proof: preactivationContentProof({
+        bindingSha256: hash("rollback-database-unseal-receipt"),
+        runtimePlanSha256: packageValue.runtime_plan_sha256,
+        reconciliationSha256:
+          packageValue.content_reconciliation.source_reconciliation_sha256,
+        reportSha256: packageValue.content_reconciliation.database.report_sha256,
+        migrationHead: predecessor.migration_head,
+        migrationManifestSha256: predecessor.migration_manifest_sha256,
+        database,
+        restoredOid: priorStages[2]?.evidence.restored_database_oid ?? "17384",
+        quarantineName: targets.database.candidate_quarantine,
+        quarantineMarker:
+          `chenyida-erp-uat-rollback/v1:${intent.rollback_operation_id}:CANDIDATE_QUARANTINE`,
+      }),
     },
     PROTECTED_RESOURCE_RECHECK: {
       before_sha256: packageValue.protected_resources_sha256,
       after_sha256: packageValue.protected_resources_sha256,
       runtime_plan_sha256: packageValue.runtime_plan_sha256,
+      observation_sha256: hash("protected-resource-observation"),
     },
   };
   return values[stage];
@@ -356,7 +549,7 @@ function rollbackResult(intent = rollbackIntent(), packageValue = executionPacka
       prepared_at: new Date(base + index * 2_000).toISOString(),
     };
     const stageIntent = createUatPromotionRollbackStageIntent(common);
-    const evidence = stageEvidence(stage, intent, packageValue);
+    const evidence = stageEvidence(stage, intent, packageValue, stages);
     mutateEvidence?.(stage, evidence);
     const result = createUatPromotionRollbackStageResult({
       promotion_id: common.promotion_id,
@@ -370,6 +563,7 @@ function rollbackResult(intent = rollbackIntent(), packageValue = executionPacka
       stage,
       previous_result_sha256: previous,
       stage_intent_sha256: stageIntent.stage_intent_sha256,
+      side_effect_receipts_sha256: hash(`stage-side-effect-receipts:${stage}`),
       evidence,
       started_at: common.prepared_at,
       completed_at: new Date(base + index * 2_000 + 1_000).toISOString(),
@@ -390,6 +584,11 @@ function rollbackResult(intent = rollbackIntent(), packageValue = executionPacka
     runtime_plan_sha256: packageValue.runtime_plan_sha256,
     source_set_sha256: packageValue.source_set_sha256,
     promotion_snapshot_binding_sha256: intent.parameters.promotion_snapshot_binding_sha256,
+    uat_reconciliation_authority_sha256:
+      stages[2].evidence.uat_reconciliation_authority_sha256,
+    uat_reconciliation_activation_sha256:
+      stages[2].evidence.uat_reconciliation_activation_sha256,
+    sealed_security_projection_sha256: stages[2].evidence.sealed_security_projection_sha256,
     snapshot_readiness_sha256: intent.parameters.snapshot_readiness_sha256,
     snapshot_backup_id: intent.parameters.snapshot_backup_id,
     snapshot_restore_run_id: intent.parameters.snapshot_restore_run_id,
@@ -401,6 +600,13 @@ function rollbackResult(intent = rollbackIntent(), packageValue = executionPacka
       name: stages[2].evidence.candidate_database_quarantine_name,
       oid: stages[2].evidence.candidate_database_quarantine_oid,
     },
+    predecessor_runtime_configuration_sha256:
+      stages[6].evidence.predecessor_runtime_configuration_sha256,
+    rollback_runtime_configuration_sha256:
+      stages[6].evidence.rollback_runtime_configuration_sha256,
+    rollback_runtime_projection_sha256:
+      stages[6].evidence.rollback_runtime_projection_sha256,
+    compose_rollback_overlay_sha256: stages[6].evidence.compose_rollback_overlay_sha256,
     compose_project: intent.parameters.compose_project,
     compose_project_root: intent.parameters.compose_project_root,
     boundary: intent.parameters.boundary,
@@ -461,10 +667,60 @@ function checkEvidence(check, rollback, packageValue, checkedAt) {
         candidate_database_quarantine_name: stage.evidence.candidate_database_quarantine_name,
         candidate_database_quarantine_oid: stage.evidence.candidate_database_quarantine_oid,
         candidate_database_quarantine_present: true,
+        runtime_plan_sha256: stage.evidence.runtime_plan_sha256,
+        restored_database_oid: stage.evidence.restored_database_oid,
+        restored_database_marker: stage.evidence.restored_database_marker,
+        system_identifier: stage.evidence.system_identifier,
+        migration_head: stage.evidence.migration_head,
+        migration_manifest_sha256: stage.evidence.migration_manifest_sha256,
+        restore_receipt_sha256: stage.evidence.restore_receipt_sha256,
+        runtime_privilege_access_sha256: stage.evidence.runtime_privilege_access_sha256,
+        runtime_privilege_catalog_sha256: stage.evidence.runtime_privilege_catalog_sha256,
+        runtime_privilege_catalog_artifact_sha256:
+          stage.evidence.runtime_privilege_catalog_artifact_sha256,
+        runtime_privilege_policy_sha256: stage.evidence.runtime_privilege_policy_sha256,
+        runtime_privilege_operator_policy_sha256:
+          stage.evidence.runtime_privilege_operator_policy_sha256,
+        uat_reconciliation_authority_sha256:
+          stage.evidence.uat_reconciliation_authority_sha256,
+        uat_reconciliation_activation_sha256:
+          stage.evidence.uat_reconciliation_activation_sha256,
+        sealed_security_projection_sha256: stage.evidence.sealed_security_projection_sha256,
+        live_security_state_sha256: hash("rollback-live-security-state"),
+        active_allow_connections: true,
+        active_connection_limit: 64,
+        active_default_transaction_read_only: false,
+        active_allowed_session_role_set_sha256: hash("rollback-allowed-session-role-set"),
+        active_session_observation_sha256: hash("rollback-active-session-observation"),
+        active_session_client_policy_sha256: hash("rollback-session-client-policy"),
+        active_writer_session_count: 0,
+        active_unexpected_session_count: 0,
+        active_prepared_xacts: 0,
+        candidate_database_quarantine_marker:
+          stage.evidence.candidate_database_quarantine_marker,
+        candidate_database_quarantine_allow_connections: false,
+        candidate_database_quarantine_connection_limit: 0,
+        candidate_database_quarantine_sessions: 0,
+        candidate_database_quarantine_prepared_xacts: 0,
       } : {
         candidate_volume_name: stage.evidence.retained_candidate_volume,
         candidate_volume_identity_sha256: stage.evidence.retained_candidate_volume_identity_sha256,
         candidate_volume_present: true,
+        domain: stage.evidence.domain,
+        runtime_plan_sha256: stage.evidence.runtime_plan_sha256,
+        target_volume: stage.evidence.target_volume,
+        target_volume_marker_sha256: stage.evidence.target_volume_marker_sha256,
+        expected_tree_sha256: stage.evidence.expected_tree_sha256,
+        target_root_identity_sha256: stage.evidence.target_root_identity_sha256,
+        metadata_policy_sha256: stage.evidence.metadata_policy_sha256,
+        metadata_state_sha256: stage.evidence.metadata_state_sha256,
+        volume_restore_receipt_sha256: stage.evidence.volume_restore_receipt_sha256,
+        helper_image_config_digest: stage.evidence.helper_image_config_digest,
+        ...(domain === "backup_status" ? {
+          backup_status_disposition: UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION,
+          current_backup_readiness: false,
+          post_rollback_backup_required: true,
+        } : {}),
       }),
     };
   }
@@ -489,7 +745,11 @@ function checkEvidence(check, rollback, packageValue, checkedAt) {
       git_commit: rollback.predecessor.git_commit,
     },
     RUNTIME_CONFIGURATION: {
-      runtime_configuration_sha256: rollback.predecessor.runtime_configuration_sha256,
+      predecessor_runtime_configuration_sha256:
+        rollback.predecessor_runtime_configuration_sha256,
+      rollback_runtime_configuration_sha256: rollback.rollback_runtime_configuration_sha256,
+      rollback_runtime_projection_sha256: rollback.rollback_runtime_projection_sha256,
+      compose_rollback_overlay_sha256: rollback.compose_rollback_overlay_sha256,
       deployment_environment_sha256: packageValue.sources.deployment_environment.sha256,
       activation_stage_result_sha256: rollback.stages[7].stage_result_sha256,
       runtime_plan_sha256: rollback.runtime_plan_sha256,
@@ -499,6 +759,9 @@ function checkEvidence(check, rollback, packageValue, checkedAt) {
       release_manifest_sha256: rollback.predecessor.release_manifest_sha256,
       rollback_postdeploy_receipt_sha256: activation.rollback_postdeploy_receipt_sha256,
       activation_stage_result_sha256: rollback.stages[7].stage_result_sha256,
+      predecessor_runtime_configuration_sha256:
+        rollback.predecessor_runtime_configuration_sha256,
+      rollback_runtime_configuration_sha256: rollback.rollback_runtime_configuration_sha256,
     },
     HEALTH: (() => {
       const receipt = JSON.parse(activation.rollback_postdeploy_receipt_json);
@@ -515,7 +778,10 @@ function checkEvidence(check, rollback, packageValue, checkedAt) {
         services,
         service_set_sha256: clusterSha256(services),
         release_identity_sha256: activation.release_identity_sha256,
-        runtime_configuration_sha256: activation.runtime_configuration_sha256,
+        runtime_configuration_sha256: rollback.rollback_runtime_configuration_sha256,
+        backup_status_disposition: UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION,
+        current_backup_readiness: false,
+        post_rollback_backup_required: true,
       };
       return { ...body, health_sha256: clusterSha256(body) };
     })(),
@@ -529,7 +795,12 @@ function checkEvidence(check, rollback, packageValue, checkedAt) {
   return values[check];
 }
 
-function postverifyResult(rollback, intent = postverifyIntent(rollback), packageValue = executionPackage()) {
+function postverifyResult(
+  rollback,
+  intent = postverifyIntent(rollback),
+  packageValue = executionPackage(),
+  mutateEvidence = null,
+) {
   const checks = [];
   let previous = "0".repeat(64);
   const base = Date.parse(intent.created_at);
@@ -549,6 +820,10 @@ function postverifyResult(rollback, intent = postverifyIntent(rollback), package
       prepared_at: new Date(base + index * 1_000).toISOString(),
     };
     const checkIntent = createUatPromotionRollbackCheckIntent(common);
+    const evidence = checkEvidence(
+      check, rollback, packageValue, new Date(base + index * 1_000 + 250).toISOString(),
+    );
+    mutateEvidence?.(check, evidence);
     const result = createUatPromotionRollbackCheckResult({
       promotion_id: common.promotion_id,
       promotion_generation: common.promotion_generation,
@@ -561,9 +836,8 @@ function postverifyResult(rollback, intent = postverifyIntent(rollback), package
       check,
       previous_result_sha256: previous,
       check_intent_sha256: checkIntent.check_intent_sha256,
-      evidence: checkEvidence(
-        check, rollback, packageValue, new Date(base + index * 1_000 + 250).toISOString(),
-      ),
+      side_effect_receipts_sha256: hash(`check-side-effect-receipts:${check}`),
+      evidence,
       started_at: common.prepared_at,
       completed_at: new Date(base + index * 1_000 + 500).toISOString(),
     });
@@ -585,17 +859,130 @@ function postverifyResult(rollback, intent = postverifyIntent(rollback), package
     runtime_plan_sha256: rollback.runtime_plan_sha256,
     postverify_intent_sha256: intent.postverify_intent_sha256,
     postverify_plan_sha256: intent.postverify_plan_sha256,
+    uat_reconciliation_authority_sha256: rollback.uat_reconciliation_authority_sha256,
+    uat_reconciliation_activation_sha256: rollback.uat_reconciliation_activation_sha256,
+    sealed_security_projection_sha256: rollback.sealed_security_projection_sha256,
     snapshot_objects: rollback.snapshot_objects,
     predecessor: rollback.predecessor,
     database: rollback.database,
     restored_database: rollback.restored_database,
     candidate_database_quarantine: rollback.candidate_database_quarantine,
     boundary: rollback.boundary,
+    predecessor_runtime_configuration_sha256:
+      rollback.predecessor_runtime_configuration_sha256,
+    rollback_runtime_configuration_sha256: rollback.rollback_runtime_configuration_sha256,
+    rollback_runtime_projection_sha256: rollback.rollback_runtime_projection_sha256,
+    compose_rollback_overlay_sha256: rollback.compose_rollback_overlay_sha256,
     check_result_sha256_chain: previous,
     checks,
     verified_at: checks.at(-1).completed_at,
   });
 }
+
+test("execution package v3 requires every immutable runtime privilege source", () => {
+  const packageValue = executionPackage();
+  assert.equal(packageValue.schema_version, 3);
+  const missingSources = { ...packageValue.sources };
+  delete missingSources.snapshot_runtime_privilege_access;
+  assert.throws(
+    () => validateUatPromotionRollbackExecutionPackage({
+      ...packageValue,
+      sources: missingSources,
+    }),
+    /UAT_PROMOTION_ROLLBACK_EXECUTION_PACKAGE_INVALID/,
+  );
+  assert.throws(
+    () => validateUatPromotionRollbackExecutionPackage({
+      ...packageValue,
+      sources: {
+        ...packageValue.sources,
+        snapshot_runtime_privilege_policy: {
+          ...packageValue.sources.snapshot_runtime_privilege_policy,
+          sha256: hash("drifted-runtime-privilege-policy"),
+        },
+      },
+    }),
+    /UAT_PROMOTION_ROLLBACK_EXECUTION_PACKAGE_INVALID/,
+  );
+});
+
+test("stage results reject a zero side-effect receipt aggregate after result rehash", () => {
+  const stage = structuredClone(rollbackResult().stages[0]);
+  stage.side_effect_receipts_sha256 = "0".repeat(64);
+  const { stage_result_sha256: _previousDigest, ...body } = stage;
+  stage.stage_result_sha256 = clusterSha256(body);
+  assert.throws(
+    () => validateUatPromotionRollbackStageResult(stage),
+    /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID/,
+  );
+});
+
+test("checkpoint 14 rejects missing privilege evidence and unusable capacity or restore receipts", () => {
+  const packageValue = executionPackage();
+  const intent = rollbackIntent(packageValue);
+  assert.throws(
+    () => rollbackResult(intent, packageValue, (stage, evidence) => {
+      if (stage === "POSTGRESQL_RESTORE") delete evidence.runtime_privilege_access_sha256;
+    }),
+    /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID/,
+  );
+  assert.throws(
+    () => rollbackResult(intent, packageValue, (stage, evidence) => {
+      if (stage === "POSTGRESQL_RESTORE") evidence.capacity_receipt_sha256 = "0".repeat(64);
+    }),
+    /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID/,
+  );
+  assert.throws(
+    () => rollbackResult(intent, packageValue, (stage, evidence) => {
+      if (stage === "UPLOADS_RESTORE") evidence.volume_restore_receipt_sha256 = "0".repeat(64);
+    }),
+    /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID/,
+  );
+  assert.throws(
+    () => rollbackResult(intent, packageValue, (stage, evidence) => {
+      if (stage === "ATTACHMENTS_RESTORE") delete evidence.metadata_state_sha256;
+    }),
+    /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID/,
+  );
+});
+
+test("checkpoint 15 rejects privilege, metadata, and restore-receipt drift from checkpoint 14", () => {
+  const packageValue = executionPackage();
+  const rollback = rollbackResult(rollbackIntent(packageValue), packageValue);
+  const intent = postverifyIntent(rollback);
+  for (const [check, field, drift] of [
+    ["POSTGRESQL_CONTENT", "runtime_privilege_policy_sha256", hash("privilege-policy-drift")],
+    ["UPLOADS_CONTENT", "metadata_state_sha256", hash("uploads-metadata-drift")],
+    ["ATTACHMENTS_CONTENT", "volume_restore_receipt_sha256", hash("attachments-receipt-drift")],
+  ]) {
+    const result = postverifyResult(rollback, intent, packageValue, (label, evidence) => {
+      if (label === check) evidence[field] = drift;
+    });
+    assert.throws(
+      () => assertUatPromotionRollbackPostverifyResultMatchesIntent(result, intent, rollback),
+      /UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_BINDING_INVALID/,
+    );
+  }
+});
+
+test("restored historical backup status cannot masquerade as current backup readiness", () => {
+  const packageValue = executionPackage();
+  const rollbackIntentValue = rollbackIntent(packageValue);
+  assert.throws(
+    () => rollbackResult(rollbackIntentValue, packageValue, (stage, evidence) => {
+      if (stage === "BACKUP_STATUS_RESTORE") evidence.current_backup_readiness = true;
+    }),
+    /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID/,
+  );
+  const rollback = rollbackResult(rollbackIntentValue, packageValue);
+  const intent = postverifyIntent(rollback);
+  assert.throws(
+    () => postverifyResult(rollback, intent, packageValue, (check, evidence) => {
+      if (check === "BACKUP_STATUS_CONTENT") evidence.current_backup_readiness = true;
+    }),
+    /UAT_PROMOTION_ROLLBACK_CHECK_RESULT_INVALID/,
+  );
+});
 
 test("checkpoint 14 accepts only the complete ordered four-domain predecessor rollback", () => {
   const intent = rollbackIntent();
@@ -663,6 +1050,35 @@ test("checkpoint 15 uses a distinct authorization and verifies every restored do
   assert.equal(validateUatPromotionRollbackPostverifyResult(result), result);
   assert.equal(assertUatPromotionRollbackPostverifyResultMatchesIntent(result, intent, rollback), result);
   assert.equal(result.checks.length, 13);
+});
+
+test("health completion time is independent from fresh database time but bounded to five seconds", () => {
+  const rollback = rollbackResult();
+  const intent = postverifyIntent(rollback);
+  const fresh = postverifyResult(rollback, intent, executionPackage(), (check, evidence) => {
+    if (check !== "HEALTH") return;
+    evidence.readiness.database_time = new Date(
+      Date.parse(evidence.checked_at) - 1_000,
+    ).toISOString();
+    evidence.readiness_sha256 = clusterSha256(evidence.readiness);
+    evidence.health_sha256 = clusterSha256(
+      Object.fromEntries(Object.entries(evidence).filter(([field]) => field !== "health_sha256")),
+    );
+  });
+  assert.equal(validateUatPromotionRollbackPostverifyResult(fresh), fresh);
+  assert.throws(
+    () => postverifyResult(rollback, intent, executionPackage(), (check, evidence) => {
+      if (check !== "HEALTH") return;
+      evidence.readiness.database_time = new Date(
+        Date.parse(evidence.checked_at) - 6_000,
+      ).toISOString();
+      evidence.readiness_sha256 = clusterSha256(evidence.readiness);
+      evidence.health_sha256 = clusterSha256(
+        Object.fromEntries(Object.entries(evidence).filter(([field]) => field !== "health_sha256")),
+      );
+    }),
+    /UAT_PROMOTION_ROLLBACK_CHECK_RESULT_INVALID/,
+  );
 });
 
 test("checkpoint 15 rejects authorization reuse, missing checks, and result substitution", () => {

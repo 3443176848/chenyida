@@ -57,3 +57,30 @@ RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments /run/chen
     && chown 0:0 /run/chenyida-erp-secrets && chmod 0555 /run/chenyida-erp-secrets
 USER 65532:65532
 CMD ["node", "--experimental-strip-types", "worker/selfhost.ts"]
+
+FROM cgr.dev/chainguard/wolfi-base@sha256:5f3cb6adc6057b4084b8a1844ea16069d5d6be5a48da5a4856495b9a44bce4ed AS volume-restore-helper
+RUN apk add --no-cache --repository=https://apk.cgr.dev/chainguard \
+      gnutar=1.35-r11 gzip=1.14-r8 coreutils=9.11-r3 findutils=4.11.0-r1 \
+    && [ "$(apk info -v gnutar)" = "gnutar-1.35-r11" ] \
+    && [ "$(apk info -v gzip)" = "gzip-1.14-r8" ] \
+    && [ "$(apk info -v coreutils)" = "coreutils-9.11-r3" ] \
+    && [ "$(apk info -v findutils)" = "findutils-4.11.0-r1" ]
+ARG ERP_BUILD_VERSION
+ARG ERP_BUILD_REVISION
+ARG ERP_BUILD_TREE
+ARG ERP_VOLUME_HELPER_CONTRACT_SHA256
+RUN [ "$ERP_VOLUME_HELPER_CONTRACT_SHA256" = "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d" ] \
+    && case "$ERP_BUILD_REVISION$ERP_BUILD_TREE" in *[!0-9a-f]*|'') exit 1 ;; esac \
+    && [ "${#ERP_BUILD_REVISION}" -eq 40 ] && [ "${#ERP_BUILD_TREE}" -eq 40 ]
+LABEL org.opencontainers.image.version=$ERP_BUILD_VERSION \
+      org.opencontainers.image.revision=$ERP_BUILD_REVISION \
+      io.chenyida.erp.git-tree=$ERP_BUILD_TREE \
+      io.chenyida.erp.image-role=volume-restore-helper \
+      io.chenyida.erp.volume-helper.protocol=chenyida-erp-volume-helper/v1 \
+      io.chenyida.erp.volume-helper.toolchain-contract-sha256=$ERP_VOLUME_HELPER_CONTRACT_SHA256
+COPY --chown=0:0 --chmod=0555 scripts/volume-restore-helper.sh /usr/local/bin/chenyida-erp-volume-helper
+COPY --chown=0:0 --chmod=0444 operations/volume-restore-helper-contract-v1.json /usr/local/share/chenyida-erp/volume-restore-helper-contract-v1.json
+USER 0:0
+WORKDIR /
+ENTRYPOINT ["/usr/local/bin/chenyida-erp-volume-helper"]
+CMD ["unsupported"]

@@ -496,7 +496,7 @@
     },
     {
       "path": "tests/selfhost-dockerfile-version-contract.test.mjs",
-      "sha256": "452e3bce471c73e35012e4da386d6619f38ebeb1edc58ae919afe95887c692f1",
+      "sha256": "34b513bf46f5469035f2d66651b6b47d9536069626a5cf6a2f416664ecb48ee0",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -2323,7 +2323,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-rollback-contract.test.mjs",
-      "sha256": "0264d40fb954f4b943887825f99a9654f4fa698d2079bd90e702dc5615b360af",
+      "sha256": "fccea33467003b6b892080579e3ee3c5970faab4ad7e649123e04c37371bb0ad",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2332,7 +2332,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs",
-      "sha256": "0f67c939fd713712a8f8ce0c31c695c21855c49805ebd0bf155849ecf5f68b0e",
+      "sha256": "943f51b319f62ce487214de8bd8ba241e29dcf044e600abc2bcc88ecc19c1c54",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2341,7 +2341,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-rollback-runtime-contract.test.mjs",
-      "sha256": "862dbe1c57cb3ced438a8dfa21e757f3a32884c216c59470b9183a51f4efb81d",
+      "sha256": "293ff34853fa4fc67187c9a8ca2de84319c2d59d06430bb52ceb5e82f4f4bba6",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2350,7 +2350,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-transaction-journal.test.mjs",
-      "sha256": "7980d293e4e20af6e34289a332c77120c6c464f63cd1801d366b69aefdb6e9ee",
+      "sha256": "9f1ff546defced7303dfd411d9768f78c0ef6f11d58c1f0145689ba78590b167",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

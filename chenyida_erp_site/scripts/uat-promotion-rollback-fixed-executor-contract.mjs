@@ -7,7 +7,7 @@ export const UAT_ROLLBACK_FIXED_EXECUTOR_CONTRACT =
 export const UAT_ROLLBACK_FIXED_EXECUTOR_CATALOG_CONTRACT =
   "chenyida-erp-uat-promotion-rollback-fixed-executor-catalog/v1";
 export const UAT_ROLLBACK_TRUSTED_FD_MANIFEST_CONTRACT =
-  "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v2";
+  "chenyida-erp-uat-promotion-rollback-trusted-fd-manifest/v3";
 export const UAT_ROLLBACK_RUNTIME_ACTIVATION_INTENT_CONTRACT =
   "chenyida-erp-uat-promotion-rollback-runtime-activation-intent/v2";
 export const UAT_ROLLBACK_RUNTIME_ACTIVATION_RECEIPT_CONTRACT =
@@ -27,6 +27,10 @@ export const UAT_ROLLBACK_RUNTIME_EXECUTOR_FILE =
   "/usr/local/libexec/chenyida-erp-uat-rollback-executor-v1";
 export const UAT_ROLLBACK_RUNTIME_EXECUTOR_SOURCE =
   "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py";
+export const UAT_ROLLBACK_HANDLER_STATE_CONTRACT =
+  "chenyida-erp-uat-promotion-rollback-handler-state-event/v1";
+export const UAT_ROLLBACK_HANDLER_STATE_ROOT =
+  `${UAT_ROLLBACK_RUNTIME_STATE_ROOT}/handler-state-v1`;
 
 export const UAT_ROLLBACK_EXECUTION_STAGES = Object.freeze([
   "PRECONDITION_RECHECK",
@@ -59,7 +63,9 @@ export const UAT_ROLLBACK_POSTVERIFY_CHECKS = Object.freeze([
 const STAGE_SOURCES = Object.freeze({
   PRECONDITION_RECHECK: [
     "snapshot_readiness", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
-    "snapshot_policy", "snapshot_policy_activation", "predecessor_postdeploy_receipt",
+    "snapshot_policy", "snapshot_policy_activation", "snapshot_runtime_privilege_access",
+    "snapshot_runtime_privilege_compiled_catalog", "snapshot_runtime_privilege_policy",
+    "snapshot_runtime_privilege_operator_policy", "predecessor_postdeploy_receipt",
     "predecessor_release_manifest", "candidate_deployment_result", "candidate_postdeploy_identity",
     "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
   ],
@@ -67,6 +73,8 @@ const STAGE_SOURCES = Object.freeze({
   POSTGRESQL_RESTORE: [
     "snapshot_readiness", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
     "snapshot_postgresql", "snapshot_policy", "snapshot_policy_activation",
+    "snapshot_runtime_privilege_access", "snapshot_runtime_privilege_compiled_catalog",
+    "snapshot_runtime_privilege_policy", "snapshot_runtime_privilege_operator_policy",
   ],
   UPLOADS_RESTORE: ["snapshot_manifest", "snapshot_uploads"],
   ATTACHMENTS_RESTORE: ["snapshot_manifest", "snapshot_attachments"],
@@ -75,8 +83,12 @@ const STAGE_SOURCES = Object.freeze({
     "compose_file", "compose_release_file", "deployment_environment", "runtime_policy",
   ],
   WEB_WORKER_PREDECESSOR_ACTIVATION: [
-    "predecessor_postdeploy_receipt", "predecessor_release_manifest", "compose_file",
-    "compose_release_file", "deployment_environment", "runtime_policy",
+    "snapshot_postgresql", "snapshot_manifest", "snapshot_migrations",
+    "snapshot_reconciliation", "snapshot_policy_activation", "snapshot_runtime_privilege_access",
+    "snapshot_runtime_privilege_compiled_catalog", "snapshot_runtime_privilege_policy",
+    "snapshot_runtime_privilege_operator_policy", "predecessor_postdeploy_receipt",
+    "predecessor_release_manifest", "compose_file", "compose_release_file",
+    "deployment_environment", "runtime_policy",
   ],
   PROTECTED_RESOURCE_RECHECK: ["candidate_deployment_result", "candidate_postdeploy_identity"],
 });
@@ -84,6 +96,8 @@ const STAGE_SOURCES = Object.freeze({
 const CHECK_SOURCES = Object.freeze({
   POSTGRESQL_CONTENT: [
     "snapshot_postgresql", "snapshot_manifest", "snapshot_migrations", "snapshot_reconciliation",
+    "snapshot_runtime_privilege_access", "snapshot_runtime_privilege_compiled_catalog",
+    "snapshot_runtime_privilege_policy", "snapshot_runtime_privilege_operator_policy",
   ],
   UPLOADS_CONTENT: ["snapshot_uploads", "snapshot_manifest", "snapshot_reconciliation"],
   ATTACHMENTS_CONTENT: ["snapshot_attachments", "snapshot_manifest", "snapshot_reconciliation"],
@@ -94,8 +108,13 @@ const CHECK_SOURCES = Object.freeze({
   WEB_IDENTITY: ["predecessor_postdeploy_receipt", "predecessor_release_manifest"],
   WORKER_IDENTITY: ["predecessor_postdeploy_receipt", "predecessor_release_manifest"],
   RUNTIME_CONFIGURATION: ["deployment_environment", "runtime_policy"],
-  STRICT_RELEASE_IDENTITY: ["predecessor_postdeploy_receipt", "predecessor_release_manifest"],
-  HEALTH: ["predecessor_postdeploy_receipt"],
+  STRICT_RELEASE_IDENTITY: [
+    "predecessor_postdeploy_receipt", "predecessor_release_manifest", "deployment_environment",
+  ],
+  HEALTH: [
+    "predecessor_postdeploy_receipt", "predecessor_release_manifest",
+    "candidate_deployment_result", "deployment_environment",
+  ],
   PROTECTED_RESOURCES: ["candidate_deployment_result", "candidate_postdeploy_identity"],
 });
 
@@ -115,19 +134,21 @@ const MISSING_CAPABILITIES = Object.freeze({
   POSTGRES_IDENTITY: "UAT_POSTGRES_IDENTITY_READONLY_PROBE_HANDLER_MISSING",
   WEB_IDENTITY: "UAT_WEB_IDENTITY_READONLY_PROBE_HANDLER_MISSING",
   WORKER_IDENTITY: "UAT_WORKER_IDENTITY_READONLY_PROBE_HANDLER_MISSING",
-  RUNTIME_CONFIGURATION: "UAT_RUNTIME_CONFIGURATION_READONLY_PROBE_HANDLER_MISSING",
   STRICT_RELEASE_IDENTITY: "UAT_STRICT_RELEASE_IDENTITY_READONLY_PROBE_HANDLER_MISSING",
   HEALTH: "UAT_HEALTH_READONLY_PROBE_HANDLER_MISSING",
 });
 
 const INTERNAL_ONLY = new Set([
   "PRECONDITION_RECHECK", "RUNTIME_CONFIGURATION_RESTORE",
-  "PROTECTED_RESOURCE_RECHECK", "PROTECTED_RESOURCES",
+  "PROTECTED_RESOURCE_RECHECK", "RUNTIME_CONFIGURATION", "STRICT_RELEASE_IDENTITY",
+  "PROTECTED_RESOURCES",
 ]);
 
 function handler(label, kind, sources) {
   const unavailable = MISSING_CAPABILITIES[label] ?? null;
-  const tool = INTERNAL_ONLY.has(label) ? "EXECUTOR_INTERNAL" : "DOCKER_FD";
+  const tool = INTERNAL_ONLY.has(label)
+    ? "EXECUTOR_INTERNAL"
+    : label === "WEB_WORKER_PREDECESSOR_ACTIVATION" ? "COMPOSE_PLUGIN_FD" : "DOCKER_FD";
   const actions = kind === "STAGE" ? ["PREPARE", "EXECUTE", "PROBE"] : ["PREPARE", "PROBE"];
   return Object.freeze({
     label,
@@ -137,7 +158,9 @@ function handler(label, kind, sources) {
     tool,
     argv_template: Object.freeze(tool === "DOCKER_FD"
       ? ["/proc/self/fd/{docker_fd}", "FIXED_HANDLER", label]
-      : ["EXECUTOR_INTERNAL", label]),
+      : tool === "COMPOSE_PLUGIN_FD"
+        ? ["/proc/self/fd/{compose_plugin_fd}", "FIXED_HANDLER", label]
+        : ["EXECUTOR_INTERNAL", label]),
     cwd: "/",
     environment: "EMPTY_FIXED_LOCALE_UTC",
     required_source_roles: Object.freeze([...sources, "runtime_adapter_activation"]),
@@ -145,10 +168,16 @@ function handler(label, kind, sources) {
     output_contract: kind === "STAGE"
       ? "chenyida-erp-uat-promotion-rollback-stage-evidence/v1"
       : "chenyida-erp-uat-promotion-rollback-check-evidence/v1",
-    timeout_seconds: kind === "STAGE" ? 1800 : 300,
+    timeout_seconds: kind === "STAGE" ? 1800
+      : label === "POSTGRESQL_CONTENT" ? 1200 : 300,
     privilege: "ROOT_UNDER_RELEASE_SUPERVISOR_GLOBAL_LOCK",
+    state_contract: UAT_ROLLBACK_HANDLER_STATE_CONTRACT,
+    state_root: UAT_ROLLBACK_HANDLER_STATE_ROOT,
+    durability: "IMMUTABLE_EVENT_ATOMIC_RENAME_FSYNC_DIRECTORY",
+    containment_scope: "OPERATION_ENUMERATES_ALL_HANDLER_EVENTS",
     idempotency_key_fields: Object.freeze([
-      "operation_id", "label", "record_intent_sha256", "runtime_plan_sha256",
+      "operation_id", "execution_mode", "action", "label",
+      "record_intent_sha256", "runtime_plan_sha256",
       "previous_result_sha256",
     ]),
     unknown_policy: "PROBE_THEN_CONTAIN_NEVER_BLINDLY_REEXECUTE",
@@ -221,7 +250,7 @@ export function uatRollbackFixedExecutorIdempotencyKey(request) {
   const entry = fixedUatRollbackHandler(request.operation, request.label, request.action);
   const body = Object.fromEntries(entry.idempotency_key_fields.map((field) => [field, request[field]]));
   return createHash("sha256").update(canonicalClusterJson({
-    contract: "chenyida-erp-uat-promotion-rollback-idempotency-key/v1",
+    contract: "chenyida-erp-uat-promotion-rollback-idempotency-key/v2",
     ...body,
   })).digest("hex");
 }
@@ -276,9 +305,14 @@ function hashed(body, field) {
   });
 }
 function validatePlanReference(plan, executorSha256, code) {
+  const supportedPlan = plan?.schema_version === 1
+    && plan?.contract === "chenyida-erp-uat-promotion-rollback-runtime-plan/v1"
+    || plan?.schema_version === 2
+      && plan?.contract === "chenyida-erp-uat-promotion-rollback-runtime-plan/v2"
+    || plan?.schema_version === 3
+      && plan?.contract === "chenyida-erp-uat-promotion-rollback-runtime-plan/v3";
   if (!plan || typeof plan !== "object" || Array.isArray(plan)
-    || plan.schema_version !== 1
-    || plan.contract !== "chenyida-erp-uat-promotion-rollback-runtime-plan/v1"
+    || !supportedPlan
     || !SHA256.test(plan.runtime_plan_sha256 ?? "")
     || !SHA256.test(plan.toolchain?.executor?.sha256 ?? "")
     || plan.toolchain.executor.sha256 !== executorSha256

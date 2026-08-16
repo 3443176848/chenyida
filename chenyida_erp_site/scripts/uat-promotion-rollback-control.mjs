@@ -6,6 +6,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { canonicalClusterJson, clusterSha256 } from "./postgresql-cluster-recovery-contract.mjs";
+import { validateClusterRecoveryPolicyV2 } from "./postgresql-cluster-recovery-policy-v2-contract.mjs";
+import { validateRuntimePrivilegeAccessDocument } from "./postgresql-runtime-privilege-source.mjs";
+import { validateRuntimePrivilegeCompiledCatalog } from "./postgresql-runtime-privilege-catalog.mjs";
+import { validateRuntimePrivilegePolicy } from "./postgresql-runtime-privilege-policy.mjs";
+import { validateRuntimePrivilegeOperatorPolicy } from "./postgresql-runtime-privilege-operator.mjs";
 import { validateReconciliation } from "./backup-recovery-contract.mjs";
 import { validateUatPromotionComposeDeploymentResult } from "./uat-promotion-compose-deployment-contract.mjs";
 import { parseStrictJson, validateReleaseIdentity } from "./release-identity-contract.mjs";
@@ -19,6 +24,7 @@ import {
   validateReleaseManifest,
 } from "./release-manifest-contract.mjs";
 import {
+  UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION,
   UAT_PROMOTION_ROLLBACK_PACKAGE_SOURCE_ROLES,
   UAT_PROMOTION_ROLLBACK_POSTVERIFY_CHECKS,
   UAT_PROMOTION_ROLLBACK_STAGES,
@@ -45,8 +51,11 @@ import {
   UAT_PROMOTION_ROLLBACK_RUNTIME_ACTIVATION_FILE,
   UAT_PROMOTION_ROLLBACK_RUNTIME_STAGE_SOURCE_ROLES,
   UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS,
+  uatPromotionRollbackRuntimeTimeoutSeconds,
   createUatPromotionRollbackRuntimeOriginalObservation,
   createUatPromotionRollbackRuntimeRequest,
+  createUatPromotionRollbackComposeOverlay,
+  deriveUatPromotionRollbackRuntimeProjection,
   deriveUatPromotionRollbackRuntimeSourceRoles,
   deriveUatPromotionRollbackRuntimeTargets,
   validateUatPromotionRollbackRuntimeActivation,
@@ -69,6 +78,7 @@ const HASH_BUFFER_BYTES = 1024 * 1024;
 const HELPER = path.join(SITE_ROOT, "scripts/uat-promotion-rollback-runtime-adapter.py");
 const ZERO_SHA256 = "0".repeat(64);
 const MAX_CONTAINMENT_ATTEMPTS = 3;
+const HEALTH_DATABASE_TIME_MAX_SKEW_MS = 5_000;
 
 const STAGE_SOURCE_ROLES = UAT_PROMOTION_ROLLBACK_RUNTIME_STAGE_SOURCE_ROLES;
 const CHECK_SOURCE_ROLES = UAT_PROMOTION_ROLLBACK_RUNTIME_CHECK_SOURCE_ROLES;
@@ -272,7 +282,8 @@ async function trustedSourceDocument(specInput, filesystemRoot, validator, code)
     try { value = validator(parseStrictJson(raw.toString("utf8"), MAX_JSON_BYTES)); }
     catch { reject(code); }
     const text = raw.toString("utf8");
-    if (text !== canonicalClusterJson(value) && text !== releaseCanonicalJson(value)) reject(code);
+    if (text !== canonicalClusterJson(value) && text !== releaseCanonicalJson(value)
+      && text !== `${JSON.stringify(value, null, 2)}\n`) reject(code);
     return value;
   } finally { await handle.close(); }
 }
@@ -375,6 +386,15 @@ async function loadRuntimeTrustSources(context, packageValue, filesystemRoot, cl
     "ROLLBACK_CONTROL_CANDIDATE_IDENTITY_INVALID",
   );
   const plan = activation.plan;
+  const reconciliationAuthority = plan.reconciliation_authority;
+  const authorityApproved = Date.parse(reconciliationAuthority.approved_at);
+  const authorityExpires = Date.parse(reconciliationAuthority.expires_at);
+  const observedAt = clock().getTime();
+  if (authorityExpires < Date.parse(packageValue.execution_deadline)
+    || context.execution_mode === "ORIGINAL"
+      && (observedAt < authorityApproved || observedAt >= authorityExpires)) {
+    reject("ROLLBACK_CONTROL_RECONCILIATION_AUTHORITY_INVALID");
+  }
   const candidateServices = candidateServiceProjection(candidateDeployment);
   const handoff = candidateDeployment.database_handoff;
   if (!same(plan.candidate.services, candidateServices)
@@ -403,6 +423,53 @@ async function loadRuntimeTrustSources(context, packageValue, filesystemRoot, cl
     packageValue.content_reconciliation,
     reconciliationProjection(reconciliation, sources.snapshot_reconciliation.sha256),
   )) reject("ROLLBACK_CONTROL_SNAPSHOT_RECONCILIATION_BINDING_INVALID");
+  const snapshotPolicy = await trustedSourceDocument(
+    sources.snapshot_policy, filesystemRoot, validateClusterRecoveryPolicyV2,
+    "ROLLBACK_CONTROL_SNAPSHOT_POLICY_INVALID",
+  );
+  const runtimePrivilegeAccess = await trustedSourceDocument(
+    sources.snapshot_runtime_privilege_access, filesystemRoot,
+    validateRuntimePrivilegeAccessDocument,
+    "ROLLBACK_CONTROL_RUNTIME_PRIVILEGE_ACCESS_INVALID",
+  );
+  const runtimePrivilegeCatalog = await trustedSourceDocument(
+    sources.snapshot_runtime_privilege_compiled_catalog, filesystemRoot,
+    (value) => validateRuntimePrivilegeCompiledCatalog(value, { access: runtimePrivilegeAccess }),
+    "ROLLBACK_CONTROL_RUNTIME_PRIVILEGE_CATALOG_INVALID",
+  );
+  const runtimePrivilegePolicy = await trustedSourceDocument(
+    sources.snapshot_runtime_privilege_policy, filesystemRoot,
+    (value) => validateRuntimePrivilegePolicy(value, {
+      access: runtimePrivilegeAccess, catalog: runtimePrivilegeCatalog,
+    }),
+    "ROLLBACK_CONTROL_RUNTIME_PRIVILEGE_POLICY_INVALID",
+  );
+  const runtimePrivilegeOperatorPolicy = await trustedSourceDocument(
+    sources.snapshot_runtime_privilege_operator_policy, filesystemRoot,
+    (value) => validateRuntimePrivilegeOperatorPolicy(value, {
+      runtimePolicy: runtimePrivilegePolicy,
+      access: runtimePrivilegeAccess,
+      catalog: runtimePrivilegeCatalog,
+    }),
+    "ROLLBACK_CONTROL_RUNTIME_PRIVILEGE_OPERATOR_POLICY_INVALID",
+  );
+  const privilegeBinding = snapshotPolicy.runtime_privilege_binding;
+  if (privilegeBinding.access_sha256 !== runtimePrivilegeAccess.access_sha256
+    || privilegeBinding.compiled_catalog_sha256 !== runtimePrivilegeCatalog.catalog_sha256
+    || privilegeBinding.compiled_catalog_artifact_sha256 !== runtimePrivilegeCatalog.artifact_sha256
+    || privilegeBinding.policy_sha256 !== runtimePrivilegePolicy.policy_sha256
+    || privilegeBinding.operator_policy_sha256 !== runtimePrivilegeOperatorPolicy.policy_sha256
+    || privilegeBinding.file_sha256 !== sources.snapshot_runtime_privilege_policy.sha256
+    || privilegeBinding.operator_policy_file_sha256
+      !== sources.snapshot_runtime_privilege_operator_policy.sha256
+    || runtimePrivilegePolicy.source_binding.access_intent.file_sha256
+      !== sources.snapshot_runtime_privilege_access.sha256
+    || runtimePrivilegePolicy.source_binding.compiled_catalog.file_sha256
+      !== sources.snapshot_runtime_privilege_compiled_catalog.sha256
+    || runtimePrivilegeCatalog.source_binding.access_intent.file_sha256
+      !== sources.snapshot_runtime_privilege_access.sha256) {
+    reject("ROLLBACK_CONTROL_RUNTIME_PRIVILEGE_BINDING_INVALID");
+  }
   const predecessorReceipt = await trustedSourceDocument(
     sources.predecessor_postdeploy_receipt, filesystemRoot, validatePostDeployReceipt,
     "ROLLBACK_CONTROL_PREDECESSOR_RECEIPT_INVALID",
@@ -425,7 +492,11 @@ async function loadRuntimeTrustSources(context, packageValue, filesystemRoot, cl
     || predecessorManifest.migrations.head !== predecessor.migration_head
     || predecessorManifest.migrations.allowlist_sha256 !== predecessor.migration_manifest_sha256
     || predecessorManifest.images.web.image_reference !== predecessor.web_image
+    || plan.predecessor.web_image_config_digest
+      !== predecessorManifest.images.web.image_digest
     || predecessorManifest.images.worker.image_reference !== predecessor.worker_image
+    || plan.predecessor.worker_image_config_digest
+      !== predecessorManifest.images.worker.image_digest
     || predecessorReceipt.runtime_configuration_sha256 !== predecessor.runtime_configuration_sha256
     || predecessorServices.web.image_reference !== predecessor.web_image
     || predecessorServices.worker.image_reference !== predecessor.worker_image
@@ -439,7 +510,9 @@ async function loadRuntimeTrustSources(context, packageValue, filesystemRoot, cl
   }
   return Object.freeze({
     runtimePlan: plan, reconciliation, candidateDeployment, candidateIdentity,
-    predecessorReceipt, predecessorManifest, predecessorIdentity,
+    predecessorReceipt, predecessorManifest, predecessorIdentity, snapshotPolicy,
+    runtimePrivilegeAccess, runtimePrivilegeCatalog, runtimePrivilegePolicy,
+    runtimePrivilegeOperatorPolicy,
   });
 }
 
@@ -565,7 +638,7 @@ async function invokeHelper({
     ...(recordIntent === null ? {} : { record_intent: recordIntent }),
     ...extra,
   };
-  const policyTimeout = UAT_PROMOTION_ROLLBACK_RUNTIME_TIMEOUTS[action] * 1_000;
+  const policyTimeout = uatPromotionRollbackRuntimeTimeoutSeconds(action, label) * 1_000;
   const requestedMs = Date.parse(requestedAt);
   const authorizationExpiresAt = process.env.ERP_RELEASE_SUPERVISOR_AUTHORIZATION_EXPIRES_AT;
   const authorizationExpiresMs = Date.parse(authorizationExpiresAt || "");
@@ -676,12 +749,14 @@ function productionAdapter(context, intent) {
       const prepared = await invokeHelper({ ...common, action: "PREPARE" });
       if (prepared.status !== "PREPARED") reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
       const executed = await invokeHelper({ ...common, action: "EXECUTE" });
-      if (!new Set(["COMMITTED", "ALREADY_COMMITTED"]).has(executed.status)) {
+      if (!new Set(["COMMITTED", "ALREADY_COMMITTED", "PARTIAL_OR_UNKNOWN"])
+        .has(executed.status)) {
         reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
       }
       const probed = await invokeHelper({ ...common, action: "PROBE" });
       if (probed.status !== "COMMITTED") reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
-      return probed.output.record;
+      const { started_at, side_effect_receipts_sha256, evidence, completed_at } = probed.output.record;
+      return { started_at, side_effect_receipts_sha256, evidence, completed_at };
     },
     async verifyCheck({ packageValue, rollbackResult, check, checkIntent }) {
       const common = {
@@ -692,7 +767,8 @@ function productionAdapter(context, intent) {
       if (prepared.status !== "PREPARED") reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
       const probed = await invokeHelper({ ...common, action: "PROBE" });
       if (probed.status !== "VERIFIED") reject("ROLLBACK_CONTROL_RUNTIME_ADAPTER_FAILED");
-      return probed.output.record;
+      const { started_at, side_effect_receipts_sha256, evidence, completed_at } = probed.output.record;
+      return { started_at, side_effect_receipts_sha256, evidence, completed_at };
     },
     async contain({ packageValue, containmentIntent, runtimeObservation }) {
       const common = {
@@ -1122,7 +1198,7 @@ async function auditCommittedRecords(root, context, intent, packageValue, rollba
         { startedAt: storedResult.started_at, completedAt: storedResult.completed_at },
       );
       else assertStageEvidenceBindings(
-        label, storedResult.evidence, intent, packageValue, runtimeTrust,
+        label, storedResult.evidence, intent, packageValue, runtimeTrust, storedIntent,
       );
     } catch (error) {
       prefixExact = false;
@@ -1142,6 +1218,7 @@ async function auditCommittedRecords(root, context, intent, packageValue, rollba
         check: label,
         previous_result_sha256: previous,
         check_intent_sha256: storedIntent.check_intent_sha256,
+        side_effect_receipts_sha256: storedResult.side_effect_receipts_sha256,
         evidence: storedResult.evidence,
         started_at: storedResult.started_at,
         completed_at: storedResult.completed_at,
@@ -1158,6 +1235,7 @@ async function auditCommittedRecords(root, context, intent, packageValue, rollba
         stage: label,
         previous_result_sha256: previous,
         stage_intent_sha256: storedIntent.stage_intent_sha256,
+        side_effect_receipts_sha256: storedResult.side_effect_receipts_sha256,
         evidence: storedResult.evidence,
         started_at: storedResult.started_at,
         completed_at: storedResult.completed_at,
@@ -1205,12 +1283,16 @@ async function completion(context, intent, filesystemRoot, root) {
   return Object.freeze({ partial: false, result: stored.value });
 }
 
-function assertStageEvidenceBindings(stage, evidence, intent, packageValue, runtimeTrust) {
+function assertStageEvidenceBindings(
+  stage, evidence, intent, packageValue, runtimeTrust, recordIntent = null,
+) {
   const parameters = intent.parameters;
   const plan = runtimeTrust?.runtimePlan;
   if (!plan || plan.runtime_plan_sha256 !== packageValue.runtime_plan_sha256) {
     reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
   }
+  const runtimeProjection = deriveUatPromotionRollbackRuntimeProjection(plan);
+  const rollbackOverlay = createUatPromotionRollbackComposeOverlay(plan);
   const sourceByStage = {
     POSTGRESQL_RESTORE: ["snapshot_postgresql", "postgresql"],
     UPLOADS_RESTORE: ["snapshot_uploads", "uploads"],
@@ -1264,6 +1346,30 @@ function assertStageEvidenceBindings(stage, evidence, intent, packageValue, runt
       evidence.staging_database_name !== targets.database.staging
       || evidence.candidate_database_quarantine_name !== targets.database.candidate_quarantine
       || evidence.candidate_database_quarantine_oid !== plan.deployment.database.oid
+      || evidence.manifest_sha256 !== packageValue.sources.snapshot_manifest.sha256
+      || evidence.migration_manifest_sha256 !== parameters.predecessor.migration_manifest_sha256
+      || !recordIntent
+      || evidence.writer_containment_stage_result_sha256
+        !== recordIntent.previous_result_sha256
+      || evidence.postgres_container_id !== plan.candidate.services.postgres.container_id
+      || evidence.postgres_image_config_digest
+        !== plan.candidate.services.postgres.image_digest
+      || evidence.runtime_privilege_access_sha256
+        !== runtimeTrust.runtimePrivilegeAccess.access_sha256
+      || evidence.runtime_privilege_catalog_sha256
+        !== runtimeTrust.runtimePrivilegeCatalog.catalog_sha256
+      || evidence.runtime_privilege_catalog_artifact_sha256
+        !== runtimeTrust.runtimePrivilegeCatalog.artifact_sha256
+      || evidence.runtime_privilege_policy_sha256
+        !== runtimeTrust.runtimePrivilegePolicy.policy_sha256
+      || evidence.runtime_privilege_operator_policy_sha256
+        !== runtimeTrust.runtimePrivilegeOperatorPolicy.policy_sha256
+      || evidence.uat_reconciliation_authority_sha256
+        !== plan.reconciliation_authority.authority_sha256
+      || evidence.staging_database_marker
+        !== `chenyida-erp-uat-rollback/v1:${intent.rollback_operation_id}:RESTORED_STAGING`
+      || evidence.candidate_database_quarantine_marker
+        !== `chenyida-erp-uat-rollback/v1:${intent.rollback_operation_id}:CANDIDATE_QUARANTINE`
     )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
     if (domain !== "postgresql" && evidence.target_volume !== targets.volumes[domain].target) {
       reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
@@ -1273,6 +1379,16 @@ function assertStageEvidenceBindings(stage, evidence, intent, packageValue, runt
       || evidence.retained_candidate_volume_identity_sha256
         !== plan.candidate.volumes[domain].identity_sha256
       || evidence.target_volume_identity_sha256 === plan.candidate.volumes[domain].identity_sha256
+      || evidence.domain !== domain
+      || evidence.manifest_sha256 !== packageValue.sources.snapshot_manifest.sha256
+      || evidence.expected_tree_sha256 !== expectedContentSha256
+      || evidence.helper_image_reference !== plan.helpers.volume_restore.image_reference
+      || evidence.helper_image_config_digest !== plan.helpers.volume_restore.image_config_digest
+    )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
+    if (domain === "backup_status" && (
+      evidence.backup_status_disposition !== UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION
+      || evidence.current_backup_readiness !== false
+      || evidence.post_rollback_backup_required !== true
     )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
   }
   if (stage === "RUNTIME_CONFIGURATION_RESTORE" && (
@@ -1280,7 +1396,14 @@ function assertStageEvidenceBindings(stage, evidence, intent, packageValue, runt
     || evidence.compose_release_file_sha256 !== packageValue.sources.compose_release_file.sha256
     || evidence.deployment_environment_sha256 !== packageValue.sources.deployment_environment.sha256
     || evidence.runtime_policy_sha256 !== packageValue.sources.runtime_policy.sha256
-    || evidence.runtime_configuration_sha256 !== parameters.predecessor.runtime_configuration_sha256
+    || evidence.predecessor_runtime_configuration_sha256
+      !== parameters.predecessor.runtime_configuration_sha256
+    || evidence.rollback_runtime_configuration_sha256
+      === parameters.predecessor.runtime_configuration_sha256
+    || evidence.rollback_runtime_projection_sha256
+      !== runtimeProjection.rollback_runtime_projection_sha256
+    || evidence.compose_rollback_overlay_sha256
+      !== rollbackOverlay.compose_rollback_overlay_sha256
     || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
   )) reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
   if (stage === "WEB_WORKER_PREDECESSOR_ACTIVATION") {
@@ -1307,6 +1430,10 @@ function assertStageEvidenceBindings(stage, evidence, intent, packageValue, runt
     };
     if (evidence.web.image_reference !== parameters.predecessor.web_image
       || evidence.worker.image_reference !== parameters.predecessor.worker_image
+      || evidence.web.image_config_digest
+        !== plan.predecessor.web_image_config_digest
+      || evidence.worker.image_config_digest
+        !== plan.predecessor.worker_image_config_digest
       || evidence.web.container_id === plan.candidate.services.web.container_id
       || evidence.worker.container_id === plan.candidate.services.worker.container_id
       || evidence.caddy.container_id !== plan.candidate.services.caddy.container_id
@@ -1329,7 +1456,7 @@ function assertStageEvidenceBindings(stage, evidence, intent, packageValue, runt
       || receipt.source.git_tree !== parameters.predecessor.git_tree
       || receipt.migrations.head !== parameters.predecessor.migration_head
       || receipt.migrations.manifest_sha256 !== parameters.predecessor.migration_manifest_sha256
-      || receipt.runtime_configuration_sha256 !== parameters.predecessor.runtime_configuration_sha256
+      || receipt.runtime_configuration_sha256 !== evidence.rollback_runtime_configuration_sha256
       || receipt.control.supervisor_bundle_sha256 !== intent.supervisor_bundle_sha256
       || receipt.control.authorization_sha256 !== intent.execution_authorization_sha256
       || ["caddy", "postgres"].some((service) => (
@@ -1343,9 +1470,18 @@ function assertStageEvidenceBindings(stage, evidence, intent, packageValue, runt
         || receiptServices[service].image_id
           !== pinnedDigest(parameters.predecessor[`${service}_image`])
       ))
-      || evidence.runtime_configuration_sha256 !== parameters.predecessor.runtime_configuration_sha256
+      || evidence.predecessor_runtime_configuration_sha256
+        !== parameters.predecessor.runtime_configuration_sha256
+      || evidence.rollback_runtime_configuration_sha256
+        === parameters.predecessor.runtime_configuration_sha256
+      || evidence.rollback_runtime_projection_sha256
+        !== runtimeProjection.rollback_runtime_projection_sha256
+      || evidence.compose_rollback_overlay_sha256
+        !== rollbackOverlay.compose_rollback_overlay_sha256
       || evidence.protected_resources_sha256 !== packageValue.protected_resources_sha256
-      || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256) {
+      || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
+      || evidence.uat_reconciliation_authority_sha256
+        !== plan.reconciliation_authority.authority_sha256) {
       reject("ROLLBACK_CONTROL_STAGE_EVIDENCE_BINDING_INVALID");
     }
   }
@@ -1357,6 +1493,7 @@ function assertStageEvidenceBindings(stage, evidence, intent, packageValue, runt
 }
 
 function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageValue, timing) {
+  const activation = rollbackResult.stages[7].evidence;
   const sourceByCheck = {
     POSTGRESQL_CONTENT: ["snapshot_postgresql", "postgresql"],
     UPLOADS_CONTENT: ["snapshot_uploads", "uploads"],
@@ -1374,6 +1511,20 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
     const expectedTargetIdentitySha256 = domain === "postgresql"
       ? clusterSha256(rollbackResult.restored_database)
       : stage.evidence.target_volume_identity_sha256;
+    const postgresqlSharedFields = [
+      "runtime_plan_sha256", "restored_database_oid", "restored_database_marker",
+      "system_identifier", "migration_head", "migration_manifest_sha256",
+      "restore_receipt_sha256", "runtime_privilege_access_sha256",
+      "runtime_privilege_catalog_sha256", "runtime_privilege_catalog_artifact_sha256",
+      "runtime_privilege_policy_sha256", "runtime_privilege_operator_policy_sha256",
+      "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+      "sealed_security_projection_sha256", "candidate_database_quarantine_marker",
+    ];
+    const volumeSharedFields = [
+      "domain", "runtime_plan_sha256", "target_volume", "target_volume_marker_sha256",
+      "expected_tree_sha256", "target_root_identity_sha256", "metadata_policy_sha256",
+      "metadata_state_sha256", "volume_restore_receipt_sha256", "helper_image_config_digest",
+    ];
     if (evidence.source_artifact_sha256 !== packageValue.sources[role].sha256
       || evidence.source_artifact_sha256 !== object.sha256
       || evidence.source_artifact_bytes !== object.bytes
@@ -1390,17 +1541,39 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
         || evidence.candidate_database_quarantine_oid
           !== stage.evidence.candidate_database_quarantine_oid
         || evidence.candidate_database_quarantine_oid !== packageValue.database.oid
+        || evidence.active_allow_connections !== activation.active_database_allow_connections
+        || evidence.active_connection_limit !== activation.active_database_connection_limit
+        || evidence.candidate_database_quarantine_allow_connections
+          !== stage.evidence.candidate_database_quarantine_allow_connections_at_commit
+        || evidence.candidate_database_quarantine_connection_limit
+          !== stage.evidence.candidate_database_quarantine_connection_limit_at_commit
+        || evidence.candidate_database_quarantine_sessions
+          !== stage.evidence.candidate_database_quarantine_sessions_at_commit
+        || evidence.candidate_database_quarantine_prepared_xacts
+          !== stage.evidence.candidate_database_quarantine_prepared_xacts_at_commit
+        || evidence.candidate_database_quarantine_allow_connections
+          !== activation.candidate_database_quarantine_allow_connections
+        || evidence.candidate_database_quarantine_connection_limit
+          !== activation.candidate_database_quarantine_connection_limit
+        || postgresqlSharedFields.some((field) => (
+          evidence[field] !== stage.evidence[field]
+        ))
       )
       || check !== "POSTGRESQL_CONTENT" && (
         evidence.candidate_volume_present !== true
         || evidence.candidate_volume_name !== stage.evidence.retained_candidate_volume
         || evidence.candidate_volume_identity_sha256
           !== stage.evidence.retained_candidate_volume_identity_sha256
+        || volumeSharedFields.some((field) => evidence[field] !== stage.evidence[field])
+        || check === "BACKUP_STATUS_CONTENT" && (
+          evidence.backup_status_disposition !== UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION
+          || evidence.current_backup_readiness !== false
+          || evidence.post_rollback_backup_required !== true
+        )
       )) {
       reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
     }
   }
-  const activation = rollbackResult.stages[7].evidence;
   const activationStageSha256 = rollbackResult.stages[7].stage_result_sha256;
   if (check === "MIGRATION_HEAD" && (evidence.migration_head !== rollbackResult.predecessor.migration_head
     || evidence.migration_manifest_sha256 !== rollbackResult.predecessor.migration_manifest_sha256
@@ -1413,6 +1586,7 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
   for (const [label, service] of [["WEB_IDENTITY", "web"], ["WORKER_IDENTITY", "worker"]]) {
     if (check === label && (evidence.container_id !== activation[service].container_id
       || evidence.image_reference !== activation[service].image_reference
+      || evidence.image_config_digest !== activation[service].image_config_digest
       || evidence.application_version !== rollbackResult.predecessor.application_version
       || evidence.git_commit !== rollbackResult.predecessor.git_commit
       || evidence.running !== activation[service].running
@@ -1423,7 +1597,14 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
     }
   }
   if (check === "RUNTIME_CONFIGURATION" && (
-    evidence.runtime_configuration_sha256 !== rollbackResult.predecessor.runtime_configuration_sha256
+    evidence.predecessor_runtime_configuration_sha256
+      !== rollbackResult.predecessor_runtime_configuration_sha256
+    || evidence.rollback_runtime_configuration_sha256
+      !== rollbackResult.rollback_runtime_configuration_sha256
+    || evidence.rollback_runtime_projection_sha256
+      !== rollbackResult.rollback_runtime_projection_sha256
+    || evidence.compose_rollback_overlay_sha256
+      !== rollbackResult.compose_rollback_overlay_sha256
     || evidence.deployment_environment_sha256 !== packageValue.sources.deployment_environment.sha256
     || evidence.activation_stage_result_sha256 !== activationStageSha256
     || evidence.runtime_plan_sha256 !== packageValue.runtime_plan_sha256
@@ -1433,18 +1614,25 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
     || evidence.release_manifest_sha256 !== rollbackResult.predecessor.release_manifest_sha256
     || evidence.rollback_postdeploy_receipt_sha256 !== activation.rollback_postdeploy_receipt_sha256
     || evidence.activation_stage_result_sha256 !== activationStageSha256
+    || evidence.predecessor_runtime_configuration_sha256
+      !== rollbackResult.predecessor_runtime_configuration_sha256
+    || evidence.rollback_runtime_configuration_sha256
+      !== rollbackResult.rollback_runtime_configuration_sha256
   )) reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID");
   if (check === "HEALTH") {
     let readiness;
     try { readiness = validatePostDeployReadiness(evidence.readiness); }
     catch { reject("ROLLBACK_CONTROL_CHECK_EVIDENCE_BINDING_INVALID"); }
+    const checkedAtMs = Date.parse(evidence.checked_at);
+    const databaseTimeMs = Date.parse(readiness.database_time);
     const expectedServices = {
       caddy: activation.caddy, postgres: activation.postgres,
       web: activation.web, worker: activation.worker,
     };
-    if (!timing || Date.parse(evidence.checked_at) < Date.parse(timing.startedAt)
-      || Date.parse(evidence.checked_at) > Date.parse(timing.completedAt)
-      || evidence.checked_at !== readiness.database_time
+    if (!timing || !Number.isFinite(checkedAtMs) || !Number.isFinite(databaseTimeMs)
+      || checkedAtMs < Date.parse(timing.startedAt)
+      || checkedAtMs > Date.parse(timing.completedAt)
+      || Math.abs(checkedAtMs - databaseTimeMs) > HEALTH_DATABASE_TIME_MAX_SKEW_MS
       || readiness.deployment_class !== "UAT"
       || readiness.deployment_id !== packageValue.compose_project
       || readiness.version !== rollbackResult.predecessor.application_version
@@ -1456,7 +1644,12 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
       || !same(evidence.services, expectedServices)
       || evidence.service_set_sha256 !== clusterSha256(expectedServices)
       || evidence.release_identity_sha256 !== activation.release_identity_sha256
-      || evidence.runtime_configuration_sha256 !== activation.runtime_configuration_sha256
+      || evidence.runtime_configuration_sha256 !== rollbackResult.rollback_runtime_configuration_sha256
+      || activation.rollback_runtime_configuration_sha256
+        !== rollbackResult.rollback_runtime_configuration_sha256
+      || evidence.backup_status_disposition !== UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION
+      || evidence.current_backup_readiness !== false
+      || evidence.post_rollback_backup_required !== true
       || evidence.health_sha256 !== clusterSha256(
         Object.fromEntries(Object.entries(evidence).filter(([field]) => field !== "health_sha256")),
       )) {
@@ -1473,7 +1666,10 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
 
 function adapterRecord(value, code) {
   if (!value || typeof value !== "object" || Array.isArray(value)
-    || !same(Object.keys(value).sort(), ["completed_at", "evidence", "started_at"].sort())) reject(code);
+    || !same(Object.keys(value).sort(), [
+      "completed_at", "evidence", "side_effect_receipts_sha256", "started_at",
+    ].sort()) || !SHA256.test(value.side_effect_receipts_sha256)
+    || value.side_effect_receipts_sha256 === ZERO_SHA256) reject(code);
   return value;
 }
 
@@ -1965,7 +2161,7 @@ async function executeRecords(context, intent, packageValue, rollbackResult, roo
       { startedAt: observed.started_at, completedAt: observed.completed_at },
     );
     else assertStageEvidenceBindings(
-      label, observed.evidence, intent, packageValue, options.runtimeTrust,
+      label, observed.evidence, intent, packageValue, options.runtimeTrust, recordIntent,
     );
     const resultCommon = {
       promotion_id: common.promotion_id,
@@ -1981,10 +2177,12 @@ async function executeRecords(context, intent, packageValue, rollbackResult, roo
     const recordResult = postverify
       ? createUatPromotionRollbackCheckResult({
         ...resultCommon, check: label, check_intent_sha256: recordIntent.check_intent_sha256,
+        side_effect_receipts_sha256: observed.side_effect_receipts_sha256,
         evidence: observed.evidence, started_at: observed.started_at, completed_at: observed.completed_at,
       })
       : createUatPromotionRollbackStageResult({
         ...resultCommon, stage: label, stage_intent_sha256: recordIntent.stage_intent_sha256,
+        side_effect_receipts_sha256: observed.side_effect_receipts_sha256,
         evidence: observed.evidence, started_at: observed.started_at, completed_at: observed.completed_at,
       });
     await persistRecord(root, recordResult, postverify, recordIntent);
@@ -1998,6 +2196,7 @@ async function executeRecords(context, intent, packageValue, rollbackResult, roo
 function finalResult(context, intent, packageValue, rollbackResult, execution) {
   if (context.operation === "ROLLBACK_EXECUTION") {
     const postgres = execution.records[2].evidence;
+    const runtimeConfiguration = execution.records[6].evidence;
     return createUatPromotionRollbackResult({
       promotion_id: intent.promotion_id, promotion_generation: intent.promotion_generation,
       rollback_operation_id: intent.rollback_operation_id,
@@ -2009,6 +2208,11 @@ function finalResult(context, intent, packageValue, rollbackResult, execution) {
       runtime_plan_sha256: packageValue.runtime_plan_sha256,
       source_set_sha256: packageValue.source_set_sha256,
       promotion_snapshot_binding_sha256: intent.promotion_snapshot_binding_sha256,
+      uat_reconciliation_authority_sha256:
+        postgres.uat_reconciliation_authority_sha256,
+      uat_reconciliation_activation_sha256:
+        postgres.uat_reconciliation_activation_sha256,
+      sealed_security_projection_sha256: postgres.sealed_security_projection_sha256,
       snapshot_readiness_sha256: intent.snapshot_readiness_sha256,
       snapshot_backup_id: intent.parameters.snapshot_backup_id,
       snapshot_restore_run_id: intent.parameters.snapshot_restore_run_id,
@@ -2022,6 +2226,13 @@ function finalResult(context, intent, packageValue, rollbackResult, execution) {
         name: postgres.candidate_database_quarantine_name,
         oid: postgres.candidate_database_quarantine_oid,
       },
+      predecessor_runtime_configuration_sha256:
+        runtimeConfiguration.predecessor_runtime_configuration_sha256,
+      rollback_runtime_configuration_sha256:
+        runtimeConfiguration.rollback_runtime_configuration_sha256,
+      rollback_runtime_projection_sha256:
+        runtimeConfiguration.rollback_runtime_projection_sha256,
+      compose_rollback_overlay_sha256: runtimeConfiguration.compose_rollback_overlay_sha256,
       compose_project: intent.parameters.compose_project,
       compose_project_root: intent.parameters.compose_project_root, boundary: intent.parameters.boundary,
       protected_resources_before_sha256: packageValue.protected_resources_sha256,
@@ -2046,6 +2257,16 @@ function finalResult(context, intent, packageValue, rollbackResult, execution) {
     restored_database: rollbackResult.restored_database,
     candidate_database_quarantine: rollbackResult.candidate_database_quarantine,
     boundary: rollbackResult.boundary,
+    uat_reconciliation_authority_sha256:
+      rollbackResult.uat_reconciliation_authority_sha256,
+    uat_reconciliation_activation_sha256:
+      rollbackResult.uat_reconciliation_activation_sha256,
+    sealed_security_projection_sha256: rollbackResult.sealed_security_projection_sha256,
+    predecessor_runtime_configuration_sha256:
+      rollbackResult.predecessor_runtime_configuration_sha256,
+    rollback_runtime_configuration_sha256: rollbackResult.rollback_runtime_configuration_sha256,
+    rollback_runtime_projection_sha256: rollbackResult.rollback_runtime_projection_sha256,
+    compose_rollback_overlay_sha256: rollbackResult.compose_rollback_overlay_sha256,
     check_result_sha256_chain: execution.previousResultSha256, checks: execution.records,
     verified_at: execution.records.at(-1).completed_at,
   });
@@ -2072,11 +2293,19 @@ export async function runUatPromotionRollbackControl(contextInput, phase, option
     && !exactRuntimeMatchesRollbackStages(runtimeRecheck, rollbackResult.stages)) {
     reject("ROLLBACK_CONTROL_RUNTIME_RECHECK_INVALID");
   }
+  let recordTrust = runtimeTrust;
+  try {
+    recordTrust = await loadRuntimeTrustSources(
+      context, packageValue, resolved.filesystemRoot, resolved.clock,
+    );
+  } catch (cause) {
+    if (phase !== "recover") throw cause;
+  }
   const root = await executionRoot(context, options.expectedIntentSha256, resolved.filesystemRoot, phase === "recover");
   let ledger;
   try {
     ledger = await auditCommittedRecords(
-      root, context, intent, packageValue, rollbackResult, runtimeTrust,
+      root, context, intent, packageValue, rollbackResult, recordTrust,
     );
   } catch {
     ledger = Object.freeze({
@@ -2158,7 +2387,7 @@ export async function runUatPromotionRollbackControl(contextInput, phase, option
   try {
     const execution = await executeRecords(
       context, intent, packageValue, rollbackResult, root, adapter,
-      { ...options, ...resolved, runtimeTrust },
+      { ...options, ...resolved, runtimeTrust: recordTrust },
     );
     const result = finalResult(context, intent, packageValue, rollbackResult, execution);
     if (context.operation === "ROLLBACK_POSTVERIFY") {
@@ -2180,7 +2409,7 @@ export async function runUatPromotionRollbackControl(contextInput, phase, option
     let failureLedger;
     try {
       failureLedger = await auditCommittedRecords(
-        root, context, intent, packageValue, rollbackResult, runtimeTrust,
+        root, context, intent, packageValue, rollbackResult, recordTrust,
       );
     } catch {
       failureLedger = Object.freeze({

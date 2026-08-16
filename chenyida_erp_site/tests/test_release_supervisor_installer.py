@@ -158,8 +158,8 @@ class ReleaseSupervisorInstallerTest(unittest.TestCase):
             executor_sha = installer.sha256(executor_raw)
             write_mode(executor, executor_raw, 0o555)
             plan = self_hashed({
-                "schema_version": 1,
-                "contract": "chenyida-erp-uat-promotion-rollback-runtime-plan/v1",
+                "schema_version": 2,
+                "contract": "chenyida-erp-uat-promotion-rollback-runtime-plan/v2",
                 "toolchain": {"executor": {"sha256": executor_sha}},
             }, "runtime_plan_sha256")
             zero = "0" * 64

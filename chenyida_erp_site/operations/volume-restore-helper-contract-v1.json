@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-volume-restore-helper-contract/v1",
+  "image_role": "volume-restore-helper",
+  "protocol": "chenyida-erp-volume-helper/v1",
+  "platform": "linux/amd64",
+  "base_image": "cgr.dev/chainguard/wolfi-base@sha256:5f3cb6adc6057b4084b8a1844ea16069d5d6be5a48da5a4856495b9a44bce4ed",
+  "toolchain": {
+    "gnutar": "1.35-r11",
+    "gzip": "1.14-r8",
+    "coreutils": "9.11-r3",
+    "findutils": "4.11.0-r1"
+  },
+  "entrypoint": "/usr/local/bin/chenyida-erp-volume-helper",
+  "operations": {
+    "capacity": {
+      "arguments": 0,
+      "read_only_volume": true,
+      "cap_add": []
+    },
+    "restore": {
+      "arguments": 0,
+      "read_only_volume": false,
+      "cap_add": []
+    },
+    "reconcile-uploads": {
+      "arguments": 0,
+      "read_only_volume": false,
+      "cap_add": ["CHOWN", "FOWNER"]
+    },
+    "reconcile-attachments": {
+      "arguments": 0,
+      "read_only_volume": false,
+      "cap_add": ["CHOWN", "FOWNER"]
+    },
+    "reconcile-backup-status": {
+      "arguments": 1,
+      "argument_schema": ["reader_gid:1..2147483647"],
+      "read_only_volume": false,
+      "cap_add": ["CHOWN", "FOWNER"]
+    },
+    "probe": {
+      "arguments": "1_OR_2_BY_DOMAIN",
+      "argument_schema": [
+        "domain:uploads|attachments|backup_status",
+        "reader_gid:required_for_backup_status_only:1..2147483647"
+      ],
+      "read_only_volume": true,
+      "cap_add_by_domain": {
+        "uploads": ["DAC_READ_SEARCH"],
+        "attachments": ["DAC_READ_SEARCH"],
+        "backup_status": []
+      }
+    }
+  },
+  "metadata_policy": {
+    "uploads": {
+      "uid": 65532,
+      "gid": 65532,
+      "directory_mode": "0750",
+      "file_mode": "0640"
+    },
+    "attachments": {
+      "uid": 65532,
+      "gid": 65532,
+      "directory_mode": "0750",
+      "file_mode": "0640"
+    },
+    "backup_status": {
+      "uid": 0,
+      "gid": "READER_GID_FROM_VALIDATED_RUNTIME_PLAN",
+      "directory_mode": "2750",
+      "file_mode": "0640",
+      "marker": ".chenyida-erp-receipt-root-v2",
+      "marker_mode": "0400",
+      "marker_value": "chenyida-erp-receipt-root/v2\n"
+    }
+  },
+  "limits": {
+    "maximum_files": 250000,
+    "maximum_uncompressed_bytes": 53687091200,
+    "maximum_output_bytes": 4194304
+  },
+  "contract_sha256": "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d"
+}

@@ -1,21 +1,24 @@
 import path from "node:path";
 
 import { canonicalClusterJson, clusterSha256 } from "./postgresql-cluster-recovery-contract.mjs";
+import { validatePostDeployReadiness } from "./postdeploy-release-contract.mjs";
+
+const HEALTH_DATABASE_TIME_MAX_SKEW_MS = 5_000;
 
 export const UAT_PROMOTION_ROLLBACK_EXECUTION_PACKAGE_CONTRACT =
-  "chenyida-erp-uat-promotion-rollback-execution-package/v2";
+  "chenyida-erp-uat-promotion-rollback-execution-package/v3";
 export const UAT_PROMOTION_ROLLBACK_STAGE_INTENT_CONTRACT =
   "chenyida-erp-uat-promotion-rollback-stage-intent/v2";
 export const UAT_PROMOTION_ROLLBACK_STAGE_RESULT_CONTRACT =
-  "chenyida-erp-uat-promotion-rollback-stage-result/v2";
+  "chenyida-erp-uat-promotion-rollback-stage-result/v5";
 export const UAT_PROMOTION_ROLLBACK_CHECK_INTENT_CONTRACT =
   "chenyida-erp-uat-promotion-rollback-check-intent/v2";
 export const UAT_PROMOTION_ROLLBACK_CHECK_RESULT_CONTRACT =
-  "chenyida-erp-uat-promotion-rollback-check-result/v2";
+  "chenyida-erp-uat-promotion-rollback-check-result/v5";
 export const UAT_PROMOTION_ROLLBACK_RESULT_CONTRACT =
-  "chenyida-erp-uat-promotion-rollback-result/v2";
+  "chenyida-erp-uat-promotion-rollback-result/v5";
 export const UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_CONTRACT =
-  "chenyida-erp-uat-promotion-rollback-postverify-result/v2";
+  "chenyida-erp-uat-promotion-rollback-postverify-result/v5";
 
 export const UAT_PROMOTION_ROLLBACK_STAGES = Object.freeze([
   "PRECONDITION_RECHECK",
@@ -56,6 +59,10 @@ export const UAT_PROMOTION_ROLLBACK_PACKAGE_SOURCE_ROLES = Object.freeze([
   "snapshot_backup_status",
   "snapshot_policy",
   "snapshot_policy_activation",
+  "snapshot_runtime_privilege_access",
+  "snapshot_runtime_privilege_compiled_catalog",
+  "snapshot_runtime_privilege_policy",
+  "snapshot_runtime_privilege_operator_policy",
   "predecessor_postdeploy_receipt",
   "predecessor_release_manifest",
   "candidate_deployment_result",
@@ -72,6 +79,8 @@ export const UAT_PROMOTION_ROLLBACK_RESTORE_STRATEGIES = Object.freeze({
   file_domains: "RESTORE_TO_NEW_NAMED_VOLUMES_RECREATE_WRITERS_RETAIN_CANDIDATE_VOLUMES",
   runtime: "RECREATE_WEB_WORKER_FROM_PREDECESSOR_PINNED_DIGESTS",
 });
+export const UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION =
+  "RESTORED_HISTORICAL_EVIDENCE_REQUIRES_NEW_POST_ROLLBACK_BACKUP";
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/u;
@@ -94,6 +103,10 @@ const SNAPSHOT_FILES = Object.freeze({
   backup_status: "backup-status.tar.gz",
 });
 const ZERO_SHA256 = "0".repeat(64);
+const RESTORED_STAGING_MARKER =
+  /^chenyida-erp-uat-rollback\/v1:[A-Za-z0-9][A-Za-z0-9._-]{0,119}:RESTORED_STAGING$/u;
+const CANDIDATE_QUARANTINE_MARKER =
+  /^chenyida-erp-uat-rollback\/v1:[A-Za-z0-9][A-Za-z0-9._-]{0,119}:CANDIDATE_QUARANTINE$/u;
 
 export class UatPromotionRollbackError extends Error {
   constructor(code) {
@@ -118,6 +131,11 @@ function string(value, pattern, code) {
   return value;
 }
 function digest(value, code) { return string(value, SHA256, code); }
+function nonZeroDigest(value, code) {
+  digest(value, code);
+  if (value === ZERO_SHA256) reject(code);
+  return value;
+}
 function instant(value, code) {
   string(value, ISO_UTC, code);
   if (Number.isNaN(Date.parse(value))) reject(code);
@@ -263,7 +281,7 @@ export function validateUatPromotionRollbackExecutionPackage(value) {
     "compose_project", "compose_project_root", "restore_strategies", "sources",
     "source_set_sha256", "package_sha256",
   ], code);
-  if (value.schema_version !== 2 || value.contract !== UAT_PROMOTION_ROLLBACK_EXECUTION_PACKAGE_CONTRACT
+  if (value.schema_version !== 3 || value.contract !== UAT_PROMOTION_ROLLBACK_EXECUTION_PACKAGE_CONTRACT
     || value.compose_project !== "chenyida-erp") reject(code);
   string(value.promotion_id, IDENTIFIER, code);
   string(value.rollback_operation_id, IDENTIFIER, code);
@@ -306,7 +324,7 @@ export function validateUatPromotionRollbackExecutionPackage(value) {
 
 export function createUatPromotionRollbackExecutionPackage(input) {
   const body = {
-    schema_version: 2,
+    schema_version: 3,
     contract: UAT_PROMOTION_ROLLBACK_EXECUTION_PACKAGE_CONTRACT,
     ...input,
   };
@@ -351,6 +369,67 @@ function validateServiceObservation(value, imageField, imagePattern, code) {
   if (value.restart_count !== 0) reject(code);
 }
 
+function validateApplicationServiceObservation(value, code) {
+  exactKeys(value, [
+    "container_id", "image_reference", "image_config_digest", "running", "healthy",
+    "restart_count", "oom_killed",
+  ], code);
+  string(value.container_id, CONTAINER_ID, code);
+  string(value.image_reference, IMAGE_REFERENCE, code);
+  string(value.image_config_digest, IMAGE_DIGEST, code);
+  if (value.running !== true || value.healthy !== true || value.oom_killed !== false
+    || value.restart_count !== 0) reject(code);
+}
+
+function validatePreactivationContentProof(value, code) {
+  exactKeys(value, [
+    "schema_version", "contract", "binding_sha256", "runtime_plan_sha256",
+    "source_reconciliation_sha256", "source_database_report_sha256",
+    "live_database_report_sha256", "migration_head", "migration_manifest_sha256",
+    "migration_ledger_sha256", "live_security_state_sha256",
+    "active_allowed_session_role_set_sha256", "active_session_client_policy_sha256",
+    "active_session_observation_sha256", "active_writer_session_count",
+    "active_database_identity_sha256", "restored_database_oid",
+    "restored_database_marker", "system_identifier", "active_allow_connections",
+    "active_connection_limit", "active_default_transaction_read_only",
+    "active_prepared_xacts", "candidate_database_quarantine_name",
+    "candidate_database_quarantine_oid", "candidate_database_quarantine_marker",
+    "candidate_database_quarantine_allow_connections",
+    "candidate_database_quarantine_connection_limit",
+    "candidate_database_quarantine_sessions",
+    "candidate_database_quarantine_prepared_xacts", "before_observation_sha256",
+    "after_observation_sha256", "proof_sha256",
+  ], code);
+  if (value.schema_version !== 1
+    || value.contract !== "chenyida-erp-uat-promotion-rollback-preactivation-content-proof/v1"
+    || value.source_database_report_sha256 !== value.live_database_report_sha256
+    || value.active_allow_connections !== true
+    || value.active_default_transaction_read_only !== false
+    || value.candidate_database_quarantine_allow_connections !== false
+    || value.restored_database_marker !== "chenyida-erp-deployment/v2:UAT:chenyida-erp") reject(code);
+  for (const field of [
+    "binding_sha256", "runtime_plan_sha256", "source_reconciliation_sha256",
+    "source_database_report_sha256", "live_database_report_sha256",
+    "migration_manifest_sha256", "migration_ledger_sha256", "live_security_state_sha256",
+    "active_allowed_session_role_set_sha256", "active_session_client_policy_sha256",
+    "active_session_observation_sha256", "active_database_identity_sha256",
+    "before_observation_sha256", "after_observation_sha256", "proof_sha256",
+  ]) nonZeroDigest(value[field], code);
+  string(value.migration_head, MIGRATION, code);
+  string(value.restored_database_oid, /^[1-9][0-9]{0,9}$/u, code);
+  string(value.system_identifier, /^[1-9][0-9]{9,29}$/u, code);
+  string(value.candidate_database_quarantine_name, DATABASE_IDENTIFIER, code);
+  string(value.candidate_database_quarantine_oid, /^[1-9][0-9]{0,9}$/u, code);
+  string(value.candidate_database_quarantine_marker, CANDIDATE_QUARANTINE_MARKER, code);
+  integer(value.active_writer_session_count, 0, 0, code);
+  integer(value.active_connection_limit, 64, 64, code);
+  integer(value.active_prepared_xacts, 0, 0, code);
+  integer(value.candidate_database_quarantine_connection_limit, 0, 0, code);
+  integer(value.candidate_database_quarantine_sessions, 0, 0, code);
+  integer(value.candidate_database_quarantine_prepared_xacts, 0, 0, code);
+  if (clusterSha256(without(value, "proof_sha256")) !== value.proof_sha256) reject(code);
+}
+
 function validateStageEvidence(stage, value, code) {
   record(value, code);
   if (stage === "PRECONDITION_RECHECK") {
@@ -379,21 +458,55 @@ function validateStageEvidence(stage, value, code) {
       "source_reconciliation_sha256", "target_content_sha256", "snapshot_database_oid",
       "restored_database_oid", "restored_database_name", "system_identifier", "migration_head",
       "restored_database_marker", "staging_database_name", "candidate_database_quarantine_name",
-      "candidate_database_quarantine_oid", "runtime_plan_sha256",
+      "candidate_database_quarantine_oid", "runtime_plan_sha256", "manifest_sha256",
+      "migration_manifest_sha256", "writer_containment_stage_result_sha256",
+      "postgres_container_id", "postgres_image_config_digest", "database_profile_sha256",
+      "capacity_receipt_sha256", "restore_receipt_sha256", "runtime_privilege_access_sha256",
+      "runtime_privilege_catalog_sha256", "runtime_privilege_catalog_artifact_sha256",
+      "runtime_privilege_policy_sha256", "runtime_privilege_operator_policy_sha256",
+      "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+      "sealed_security_projection_sha256", "staging_database_marker",
+      "candidate_database_quarantine_marker", "switch_transaction_sha256",
+      "restored_database_allow_connections_at_commit",
+      "restored_database_connection_limit_at_commit",
+      "restored_database_sessions_at_commit", "restored_database_prepared_xacts_at_commit",
+      "candidate_database_quarantine_allow_connections_at_commit",
+      "candidate_database_quarantine_connection_limit_at_commit",
+      "candidate_database_quarantine_sessions_at_commit",
+      "candidate_database_quarantine_prepared_xacts_at_commit",
     ], code);
     if (value.strategy !== UAT_PROMOTION_ROLLBACK_RESTORE_STRATEGIES.database
       || value.restored_database_name !== "chenyida_erp"
       || value.restored_database_marker !== "chenyida-erp-deployment/v2:UAT:chenyida-erp") reject(code);
     for (const field of [
       "source_artifact_sha256", "source_reconciliation_sha256", "target_content_sha256",
-      "runtime_plan_sha256",
+      "runtime_plan_sha256", "manifest_sha256", "migration_manifest_sha256",
+      "writer_containment_stage_result_sha256", "database_profile_sha256",
+      "runtime_privilege_access_sha256", "runtime_privilege_catalog_sha256",
+      "runtime_privilege_catalog_artifact_sha256", "runtime_privilege_policy_sha256",
+      "runtime_privilege_operator_policy_sha256", "uat_reconciliation_authority_sha256",
+      "uat_reconciliation_activation_sha256", "sealed_security_projection_sha256",
+      "switch_transaction_sha256",
     ]) digest(value[field], code);
+    nonZeroDigest(value.capacity_receipt_sha256, code);
+    nonZeroDigest(value.restore_receipt_sha256, code);
     integer(value.source_artifact_bytes, 1, Number.MAX_SAFE_INTEGER, code);
     for (const field of [
       "snapshot_database_oid", "restored_database_oid", "candidate_database_quarantine_oid",
     ]) string(value[field], /^[1-9][0-9]{0,9}$/u, code);
     string(value.system_identifier, /^[1-9][0-9]{9,29}$/u, code);
     string(value.migration_head, MIGRATION, code);
+    string(value.postgres_container_id, CONTAINER_ID, code);
+    string(value.postgres_image_config_digest, IMAGE_DIGEST, code);
+    string(value.staging_database_marker, RESTORED_STAGING_MARKER, code);
+    string(value.candidate_database_quarantine_marker, CANDIDATE_QUARANTINE_MARKER, code);
+    for (const field of [
+      "restored_database_connection_limit_at_commit",
+      "restored_database_sessions_at_commit", "restored_database_prepared_xacts_at_commit",
+      "candidate_database_quarantine_connection_limit_at_commit",
+      "candidate_database_quarantine_sessions_at_commit",
+      "candidate_database_quarantine_prepared_xacts_at_commit",
+    ]) integer(value[field], 0, 0, code);
     for (const field of ["staging_database_name", "candidate_database_quarantine_name"]) {
       string(value[field], /^[a-z][a-z0-9_]{0,62}$/u, code);
     }
@@ -401,52 +514,99 @@ function validateStageEvidence(stage, value, code) {
       || value.staging_database_name === value.restored_database_name
       || value.candidate_database_quarantine_name === value.restored_database_name
       || value.candidate_database_quarantine_oid !== value.snapshot_database_oid
-      || value.candidate_database_quarantine_oid === value.restored_database_oid) reject(code);
+      || value.candidate_database_quarantine_oid === value.restored_database_oid
+      || value.restored_database_allow_connections_at_commit !== false
+      || value.candidate_database_quarantine_allow_connections_at_commit !== false) reject(code);
   } else if (new Set(["UPLOADS_RESTORE", "ATTACHMENTS_RESTORE", "BACKUP_STATUS_RESTORE"]).has(stage)) {
-    exactKeys(value, [
+    const domain = {
+      UPLOADS_RESTORE: "uploads",
+      ATTACHMENTS_RESTORE: "attachments",
+      BACKUP_STATUS_RESTORE: "backup_status",
+    }[stage];
+    const fields = [
       "strategy", "source_artifact_sha256", "source_artifact_bytes", "source_entries",
       "source_reconciliation_sha256", "target_content_sha256", "target_volume",
       "target_volume_identity_sha256", "retained_candidate_volume",
-      "retained_candidate_volume_identity_sha256", "runtime_plan_sha256",
-    ], code);
-    if (value.strategy !== UAT_PROMOTION_ROLLBACK_RESTORE_STRATEGIES.file_domains) reject(code);
+      "retained_candidate_volume_identity_sha256", "runtime_plan_sha256", "domain",
+      "manifest_sha256", "expected_tree_sha256", "target_volume_marker_sha256",
+      "target_root_identity_sha256", "metadata_policy_sha256", "metadata_state_sha256",
+      "capacity_receipt_sha256", "volume_restore_receipt_sha256", "helper_image_reference",
+      "helper_image_config_digest", "archive_inventory_sha256",
+    ];
+    if (stage === "BACKUP_STATUS_RESTORE") fields.push(
+      "backup_status_disposition", "current_backup_readiness", "post_rollback_backup_required",
+    );
+    exactKeys(value, fields, code);
+    if (value.strategy !== UAT_PROMOTION_ROLLBACK_RESTORE_STRATEGIES.file_domains
+      || value.domain !== domain || value.expected_tree_sha256 !== value.target_content_sha256) reject(code);
     for (const field of [
       "source_artifact_sha256", "source_reconciliation_sha256", "target_content_sha256",
       "target_volume_identity_sha256", "retained_candidate_volume_identity_sha256",
-      "runtime_plan_sha256",
+      "runtime_plan_sha256", "manifest_sha256", "expected_tree_sha256",
+      "target_volume_marker_sha256", "target_root_identity_sha256", "metadata_policy_sha256",
+      "metadata_state_sha256", "archive_inventory_sha256",
     ]) digest(value[field], code);
+    nonZeroDigest(value.capacity_receipt_sha256, code);
+    nonZeroDigest(value.volume_restore_receipt_sha256, code);
+    string(value.helper_image_reference, IMAGE_REFERENCE, code);
+    string(value.helper_image_config_digest, IMAGE_DIGEST, code);
     integer(value.source_artifact_bytes, 1, Number.MAX_SAFE_INTEGER, code);
     integer(value.source_entries, 0, Number.MAX_SAFE_INTEGER, code);
     for (const field of ["target_volume", "retained_candidate_volume"]) string(value[field], IDENTIFIER, code);
     if (value.target_volume === value.retained_candidate_volume) reject(code);
+    if (stage === "BACKUP_STATUS_RESTORE"
+      && (value.backup_status_disposition !== UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION
+        || value.current_backup_readiness !== false
+        || value.post_rollback_backup_required !== true)) reject(code);
   } else if (stage === "RUNTIME_CONFIGURATION_RESTORE") {
     exactKeys(value, [
       "compose_file_sha256", "compose_release_file_sha256", "deployment_environment_sha256",
-      "runtime_policy_sha256", "runtime_configuration_sha256", "runtime_plan_sha256",
+      "runtime_policy_sha256", "predecessor_runtime_configuration_sha256",
+      "rollback_runtime_projection_sha256", "compose_rollback_overlay_sha256",
+      "rollback_runtime_configuration_sha256", "runtime_plan_sha256",
     ], code);
     Object.values(value).forEach((item) => digest(item, code));
   } else if (stage === "WEB_WORKER_PREDECESSOR_ACTIVATION") {
     exactKeys(value, [
       "strategy", "web", "worker", "caddy", "postgres", "rollback_postdeploy_receipt_sha256",
       "rollback_postdeploy_receipt_json", "release_identity_sha256", "release_identity_json",
-      "runtime_configuration_sha256", "protected_resources_sha256", "runtime_plan_sha256",
+      "predecessor_runtime_configuration_sha256", "rollback_runtime_configuration_sha256",
+      "rollback_runtime_projection_sha256", "compose_rollback_overlay_sha256",
+      "protected_resources_sha256", "runtime_plan_sha256",
+      "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+      "sealed_security_projection_sha256", "database_unseal_receipt_sha256",
+      "compose_invocation_receipt_sha256", "active_database_allow_connections",
+      "active_database_connection_limit", "candidate_database_quarantine_allow_connections",
+      "candidate_database_quarantine_connection_limit", "preactivation_content_proof",
     ], code);
     if (value.strategy !== UAT_PROMOTION_ROLLBACK_RESTORE_STRATEGIES.runtime) reject(code);
-    validateServiceObservation(value.web, "image_reference", IMAGE_REFERENCE, code);
-    validateServiceObservation(value.worker, "image_reference", IMAGE_REFERENCE, code);
+    validateApplicationServiceObservation(value.web, code);
+    validateApplicationServiceObservation(value.worker, code);
     validateServiceObservation(value.caddy, "image_digest", IMAGE_DIGEST, code);
     validateServiceObservation(value.postgres, "image_digest", IMAGE_DIGEST, code);
     for (const field of [
       "rollback_postdeploy_receipt_sha256", "release_identity_sha256",
-      "runtime_configuration_sha256", "protected_resources_sha256", "runtime_plan_sha256",
+      "predecessor_runtime_configuration_sha256", "rollback_runtime_configuration_sha256",
+      "rollback_runtime_projection_sha256", "compose_rollback_overlay_sha256",
+      "protected_resources_sha256", "runtime_plan_sha256",
+      "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+      "sealed_security_projection_sha256",
     ]) digest(value[field], code);
+    nonZeroDigest(value.database_unseal_receipt_sha256, code);
+    nonZeroDigest(value.compose_invocation_receipt_sha256, code);
+    integer(value.active_database_connection_limit, 64, 64, code);
+    integer(value.candidate_database_quarantine_connection_limit, 0, 0, code);
+    if (value.active_database_allow_connections !== true
+      || value.candidate_database_quarantine_allow_connections !== false) reject(code);
+    validatePreactivationContentProof(value.preactivation_content_proof, code);
     for (const field of ["rollback_postdeploy_receipt_json", "release_identity_json"]) {
       if (typeof value[field] !== "string" || !value[field].endsWith("\n")
         || Buffer.byteLength(value[field]) > 1024 * 1024) reject(code);
     }
   } else if (stage === "PROTECTED_RESOURCE_RECHECK") {
-    exactKeys(value, ["before_sha256", "after_sha256", "runtime_plan_sha256"], code);
-    digest(value.before_sha256, code); digest(value.after_sha256, code); digest(value.runtime_plan_sha256, code);
+    exactKeys(value, ["before_sha256", "after_sha256", "runtime_plan_sha256", "observation_sha256"], code);
+    digest(value.before_sha256, code); digest(value.after_sha256, code);
+    digest(value.runtime_plan_sha256, code); digest(value.observation_sha256, code);
     if (value.before_sha256 !== value.after_sha256) reject(code);
   } else reject(code);
   return value;
@@ -464,10 +624,32 @@ function validateCheckEvidence(check, value, code) {
     ];
     if (check === "POSTGRESQL_CONTENT") fields.push(
       "candidate_database_quarantine_name", "candidate_database_quarantine_oid",
-      "candidate_database_quarantine_present",
+      "candidate_database_quarantine_present", "runtime_plan_sha256", "restored_database_oid",
+      "restored_database_marker", "system_identifier", "migration_head",
+      "migration_manifest_sha256", "restore_receipt_sha256", "runtime_privilege_access_sha256",
+      "runtime_privilege_catalog_sha256", "runtime_privilege_catalog_artifact_sha256",
+      "runtime_privilege_policy_sha256", "runtime_privilege_operator_policy_sha256",
+      "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+      "sealed_security_projection_sha256", "live_security_state_sha256",
+      "active_allow_connections", "active_connection_limit",
+      "active_default_transaction_read_only", "active_allowed_session_role_set_sha256",
+      "active_session_observation_sha256", "active_session_client_policy_sha256",
+      "active_writer_session_count",
+      "active_unexpected_session_count", "active_prepared_xacts",
+      "candidate_database_quarantine_marker",
+      "candidate_database_quarantine_allow_connections",
+      "candidate_database_quarantine_connection_limit",
+      "candidate_database_quarantine_sessions",
+      "candidate_database_quarantine_prepared_xacts",
     );
     else fields.push(
       "candidate_volume_name", "candidate_volume_identity_sha256", "candidate_volume_present",
+      "domain", "runtime_plan_sha256", "target_volume", "target_volume_marker_sha256",
+      "expected_tree_sha256", "target_root_identity_sha256", "metadata_policy_sha256",
+      "metadata_state_sha256", "volume_restore_receipt_sha256", "helper_image_config_digest",
+    );
+    if (check === "BACKUP_STATUS_CONTENT") fields.push(
+      "backup_status_disposition", "current_backup_readiness", "post_rollback_backup_required",
     );
     exactKeys(value, fields, code);
     for (const field of [
@@ -478,12 +660,54 @@ function validateCheckEvidence(check, value, code) {
     if (check === "POSTGRESQL_CONTENT") {
       string(value.candidate_database_quarantine_name, DATABASE_IDENTIFIER, code);
       string(value.candidate_database_quarantine_oid, /^[1-9][0-9]{0,9}$/u, code);
-      if (value.entries !== null || value.candidate_database_quarantine_present !== true) reject(code);
+      string(value.restored_database_oid, /^[1-9][0-9]{0,9}$/u, code);
+      string(value.system_identifier, /^[1-9][0-9]{9,29}$/u, code);
+      string(value.migration_head, MIGRATION, code);
+      string(value.candidate_database_quarantine_marker, CANDIDATE_QUARANTINE_MARKER, code);
+      for (const field of [
+        "runtime_plan_sha256", "migration_manifest_sha256", "runtime_privilege_access_sha256",
+        "runtime_privilege_catalog_sha256", "runtime_privilege_catalog_artifact_sha256",
+        "runtime_privilege_policy_sha256", "runtime_privilege_operator_policy_sha256",
+        "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+        "sealed_security_projection_sha256", "live_security_state_sha256",
+        "active_allowed_session_role_set_sha256", "active_session_observation_sha256",
+        "active_session_client_policy_sha256",
+      ]) digest(value[field], code);
+      nonZeroDigest(value.restore_receipt_sha256, code);
+      integer(value.active_connection_limit, 64, 64, code);
+      integer(value.active_writer_session_count, 0, 14, code);
+      integer(value.active_unexpected_session_count, 0, 0, code);
+      integer(value.active_prepared_xacts, 0, 0, code);
+      integer(value.candidate_database_quarantine_connection_limit, 0, 0, code);
+      integer(value.candidate_database_quarantine_sessions, 0, 0, code);
+      integer(value.candidate_database_quarantine_prepared_xacts, 0, 0, code);
+      if (value.entries !== null || value.candidate_database_quarantine_present !== true
+        || value.restored_database_marker !== "chenyida-erp-deployment/v2:UAT:chenyida-erp"
+        || value.active_allow_connections !== true
+        || value.active_default_transaction_read_only !== false
+        || value.candidate_database_quarantine_allow_connections !== false) reject(code);
     } else {
+      const domain = {
+        UPLOADS_CONTENT: "uploads",
+        ATTACHMENTS_CONTENT: "attachments",
+        BACKUP_STATUS_CONTENT: "backup_status",
+      }[check];
       integer(value.entries, 0, Number.MAX_SAFE_INTEGER, code);
       string(value.candidate_volume_name, IDENTIFIER, code);
+      string(value.target_volume, IDENTIFIER, code);
       digest(value.candidate_volume_identity_sha256, code);
-      if (value.candidate_volume_present !== true) reject(code);
+      for (const field of [
+        "runtime_plan_sha256", "target_volume_marker_sha256", "expected_tree_sha256",
+        "target_root_identity_sha256", "metadata_policy_sha256", "metadata_state_sha256",
+      ]) digest(value[field], code);
+      nonZeroDigest(value.volume_restore_receipt_sha256, code);
+      string(value.helper_image_config_digest, IMAGE_DIGEST, code);
+      if (value.candidate_volume_present !== true || value.domain !== domain
+        || value.expected_tree_sha256 !== value.target_content_sha256) reject(code);
+      if (check === "BACKUP_STATUS_CONTENT"
+        && (value.backup_status_disposition !== UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION
+          || value.current_backup_readiness !== false
+          || value.post_rollback_backup_required !== true)) reject(code);
     }
   } else if (check === "MIGRATION_HEAD") {
     exactKeys(value, [
@@ -498,44 +722,57 @@ function validateCheckEvidence(check, value, code) {
     validateServiceObservation(value, "image_digest", IMAGE_DIGEST, code);
   } else if (new Set(["WEB_IDENTITY", "WORKER_IDENTITY"]).has(check)) {
     exactKeys(value, [
-      "container_id", "image_reference", "application_version", "git_commit", "running", "healthy",
-      "restart_count", "oom_killed",
+      "container_id", "image_reference", "image_config_digest", "application_version", "git_commit",
+      "running", "healthy", "restart_count", "oom_killed",
     ], code);
     string(value.container_id, CONTAINER_ID, code); string(value.image_reference, IMAGE_REFERENCE, code);
+    string(value.image_config_digest, IMAGE_DIGEST, code);
     string(value.application_version, VERSION, code); string(value.git_commit, COMMIT, code);
     if (value.running !== true || value.healthy !== true || value.oom_killed !== false) reject(code);
     if (value.restart_count !== 0) reject(code);
   } else if (check === "RUNTIME_CONFIGURATION") {
     exactKeys(value, [
-      "runtime_configuration_sha256", "deployment_environment_sha256",
+      "predecessor_runtime_configuration_sha256", "rollback_runtime_configuration_sha256",
+      "rollback_runtime_projection_sha256", "compose_rollback_overlay_sha256",
+      "deployment_environment_sha256",
       "activation_stage_result_sha256", "runtime_plan_sha256",
     ], code);
     Object.values(value).forEach((item) => digest(item, code));
   } else if (check === "STRICT_RELEASE_IDENTITY") {
     exactKeys(value, [
       "release_identity_sha256", "release_manifest_sha256", "rollback_postdeploy_receipt_sha256",
-      "activation_stage_result_sha256",
+      "activation_stage_result_sha256", "predecessor_runtime_configuration_sha256",
+      "rollback_runtime_configuration_sha256",
     ], code);
     Object.values(value).forEach((item) => digest(item, code));
   } else if (check === "HEALTH") {
     exactKeys(value, [
       "status", "checked_at", "health_sha256", "readiness_sha256", "readiness",
       "services", "service_set_sha256", "release_identity_sha256",
-      "runtime_configuration_sha256",
+      "runtime_configuration_sha256", "backup_status_disposition",
+      "current_backup_readiness", "post_rollback_backup_required",
     ], code);
-    if (value.status !== "HEALTHY") reject(code);
-    instant(value.checked_at, code);
-    record(value.readiness, code);
+    if (value.status !== "HEALTHY"
+      || value.backup_status_disposition !== UAT_PROMOTION_ROLLBACK_BACKUP_STATUS_DISPOSITION
+      || value.current_backup_readiness !== false
+      || value.post_rollback_backup_required !== true) reject(code);
+    const checkedAt = Date.parse(instant(value.checked_at, code));
+    let readiness;
+    try { readiness = validatePostDeployReadiness(value.readiness); }
+    catch { reject(code); }
+    const databaseTime = Date.parse(readiness.database_time);
+    if (!Number.isFinite(checkedAt) || !Number.isFinite(databaseTime)
+      || Math.abs(checkedAt - databaseTime) > HEALTH_DATABASE_TIME_MAX_SKEW_MS) reject(code);
     exactKeys(value.services, ["caddy", "postgres", "web", "worker"], code);
     validateServiceObservation(value.services.caddy, "image_digest", IMAGE_DIGEST, code);
     validateServiceObservation(value.services.postgres, "image_digest", IMAGE_DIGEST, code);
-    validateServiceObservation(value.services.web, "image_reference", IMAGE_REFERENCE, code);
-    validateServiceObservation(value.services.worker, "image_reference", IMAGE_REFERENCE, code);
+    validateApplicationServiceObservation(value.services.web, code);
+    validateApplicationServiceObservation(value.services.worker, code);
     for (const field of [
       "health_sha256", "readiness_sha256", "service_set_sha256",
       "release_identity_sha256", "runtime_configuration_sha256",
     ]) digest(value[field], code);
-    if (clusterSha256(value.readiness) !== value.readiness_sha256
+    if (clusterSha256(readiness) !== value.readiness_sha256
       || clusterSha256(value.services) !== value.service_set_sha256
       || clusterSha256(without(value, "health_sha256")) !== value.health_sha256) reject(code);
   } else if (check === "PROTECTED_RESOURCES") {
@@ -582,12 +819,12 @@ function validateRecordResult(value, labels, kind, code) {
     "schema_version", "contract", "status", "promotion_id", "promotion_generation",
     "operation_id", "execution_authorization_sha256", "rollback_plan_sha256",
     "execution_package_sha256", "runtime_plan_sha256", "ordinal", labelField, "previous_result_sha256",
-    intentField, "evidence", "started_at", "completed_at", resultField,
+    intentField, "side_effect_receipts_sha256", "evidence", "started_at", "completed_at", resultField,
   ], code);
   const expectedContract = kind === "stage"
     ? UAT_PROMOTION_ROLLBACK_STAGE_RESULT_CONTRACT : UAT_PROMOTION_ROLLBACK_CHECK_RESULT_CONTRACT;
   const expectedStatus = kind === "stage" ? "COMMITTED" : "VERIFIED";
-  if (value.schema_version !== 2 || value.contract !== expectedContract || value.status !== expectedStatus) reject(code);
+  if (value.schema_version !== 5 || value.contract !== expectedContract || value.status !== expectedStatus) reject(code);
   for (const field of ["promotion_id", "operation_id"]) string(value[field], IDENTIFIER, code);
   integer(value.promotion_generation, 1, 1_000_000, code);
   integer(value.ordinal, 1, labels.length, code);
@@ -596,6 +833,7 @@ function validateRecordResult(value, labels, kind, code) {
     "execution_authorization_sha256", "rollback_plan_sha256", "execution_package_sha256", "runtime_plan_sha256",
     "previous_result_sha256", intentField, resultField,
   ]) digest(value[field], code);
+  nonZeroDigest(value.side_effect_receipts_sha256, code);
   const started = Date.parse(instant(value.started_at, code));
   const completed = Date.parse(instant(value.completed_at, code));
   if (completed < started) reject(code);
@@ -615,7 +853,7 @@ export function validateUatPromotionRollbackStageIntent(value) {
   return validateRecordIntent(value, UAT_PROMOTION_ROLLBACK_STAGES, "stage", "UAT_PROMOTION_ROLLBACK_STAGE_INTENT_INVALID");
 }
 export function createUatPromotionRollbackStageResult(input) {
-  const body = { schema_version: 2, contract: UAT_PROMOTION_ROLLBACK_STAGE_RESULT_CONTRACT, status: "COMMITTED", ...input };
+  const body = { schema_version: 5, contract: UAT_PROMOTION_ROLLBACK_STAGE_RESULT_CONTRACT, status: "COMMITTED", ...input };
   return Object.freeze(validateUatPromotionRollbackStageResult({
     ...body, stage_result_sha256: clusterSha256(body),
   }));
@@ -633,7 +871,7 @@ export function validateUatPromotionRollbackCheckIntent(value) {
   return validateRecordIntent(value, UAT_PROMOTION_ROLLBACK_POSTVERIFY_CHECKS, "check", "UAT_PROMOTION_ROLLBACK_CHECK_INTENT_INVALID");
 }
 export function createUatPromotionRollbackCheckResult(input) {
-  const body = { schema_version: 2, contract: UAT_PROMOTION_ROLLBACK_CHECK_RESULT_CONTRACT, status: "VERIFIED", ...input };
+  const body = { schema_version: 5, contract: UAT_PROMOTION_ROLLBACK_CHECK_RESULT_CONTRACT, status: "VERIFIED", ...input };
   return Object.freeze(validateUatPromotionRollbackCheckResult({
     ...body, check_result_sha256: clusterSha256(body),
   }));
@@ -664,13 +902,17 @@ export function validateUatPromotionRollbackResult(value) {
     "rollback_operation_id", "execution_authorization_sha256", "supervisor_bundle_sha256",
     "checkpoint_13_receipt_sha256", "rollback_intent_sha256", "rollback_plan_sha256",
     "execution_package_sha256", "runtime_plan_sha256", "source_set_sha256", "promotion_snapshot_binding_sha256",
+    "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+    "sealed_security_projection_sha256",
     "snapshot_readiness_sha256", "snapshot_backup_id", "snapshot_restore_run_id", "snapshot_objects",
     "predecessor", "database", "restored_database", "candidate_database_quarantine",
+    "predecessor_runtime_configuration_sha256", "rollback_runtime_configuration_sha256",
+    "rollback_runtime_projection_sha256", "compose_rollback_overlay_sha256",
     "compose_project", "compose_project_root",
     "boundary", "protected_resources_before_sha256", "protected_resources_after_sha256",
     "stage_result_sha256_chain", "stages", "started_at", "completed_at", "result_sha256",
   ], code);
-  if (value.schema_version !== 2 || value.contract !== UAT_PROMOTION_ROLLBACK_RESULT_CONTRACT
+  if (value.schema_version !== 5 || value.contract !== UAT_PROMOTION_ROLLBACK_RESULT_CONTRACT
     || value.status !== "ROLLBACK_EXECUTION_COMMITTED" || value.compose_project !== "chenyida-erp") reject(code);
   normalizedAbsolute(value.compose_project_root, code);
   for (const field of ["promotion_id", "rollback_operation_id", "snapshot_backup_id", "snapshot_restore_run_id"]) {
@@ -681,6 +923,10 @@ export function validateUatPromotionRollbackResult(value) {
     "execution_authorization_sha256", "supervisor_bundle_sha256", "checkpoint_13_receipt_sha256",
     "rollback_intent_sha256", "rollback_plan_sha256", "execution_package_sha256", "runtime_plan_sha256", "source_set_sha256",
     "promotion_snapshot_binding_sha256", "snapshot_readiness_sha256",
+    "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+    "sealed_security_projection_sha256",
+    "predecessor_runtime_configuration_sha256", "rollback_runtime_configuration_sha256",
+    "rollback_runtime_projection_sha256", "compose_rollback_overlay_sha256",
     "protected_resources_before_sha256", "protected_resources_after_sha256",
     "stage_result_sha256_chain", "result_sha256",
   ]) digest(value[field], code);
@@ -718,12 +964,44 @@ export function validateUatPromotionRollbackResult(value) {
     || value.stages.at(-1).evidence.after_sha256 !== value.protected_resources_after_sha256
     || value.stages[2].evidence.restored_database_oid !== value.restored_database.oid
     || value.stages[2].evidence.system_identifier !== value.restored_database.system_identifier
+    || value.stages[2].evidence.migration_head !== value.predecessor.migration_head
+    || value.stages[2].evidence.migration_manifest_sha256
+      !== value.predecessor.migration_manifest_sha256
+    || value.stages[2].evidence.writer_containment_stage_result_sha256
+      !== value.stages[1].stage_result_sha256
+    || value.stages[2].evidence.uat_reconciliation_authority_sha256
+      !== value.uat_reconciliation_authority_sha256
+    || value.stages[2].evidence.uat_reconciliation_activation_sha256
+      !== value.uat_reconciliation_activation_sha256
+    || value.stages[2].evidence.sealed_security_projection_sha256
+      !== value.sealed_security_projection_sha256
     || value.candidate_database_quarantine.name
       !== value.stages[2].evidence.candidate_database_quarantine_name
     || value.candidate_database_quarantine.oid
       !== value.stages[2].evidence.candidate_database_quarantine_oid
     || value.candidate_database_quarantine.oid !== value.database.oid
     || value.candidate_database_quarantine.oid === value.restored_database.oid
+    || value.predecessor_runtime_configuration_sha256 !== value.predecessor.runtime_configuration_sha256
+    || value.stages[6].evidence.predecessor_runtime_configuration_sha256
+      !== value.predecessor_runtime_configuration_sha256
+    || value.stages[6].evidence.rollback_runtime_configuration_sha256
+      !== value.rollback_runtime_configuration_sha256
+    || value.stages[6].evidence.rollback_runtime_projection_sha256
+      !== value.rollback_runtime_projection_sha256
+    || value.stages[6].evidence.compose_rollback_overlay_sha256
+      !== value.compose_rollback_overlay_sha256
+    || value.stages[7].evidence.predecessor_runtime_configuration_sha256
+      !== value.predecessor_runtime_configuration_sha256
+    || value.stages[7].evidence.rollback_runtime_configuration_sha256
+      !== value.rollback_runtime_configuration_sha256
+    || value.stages[7].evidence.uat_reconciliation_authority_sha256
+      !== value.uat_reconciliation_authority_sha256
+    || value.stages[7].evidence.uat_reconciliation_activation_sha256
+      !== value.uat_reconciliation_activation_sha256
+    || value.stages[7].evidence.sealed_security_projection_sha256
+      !== value.sealed_security_projection_sha256
+    || value.stages[7].evidence.web.image_reference !== value.predecessor.web_image
+    || value.stages[7].evidence.worker.image_reference !== value.predecessor.worker_image
     || targetVolumes.size !== 3 || targetVolumeIdentities.size !== 3
     || candidateVolumes.size !== 3 || candidateVolumeIdentities.size !== 3
     || restoredVolumes.some((item) => candidateVolumes.has(item.target_volume)
@@ -733,7 +1011,7 @@ export function validateUatPromotionRollbackResult(value) {
 }
 
 export function createUatPromotionRollbackResult(input) {
-  const body = { schema_version: 2, contract: UAT_PROMOTION_ROLLBACK_RESULT_CONTRACT, status: "ROLLBACK_EXECUTION_COMMITTED", ...input };
+  const body = { schema_version: 5, contract: UAT_PROMOTION_ROLLBACK_RESULT_CONTRACT, status: "ROLLBACK_EXECUTION_COMMITTED", ...input };
   return Object.freeze(validateUatPromotionRollbackResult({ ...body, result_sha256: clusterSha256(body) }));
 }
 
@@ -775,11 +1053,15 @@ export function validateUatPromotionRollbackPostverifyResult(value) {
     "checkpoint_14_receipt_sha256", "rollback_operation_id", "rollback_intent_sha256",
     "rollback_result_sha256", "rollback_plan_sha256", "execution_package_sha256",
     "runtime_plan_sha256", "postverify_intent_sha256", "postverify_plan_sha256", "snapshot_objects", "predecessor",
+    "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+    "sealed_security_projection_sha256",
     "database", "restored_database", "candidate_database_quarantine", "boundary",
+    "predecessor_runtime_configuration_sha256", "rollback_runtime_configuration_sha256",
+    "rollback_runtime_projection_sha256", "compose_rollback_overlay_sha256",
     "check_result_sha256_chain", "checks",
     "verified_at", "result_sha256",
   ], code);
-  if (value.schema_version !== 2 || value.contract !== UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_CONTRACT
+  if (value.schema_version !== 5 || value.contract !== UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_CONTRACT
     || value.status !== "ROLLBACK_POSTVERIFY_COMMITTED") reject(code);
   for (const field of ["promotion_id", "postverify_operation_id", "rollback_operation_id"]) string(value[field], IDENTIFIER, code);
   integer(value.promotion_generation, 1, 1_000_000, code);
@@ -787,6 +1069,10 @@ export function validateUatPromotionRollbackPostverifyResult(value) {
     "execution_authorization_sha256", "supervisor_bundle_sha256", "checkpoint_14_receipt_sha256",
     "rollback_intent_sha256", "rollback_result_sha256", "rollback_plan_sha256",
     "execution_package_sha256", "runtime_plan_sha256", "postverify_intent_sha256", "postverify_plan_sha256",
+    "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+    "sealed_security_projection_sha256",
+    "predecessor_runtime_configuration_sha256", "rollback_runtime_configuration_sha256",
+    "rollback_runtime_projection_sha256", "compose_rollback_overlay_sha256",
     "check_result_sha256_chain", "result_sha256",
   ]) digest(value[field], code);
   validateUatPromotionRollbackSnapshotObjects(value.snapshot_objects, code);
@@ -808,14 +1094,47 @@ export function validateUatPromotionRollbackPostverifyResult(value) {
   const postgresql = value.checks[0].evidence;
   if (value.candidate_database_quarantine.name !== postgresql.candidate_database_quarantine_name
     || value.candidate_database_quarantine.oid !== postgresql.candidate_database_quarantine_oid
-    || postgresql.candidate_database_quarantine_present !== true) reject(code);
+    || postgresql.candidate_database_quarantine_present !== true
+    || postgresql.runtime_plan_sha256 !== value.runtime_plan_sha256
+    || postgresql.target_identity_sha256 !== clusterSha256(value.restored_database)
+    || postgresql.restored_database_oid !== value.restored_database.oid
+    || postgresql.restored_database_marker !== value.restored_database.marker
+    || postgresql.system_identifier !== value.restored_database.system_identifier
+    || postgresql.migration_head !== value.predecessor.migration_head
+    || postgresql.migration_manifest_sha256 !== value.predecessor.migration_manifest_sha256
+    || postgresql.uat_reconciliation_authority_sha256
+      !== value.uat_reconciliation_authority_sha256
+    || postgresql.uat_reconciliation_activation_sha256
+      !== value.uat_reconciliation_activation_sha256
+    || postgresql.sealed_security_projection_sha256
+      !== value.sealed_security_projection_sha256
+    || value.checks.slice(1, 4).some((item) => (
+      item.evidence.runtime_plan_sha256 !== value.runtime_plan_sha256
+    ))
+    || value.predecessor_runtime_configuration_sha256 !== value.predecessor.runtime_configuration_sha256
+    || value.checks[9].evidence.predecessor_runtime_configuration_sha256
+      !== value.predecessor_runtime_configuration_sha256
+    || value.checks[9].evidence.rollback_runtime_configuration_sha256
+      !== value.rollback_runtime_configuration_sha256
+    || value.checks[9].evidence.rollback_runtime_projection_sha256
+      !== value.rollback_runtime_projection_sha256
+    || value.checks[9].evidence.compose_rollback_overlay_sha256
+      !== value.compose_rollback_overlay_sha256
+    || value.checks[10].evidence.predecessor_runtime_configuration_sha256
+      !== value.predecessor_runtime_configuration_sha256
+    || value.checks[10].evidence.rollback_runtime_configuration_sha256
+      !== value.rollback_runtime_configuration_sha256
+    || value.checks[7].evidence.image_reference !== value.predecessor.web_image
+    || value.checks[8].evidence.image_reference !== value.predecessor.worker_image
+    || value.checks[11].evidence.runtime_configuration_sha256
+      !== value.rollback_runtime_configuration_sha256) reject(code);
   instant(value.verified_at, code);
   if (clusterSha256(without(value, "result_sha256")) !== value.result_sha256) reject(code);
   return value;
 }
 
 export function createUatPromotionRollbackPostverifyResult(input) {
-  const body = { schema_version: 2, contract: UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_CONTRACT, status: "ROLLBACK_POSTVERIFY_COMMITTED", ...input };
+  const body = { schema_version: 5, contract: UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_CONTRACT, status: "ROLLBACK_POSTVERIFY_COMMITTED", ...input };
   return Object.freeze(validateUatPromotionRollbackPostverifyResult({ ...body, result_sha256: clusterSha256(body) }));
 }
 
@@ -825,6 +1144,20 @@ export function assertUatPromotionRollbackPostverifyResultMatchesIntent(resultIn
   const code = "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_BINDING_INVALID";
   const intent = record(intentInput, code);
   const parameters = record(intent.parameters, code);
+  const postgresqlContent = result.checks[0].evidence;
+  const postgresqlRestore = rollback.stages[2].evidence;
+  const postgresqlSharedFields = [
+    "source_artifact_sha256", "source_artifact_bytes", "source_reconciliation_sha256",
+    "target_content_sha256", "runtime_plan_sha256", "restored_database_oid",
+    "restored_database_marker", "system_identifier", "migration_head",
+    "migration_manifest_sha256", "restore_receipt_sha256", "runtime_privilege_access_sha256",
+    "runtime_privilege_catalog_sha256", "runtime_privilege_catalog_artifact_sha256",
+    "runtime_privilege_policy_sha256", "runtime_privilege_operator_policy_sha256",
+    "uat_reconciliation_authority_sha256", "uat_reconciliation_activation_sha256",
+    "sealed_security_projection_sha256",
+    "candidate_database_quarantine_name", "candidate_database_quarantine_oid",
+    "candidate_database_quarantine_marker",
+  ];
   const retainedDomainRecords = [[1, 3], [2, 4], [3, 5]];
   if (result.promotion_id !== intent.promotion_id
     || result.promotion_generation !== intent.promotion_generation
@@ -839,6 +1172,17 @@ export function assertUatPromotionRollbackPostverifyResultMatchesIntent(resultIn
     || result.rollback_plan_sha256 !== rollback.rollback_plan_sha256
     || result.execution_package_sha256 !== rollback.execution_package_sha256
     || result.runtime_plan_sha256 !== rollback.runtime_plan_sha256
+    || result.uat_reconciliation_authority_sha256
+      !== rollback.uat_reconciliation_authority_sha256
+    || result.uat_reconciliation_activation_sha256
+      !== rollback.uat_reconciliation_activation_sha256
+    || result.sealed_security_projection_sha256
+      !== rollback.sealed_security_projection_sha256
+    || result.predecessor_runtime_configuration_sha256
+      !== rollback.predecessor_runtime_configuration_sha256
+    || result.rollback_runtime_configuration_sha256 !== rollback.rollback_runtime_configuration_sha256
+    || result.rollback_runtime_projection_sha256 !== rollback.rollback_runtime_projection_sha256
+    || result.compose_rollback_overlay_sha256 !== rollback.compose_rollback_overlay_sha256
     || !same(result.candidate_database_quarantine, rollback.candidate_database_quarantine)
     || result.postverify_intent_sha256 !== intent.postverify_intent_sha256
     || result.postverify_plan_sha256 !== intent.postverify_plan_sha256
@@ -847,12 +1191,45 @@ export function assertUatPromotionRollbackPostverifyResultMatchesIntent(resultIn
     || !same(result.database, rollback.database)
     || !same(result.restored_database, rollback.restored_database)
     || !same(result.boundary, rollback.boundary)
+    || postgresqlContent.stage_result_sha256 !== rollback.stages[2].stage_result_sha256
+    || postgresqlContent.target_identity_sha256 !== clusterSha256(rollback.restored_database)
+    || postgresqlContent.candidate_database_quarantine_allow_connections
+      !== postgresqlRestore.candidate_database_quarantine_allow_connections_at_commit
+    || postgresqlContent.candidate_database_quarantine_connection_limit
+      !== postgresqlRestore.candidate_database_quarantine_connection_limit_at_commit
+    || postgresqlContent.candidate_database_quarantine_sessions
+      !== postgresqlRestore.candidate_database_quarantine_sessions_at_commit
+    || postgresqlContent.candidate_database_quarantine_prepared_xacts
+      !== postgresqlRestore.candidate_database_quarantine_prepared_xacts_at_commit
+    || postgresqlSharedFields.some((field) => (
+      postgresqlContent[field] !== postgresqlRestore[field]
+    ))
+    || result.checks[7].evidence.image_config_digest
+      !== rollback.stages[7].evidence.web.image_config_digest
+    || result.checks[8].evidence.image_config_digest
+      !== rollback.stages[7].evidence.worker.image_config_digest
     || retainedDomainRecords.some(([checkIndex, stageIndex]) => (
       result.checks[checkIndex].evidence.candidate_volume_present !== true
       || result.checks[checkIndex].evidence.candidate_volume_name
         !== rollback.stages[stageIndex].evidence.retained_candidate_volume
       || result.checks[checkIndex].evidence.candidate_volume_identity_sha256
         !== rollback.stages[stageIndex].evidence.retained_candidate_volume_identity_sha256
+      || result.checks[checkIndex].evidence.stage_result_sha256
+        !== rollback.stages[stageIndex].stage_result_sha256
+      || result.checks[checkIndex].evidence.target_identity_sha256
+        !== rollback.stages[stageIndex].evidence.target_volume_identity_sha256
+      || result.checks[checkIndex].evidence.entries
+        !== rollback.stages[stageIndex].evidence.source_entries
+      || [
+        "domain", "runtime_plan_sha256", "source_artifact_sha256", "source_artifact_bytes",
+        "source_reconciliation_sha256", "target_content_sha256", "target_volume",
+        "target_volume_marker_sha256", "expected_tree_sha256", "target_root_identity_sha256",
+        "metadata_policy_sha256", "metadata_state_sha256", "volume_restore_receipt_sha256",
+        "helper_image_config_digest",
+      ].some((field) => (
+        result.checks[checkIndex].evidence[field]
+          !== rollback.stages[stageIndex].evidence[field]
+      ))
     ))
     || Date.parse(result.verified_at) < Date.parse(intent.created_at)
     || Date.parse(result.verified_at) >= Date.parse(intent.expires_at)) reject(code);

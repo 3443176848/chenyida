@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "6c3cdcebeb023db9c6bd405e68a70243a843de8c3e56a331c13fec02728c29b5",
+  "artifact_sha256": "e2d57cc84807cd3ac5bac0685751af949bf27b998c0f32afd99a73e5dae02364",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -239,7 +239,7 @@
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 238,
-      "sha256": "a5fa5cfdd6e3bd7dff6fb5a5b60588189af81445064ddc09add4a95d243c69b3",
+      "sha256": "74094fe2a98de757ecab741aa81858666f42d58df4f13fdde5bec082f13251b4",
       "total_tests": 262
     },
     "source_manifest": {
@@ -284,7 +284,7 @@
             "\"status\": \"BLOCKED\""
           ],
           "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
-          "sha256": "5f75fccbe26d836acec9d27f4243d9c079327881448fbc9210709974c96b6668"
+          "sha256": "50cf7b9cfe5baf0c563d3f6a828d78f4cea56cbff6bbdb76b54084f104537135"
         },
         {
           "markers": [
@@ -327,7 +327,7 @@
             "SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_RECOVERY_REQUIRED"
           ],
           "path": "chenyida_erp_site/scripts/install-release-supervisor.py",
-          "sha256": "e28634660b5707a678f30516250e82247baa9fc527c1035e64a8831b0814f26b"
+          "sha256": "9494592df62154cee0e2cd29a4efe4d3ba06675d40bb6a0f521e2c9ce50f6b2b"
         },
         {
           "markers": [
@@ -393,7 +393,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "87849ca1a1a4b5de4dfa1794c66503145385cf00a71f0bbc54401e9b132e7129"
+          "sha256": "3d819c9ced89c80b26f285b40699326aad8f71184ba7de07dd66831b3a8434cc"
         },
         {
           "markers": [
@@ -432,7 +432,7 @@
             "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
           ],
           "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
-          "sha256": "119cf364d6dcdec6800763827fc102f9573a20b31d465a6806312a79ff6b6753"
+          "sha256": "96dd8b3b5ee2e976e8161dc9146c3d8185fe467c15bf63910a282436c75e9831"
         },
         {
           "markers": [
@@ -496,7 +496,7 @@
             "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_CONTRACT"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs",
-          "sha256": "adf0853174bb5047f34ebaad5416844d25266a57fe4850906ab2d796905e06e2"
+          "sha256": "d8e5ca6471f447385997cdd7a0ce86368982e422c9e8f35b032858225dedb621"
         },
         {
           "markers": [
@@ -513,7 +513,7 @@
             "uat-promotion-rollback-runtime-adapter.py"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs",
-          "sha256": "ba6635a61e40e16772a4d0aec129e9c9afde35e3fb99840b5c7000588d2b8ee9"
+          "sha256": "2ceb8edeb04db858e3b9978f76febc3613f9ce56ba844fd8a1208a43c4c0a654"
         },
         {
           "markers": [
@@ -526,7 +526,7 @@
             "chenyida-erp-uat-promotion-rollback-runtime-activation-receipt/v2"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor-contract.mjs",
-          "sha256": "fc2bdbcbaa8b5299a96b0d77df578b9d1a71af7fccdb41728523562013de97ca"
+          "sha256": "22e595519c17a18425bc4e393269bea3d125dae9f4cccf3ef03e04a8084408c0"
         },
         {
           "markers": [
@@ -537,7 +537,7 @@
             "runtime_plan_sha256"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py",
-          "sha256": "0cbdd508589902a782a23e7b11b20eacd5a07ef04e6b2f3f2a51a8f9cf574c03"
+          "sha256": "71e4f10cff046a0dd90a7e10fcdf96520834805ddd5a7c2979cdb94a203f0cf8"
         },
         {
           "markers": [
@@ -565,7 +565,7 @@
             "contain database, volume, or Compose mutation logic itself"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py",
-          "sha256": "453c45cbfd8546789dc4e18d848ceb87a3f2b7daf33b97b9dae9e7762ca79745"
+          "sha256": "d68611af48daf32ada0a4b85aec0f24b3c04b33ac2a40fe5239cb4a3ed084e90"
         },
         {
           "markers": [
@@ -579,7 +579,7 @@
             "knownServiceContainerIds"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs",
-          "sha256": "94fe427e08e84c605850963203a40e59544f505eb30ea7e4909adfba1705ff92"
+          "sha256": "037288a8f086cb925d154bf830561f1bcec030b3ec50d0c1198ed701fad55229"
         },
         {
           "markers": [
@@ -627,10 +627,10 @@
             "foreign executor alias is preserved"
           ],
           "path": "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs",
-          "sha256": "0f67c939fd713712a8f8ce0c31c695c21855c49805ebd0bf155849ecf5f68b0e"
+          "sha256": "943f51b319f62ce487214de8bd8ba241e29dcf044e600abc2bcc88ecc19c1c54"
         }
       ],
-      "sha256": "9057cf5678f5f103231c04dcfb195452ae7b0cc0d7782ef16f0b205e1db04faa"
+      "sha256": "b4ca700641d3ea071892e29db5992f79673f4b156e35eca10426ef6c092e12b9"
     }
   },
   "observations": {

@@ -3,6 +3,11 @@
 \pset tuples_only on
 \pset fieldsep '\t'
 
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '240s';
+SET LOCAL idle_in_transaction_session_timeout = '15s';
+
 -- Canonical, plaintext-free but content-sensitive logical reconciliation for
 -- the application database dump. Object names are UTF-8 hex so tabs/newlines
 -- in identifiers cannot alter rows. Session rendering is fixed explicitly so
@@ -87,3 +92,5 @@ SELECT
 FROM large_object_inventory
 CROSS JOIN zero_large_object_assertion
 WHERE zero_large_object_assertion.checked = 1;
+
+COMMIT;
