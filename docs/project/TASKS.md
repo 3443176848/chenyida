@@ -11,13 +11,15 @@
 
 ## 当前任务
 
-当前零`DOING`。TASK83/D-158已完成只读归因：两段60秒窗口无PSI/OOM和显著持续Swap增长，但Swap仍约82.7%，根盘仅约11GiB；长期Codex session约317MiB Swap/2.01GiB memory，BuildKit至少约7.87GB private cache可回收。`SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84`等待项目负责人从客户端重启Codex运行时并专项授权BuildKit-only清理；TASK70继续`BLOCKED`。真实备份恢复、A1—A8、外部锚点、UAT/生产、Volume和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前零`DOING`。2026-08-20只读现场证明宿主/Codex已在TASK83后外部重启，清理前60秒资源数值门通过：MemAvailable最低约1.90GiB、Swap约0.97%且增长0、根盘约10.62GiB、Load/PSI/OOM/restart/health均通过；外部重启原因和授权来源不推断。`SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84`仍等待项目负责人专项授权BuildKit-only清理及清理后新鲜60秒门；TASK70继续`BLOCKED`。真实备份恢复、A1—A8、外部锚点、UAT/生产、Volume和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-16调度事件：`SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82 DOING → DONE`。D-157固定逐副作用耐久回执、派生数据库/卷身份、commit-before-receipt只读恢复、精确前代镜像与live postverify；source`c2f071c`→manifest-only`aa77732`形成156文件canonical bundle`3674e011…35fb`。轻量组合201/201、manifest后installer21/21、inventory262/238/24及三路只读复核通过。未运行真实PG/Volume/Compose/恢复/回退，catalog与TASK70继续失败关闭。
 
 2026-08-16后续调度事件：主智能体从零`DOING`自动选择停止线这一最高优先级未阻塞安全任务，状态按`SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83 TODO → DOING`切换唯一active slot。任务只读采样资源和非敏感进程/cgroup身份，形成自然恢复或最小host专项授权入口；不得以诊断授权执行restart、swapoff、prune或其他系统变化。
 
 2026-08-16资源归因事件：`SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83 DOING → DONE`。两段60秒窗口证明无持续高压但Swap硬线仍失败；只读容量确认BuildKit private cache至少约7.87GB可回收，未清理。新增`SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84`为`BLOCKED`，等待项目负责人侧Codex运行时重启和精确BuildKit-only删除授权；当前回到零`DOING`，不以诊断扩权。
+
+2026-08-20只读复核事件：主机与Codex已在TASK83后外部重启，清理前60秒数值门全部通过；四服务及四个受保护卷保持，Build Cache为10.79GB/6.149GB reclaimable/active 0。根盘仅约10.62GiB，且“继续”不构成删除专项授权；D-158保持不变，TASK84继续`BLOCKED / BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED`，TASK70不得转`DOING`。三条独立只读审计一致同意该失败关闭结论，本轮未执行清理、重启、数据库、Volume、UAT或数据动作。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -225,7 +227,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84 | 受控资源停止线恢复 | BLOCKED | 项目负责人（客户端重启Codex、BuildKit-only删除授权）、Codex（重连后串行门禁/清理/验证） | - | SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83、专项授权 | `BLOCKED / OWNER-SIDE CODEX RUNTIME RESTART + BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED / PRODUCTION NO-GO`。不授权ERP/Docker服务重启、镜像/容器/卷删除或Swap修改；获权后仍须60秒门通过。见[任务文档](../tasks/SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84.md)。 |
+| SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84 | 受控资源停止线恢复 | BLOCKED | 项目负责人（BuildKit-only删除授权）、Codex（获权后串行清理/对象复核/门禁/验证） | - | SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83、专项授权 | `BLOCKED / CODEX RESTART AND READ-ONLY RESOURCE GATE VERIFIED / BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED / PRODUCTION NO-GO`。外部重启事实及清理前60秒门已验证；不授权ERP/Docker服务重启、镜像/容器/卷删除或Swap修改，获权清理后仍须新鲜60秒门通过。见[任务文档](../tasks/SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84.md)。 |
 | SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 | UAT晋升与回滚隔离动态验证 | BLOCKED | Codex主智能体（资源解除后串行调度）、项目负责人（保留真实环境授权） | - | TASK82已完成；资源停止线解除 | `BLOCKED / RESOURCE STOP LINE + CAPABILITY HANDLER DYNAMIC VALIDATION / ISOLATED SYNTHETIC ONLY / PRODUCTION NO-GO`。专用handler仓库实现已完成；仅在资源门恢复后运行合成Compose/隔离PostgreSQL/可丢弃文件域的失败、恢复和回退测试，不授权UAT/生产。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70.md)。 |
 
 ## 已完成任务

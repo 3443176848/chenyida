@@ -2,6 +2,20 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-20
+
+### SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84 - `docs: record TASK84 resource gate revalidation`
+
+- 调度/范围：用户继续持续目标后按强制文档链恢复，以TASK84为唯一正式任务编号；三条智能体线分别只读复核数据动态切片、应用测试入口和运维安全门。主智能体唯一写文档，未读取受保护状态报告，未启动TASK70或任何重任务。
+- Git/版本：起点根仓库`main@6c3055bdc4b7ee728fb26cfa8bbe05ba7d9f6f25`、tree`29116f4bcf9e75e394ac7b1b3090ea8881155eca`，源码alpha.47/46项Migration/head 0046；运行Web只读health仍为alpha.42/source`569aa954…d33a24`。本轮没有访问运行数据库确认Migration head，也没有build、Migration、部署或业务写。
+- 外部重启事实：宿主已于2026-08-18 20:11:57外部重启，当前Codex PID `2688`于20:12:25启动；重启原因和授权来源不推断，不作追溯性授权。四服务在宿主启动后稳定约43小时，identity保持，restart0/OOM false，Web/PostgreSQL healthy、Worker/Caddy running，四个受保护卷身份和挂载完整。
+- 资源门：清理前60秒7点窗口的MemAvailable最低`1,995,564 KiB`、Swap始终`10,204/1,049,596 KiB`且增长0、根盘最低`11,403,153,408 B`（约10.62GiB）、Load1最高0.72，memory PSI与`oom_kill`增量均为0。根盘只比10GiB硬线多约0.62GiB，不启动无最坏磁盘上界的动态任务。
+- Docker容量：Build Cache为192项/10.79GB，其中6.149GB reclaimable、active 0。镜像13.81GB和Volume 380.1MB虽被Docker报告为reclaimable也始终禁止触碰；未执行prune、对象删除、Compose/服务重启或host修改。
+- 治理：D-158保持不变。清理前数值通过不能替代精确BuildKit-only专项授权、一次受控清理、对象复核和清理后新鲜60秒门；“继续”不扩大到删除授权。TASK84保持`BLOCKED`、当前零`DOING`，TASK70继续失败关闭，系统仍`PRODUCTION NO-GO`。
+- 验证：六份治理Markdown的177个本地链接、唯一active状态（DOING=0）、跨文档状态标记、发布bundle literal allowlist/精确blob字节单元测试1/1、增量高置信敏感信息与`git diff --check`通过。未运行Node全量、build、PG/Compose、Migration、备份恢复或UAT测试。
+- 资源/临时项：起点available约2.39GiB、Swap约0.8MiB、根盘约11.10GiB、Load1 0.17；收口available约1.94GiB、Swap约9.97MiB、根盘约10.88GiB、Load1 0.17，内核`oom_kill=0`。四服务identity、restart0/OOM false和health保持，四个受保护卷完整；本任务未创建临时文件、容器、网络、Volume、数据库或测试数据，无需清理。
+- 数据库/API/产品：无Schema、Migration、API、业务代码或运行面变化；真实异机恢复、迁移、账号、员工UAT和正式切换仍未完成或未授权。
+
 ## 2026-08-16
 
 ### SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83 - `docs: attribute resource stop line and request bounded remediation`

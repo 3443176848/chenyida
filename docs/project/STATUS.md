@@ -1,15 +1,20 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-16（Asia/Shanghai）
+最后更新时间：2026-08-20（Asia/Shanghai）
 
-## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（阻塞；等待最小资源恢复动作）
+## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（阻塞；外部重启已发生，等待精确BuildKit授权）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | BLOCKED / OWNER-SIDE CODEX RUNTIME RESTART + BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED / PRODUCTION NO-GO | 当前零DOING；智能体不能安全自重启，BuildKit删除需要专项授权 |
-| 解除条件 | EXTERNAL / MINIMAL | 项目负责人从客户端重启Codex运行时，并授权仅执行`docker builder prune --force --filter until=24h`；不授权ERP/Docker服务或Swap变化 |
+| 当前状态 | BLOCKED / CODEX RESTART AND READ-ONLY RESOURCE GATE VERIFIED / BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED / PRODUCTION NO-GO | 当前零DOING；现场宿主/Codex已在TASK83后外部重启，原因和授权来源不推断，BuildKit删除仍需专项授权 |
+| 已满足前提 | PASS / READ-ONLY FACT | 宿主于2026-08-18 20:11:57外部重启，当前Codex于20:12:25启动；本轮未发起任何重启 |
+| 解除条件 | EXTERNAL / MINIMAL | 项目负责人授权仅执行一次`docker builder prune --force --filter until=24h`；不授权ERP/Docker服务、镜像/容器/卷或Swap变化 |
 | 保护范围 | EXACT | 禁止system/image/volume prune、镜像/容器/卷删除、`/root/.codex`/日志清理、host重启及任何UAT/生产/数据动作 |
-| 获权后验证 | FAIL CLOSED | 重连核对Git/服务/受保护卷，BuildKit-only清理后完成60秒窗口；仅当available≥768MiB、Swap≤80%、根盘>10GiB及OOM/restart/health通过，TASK70才转DOING |
+| 清理前60秒门 | PASS / DOES NOT RELEASE TASK | MemAvailable最低约1.90GiB、Swap约0.97%且增长0、根盘约10.62GiB、Load1最高0.72、PSI/OOM增量0；四服务restart0/OOM false，四卷完整 |
+| BuildKit | BLOCKED / AUTHORIZATION REQUIRED | 192项/10.79GB，6.149GB reclaimable、active 0；未执行prune，镜像和Volume不属于目标 |
+| 获权后验证 | FAIL CLOSED | BuildKit-only清理后复核对象并完成新鲜60秒窗口；仅当available≥768MiB、Swap≤80%、根盘>10GiB及OOM/restart/health通过，TASK70才转DOING |
+| 本轮适用验证 | PASS / LIGHTWEIGHT ONLY | 177个本地Markdown链接、状态一致性、发布清单精确字节单元测试1/1、增量敏感信息及diff门通过；没有运行重任务 |
+| 收口资源/临时项 | PASS / NO TASK RESIDUE | available约1.94GiB、Swap约9.97MiB、根盘约10.88GiB、Load1 0.17、`oom_kill=0`；四服务和四卷保持，本任务未创建临时资源 |
 | 系统是否可用 | NO | 资源门、动态回退、host激活、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
 
 ## SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83（完成；只读归因与恢复入口已固定）

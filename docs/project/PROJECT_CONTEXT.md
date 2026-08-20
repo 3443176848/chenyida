@@ -12,6 +12,8 @@
 
 2026-08-16增量：TASK82/D-157已在TASK81固定executor上加入writer、PG staging/switch、uploads/attachments/backup_status、runtime、前代Web/Worker和十三postverify固定handler，逐副作用耐久receipt与commit-before-receipt只读恢复闭合；最终source`c2f071c`→Supervisor`aa77732`形成156文件bundle`3674e011…35fb`。隔离PG17/卷/Compose动态证明和host激活未执行，catalog继续`BLOCKED_MISSING_UAT_CAPABLE_HANDLERS`；机器审计仍以动态能力/host activation、隔离回退演练和人工UAT三项条件阻断。TASK83/D-158随后完成两段60秒只读资源归因：Swap最终仍约82.7%，长期Codex session约317MiB Swap/2.01GiB memory，BuildKit private至少约7.87GB可回收；未修改host。当前零DOING，TASK84等待owner侧Codex重启和BuildKit-only授权，TASK70继续BLOCKED。
 
+2026-08-20增量：只读现场确认宿主于2026-08-18外部重启，当前Codex与四个ERP服务均已在该次启动后稳定约43小时；外部重启原因和授权来源不可推断。清理前60秒窗口中MemAvailable最低约1.90GiB、Swap约0.97%且增长0、根盘约10.62GiB、Load/PSI/OOM/restart/health均通过，四个受保护卷完整；Build Cache为10.79GB，其中6.149GB reclaimable、active 0。D-158仍要求精确BuildKit-only专项授权、受控清理、对象复核和清理后新鲜60秒门；当前零DOING，TASK84只剩该授权链阻断，TASK70仍不得启动。三条独立只读审计未修改文件或运行重任务，本轮未访问数据库、Volume或备份正文，未执行清理、重启、UAT或数据动作。
+
 项目负责人已授权持续选择最高优先级且可安全执行的任务，不再要求每项后等待“继续”。该持续授权不包含生产数据访问、真实数据外传、正式备份恢复、UAT/生产 Migration、build/deploy、账号权限、systemd/网络/Swap、真实员工业务写或切换/回滚；这些动作仍须专项明确授权。
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。

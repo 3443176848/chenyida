@@ -33,7 +33,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前状态
 
-快照时间：2026-08-16（Asia/Shanghai）
+快照时间：2026-08-20（Asia/Shanghai）
 
 | 项目 | 当前值 |
 | --- | --- |
@@ -41,7 +41,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前版本 | 自托管源码为`0.1.0-alpha.47`，源码Migration为46/head `0046_runtime_lock_privilege_boundary.sql`。TASK56已按D-133/D-134完成权限/恢复/受控operator仓库闭环，TASK59—TASK60按D-135/D-136完成独立detached候选和创建前reservation，TASK61—TASK65按D-137—D-141完成monitor交付、权威投影、V2恢复政策/激活及target-bound egress，TASK66—TASK82再按D-142—D-157固定授权矩阵、跨岗UAT证据、晋升审计、checkpoint 4—15事务控制平面、内容寻址root受信rollback gateway、fixed executor/activation v2及数据库/四文件域/前代运行面专用handler。仓库能力已实现，但PG17动态证明和host激活尚不存在，catalog仍在授权消费前以`BLOCKED_MISSING_UAT_CAPABLE_HANDLERS`失败关闭。TASK57及当前安全仓库变化前的Web/Worker镜像均为`STALE / NOT AUTHORIZABLE`；当前没有与最终源码匹配的可授权镜像或正式19步门。并行非生产UAT仍为Web alpha.42/source`569aa954d764309e239d1f6c174e582596d33a24`与PostgreSQL 40/head`0040_warehouse_receipt_readiness.sql`；0041—0046未应用，真实角色/secret/Volume、外部锚点、UAT晋升和正式门均未执行 |
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
-| 当前根仓库运维基线 | `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`已在不停止或重建服务的前提下清理10.92 GB BuildKit cache和四个精确核准的无引用测试/旧任务镜像，根盘可用17→30.34 GiB（`df -h`为31G）；Build Cache为0B，四服务restart0/OOM false，当前/alpha.41回滚/FIX38被拒证据镜像、private GHCR本地锚点、Trae/MySQL、备份和四卷保持。运行面继续沿用`SELFHOST-UAT-FIX-38`的alpha.42/0040非生产UAT基线，未执行build、Migration、部署或业务写 |
+| 当前根仓库运维基线 | `SELFHOST-OPS-DOCKER-CACHE-CLEANUP-03`曾在不停止或重建服务的前提下清理10.92 GB BuildKit cache和四个精确核准的无引用测试/旧任务镜像；该任务完成时根盘可用30.34 GiB且Build Cache为0B。2026-08-20只读实况为根盘可用约10.62GiB，Build Cache 10.79GB/6.149GB reclaimable/active 0；尚未获得TASK84清理授权，因此没有删除对象。四服务restart0/OOM false，当前/alpha.41回滚/FIX38被拒证据镜像、private GHCR本地锚点、Trae/MySQL、备份和四卷保持。运行面继续沿用`SELFHOST-UAT-FIX-38`的alpha.42/0040非生产UAT基线，未执行build、Migration、部署或业务写 |
 | Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK82 feature source`c2f071ce474460e2be7aa3e0911a34fcfe948f08`/tree`3e262bd047f76747c4822f5f12322db170dbb90f`→Supervisor manifest-only`aa777324b08d06a27b1ade72a01d8d850b9a1688`/tree`a734aa13e4cb732ffc3726b56e9a62d82c34f3d0`形成当前156文件canonical链，manifest raw SHA-256为`3674e01121b09bf11014f1bcc68fd9743c4d2b60f340aa9f3089731d46c235fb`；TASK81及更早清单/镜像只保留历史审计价值并为`STALE / NOT AUTHORIZABLE`。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；未fetch/push或改动远端，公开origin继续禁止接收内部历史 |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
@@ -51,9 +51,9 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0046`，46/head`0046_runtime_lock_privilege_boundary.sql`，0046 SQL/Snapshot SHA-256分别为`ad68aaa4f20d16324fcdc7b234928ac363ecb73313921970d3b4840f4db6d66b`/`c8fe259a7838475bc41ffaf0e843ba9ca69a8ca0c5688d42275a81ea8b21f60d`；0001—0045未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0046只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / CHECKPOINT 4—15 CONTROL PLANE + REPOSITORY ROLLBACK HANDLERS COMPLETE / RESOURCE ATTRIBUTION COMPLETE / EXTERNAL RESOURCE REMEDIATION REQUIRED / CATALOG AND HOST ACTIVATION BLOCKED / ACTUAL HUMAN UAT ABSENT / LOCAL IMAGE CANDIDATE STALE / PRODUCTION NO-GO`。TASK83/D-158确认Swap主要由长期Codex、Docker/容器历史换出页持有，空闲窗口无持续高压但约82.7%仍越过硬线；隔离PG17/Compose动态证明不得启动 |
-| 当前任务 | 当前零`DOING`。`SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84`为`BLOCKED / OWNER-SIDE CODEX RUNTIME RESTART + BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED`；TASK70继续等待资源门。没有host、服务、Docker对象或数据变化 |
-| 下一任务 | 项目负责人从客户端重启Codex运行时并专项授权仅清理超过24小时的BuildKit cache后，TASK84先做受控清理和60秒门禁；只有Swap≤80%、available≥768MiB、根盘>10GiB且服务/OOM稳定，TASK70才转DOING。真实target/凭据、host安装/政策激活、账号/systemd/网络/告警、A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / CHECKPOINT 4—15 CONTROL PLANE + REPOSITORY ROLLBACK HANDLERS COMPLETE / CODEX RESTART AND PRE-CLEANUP RESOURCE GATE VERIFIED / BUILDKIT-ONLY AUTHORIZATION REQUIRED / CATALOG AND HOST ACTIVATION BLOCKED / ACTUAL HUMAN UAT ABSENT / LOCAL IMAGE CANDIDATE STALE / PRODUCTION NO-GO`。2026-08-20实测Swap约0.97%、60秒增长0、available最低约1.90GiB、根盘约10.62GiB且OOM/restart/health通过；D-158仍要求受控清理及清理后的新鲜门禁，隔离PG17/Compose动态证明不得启动 |
+| 当前任务 | 当前零`DOING`。`SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84`为`BLOCKED / CODEX RESTART AND READ-ONLY RESOURCE GATE VERIFIED / BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED`；TASK70继续等待TASK84收口。外部宿主/Codex重启原因不推断，本轮没有执行清理、重启、数据库、Volume、UAT或数据动作 |
+| 下一任务 | 项目负责人专项授权仅执行一次`docker builder prune --force --filter until=24h`后，TASK84串行做BuildKit-only清理、Docker对象复核和清理后60秒门禁；只有Swap≤80%、available≥768MiB、根盘>10GiB且服务/OOM稳定，TASK70才转DOING。真实target/凭据、host安装/政策激活、账号/systemd/网络/告警、A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
 
 ## 当前完成模块
 
@@ -402,7 +402,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前零`DOING`：TASK83/D-158已完成只读归因，Swap约82.7%仍越线且根盘仅约11GiB；TASK84等待项目负责人从客户端重启Codex运行时并专项授权BuildKit-only清理，TASK70继续BLOCKED。TASK82的156文件handler链保持不变，未修改UAT或host，系统继续`PRODUCTION NO-GO`。
+- 当前零`DOING`：现场宿主/Codex已在TASK83后外部重启，2026-08-20清理前60秒资源数值门通过；TASK84仍等待项目负责人专项授权唯一BuildKit-only清理命令及清理后新鲜门禁，根盘仅比10GiB硬线多约0.62GiB，TASK70继续BLOCKED。TASK82的156文件handler链保持不变，本轮未修改UAT、host、Docker对象或数据，系统继续`PRODUCTION NO-GO`。
 - `SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已按D-132完成并释放active slot：冻结源码`b93d838`/tree`269165d4`与manifest-only直接子提交`2136aa3`/tree`c5b78dab`形成49文件bundle，manifest SHA-256`699cdd2a…7dd6`。cluster catalog/security/tablespace、秘密分离、加密传输、V4 readiness、Dashboard/monitor与崩溃安全executor均通过合成双PostgreSQL cluster及完整适用回归；没有真实恢复或部署。
 - `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已按D-131完成并释放active slot：源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle；签名密文来源、双向ACK、恢复强绑定、调度/保留和V3 readiness通过合成密文双集群恢复及适用回归。真实异机、密钥托管、timer/WORM、真实数据与RPO/RTO均未执行。
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。
