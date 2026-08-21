@@ -3333,6 +3333,45 @@
 - 拒绝在单容器硬规则下把模拟依赖或顺序启动描述为完整Compose；也拒绝挂载现有服务socket、数据库或受保护Volume以缩短测试。
 - 拒绝允许自由镜像tag、pull/build、宽泛临时目录清理、仅记录最终资源快照，或用operator声明替代源码/对象/清理收据。
 
+## D-160 TASK70第二个数据库case先绑定完整Migration状态与精确生产回执，恢复语义不得超出实际故障模型
+
+- 日期：2026-08-21
+- 状态：`ACCEPTED / V3 SOURCE VERIFIED / ISOLATED DYNAMIC ARTIFACT PENDING / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据两条独立跨语言/fixed-executor终审、现有生产handler与V2证据边界、低资源单容器规则及Python/Node专项回归
+- 确认边界：只接受仓库源码和后续隔离合成PG17证据；不授权或声称dump/Volume、真实备份恢复、fresh-process恢复、host activation、UAT/生产、受保护数据、员工验收或切换已发生
+
+### Context
+
+- D-159首个case只证明原子双rename机制，未把46项Migration、角色/ACL/default privileges、内容摘要和生产fixed executor真实执行回执放在同一证据链中。原计划直接命名为`DV70-PG-RESTORE-02`会把“staging数据如何由dump/Volume物化”与“已物化数据库如何受守卫切换及恢复”混为一谈。
+- fixed executor此前只能返回语义evidence；producer若在执行后自行重建argv/stdout，会留下“声称执行内容”与实际子进程调用不一致的空间。observer若默认启用，又会改变全部生产路径的内存、失败或敏感信息边界。
+- 旧的“commit response loss”“crash recovery”措辞可能被误读为传输层COMMIT ACK丢失或进程终止后的新进程恢复，而当前可安全合成的模型实际是同一进程内调用方丢弃已完成结果、runtime重建和副作用后异常。证据必须精确命名，不得外推。
+- artifact以hardlink无覆盖发布时，link成功后的unlink、目录fsync或metadata失败可能留下本任务最终路径与临时硬链并阻断重试。失败清理必须证明inode所有权，不能用宽泛目录清理解决。
+
+### Decision
+
+1. 原`DV70-PG-RESTORE-02`拆分。当前case命名为`DV70-PG-GUARDED-SWITCH-02`，只验证完整46项Migration/权限/内容状态上的守卫切换和一次性恢复；dump及四文件Volume恢复继续作为独立未证明边界，不因本case通过而关闭。
+2. policy v3固定唯一case、全部46项Migration source、9个受管角色、4项membership、canonical relation/large-object content report、runtime privilege来源和历史V2五文件字节冻结。任何source、ledger、角色、ACL/default privilege、内容或安全摘要漂移都必须在rename前拒绝。
+3. `ClosedDockerRunner`只增加可选且默认`None`的完成态observer；默认生产路径不得为observer额外哈希/copy stdin或回调。仅隔离V3 runner注入observer，并且只能在stdin发送完成、stdout/stderr读到EOF、子进程退出且无遗留daemon后形成回执。
+4. 每次受观察调用绑定精确argv、固定env、stdin presence/bytes/SHA、timeout、maximum output、side-effect、return code、原始stdout/stderr及daemon state。V3必须得到固定1—9序列；Node独立重建SQL/argv/env/limits/输出和回执自摘要。副作用后observer异常按`SIDE_EFFECT_OUTCOME_UNKNOWN / AFTER_SIDE_EFFECT`处理，不得假定失败或重放。
+5. 恢复场景只允许：OLD布局的一个耐久恢复attempt；attempt结果unknown时不得第二次重放；NEW_SEALED调用方丢弃已完成delegate结果时不得重放。artifact必须显式记录`same-process runtime reconstruction`、`in-process exception after durable reservation`及`caller-discarded completed result`，并非fresh-process或transport-level证明。
+6. SQL压缩只接受单一mtime=0 canonical gzip member；artifact读取要求root-owned `0400`、普通文件、单硬链接及稳定inode/mtime/ctime。整件负向harness必须在每次mutation后合法重算assertion evidence、case和artifact摘要，使拒绝原因落在被测语义而非陈旧上层哈希。
+7. 资源样本必须同时绑定monotonic elapsed与UTC wall clock，最大漂移1.5秒；容器创建晚于≥60秒前检，总窗口≥180秒。只允许一个断网、只读rootfs、全有界tmpfs且无bind/Volume/build/pull的既有固定摘要PG17容器。
+8. artifact发布过程中记录本次创建文件的device/inode；任一后链接失败只删除精确临时/最终路径中仍匹配该inode的普通root文件并fsync目录。外来或身份不匹配路径必须保留并失败关闭，禁止宽泛删除。
+9. V3 source先以独立提交完成测试、敏感信息检查和`recovery-private/main`普通fast-forward；只有clean source才能执行动态producer。最终artifact仍最多为`PARTIAL_ONLY`，且必须再经Node verifier与独立整件篡改harness；通过后TASK70也不得自动转DONE。
+
+### Consequences
+
+- V3源码验收为Python16/16与129/129、Node13/13、受影响合同108/108、release29/29、inventory263/239/24；两条独立终审P0=0/P1=0。首次drop-all Node容器的35个EACCES被证明为夹具需要覆盖`0440`文件及chown reader GID，离线容器仅增加`DAC_OVERRIDE`/`CHOWN`后108/108，不降低断言。
+- V2五文件SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91`；V3 policy raw SHA-256为`9245a099…dc22`，release inventory/runtime policy为`c4775f60…6485`/`8f6fb710…85d2`。
+- 当前没有V3动态artifact，因此状态只能是`SOURCE READY / DYNAMIC RUN PENDING`。系统继续`PRODUCTION NO-GO`；UAT alpha.42/0040和四个受保护Volume均未访问或修改。
+
+### Rejected alternatives
+
+- 拒绝用一个“restore”case同时声称dump物化、Migration、权限、guarded switch、进程恢复和Volume恢复；也拒绝因完整Migration fixture存在而称其为真实数据试迁移或恢复。
+- 拒绝在fixed executor调用外重建一份“推定执行回执”，或让observer默认启用、在子进程结束前回调、吞掉回调异常、记录自由环境/敏感正文或在UNKNOWN后重放。
+- 拒绝将same-process runtime重建描述成进程崩溃恢复，将调用方丢弃返回值描述成PostgreSQL传输层COMMIT ACK丢失，或以这些合成证据解除host/真实UAT/人工UAT阻断。
+- 拒绝用rename覆盖artifact、宽泛glob/rmtree清理失败发布，或为追求可重跑而删除身份不明的路径。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

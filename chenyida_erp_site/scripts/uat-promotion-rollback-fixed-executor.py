@@ -38,13 +38,15 @@ RUNTIME_OBSERVATION_CONTRACT = \
     "chenyida-erp-uat-promotion-rollback-runtime-observation/v1"
 COMPOSE_OVERLAY_CONTRACT = "chenyida-erp-uat-promotion-rollback-compose-overlay/v1"
 POSTGRES_BASE_SPEC_CONTRACT = \
-    "chenyida-erp-uat-rollback-postgresql-base-spec/v1"
+    "chenyida-erp-uat-rollback-postgresql-base-spec/v2"
 POSTGRES_OPCODE_SPEC_CONTRACT = \
-    "chenyida-erp-uat-rollback-postgresql-opcode-spec/v1"
+    "chenyida-erp-uat-rollback-postgresql-opcode-spec/v2"
 POSTGRES_DUMP_OPCODE_SPEC_CONTRACT = \
-    "chenyida-erp-uat-rollback-postgresql-dump-opcode-spec/v1"
+    "chenyida-erp-uat-rollback-postgresql-dump-opcode-spec/v2"
 POSTGRES_RECONCILE_OPCODE_SPEC_CONTRACT = \
-    "chenyida-erp-uat-rollback-postgresql-reconcile-opcode-spec/v1"
+    "chenyida-erp-uat-rollback-postgresql-reconcile-opcode-spec/v2"
+POSTGRES_GUARDED_SWITCH_OPCODE_SPEC_CONTRACT = \
+    "chenyida-erp-uat-rollback-postgresql-guarded-switch-opcode-spec/v2"
 VOLUME_HELPER_CONTRACT_SHA256 = \
     "143071fae30de9f0f4c04dff1df17d5d42fd8bfaa967ca0e70836d5ffd1ffb8d"
 VOLUME_HELPER_PROTOCOL = "chenyida-erp-volume-helper/v1"
@@ -52,8 +54,12 @@ VOLUME_HELPER_ENTRYPOINT = "/usr/local/bin/chenyida-erp-volume-helper"
 POSTGRES_SQL_OPCODES = {
     "PG_RB_CREATE_STAGING_V1",
     "PG_RB_OBSERVE_STATE_V1",
+    "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1",
     "PG_RB_ATOMIC_SWITCH_V1",
     "PG_RB_UNSEAL_ACTIVE_V1",
+}
+POSTGRES_READ_ONLY_SQL_OPCODES = {
+    "PG_RB_OBSERVE_STATE_V1", "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1",
 }
 WRITER_SQL_OPCODES = {
     "PG_RB_OBSERVE_WRITER_FENCE_V1",
@@ -102,7 +108,7 @@ POSTGRES_CONTENT_REPORT_MAX_BYTES = 64 * 1024 * 1024
 POSTGRES_CONTENT_SQL_SHA256 = \
     "b0486448ec248ca76d687060b5c2d564db3d9b423fa1febb9ab33460c99550fc"
 POSTGRES_SECURITY_SQL_SHA256 = \
-    "d155ca04fea4728ae2bdf6481e043dc243b20a0b15e6e396affe9a99587ab6f4"
+    "b42f6bb969bfd931579e0a12e800399d3e4c0404981ab695b01bdac84232ac41"
 POSTGRES_CONTENT_SQL_ZLIB_BASE64 = (
     "eNrNVm1v2zYQ/q5fcStaSBkc127SLEu2AY6jti4cq7PVdR2CCbTE2GxkUhWpvBTFfvse0ootJ0u2AP0wJLDI4/Hu4XPH451qbiga"
     "JeF4HI2TSRy9IyW908KKz1S5YIYqyXIxkzyrxaYqcq4TJfPrhq7geaZ5Qf6p8T3vKHw9GFE87o0mvX48iEY0mETDnhsNw9/CIY3D"
@@ -124,62 +130,63 @@ POSTGRES_CONTENT_SQL_ZLIB_BASE64 = (
     "mEXEI/QFSdww9otGsiwFQXWduPTk4G8aH3N1zRG5o="
 )
 POSTGRES_SECURITY_SQL_ZLIB_BASE64 = (
-    "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"
+    "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"
+    "q0cius9qO10BWR9La8ivtNDfF/q691/BsV/l"
 )
 TIMEOUTS = {
     "PREFLIGHT": 120,
@@ -403,8 +410,8 @@ HANDLER_EVENT_FIELDS = {
 }
 HANDLER_EVENTS = {
     "PREPARED", "EXECUTION_STARTED", "SIDE_EFFECT_STARTED", "SIDE_EFFECT_RECORDED",
-    "READ_ONLY_PROOF_RECORDED", "RESULT_COMMITTED", "RESULT_VERIFIED", "UNKNOWN",
-    "CONTAINMENT_STARTED", "CONTAINED",
+    "SIDE_EFFECT_RECOVERY_STARTED", "READ_ONLY_PROOF_RECORDED", "RESULT_COMMITTED",
+    "RESULT_VERIFIED", "UNKNOWN", "CONTAINMENT_STARTED", "CONTAINED",
 }
 HANDLER_UNKNOWN_REASONS = {
     "DURABLE_STATE_MISSING", "DURABLE_STATE_DIVERGED", "SIDE_EFFECT_OUTCOME_UNKNOWN",
@@ -417,9 +424,17 @@ HANDLER_UNKNOWN_PHASES = {
 }
 SIDE_EFFECT_INTENT_CONTRACT = "chenyida-erp-uat-promotion-rollback-side-effect-intent/v1"
 SIDE_EFFECT_RECEIPT_CONTRACT = "chenyida-erp-uat-promotion-rollback-side-effect-receipt/v2"
+SIDE_EFFECT_RECOVERY_ATTEMPT_CONTRACT = \
+    "chenyida-erp-uat-promotion-rollback-side-effect-recovery-attempt/v1"
 PREACTIVATION_CONTENT_PROOF_CONTRACT = \
-    "chenyida-erp-uat-promotion-rollback-preactivation-content-proof/v1"
+    "chenyida-erp-uat-promotion-rollback-preactivation-content-proof/v2"
 PREACTIVATION_CONTENT_PROOF_NAME = "PREACTIVATION_CONTENT_PROOF"
+STAGING_CONTENT_PROOF_CONTRACT = \
+    "chenyida-erp-uat-promotion-rollback-staging-content-proof/v1"
+STAGING_CONTENT_PROOF_NAME = "POSTGRES_PRE_SWITCH_PROOF"
+POSTGRES_RESTORE_PRECONDITION_CONTRACT = \
+    "chenyida-erp-uat-rollback-postgresql-restore-precondition/v1"
+POSTGRES_RESTORE_PRECONDITION_PROOF_NAME = "POSTGRES_RESTORE_PRECONDITION"
 SIDE_EFFECTS_BY_LABEL = {
     None: ("DATABASE_FENCE", "WRITER_STOP"),
     "PRECONDITION_RECHECK": (),
@@ -446,6 +461,10 @@ SIDE_EFFECTS_BY_LABEL = {
     "ATTACHMENTS_CONTENT": ("PROBE_UTILITY_CREATE", "PROBE_UTILITY_REMOVE"),
     "BACKUP_STATUS_CONTENT": ("PROBE_UTILITY_CREATE", "PROBE_UTILITY_REMOVE"),
 }
+RECORD_LABELS = frozenset((None, *STAGES, *CHECKS))
+ALL_SIDE_EFFECTS = frozenset(
+    name for names in SIDE_EFFECTS_BY_LABEL.values() for name in names
+)
 
 
 class FixedExecutorError(Exception):
@@ -1366,7 +1385,8 @@ class HandlerJournal:
             item for item in events
             if item["idempotency_key"] == key and item["event"] == event_name
             and (event_name not in {
-                "SIDE_EFFECT_STARTED", "SIDE_EFFECT_RECORDED", "READ_ONLY_PROOF_RECORDED",
+                "SIDE_EFFECT_STARTED", "SIDE_EFFECT_RECORDED",
+                "SIDE_EFFECT_RECOVERY_STARTED", "READ_ONLY_PROOF_RECORDED",
             }
                  or item["side_effect_name"] == side_effect_name)
         ]
@@ -1505,10 +1525,10 @@ def create_recovered_side_effect_receipt(
     return {**body, "receipt_sha256": digest_value(body)}
 
 
-def validate_side_effect_receipt(
-        value: Any, intent: dict[str, Any], request: dict[str, Any], name: str,
+def validate_side_effect_receipt_envelope(
+        value: Any,
+        code: str = "ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECEIPT_INVALID",
 ) -> dict[str, Any]:
-    code = "ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECEIPT_INVALID"
     item = exact(value, {
         "schema_version", "contract", "status", "operation_id", "label",
         "side_effect_name", "intent_sha256", "before_identity_sha256",
@@ -1518,10 +1538,12 @@ def validate_side_effect_receipt(
     }, code)
     if item["schema_version"] != 2 or item["contract"] != SIDE_EFFECT_RECEIPT_CONTRACT \
             or item["status"] not in {"COMMITTED", "RECOVERED_COMMITTED"} \
-            or item["operation_id"] != request["operation_id"] \
-            or item["label"] != request["label"] or item["side_effect_name"] != name \
-            or item["intent_sha256"] != intent["intent_sha256"] \
-            or item["argv_template_sha256"] != intent["argv_template_sha256"] \
+            or not IDENTIFIER.fullmatch(item.get("operation_id") or "") \
+            or item.get("label") not in RECORD_LABELS \
+            or item.get("side_effect_name") not in ALL_SIDE_EFFECTS \
+            or any(SHA256.fullmatch(item.get(field) or "") is None for field in (
+                "intent_sha256", "argv_template_sha256",
+            )) \
             or item["daemon_state"] != "COMPLETED_NO_UNTRACKED_PROCESS" \
             or any(SHA256.fullmatch(item.get(field) or "") is None for field in (
                 "before_identity_sha256", "after_identity_sha256",
@@ -1533,8 +1555,21 @@ def validate_side_effect_receipt(
             or item["status"] == "RECOVERED_COMMITTED" \
             and item["recovery_observation_sha256"] == ZERO_SHA256 \
             or ISO_UTC.fullmatch(item.get("completed_at") or "") is None \
-            or item["completed_at"] < intent["started_at"] \
             or digest_value(without(item, "receipt_sha256")) != item["receipt_sha256"]:
+        reject(code)
+    return item
+
+
+def validate_side_effect_receipt(
+        value: Any, intent: dict[str, Any], request: dict[str, Any], name: str,
+) -> dict[str, Any]:
+    code = "ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECEIPT_INVALID"
+    item = validate_side_effect_receipt_envelope(value, code)
+    if item["operation_id"] != request["operation_id"] \
+            or item["label"] != request["label"] or item["side_effect_name"] != name \
+            or item["intent_sha256"] != intent["intent_sha256"] \
+            or item["argv_template_sha256"] != intent["argv_template_sha256"] \
+            or item["completed_at"] < intent["started_at"]:
         reject(code)
     return item
 
@@ -1638,34 +1673,272 @@ class DurableSideEffectRecorder:
             started[0]["payload"], self.request, name,
         )
 
-    def record_read_only_proof(self, name: str, payload: dict[str, Any]) -> dict[str, Any]:
-        code = "ROLLBACK_FIXED_EXECUTOR_PREACTIVATION_PROOF_INVALID"
+    def begin_recovery(
+            self, name: str, *, opcode: dict[str, Any],
+            before_observation_sha256: str, candidate_oid: str,
+    ) -> bool:
+        """Reserve the sole guarded database-switch recovery attempt durably.
+
+        Returning False means an earlier probe already reserved the attempt.  The
+        caller must then stay UNKNOWN instead of issuing the mutation again.
+        """
         if self.request["operation"] != "ROLLBACK_EXECUTION" \
-                or self.request["label"] != "WEB_WORKER_PREDECESSOR_ACTIVATION" \
-                or self.request["action"] not in {"EXECUTE", "PROBE"} \
-                or name != PREACTIVATION_CONTENT_PROOF_NAME:
+                or self.request["action"] != "PROBE" \
+                or self.request["label"] != "POSTGRESQL_RESTORE" \
+                or name != "DATABASE_SWITCH" \
+                or SHA256.fullmatch(before_observation_sha256 or "") is None \
+                or OID.fullmatch(candidate_oid or "") is None:
+            reject("ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECOVERY_INVALID")
+        intent = self.started_intent(name)
+        if intent is None or self.receipt(name) is not None:
+            reject("ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECOVERY_INVALID")
+        try:
+            opcode_bindings = opcode["bindings"]
+            opcode_projection = {
+                "opcode": opcode["opcode"],
+                "opcode_spec_sha256": opcode["opcode_spec_sha256"],
+                "sql_sha256": opcode["sql_sha256"],
+                "runner_argv_template_sha256": opcode["argv_template_sha256"],
+                "guarded_state_sha256": opcode_bindings["guarded_state_sha256"],
+                "opcode_before_observation_sha256":
+                    opcode_bindings["before_observation_sha256"],
+                "staging_content_proof_sha256":
+                    opcode_bindings["staging_content_proof_sha256"],
+                "staging_oid": opcode_bindings["staging_oid"],
+                "candidate_oid": candidate_oid,
+                "expected_switched_identity_sha256":
+                    opcode_bindings["expected_switched_identity_sha256"],
+            }
+        except (KeyError, TypeError):
+            reject("ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECOVERY_INVALID")
+        if opcode_projection["opcode"] != "PG_RB_GUARDED_SWITCH_V3" \
+                or any(SHA256.fullmatch(opcode_projection[field] or "") is None
+                       for field in (
+                           "opcode_spec_sha256", "sql_sha256",
+                           "runner_argv_template_sha256", "guarded_state_sha256",
+                           "opcode_before_observation_sha256",
+                           "staging_content_proof_sha256",
+                           "expected_switched_identity_sha256",
+                       )):
+            reject("ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECOVERY_INVALID")
+        if OID.fullmatch(opcode_projection["staging_oid"] or "") is None \
+                or OID.fullmatch(opcode_projection["candidate_oid"] or "") is None:
+            reject("ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECOVERY_INVALID")
+        expected_argv = {
+            "opcode": opcode_projection["opcode"],
+            "opcode_spec_sha256": opcode_projection["opcode_spec_sha256"],
+            "sql_sha256": opcode_projection["sql_sha256"],
+            "runner_argv_template_sha256":
+                opcode_projection["runner_argv_template_sha256"],
+        }
+        if intent["argv_template_sha256"] != digest_value(expected_argv):
+            reject("ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECOVERY_INVALID")
+        body = {
+            "schema_version": 1,
+            "contract": SIDE_EFFECT_RECOVERY_ATTEMPT_CONTRACT,
+            "recovery_kind": "EXACT_OLD_GUARDED_DATABASE_SWITCH_REPLAY",
+            "attempt": 1,
+            "operation_id": self.request["operation_id"],
+            "label": self.request["label"],
+            "side_effect_name": name,
+            "intent_sha256": intent["intent_sha256"],
+            "target_identity_sha256": intent["target_identity_sha256"],
+            "argv_template_sha256": intent["argv_template_sha256"],
+            **opcode_projection,
+            "recovery_observation_sha256": before_observation_sha256,
+        }
+        payload = {**body, "recovery_attempt_sha256": digest_value(body)}
+        existing = [
+            item for item in self._events()
+            if item["event"] == "SIDE_EFFECT_RECOVERY_STARTED"
+            and item["side_effect_name"] == name
+        ]
+        if existing:
+            prior = None if len(existing) != 1 else existing[0]["payload"]
+            expected_fields = set(payload)
+            if not isinstance(prior, dict) or set(prior) != expected_fields \
+                    or SHA256.fullmatch(prior.get("recovery_observation_sha256") or "") is None \
+                    or prior.get("recovery_attempt_sha256") \
+                        != digest_value(without(prior, "recovery_attempt_sha256")) \
+                    or any(
+                        prior.get(field) != payload[field]
+                        for field in expected_fields
+                        if field not in {
+                            "recovery_observation_sha256", "recovery_attempt_sha256",
+                        }
+                    ) \
+                    or existing[0]["side_effect_identity_sha256"] \
+                        != prior.get("recovery_attempt_sha256"):
+                reject("ROLLBACK_FIXED_EXECUTOR_SIDE_EFFECT_RECOVERY_INVALID")
+            return False
+        self.journal.append(
+            self.request, self.activation_receipt_sha256,
+            "SIDE_EFFECT_RECOVERY_STARTED", payload, self.clock(),
+            side_effect_name=name,
+            side_effect_identity_sha256=payload["recovery_attempt_sha256"],
+        )
+        if self.fault is not None:
+            self.fault(f"AFTER_SIDE_EFFECT_RECOVERY_STARTED_{name}", self.request)
+        return True
+
+    def validate_terminal_evidence(self, evidence: dict[str, Any]) -> None:
+        """Bind terminal PostgreSQL evidence to the immutable side-effect chain.
+
+        The cross-language evidence validator deliberately validates a portable
+        evidence envelope.  This additional root-journal boundary prevents a
+        caller from changing and re-hashing the guarded opcode, receipt, or
+        intent projection before RESULT_COMMITTED is accepted or replayed.
+        """
+        if self.request["operation"] != "ROLLBACK_EXECUTION" \
+                or self.request["label"] != "POSTGRESQL_RESTORE":
+            return
+        code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_TERMINAL_BINDING_INVALID"
+        item = validate_handler_evidence(
+            self.request["operation"], self.request["label"], evidence,
+        )
+        intent = self.started_intent("DATABASE_SWITCH")
+        receipt = self.receipt("DATABASE_SWITCH")
+        if intent is None or receipt is None or item["switch_receipt"] != receipt \
+                or receipt["intent_sha256"] != intent["intent_sha256"]:
             reject(code)
-        proof = validate_preactivation_content_proof(payload, code)
+        target = {
+            "staging_oid": item["restored_database_oid"],
+            "candidate_oid": item["snapshot_database_oid"],
+            "staging_content_proof_sha256":
+                item["pre_switch_content_proof_sha256"],
+            "guarded_opcode_spec_sha256":
+                item["guarded_switch_opcode_spec_sha256"],
+            "guarded_sql_sha256": item["guarded_switch_sql_sha256"],
+            "guarded_state_sha256": item["guarded_switch_state_sha256"],
+            "expected_switched_identity_sha256":
+                item["guarded_switch_expected_identity_sha256"],
+        }
+        argv = {
+            "opcode": "PG_RB_GUARDED_SWITCH_V3",
+            "opcode_spec_sha256": item["guarded_switch_opcode_spec_sha256"],
+            "sql_sha256": item["guarded_switch_sql_sha256"],
+            "runner_argv_template_sha256":
+                item["guarded_switch_runner_argv_template_sha256"],
+        }
+        if intent["target_identity_sha256"] != digest_value(target) \
+                or intent["argv_template_sha256"] != digest_value(argv):
+            reject(code)
+        recovery = [
+            event for event in self._events()
+            if event["event"] == "SIDE_EFFECT_RECOVERY_STARTED"
+            and event["side_effect_name"] == "DATABASE_SWITCH"
+        ]
+        if len(recovery) > 1 or recovery \
+                and receipt["status"] != "RECOVERED_COMMITTED":
+            reject(code)
+        if recovery:
+            payload = recovery[0]["payload"]
+            expected = {
+                "operation_id": self.request["operation_id"],
+                "label": "POSTGRESQL_RESTORE",
+                "side_effect_name": "DATABASE_SWITCH",
+                "intent_sha256": intent["intent_sha256"],
+                "target_identity_sha256": intent["target_identity_sha256"],
+                "argv_template_sha256": intent["argv_template_sha256"],
+                "opcode": "PG_RB_GUARDED_SWITCH_V3",
+                "opcode_spec_sha256": item["guarded_switch_opcode_spec_sha256"],
+                "sql_sha256": item["guarded_switch_sql_sha256"],
+                "runner_argv_template_sha256":
+                    item["guarded_switch_runner_argv_template_sha256"],
+                "guarded_state_sha256": item["guarded_switch_state_sha256"],
+                "opcode_before_observation_sha256":
+                    item["pre_switch_content_proof"]["after_observation_sha256"],
+                "staging_content_proof_sha256":
+                    item["pre_switch_content_proof_sha256"],
+                "staging_oid": item["restored_database_oid"],
+                "candidate_oid": item["snapshot_database_oid"],
+                "expected_switched_identity_sha256":
+                    item["guarded_switch_expected_identity_sha256"],
+            }
+            if not isinstance(payload, dict) \
+                    or set(payload) != {
+                        "schema_version", "contract", "recovery_kind", "attempt",
+                        *expected, "recovery_observation_sha256",
+                        "recovery_attempt_sha256",
+                    } \
+                    or payload.get("schema_version") != 1 \
+                    or payload.get("contract") \
+                        != SIDE_EFFECT_RECOVERY_ATTEMPT_CONTRACT \
+                    or payload.get("recovery_kind") \
+                        != "EXACT_OLD_GUARDED_DATABASE_SWITCH_REPLAY" \
+                    or payload.get("attempt") != 1 \
+                    or any(payload.get(field) != value
+                           for field, value in expected.items()) \
+                    or SHA256.fullmatch(
+                        payload.get("recovery_observation_sha256") or "",
+                    ) is None \
+                    or payload.get("recovery_attempt_sha256") \
+                        != digest_value(without(payload, "recovery_attempt_sha256")) \
+                    or recovery[0]["side_effect_identity_sha256"] \
+                        != payload["recovery_attempt_sha256"]:
+                reject(code)
+
+    def record_read_only_proof(self, name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        if self.request["operation"] != "ROLLBACK_EXECUTION" \
+                or self.request["action"] not in {"EXECUTE", "PROBE"}:
+            reject("ROLLBACK_FIXED_EXECUTOR_READ_ONLY_PROOF_INVALID")
         events = self._events()
-        unseal_receipt = self.receipt("DATABASE_UNSEAL")
-        if unseal_receipt is None \
-                or proof["binding_sha256"] != unseal_receipt["receipt_sha256"] \
+        if name == PREACTIVATION_CONTENT_PROOF_NAME \
+                and self.request["label"] == "WEB_WORKER_PREDECESSOR_ACTIVATION":
+            code = "ROLLBACK_FIXED_EXECUTOR_PREACTIVATION_PROOF_INVALID"
+            proof = validate_preactivation_content_proof(payload, code)
+            binding_receipt = self.receipt("DATABASE_UNSEAL")
+            forbidden_effect = "WEB_WORKER_ACTIVATE"
+        elif name == POSTGRES_RESTORE_PRECONDITION_PROOF_NAME \
+                and self.request["label"] == "POSTGRESQL_RESTORE":
+            code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_RESTORE_PRECONDITION_INVALID"
+            proof = validate_pg_restore_precondition_envelope(payload, code)
+            proof_identity_field = "restore_precondition_sha256"
+            binding_receipt = self.receipt("STAGING_DATABASE_CREATE")
+            forbidden_effect = "LOGICAL_DUMP_RESTORE"
+        elif name == STAGING_CONTENT_PROOF_NAME \
+                and self.request["label"] == "POSTGRESQL_RESTORE":
+            code = "ROLLBACK_FIXED_EXECUTOR_STAGING_CONTENT_PROOF_INVALID"
+            proof = validate_staging_content_proof(payload, code)
+            proof_identity_field = "proof_sha256"
+            binding_receipt = self.receipt("PRIVILEGE_RECONCILE")
+            forbidden_effect = "DATABASE_SWITCH"
+        else:
+            reject("ROLLBACK_FIXED_EXECUTOR_READ_ONLY_PROOF_INVALID")
+        if name == PREACTIVATION_CONTENT_PROOF_NAME:
+            proof_identity_field = "proof_sha256"
+        if binding_receipt is None \
+                or proof.get("binding_sha256") != binding_receipt["receipt_sha256"] \
                 or any(item["event"] == "SIDE_EFFECT_STARTED"
-                       and item["side_effect_name"] == "WEB_WORKER_ACTIVATE"
+                       and item["side_effect_name"] == forbidden_effect
                        for item in events):
             reject(code)
+        existing = [
+            item for item in events if item["event"] == "READ_ONLY_PROOF_RECORDED"
+            and item["side_effect_name"] == name
+        ]
+        if existing:
+            if len(existing) != 1 or existing[0]["payload"] != proof:
+                reject(code)
+            return proof
         event = self.journal.append(
             self.request, self.activation_receipt_sha256, "READ_ONLY_PROOF_RECORDED",
             proof, self.clock(), side_effect_name=name,
-            side_effect_identity_sha256=proof["proof_sha256"],
+            side_effect_identity_sha256=proof[proof_identity_field],
         )
         if self.fault is not None:
-            self.fault("AFTER_PREACTIVATION_CONTENT_PROOF_RECORDED", self.request)
-        return validate_preactivation_content_proof(event["payload"], code)
+            self.fault(f"AFTER_{name}_RECORDED", self.request)
+        return event["payload"]
 
     def read_only_proof(self, name: str) -> dict[str, Any] | None:
-        if name != PREACTIVATION_CONTENT_PROOF_NAME:
-            reject("ROLLBACK_FIXED_EXECUTOR_PREACTIVATION_PROOF_INVALID")
+        validators = {
+            PREACTIVATION_CONTENT_PROOF_NAME: validate_preactivation_content_proof,
+            POSTGRES_RESTORE_PRECONDITION_PROOF_NAME:
+                validate_pg_restore_precondition_envelope,
+            STAGING_CONTENT_PROOF_NAME: validate_staging_content_proof,
+        }
+        if name not in validators:
+            reject("ROLLBACK_FIXED_EXECUTOR_READ_ONLY_PROOF_INVALID")
         events = [
             item for item in self._events()
             if item["event"] == "READ_ONLY_PROOF_RECORDED"
@@ -1673,7 +1946,9 @@ class DurableSideEffectRecorder:
         ]
         if len(events) > 1:
             reject("ROLLBACK_FIXED_EXECUTOR_HANDLER_EVENT_CHAIN_INVALID")
-        return None if not events else validate_preactivation_content_proof(events[0]["payload"])
+        if not events:
+            return None
+        return validators[name](events[0]["payload"])
 
     def assert_closed(self) -> str:
         events = self._events()
@@ -1781,7 +2056,7 @@ def validate_handler_result_record(
     label_field = kind
     intent_field = f"{kind}_intent_sha256"
     result_field = f"{kind}_result_sha256"
-    expected_contract = f"chenyida-erp-uat-promotion-rollback-{kind}-result/v5"
+    expected_contract = f"chenyida-erp-uat-promotion-rollback-{kind}-result/v6"
     expected_status = "COMMITTED" if kind == "stage" else "VERIFIED"
     fields = {
         "schema_version", "contract", "status", "promotion_id", "promotion_generation",
@@ -1796,7 +2071,7 @@ def validate_handler_result_record(
         "rollback_plan_sha256", "execution_package_sha256", "runtime_plan_sha256", "ordinal",
         label_field, "previous_result_sha256",
     )
-    if record.get("schema_version") != 5 or record.get("contract") != expected_contract \
+    if record.get("schema_version") != 6 or record.get("contract") != expected_contract \
             or record.get("status") != expected_status \
             or any(record.get(field) != intent.get(field) for field in shared_fields) \
             or record.get(intent_field) != request["record_intent_sha256"] \
@@ -1853,7 +2128,8 @@ def create_handler_unknown(
         "last_event_sha256": ZERO_SHA256 if last is None else last["event_sha256"],
         "side_effects_started": outcome.side_effects_started or any(
             item["event"] in {
-                "SIDE_EFFECT_STARTED", "SIDE_EFFECT_RECORDED", "RESULT_COMMITTED",
+                "SIDE_EFFECT_STARTED", "SIDE_EFFECT_RECORDED",
+                "SIDE_EFFECT_RECOVERY_STARTED", "RESULT_COMMITTED",
             }
             for item in events
         ),
@@ -2003,6 +2279,11 @@ class FixedHandlerEngine:
                 durable[-1]["payload"]["record"], request, intent,
                 side_effect_receipts_sha256,
             )
+            terminal_binder = getattr(
+                self.backend, "bind_terminal_evidence", None,
+            )
+            if callable(terminal_binder):
+                terminal_binder(durable_effects, record["evidence"])
             status = "ALREADY_COMMITTED" if request["action"] == "EXECUTE" \
                 else "COMMITTED" if request["operation"] == "ROLLBACK_EXECUTION" else "VERIFIED"
             return create_runtime_response(
@@ -2068,6 +2349,9 @@ class FixedHandlerEngine:
         record = validate_handler_result_record(
             outcome["record"], request, intent, side_effect_receipts_sha256,
         )
+        terminal_binder = getattr(self.backend, "bind_terminal_evidence", None)
+        if callable(terminal_binder):
+            terminal_binder(effects, record["evidence"])
         terminal = journal.append(
             request, activation_sha256, terminal_name, {"record": record}, self.clock(),
         )
@@ -2091,8 +2375,8 @@ def create_handler_result_record(
     result_field = f"{kind}_result_sha256"
     label_field = kind
     body = {
-        "schema_version": 5,
-        "contract": f"chenyida-erp-uat-promotion-rollback-{kind}-result/v5",
+        "schema_version": 6,
+        "contract": f"chenyida-erp-uat-promotion-rollback-{kind}-result/v6",
         "status": "COMMITTED" if kind == "stage" else "VERIFIED",
         **{
             field: intent[field] for field in (
@@ -2298,7 +2582,8 @@ def validate_preactivation_content_proof(
     item = exact(value, {
         "schema_version", "contract", "binding_sha256", "runtime_plan_sha256",
         "source_reconciliation_sha256", "source_database_report_sha256",
-        "live_database_report_sha256", "migration_head", "migration_manifest_sha256",
+        "live_database_report_sha256", "migration_head",
+        "migration_ledger_file_sha256", "migration_allowlist_sha256",
         "migration_ledger_sha256", "live_security_state_sha256",
         "active_allowed_session_role_set_sha256", "active_session_client_policy_sha256",
         "active_session_observation_sha256", "active_writer_session_count",
@@ -2313,7 +2598,7 @@ def validate_preactivation_content_proof(
         "candidate_database_quarantine_prepared_xacts", "before_observation_sha256",
         "after_observation_sha256", "proof_sha256",
     }, code)
-    if item["schema_version"] != 1 \
+    if type(item["schema_version"]) is not int or item["schema_version"] != 1 \
             or item["contract"] != PREACTIVATION_CONTENT_PROOF_CONTRACT \
             or item["source_database_report_sha256"] \
                 != item["live_database_report_sha256"] \
@@ -2330,7 +2615,8 @@ def validate_preactivation_content_proof(
     digest_fields = (
         "binding_sha256", "runtime_plan_sha256", "source_reconciliation_sha256",
         "source_database_report_sha256", "live_database_report_sha256",
-        "migration_manifest_sha256", "migration_ledger_sha256",
+        "migration_ledger_file_sha256", "migration_allowlist_sha256",
+        "migration_ledger_sha256",
         "live_security_state_sha256", "active_allowed_session_role_set_sha256",
         "active_session_client_policy_sha256", "active_session_observation_sha256",
         "active_database_identity_sha256", "before_observation_sha256",
@@ -2387,7 +2673,8 @@ def build_preactivation_content_proof(
             "source_database_report_sha256": source_report["report_sha256"],
             "live_database_report_sha256": live_report["sha256"],
             "migration_head": migration["head"],
-            "migration_manifest_sha256": migration["manifest_sha256"],
+            "migration_ledger_file_sha256": migration["ledger_file_sha256"],
+            "migration_allowlist_sha256": migration["allowlist_sha256"],
             "migration_ledger_sha256": migration["ledger_sha256"],
             "live_security_state_sha256": security["state_sha256"],
             "active_allowed_session_role_set_sha256":
@@ -2429,7 +2716,8 @@ def build_preactivation_content_proof(
         "source_database_report_sha256": snapshot["target_database_report_sha256"],
         "live_database_report_sha256": snapshot["target_database_report_sha256"],
         "migration_head": snapshot["migration_head"],
-        "migration_manifest_sha256": snapshot["migration_manifest_sha256"],
+        "migration_ledger_file_sha256": snapshot["migration_ledger_file_sha256"],
+        "migration_allowlist_sha256": snapshot["migration_allowlist_sha256"],
         "restored_database_marker": databases["candidate_marker"],
         "system_identifier": base["postgres"]["system_identifier"],
         "candidate_database_quarantine_name": databases["quarantine_name"],
@@ -2438,6 +2726,165 @@ def build_preactivation_content_proof(
     }
     if any(proof[field] != value for field, value in expected.items()) \
             or proof["restored_database_oid"] == databases["candidate_oid"]:
+        reject(code)
+    return proof
+
+
+def validate_staging_content_proof(
+        value: Any, code: str = "ROLLBACK_FIXED_EXECUTOR_STAGING_CONTENT_PROOF_INVALID",
+) -> dict[str, Any]:
+    item = exact(value, {
+        "schema_version", "contract", "binding_sha256", "base_spec_sha256",
+        "runtime_plan_sha256", "source_reconciliation_sha256",
+        "source_database_report_sha256", "live_database_report_sha256",
+        "migration_head", "migration_ledger_file_sha256",
+        "migration_allowlist_sha256", "migration_ledger_sha256",
+        "live_security_state_sha256", "staging_allowed_session_role_set_sha256",
+        "staging_session_client_policy_sha256", "staging_session_observation_sha256",
+        "staging_writer_session_count", "staging_database_identity_sha256",
+        "staging_database_name", "staging_database_oid", "staging_database_marker",
+        "system_identifier", "staging_allow_connections", "staging_connection_limit",
+        "staging_default_transaction_read_only", "staging_prepared_xacts",
+        "candidate_database_name", "candidate_database_oid", "candidate_database_marker",
+        "candidate_database_allow_connections", "candidate_database_connection_limit",
+        "candidate_database_sessions", "candidate_database_prepared_xacts",
+        "before_observation_sha256", "after_observation_sha256", "proof_sha256",
+    }, code)
+    if type(item["schema_version"]) is not int or item["schema_version"] != 1 \
+            or item["contract"] != STAGING_CONTENT_PROOF_CONTRACT \
+            or item["source_database_report_sha256"] \
+                != item["live_database_report_sha256"] \
+            or item["staging_writer_session_count"] != 0 \
+            or item["staging_allow_connections"] is not True \
+            or item["staging_connection_limit"] != 0 \
+            or item["staging_default_transaction_read_only"] is not True \
+            or item["staging_prepared_xacts"] != 0 \
+            or item["candidate_database_allow_connections"] is not False \
+            or item["candidate_database_connection_limit"] != 0 \
+            or item["candidate_database_sessions"] != 0 \
+            or item["candidate_database_prepared_xacts"] != 0:
+        reject(code)
+    _evidence_integers(item, (
+        "staging_writer_session_count", "staging_connection_limit",
+        "staging_prepared_xacts", "candidate_database_connection_limit",
+        "candidate_database_sessions", "candidate_database_prepared_xacts",
+    ), 0, code)
+    _evidence_nonzero_digests(item, (
+        "binding_sha256", "base_spec_sha256", "runtime_plan_sha256",
+        "source_reconciliation_sha256", "source_database_report_sha256",
+        "live_database_report_sha256", "migration_ledger_file_sha256",
+        "migration_allowlist_sha256", "migration_ledger_sha256",
+        "live_security_state_sha256", "staging_allowed_session_role_set_sha256",
+        "staging_session_client_policy_sha256", "staging_session_observation_sha256",
+        "staging_database_identity_sha256", "before_observation_sha256",
+        "after_observation_sha256", "proof_sha256",
+    ), code)
+    _evidence_strings(item, ("migration_head",), MIGRATION, code)
+    _evidence_strings(item, ("system_identifier",), SYSTEM_IDENTIFIER, code)
+    _evidence_strings(item, ("staging_database_oid", "candidate_database_oid"), OID, code)
+    _evidence_strings(item, ("staging_database_name", "candidate_database_name"),
+                      DATABASE_IDENTIFIER, code)
+    _evidence_strings(item, ("staging_database_marker",), RESTORED_STAGING_MARKER, code)
+    if item["candidate_database_marker"] \
+            != "chenyida-erp-deployment/v2:UAT:chenyida-erp" \
+            or item["candidate_database_name"] != "chenyida_erp" \
+            or item["candidate_database_name"] == item["staging_database_name"] \
+            or item["candidate_database_oid"] == item["staging_database_oid"] \
+            or item["staging_database_identity_sha256"] != digest_value({
+                "name": item["staging_database_name"],
+                "system_identifier": item["system_identifier"],
+                "oid": item["staging_database_oid"],
+                "marker": item["staging_database_marker"],
+            }) \
+            or digest_value(without(item, "proof_sha256")) != item["proof_sha256"]:
+        reject(code)
+    return item
+
+
+def build_staging_content_proof(
+        observed: dict[str, Any], base: dict[str, Any], binding_sha256: str,
+) -> dict[str, Any]:
+    code = "ROLLBACK_FIXED_EXECUTOR_STAGING_CONTENT_PROOF_INVALID"
+    base = validate_pg_rollback_base_spec(base)
+    if SHA256.fullmatch(binding_sha256 or "") is None:
+        reject(code)
+    try:
+        target = observed["target"]
+        candidate = observed["candidate"]
+        source_report = observed["source_report"]
+        live_report = observed["live_report"]
+        migration = observed["migration"]
+        security = observed["security"]
+        sessions = observed["sessions"]
+        identity = observed["identity"]
+        before = observed["before"]
+        after = observed["after"]
+        body = {
+            "schema_version": 1, "contract": STAGING_CONTENT_PROOF_CONTRACT,
+            "binding_sha256": binding_sha256,
+            "base_spec_sha256": base["base_spec_sha256"],
+            "runtime_plan_sha256": base["runtime_plan_sha256"],
+            "source_reconciliation_sha256": source_report["source_sha256"],
+            "source_database_report_sha256": source_report["report_sha256"],
+            "live_database_report_sha256": live_report["sha256"],
+            "migration_head": migration["head"],
+            "migration_ledger_file_sha256": migration["ledger_file_sha256"],
+            "migration_allowlist_sha256": migration["allowlist_sha256"],
+            "migration_ledger_sha256": migration["ledger_sha256"],
+            "live_security_state_sha256": security["state_sha256"],
+            "staging_allowed_session_role_set_sha256":
+                sessions["allowed_role_set_sha256"],
+            "staging_session_client_policy_sha256": sessions["client_policy_sha256"],
+            "staging_session_observation_sha256": sessions["observation_sha256"],
+            "staging_writer_session_count": sessions["total"],
+            "staging_database_identity_sha256": identity["identity_sha256"],
+            "staging_database_name": identity["name"],
+            "staging_database_oid": identity["oid"],
+            "staging_database_marker": identity["marker"],
+            "system_identifier": identity["system_identifier"],
+            "staging_allow_connections": target["allow_connections"],
+            "staging_connection_limit": target["connection_limit"],
+            "staging_default_transaction_read_only":
+                target["default_transaction_read_only"],
+            "staging_prepared_xacts": target["prepared_xacts"],
+            "candidate_database_name": candidate["name"],
+            "candidate_database_oid": candidate["oid"],
+            "candidate_database_marker": candidate["marker"],
+            "candidate_database_allow_connections": candidate["allow_connections"],
+            "candidate_database_connection_limit": candidate["connection_limit"],
+            "candidate_database_sessions": candidate["sessions"],
+            "candidate_database_prepared_xacts": candidate["prepared_xacts"],
+            "before_observation_sha256": before["observation_sha256"],
+            "after_observation_sha256": after["observation_sha256"],
+        }
+    except (KeyError, TypeError):
+        reject(code)
+    proof = validate_staging_content_proof({
+        **body, "proof_sha256": digest_value(body),
+    }, code)
+    expected = {
+        "base_spec_sha256": base["base_spec_sha256"],
+        "runtime_plan_sha256": base["runtime_plan_sha256"],
+        "source_reconciliation_sha256":
+            base["snapshot"]["source_reconciliation_sha256"],
+        "source_database_report_sha256":
+            base["snapshot"]["target_database_report_sha256"],
+        "live_database_report_sha256":
+            base["snapshot"]["target_database_report_sha256"],
+        "migration_head": base["snapshot"]["migration_head"],
+        "migration_ledger_file_sha256":
+            base["snapshot"]["migration_ledger_file_sha256"],
+        "migration_allowlist_sha256":
+            base["snapshot"]["migration_allowlist_sha256"],
+        "staging_database_name": base["databases"]["staging_name"],
+        "staging_database_marker": base["databases"]["staging_marker"],
+        "system_identifier": base["postgres"]["system_identifier"],
+        "candidate_database_name": base["databases"]["active_name"],
+        "candidate_database_oid": base["databases"]["candidate_oid"],
+        "candidate_database_marker": base["databases"]["candidate_marker"],
+    }
+    if any(proof[field] != expected_value for field, expected_value in expected.items()) \
+            or proof["staging_database_oid"] == base["databases"]["candidate_oid"]:
         reject(code)
     return proof
 
@@ -2482,7 +2929,7 @@ def _validate_canonical_json_text(value: Any, code: str) -> dict[str, Any]:
 def validate_handler_evidence(
         operation: str, label: str, evidence: Any,
 ) -> dict[str, Any]:
-    """Mirror the exact v5 Node evidence boundary before a terminal journal event."""
+    """Mirror the exact v6 Node evidence boundary before a terminal journal event."""
     code = "ROLLBACK_FIXED_EXECUTOR_HANDLER_EVIDENCE_INVALID"
     if operation == "ROLLBACK_EXECUTION" and label not in STAGES \
             or operation == "ROLLBACK_POSTVERIFY" and label not in CHECKS:
@@ -2518,16 +2965,26 @@ def validate_handler_evidence(
             "restored_database_oid", "restored_database_name", "system_identifier",
             "migration_head", "restored_database_marker", "staging_database_name",
             "candidate_database_quarantine_name", "candidate_database_quarantine_oid",
-            "runtime_plan_sha256", "manifest_sha256", "migration_manifest_sha256",
+            "runtime_plan_sha256", "manifest_sha256", "migration_ledger_file_sha256",
+            "migration_manifest_sha256",
             "writer_containment_stage_result_sha256", "postgres_container_id",
             "postgres_image_config_digest", "database_profile_sha256",
-            "capacity_receipt_sha256", "restore_receipt_sha256",
+            "postgres_base_spec_sha256", "staging_create_receipt_sha256",
+            "restore_receipt_sha256", "privilege_reconcile_receipt_sha256",
+            "restore_precondition_opcode_spec_sha256",
+            "restore_precondition_sha256", "dump_inventory_sha256",
+            "empty_projection_sha256", "restore_precondition",
+            "pre_switch_content_proof_sha256", "pre_switch_content_proof",
             "runtime_privilege_access_sha256", "runtime_privilege_catalog_sha256",
             "runtime_privilege_catalog_artifact_sha256", "runtime_privilege_policy_sha256",
             "runtime_privilege_operator_policy_sha256", "uat_reconciliation_authority_sha256",
             "uat_reconciliation_activation_sha256", "sealed_security_projection_sha256",
             "staging_database_marker", "candidate_database_quarantine_marker",
-            "switch_transaction_sha256", "restored_database_allow_connections_at_commit",
+            "guarded_switch_opcode_spec_sha256", "guarded_switch_sql_sha256",
+            "guarded_switch_runner_argv_template_sha256",
+            "guarded_switch_state_sha256", "guarded_switch_expected_identity_sha256",
+            "switch_receipt_sha256", "switch_effect_identity_sha256", "switch_receipt",
+            "restored_database_allow_connections_at_commit",
             "restored_database_connection_limit_at_commit",
             "restored_database_sessions_at_commit", "restored_database_prepared_xacts_at_commit",
             "candidate_database_quarantine_allow_connections_at_commit",
@@ -2543,18 +3000,44 @@ def validate_handler_evidence(
             reject(code)
         _evidence_strings(item, (
             "source_artifact_sha256", "source_reconciliation_sha256", "target_content_sha256",
-            "runtime_plan_sha256", "manifest_sha256", "migration_manifest_sha256",
+            "runtime_plan_sha256", "manifest_sha256", "migration_ledger_file_sha256",
+            "migration_manifest_sha256",
             "writer_containment_stage_result_sha256", "database_profile_sha256",
+            "postgres_base_spec_sha256", "privilege_reconcile_receipt_sha256",
+            "restore_precondition_opcode_spec_sha256",
+            "restore_precondition_sha256", "dump_inventory_sha256",
+            "empty_projection_sha256",
             "runtime_privilege_access_sha256", "runtime_privilege_catalog_sha256",
             "runtime_privilege_catalog_artifact_sha256", "runtime_privilege_policy_sha256",
             "runtime_privilege_operator_policy_sha256", "uat_reconciliation_authority_sha256",
             "uat_reconciliation_activation_sha256", "sealed_security_projection_sha256",
-            "switch_transaction_sha256",
+            "guarded_switch_opcode_spec_sha256", "guarded_switch_sql_sha256",
+            "guarded_switch_runner_argv_template_sha256",
+            "guarded_switch_state_sha256", "guarded_switch_expected_identity_sha256",
+            "switch_receipt_sha256", "switch_effect_identity_sha256",
+            "pre_switch_content_proof_sha256",
         ), SHA256, code)
         _evidence_nonzero_digests(item, (
-            "capacity_receipt_sha256", "restore_receipt_sha256",
+            "staging_create_receipt_sha256", "restore_receipt_sha256",
         ), code)
+        restore_proof = validate_pg_restore_precondition_envelope(
+            item["restore_precondition"], code,
+        )
+        staging_proof = validate_staging_content_proof(
+            item["pre_switch_content_proof"], code,
+        )
+        switch_receipt = validate_side_effect_receipt_envelope(
+            item["switch_receipt"], code,
+        )
         _evidence_integers(item, ("source_artifact_bytes",), 1, code)
+        _evidence_integers(item, (
+            "restored_database_connection_limit_at_commit",
+            "restored_database_sessions_at_commit",
+            "restored_database_prepared_xacts_at_commit",
+            "candidate_database_quarantine_connection_limit_at_commit",
+            "candidate_database_quarantine_sessions_at_commit",
+            "candidate_database_quarantine_prepared_xacts_at_commit",
+        ), 0, code)
         _evidence_strings(item, (
             "snapshot_database_oid", "restored_database_oid",
             "candidate_database_quarantine_oid",
@@ -2575,6 +3058,99 @@ def validate_handler_evidence(
             item["restored_database_name"],
         }) != 3 or item["candidate_database_quarantine_oid"] != item["snapshot_database_oid"] \
                 or item["candidate_database_quarantine_oid"] == item["restored_database_oid"] \
+                or item["pre_switch_content_proof_sha256"] \
+                    != staging_proof["proof_sha256"] \
+                or item["switch_receipt_sha256"] \
+                    != switch_receipt["receipt_sha256"] \
+                or item["switch_effect_identity_sha256"] \
+                    != switch_receipt["after_identity_sha256"] \
+                or switch_receipt["label"] != "POSTGRESQL_RESTORE" \
+                or switch_receipt["side_effect_name"] != "DATABASE_SWITCH" \
+                or switch_receipt["before_identity_sha256"] \
+                    != staging_proof["proof_sha256"] \
+                or switch_receipt["argv_template_sha256"] \
+                    != digest_value({
+                        "opcode": "PG_RB_GUARDED_SWITCH_V3",
+                        "opcode_spec_sha256":
+                            item["guarded_switch_opcode_spec_sha256"],
+                        "sql_sha256": item["guarded_switch_sql_sha256"],
+                        "runner_argv_template_sha256":
+                            item["guarded_switch_runner_argv_template_sha256"],
+                    }) \
+                or item["guarded_switch_state_sha256"] != digest_value({
+                    "source_reconciliation_sha256":
+                        staging_proof["source_reconciliation_sha256"],
+                    "expected_content_report_sha256":
+                        staging_proof["source_database_report_sha256"],
+                    "migration_ledger_file_sha256":
+                        staging_proof["migration_ledger_file_sha256"],
+                    "migration_allowlist_sha256":
+                        staging_proof["migration_allowlist_sha256"],
+                    "expected_security_state_sha256":
+                        staging_proof["live_security_state_sha256"],
+                    "staging_content_proof_sha256": staging_proof["proof_sha256"],
+                    "staging_oid": staging_proof["staging_database_oid"],
+                }) \
+                or item["guarded_switch_expected_identity_sha256"] != digest_value({
+                    "active_name": item["restored_database_name"],
+                    "active_oid": item["restored_database_oid"],
+                    "quarantine_name": item["candidate_database_quarantine_name"],
+                    "quarantine_oid": item["candidate_database_quarantine_oid"],
+                    "state": "NEW_SEALED",
+                }) \
+                or item["restore_precondition_sha256"] \
+                    != restore_proof["restore_precondition_sha256"] \
+                or item["restore_precondition_opcode_spec_sha256"] \
+                    != restore_proof["opcode_spec_sha256"] \
+                or item["dump_inventory_sha256"] \
+                    != restore_proof["dump_inventory_sha256"] \
+                or item["empty_projection_sha256"] \
+                    != restore_proof["empty_projection_sha256"] \
+                or restore_proof["base_spec_sha256"] \
+                    != item["postgres_base_spec_sha256"] \
+                or restore_proof["binding_sha256"] \
+                    != item["staging_create_receipt_sha256"] \
+                or restore_proof["create_receipt_sha256"] \
+                    != item["staging_create_receipt_sha256"] \
+                or restore_proof["system_identifier"] != item["system_identifier"] \
+                or restore_proof["database"]["name"] \
+                    != item["staging_database_name"] \
+                or restore_proof["database"]["oid"] \
+                    != item["restored_database_oid"] \
+                or restore_proof["database"]["marker"] \
+                    != item["staging_database_marker"] \
+                or restore_proof["profile_sha256"] \
+                    != item["database_profile_sha256"] \
+                or staging_proof["binding_sha256"] \
+                    != item["privilege_reconcile_receipt_sha256"] \
+                or staging_proof["base_spec_sha256"] \
+                    != item["postgres_base_spec_sha256"] \
+                or staging_proof["runtime_plan_sha256"] \
+                    != item["runtime_plan_sha256"] \
+                or staging_proof["source_reconciliation_sha256"] \
+                    != item["source_reconciliation_sha256"] \
+                or staging_proof["source_database_report_sha256"] \
+                    != item["target_content_sha256"] \
+                or staging_proof["live_database_report_sha256"] \
+                    != item["target_content_sha256"] \
+                or staging_proof["migration_head"] != item["migration_head"] \
+                or staging_proof["migration_ledger_file_sha256"] \
+                    != item["migration_ledger_file_sha256"] \
+                or staging_proof["migration_allowlist_sha256"] \
+                    != item["migration_manifest_sha256"] \
+                or staging_proof["staging_database_name"] \
+                    != item["staging_database_name"] \
+                or staging_proof["staging_database_oid"] \
+                    != item["restored_database_oid"] \
+                or staging_proof["staging_database_marker"] \
+                    != item["staging_database_marker"] \
+                or staging_proof["system_identifier"] != item["system_identifier"] \
+                or staging_proof["candidate_database_name"] \
+                    != item["restored_database_name"] \
+                or staging_proof["candidate_database_oid"] \
+                    != item["snapshot_database_oid"] \
+                or staging_proof["candidate_database_marker"] \
+                    != item["restored_database_marker"] \
                 or item["restored_database_allow_connections_at_commit"] is not False \
                 or item["candidate_database_quarantine_allow_connections_at_commit"] is not False \
                 or any(item[field] != 0 for field in (
@@ -2683,6 +3259,10 @@ def validate_handler_evidence(
                 or item["candidate_database_quarantine_allow_connections"] is not False \
                 or item["candidate_database_quarantine_connection_limit"] != 0:
             reject(code)
+        _evidence_integers(item, (
+            "active_database_connection_limit",
+            "candidate_database_quarantine_connection_limit",
+        ), 0, code)
         validate_preactivation_content_proof(item["preactivation_content_proof"], code)
         _validate_canonical_json_text(item["rollback_postdeploy_receipt_json"], code)
         _validate_canonical_json_text(item["release_identity_json"], code)
@@ -2707,7 +3287,8 @@ def validate_handler_evidence(
                 "candidate_database_quarantine_name", "candidate_database_quarantine_oid",
                 "candidate_database_quarantine_present", "runtime_plan_sha256",
                 "restored_database_oid", "restored_database_marker", "system_identifier",
-                "migration_head", "migration_manifest_sha256", "restore_receipt_sha256",
+                "migration_head", "migration_ledger_file_sha256",
+                "migration_manifest_sha256", "restore_receipt_sha256",
                 "runtime_privilege_access_sha256", "runtime_privilege_catalog_sha256",
                 "runtime_privilege_catalog_artifact_sha256", "runtime_privilege_policy_sha256",
                 "runtime_privilege_operator_policy_sha256", "uat_reconciliation_authority_sha256",
@@ -2761,6 +3342,13 @@ def validate_handler_evidence(
                     or item["candidate_database_quarantine_sessions"] != 0 \
                     or item["candidate_database_quarantine_prepared_xacts"] != 0:
                 reject(code)
+            _evidence_integers(item, (
+                "active_connection_limit", "active_writer_session_count",
+                "active_unexpected_session_count", "active_prepared_xacts",
+                "candidate_database_quarantine_connection_limit",
+                "candidate_database_quarantine_sessions",
+                "candidate_database_quarantine_prepared_xacts",
+            ), 0, code)
             _evidence_strings(item, ("candidate_database_quarantine_name",), DATABASE_IDENTIFIER, code)
             _evidence_strings(item, (
                 "candidate_database_quarantine_oid", "restored_database_oid",
@@ -2771,7 +3359,8 @@ def validate_handler_evidence(
                 "candidate_database_quarantine_marker",
             ), CANDIDATE_QUARANTINE_MARKER, code)
             _evidence_strings(item, (
-                "runtime_plan_sha256", "migration_manifest_sha256",
+                "runtime_plan_sha256", "migration_ledger_file_sha256",
+                "migration_manifest_sha256",
                 "runtime_privilege_access_sha256", "runtime_privilege_catalog_sha256",
                 "runtime_privilege_catalog_artifact_sha256", "runtime_privilege_policy_sha256",
                 "runtime_privilege_operator_policy_sha256", "uat_reconciliation_authority_sha256",
@@ -2806,12 +3395,14 @@ def validate_handler_evidence(
                 reject(code)
     elif label == "MIGRATION_HEAD":
         item = exact(evidence, {
-            "migration_head", "migration_manifest_sha256", "database_identity_sha256",
+            "migration_head", "migration_ledger_file_sha256",
+            "migration_manifest_sha256", "database_identity_sha256",
             "postgresql_stage_result_sha256",
         }, code)
         _evidence_strings(item, ("migration_head",), MIGRATION, code)
         _evidence_strings(item, (
-            "migration_manifest_sha256", "database_identity_sha256",
+            "migration_ledger_file_sha256", "migration_manifest_sha256",
+            "database_identity_sha256",
             "postgresql_stage_result_sha256",
         ), SHA256, code)
     elif label in {"CADDY_IDENTITY", "POSTGRES_IDENTITY"}:
@@ -3669,7 +4260,7 @@ def _postgres_snapshot_manifest(inputs: CapabilityInputs) -> tuple[dict[str, Any
             or migration.get("head") != package_predecessor.get("migration_head") \
             or migration.get("manifest_file") != "migrations.txt" \
             or migration.get("manifest_sha256") \
-                != package_predecessor.get("migration_manifest_sha256") \
+                != (package_sources.get("snapshot_migrations") or {}).get("sha256") \
             or reconciliation.get("contract") \
                 != "chenyida-erp-backup-reconciliation/v1" \
             or reconciliation.get("file") != "reconciliation.json" \
@@ -3812,6 +4403,12 @@ def derive_pg_rollback_base_spec(inputs: CapabilityInputs) -> dict[str, Any]:
         "one_time": authority_source["one_time"],
         "mutation_scope_sha256": digest_value(authority_source["mutation_scope"]),
     }
+    migration_ledger = validate_migration_ledger(
+        inputs.raw("snapshot_migrations"),
+        expected_ledger_file_sha256=sources["snapshot_migrations"]["sha256"],
+        expected_allowlist_sha256=predecessor["migration_manifest_sha256"],
+        expected_head=predecessor["migration_head"],
+    )
     body = {
         "schema_version": 1,
         "contract": POSTGRES_BASE_SPEC_CONTRACT,
@@ -3854,7 +4451,8 @@ def derive_pg_rollback_base_spec(inputs: CapabilityInputs) -> dict[str, Any]:
                 reconciliation["source_reconciliation_sha256"],
             "target_database_report_sha256": reconciliation["database"]["report_sha256"],
             "migration_head": predecessor["migration_head"],
-            "migration_manifest_sha256": predecessor["migration_manifest_sha256"],
+            "migration_ledger_file_sha256": migration_ledger["ledger_file_sha256"],
+            "migration_allowlist_sha256": migration_ledger["allowlist_sha256"],
         },
         "profile": profile,
         "security": security,
@@ -3928,11 +4526,12 @@ def validate_pg_rollback_base_spec(value: Any) -> dict[str, Any]:
     snapshot = exact(spec.get("snapshot"), {
         "dump_sha256", "dump_bytes", "database_bytes", "snapshot_manifest_sha256",
         "source_reconciliation_sha256", "target_database_report_sha256",
-        "migration_head", "migration_manifest_sha256",
+        "migration_head", "migration_ledger_file_sha256", "migration_allowlist_sha256",
     }, code)
     if any(not SHA256.fullmatch(snapshot.get(field) or "") for field in (
         "dump_sha256", "snapshot_manifest_sha256", "source_reconciliation_sha256",
-        "target_database_report_sha256", "migration_manifest_sha256",
+        "target_database_report_sha256", "migration_ledger_file_sha256",
+        "migration_allowlist_sha256",
     )) or any(isinstance(snapshot.get(field), bool) or not isinstance(snapshot.get(field), int)
               or not 1 <= snapshot[field] <= 64 * 1024 * 1024 * 1024
               for field in ("dump_bytes", "database_bytes")) \
@@ -4003,6 +4602,15 @@ def _pg_literal(value: str) -> str:
     if not isinstance(value, str) or not 1 <= len(value.encode("utf-8")) <= 512 \
             or "\x00" in value or "\n" in value or "\r" in value:
         reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_OPCODE_SPEC_INVALID")
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _pg_guarded_literal(value: str) -> str:
+    """Quote only trusted generated JSON used by the fixed guarded-switch SQL."""
+    if not isinstance(value, str) \
+            or not 1 <= len(value.encode("utf-8")) <= 768 * 1024 \
+            or "\x00" in value or "\n" in value or "\r" in value:
+        reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID")
     return "'" + value.replace("'", "''") + "'"
 
 
@@ -5820,8 +6428,13 @@ def render_pg_sql(
         "PG_RB_OBSERVE_STATE_V1": {
             "journal_state_sha256", "observation_scope_sha256",
         },
+        "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1": {
+            "create_receipt_sha256", "staging_oid", "dump_inventory_sha256",
+            "expected_empty_projection_sha256",
+        },
         "PG_RB_ATOMIC_SWITCH_V1": {
             "privilege_receipt_sha256", "staging_oid", "before_observation_sha256",
+            "staging_content_proof_sha256",
             "expected_switched_identity_sha256",
         },
         "PG_RB_UNSEAL_ACTIVE_V1": {
@@ -5878,6 +6491,7 @@ CREATE DATABASE {staging} WITH OWNER postgres TEMPLATE template0
   LC_CTYPE {_pg_literal(profile['ctype'])}{collation}
   TABLESPACE pg_default CONNECTION LIMIT 0;
 COMMENT ON DATABASE {staging} IS {staging_marker};
+ALTER DATABASE {staging} SET default_transaction_read_only TO 'on';
 SELECT pg_catalog.pg_advisory_unlock(pg_catalog.hashtextextended({lock_name},0));
 """
     elif opcode == "PG_RB_OBSERVE_STATE_V1":
@@ -5900,6 +6514,72 @@ SELECT pg_catalog.pg_advisory_unlock(pg_catalog.hashtextextended({lock_name},0))
     WHERE d.datname IN ({active_name},{staging_name},{quarantine_name})
   ),'[]'::json)
 )::text;
+"""
+    elif opcode == "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1":
+        staging_oid = _pg_literal(bindings["staging_oid"])
+        sql = f"""WITH target AS (
+  SELECT d.*,c.system_identifier::text AS system_identifier
+  FROM pg_catalog.pg_database d CROSS JOIN pg_catalog.pg_control_system() c
+  WHERE d.datname=current_database() AND d.oid::text={staging_oid}
+), projection AS (
+  SELECT
+    (SELECT count(*)::integer FROM pg_catalog.pg_namespace n
+     WHERE n.nspname NOT IN ('pg_catalog','information_schema','public')
+       AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%')
+      AS user_schema_count,
+    (SELECT count(*)::integer FROM pg_catalog.pg_class c
+     JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+     WHERE n.nspname NOT IN ('pg_catalog','information_schema')
+       AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+       AND c.relkind IN ('r','p','v','m','f')) AS relation_count,
+    (SELECT count(*)::integer FROM pg_catalog.pg_class c
+     JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+     WHERE n.nspname NOT IN ('pg_catalog','information_schema')
+       AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+       AND c.relkind='S') AS sequence_count,
+    (SELECT count(*)::integer FROM pg_catalog.pg_proc p
+     JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+     WHERE n.nspname NOT IN ('pg_catalog','information_schema')
+       AND n.nspname NOT LIKE 'pg_temp_%') AS routine_count,
+    (SELECT count(*)::integer FROM pg_catalog.pg_type t
+     JOIN pg_catalog.pg_namespace n ON n.oid=t.typnamespace
+     WHERE n.nspname NOT IN ('pg_catalog','information_schema')
+       AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp_%'
+       AND t.typrelid=0 AND t.typelem=0) AS standalone_type_count,
+    (SELECT count(*)::integer FROM pg_catalog.pg_extension e
+     WHERE e.extname<>'plpgsql') AS unexpected_extension_count,
+    (SELECT count(*)::integer FROM pg_catalog.pg_largeobject_metadata)
+      AS large_object_count,
+    (pg_catalog.to_regclass('public.schema_migrations') IS NOT NULL)
+      AS schema_migrations_present
+)
+SELECT pg_catalog.jsonb_build_object(
+  'system_identifier',target.system_identifier,
+  'server_version_num',current_setting('server_version_num'),
+  'database',pg_catalog.jsonb_build_object(
+    'name',target.datname,'oid',target.oid::text,
+    'marker',pg_catalog.shobj_description(target.oid,'pg_database'),
+    'owner',pg_catalog.pg_get_userbyid(target.datdba),
+    'allow_connections',target.datallowconn,'connection_limit',target.datconnlimit,
+    'default_transaction_read_only',EXISTS(
+      SELECT 1 FROM pg_catalog.pg_db_role_setting s
+      WHERE s.setdatabase=target.oid AND s.setrole=0
+        AND 'default_transaction_read_only=on'=ANY(s.setconfig)),
+    'sessions',(SELECT count(*)::integer FROM pg_catalog.pg_stat_activity a
+                WHERE a.datid=target.oid AND a.pid<>pg_catalog.pg_backend_pid()),
+    'prepared_xacts',(SELECT count(*)::integer FROM pg_catalog.pg_prepared_xacts x
+                      WHERE x.database=target.datname)),
+  'profile',pg_catalog.jsonb_build_object(
+    'encoding',pg_catalog.pg_encoding_to_char(target.encoding),
+    'locale_provider',CASE target.datlocprovider WHEN 'c' THEN 'libc'
+      WHEN 'i' THEN 'icu' WHEN 'b' THEN 'builtin' ELSE 'unknown' END,
+    'collate',target.datcollate,'ctype',target.datctype,
+    'collation_version',target.datcollversion,
+    'tablespace',(SELECT t.spcname FROM pg_catalog.pg_tablespace t
+                  WHERE t.oid=target.dattablespace)),
+  'projection',pg_catalog.to_jsonb(projection)
+)::text
+FROM target CROSS JOIN projection;
 """
     elif opcode == "PG_RB_ATOMIC_SWITCH_V1":
         staging_oid = _pg_literal(bindings["staging_oid"])
@@ -5987,16 +6667,20 @@ def derive_pg_opcode_spec(
     phase = {
         "PG_RB_CREATE_STAGING_V1": "create",
         "PG_RB_OBSERVE_STATE_V1": "observe",
+        "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1": "restoreprecondition",
         "PG_RB_ATOMIC_SWITCH_V1": "switch",
         "PG_RB_UNSEAL_ACTIVE_V1": "unseal",
     }[opcode]
-    effectful = opcode != "PG_RB_OBSERVE_STATE_V1"
+    effectful = opcode not in POSTGRES_READ_ONLY_SQL_OPCODES
+    database = base["databases"]["staging_name"] \
+        if opcode == "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1" \
+        else base["postgres"]["management_database"]
     body = {
         "schema_version": 1,
         "contract": POSTGRES_OPCODE_SPEC_CONTRACT,
         "opcode": opcode,
         "base_spec_sha256": base["base_spec_sha256"],
-        "database": base["postgres"]["management_database"],
+        "database": database,
         "phase": phase,
         "timeout_seconds": 300,
         "effectful": effectful,
@@ -6004,7 +6688,7 @@ def derive_pg_opcode_spec(
         "sql_sha256": hashlib.sha256(raw).hexdigest(),
         "argv_template_sha256": digest_value([
             "DOCKER_EXEC_POSTGRES_PSQL_V1", base["postgres"]["container_id"],
-            base["postgres"]["management_database"], phase,
+            database, phase,
         ]),
     }
     return validate_pg_opcode_spec(
@@ -6025,9 +6709,15 @@ def validate_pg_opcode_spec(
     if spec.get("schema_version") != 1 or spec.get("contract") != POSTGRES_OPCODE_SPEC_CONTRACT \
             or spec.get("opcode") not in POSTGRES_SQL_OPCODES \
             or spec.get("base_spec_sha256") != base["base_spec_sha256"] \
-            or spec.get("database") != base["postgres"]["management_database"] \
+            or spec.get("database") != (
+                base["databases"]["staging_name"]
+                if spec.get("opcode") == "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1"
+                else base["postgres"]["management_database"]
+            ) \
             or spec.get("timeout_seconds") != 300 \
-            or spec.get("effectful") != (spec["opcode"] != "PG_RB_OBSERVE_STATE_V1") \
+            or spec.get("effectful") != (
+                spec["opcode"] not in POSTGRES_READ_ONLY_SQL_OPCODES
+            ) \
             or any(not SHA256.fullmatch(spec.get(field) or "") for field in (
                 "sql_sha256", "argv_template_sha256", "opcode_spec_sha256",
             )) \
@@ -6037,6 +6727,7 @@ def validate_pg_opcode_spec(
     expected_phase = {
         "PG_RB_CREATE_STAGING_V1": "create",
         "PG_RB_OBSERVE_STATE_V1": "observe",
+        "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1": "restoreprecondition",
         "PG_RB_ATOMIC_SWITCH_V1": "switch",
         "PG_RB_UNSEAL_ACTIVE_V1": "unseal",
     }[spec["opcode"]]
@@ -6046,7 +6737,7 @@ def validate_pg_opcode_spec(
     if hashlib.sha256(raw).hexdigest() != spec["sql_sha256"] \
             or digest_value([
                 "DOCKER_EXEC_POSTGRES_PSQL_V1", base["postgres"]["container_id"],
-                base["postgres"]["management_database"], expected_phase,
+                spec["database"], expected_phase,
             ]) != spec["argv_template_sha256"]:
         reject(code)
     return spec
@@ -6061,6 +6752,8 @@ def derive_pg_dump_opcode_spec(
         "PG_RB_LIST_DUMP_V1": {"dump_sha256", "dump_bytes"},
         "PG_RB_RESTORE_DUMP_V1": {
             "create_receipt_sha256", "staging_oid", "before_content_observation_sha256",
+            "dump_inventory_sha256", "restore_precondition_opcode_spec_sha256",
+            "restore_precondition_sha256", "empty_projection_sha256",
             "dump_sha256", "dump_bytes", "expected_content_sha256",
         },
     }
@@ -6073,7 +6766,10 @@ def derive_pg_dump_opcode_spec(
                    or bindings[field] == ZERO_SHA256
                    for field in bindings if field.endswith("_sha256")) \
             or "staging_oid" in bindings \
-                and OID.fullmatch(bindings.get("staging_oid") or "") is None:
+                and OID.fullmatch(bindings.get("staging_oid") or "") is None \
+            or opcode == "PG_RB_RESTORE_DUMP_V1" \
+                and bindings.get("empty_projection_sha256") \
+                    != digest_value(postgres_empty_restore_projection()):
         reject(code)
     restore = opcode == "PG_RB_RESTORE_DUMP_V1"
     database = base["databases"]["staging_name"] if restore else None
@@ -6082,6 +6778,7 @@ def derive_pg_dump_opcode_spec(
     argv = [
         "DOCKER_EXEC_POSTGRES_PG_RESTORE_V1", base["postgres"]["container_id"],
         database, phase, "CUSTOM_DUMP_FD", "NO_OWNER", "NO_ACL", "NO_TABLESPACES",
+        *(["SESSION_READ_WRITE_OVERRIDE_FIXED"] if restore else []),
         "SINGLE_TRANSACTION" if restore else "LIST_ONLY",
     ]
     body = {
@@ -6138,6 +6835,8 @@ def derive_pg_dump_opcode_spec_body(
         "PG_RB_LIST_DUMP_V1": {"dump_sha256", "dump_bytes"},
         "PG_RB_RESTORE_DUMP_V1": {
             "create_receipt_sha256", "staging_oid", "before_content_observation_sha256",
+            "dump_inventory_sha256", "restore_precondition_opcode_spec_sha256",
+            "restore_precondition_sha256", "empty_projection_sha256",
             "dump_sha256", "dump_bytes", "expected_content_sha256",
         },
     }
@@ -6150,7 +6849,10 @@ def derive_pg_dump_opcode_spec_body(
                    or bindings[field] == ZERO_SHA256
                    for field in bindings if field.endswith("_sha256")) \
             or "staging_oid" in bindings \
-                and OID.fullmatch(bindings.get("staging_oid") or "") is None:
+                and OID.fullmatch(bindings.get("staging_oid") or "") is None \
+            or opcode == "PG_RB_RESTORE_DUMP_V1" \
+                and bindings.get("empty_projection_sha256") \
+                    != digest_value(postgres_empty_restore_projection()):
         reject(code)
     restore = opcode == "PG_RB_RESTORE_DUMP_V1"
     database = base["databases"]["staging_name"] if restore else None
@@ -6163,6 +6865,7 @@ def derive_pg_dump_opcode_spec_body(
         "argv_template_sha256": digest_value([
             "DOCKER_EXEC_POSTGRES_PG_RESTORE_V1", base["postgres"]["container_id"],
             database, phase, "CUSTOM_DUMP_FD", "NO_OWNER", "NO_ACL", "NO_TABLESPACES",
+            *(["SESSION_READ_WRITE_OVERRIDE_FIXED"] if restore else []),
             "SINGLE_TRANSACTION" if restore else "LIST_ONLY",
         ]),
     }
@@ -6544,6 +7247,7 @@ def derive_pg_reconcile_opcode_spec(
         "argv_template_sha256": digest_value([
             "DOCKER_EXEC_POSTGRES_PSQL_V1", base["postgres"]["container_id"],
             base["databases"]["staging_name"], "reconcile",
+            "SESSION_READ_WRITE_OVERRIDE_FIXED",
         ]),
     }
     return validate_pg_reconcile_opcode_spec(
@@ -6579,6 +7283,407 @@ def validate_pg_reconcile_opcode_spec(
             or digest_value([
                 "DOCKER_EXEC_POSTGRES_PSQL_V1", base["postgres"]["container_id"],
                 base["databases"]["staging_name"], "reconcile",
+                "SESSION_READ_WRITE_OVERRIDE_FIXED",
+            ]) != spec["argv_template_sha256"]:
+        reject(code)
+    return spec
+
+
+def _postgres_guarded_switch_material(
+        base: dict[str, Any], inputs: CapabilityInputs, *, restored_oid: str,
+) -> dict[str, Any]:
+    """Load only trusted, plaintext-free sources used by the guarded switch."""
+    code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID"
+    base = validate_pg_rollback_base_spec(base)
+    if OID.fullmatch(restored_oid or "") is None:
+        reject(code)
+    try:
+        inputs.fd("snapshot_reconciliation")
+        reconciliation = inputs.json("snapshot_reconciliation")
+        report_text = reconciliation["database"]["report"]
+        migration_raw = inputs.raw("snapshot_migrations")
+    except (KeyError, TypeError, FixedExecutorError):
+        reject(code)
+    if not isinstance(report_text, str):
+        reject(code)
+    try:
+        report_raw = report_text.encode("utf-8", "strict")
+    except UnicodeError:
+        reject(code)
+    report = validate_database_reconciliation_report(report_raw)
+    migration = validate_migration_ledger(
+        migration_raw,
+        expected_ledger_file_sha256=
+            base["snapshot"]["migration_ledger_file_sha256"],
+        expected_allowlist_sha256=
+            base["snapshot"]["migration_allowlist_sha256"],
+        expected_head=base["snapshot"]["migration_head"],
+    )
+    if report["sha256"] != base["snapshot"]["target_database_report_sha256"]:
+        reject(code)
+    security = derive_expected_runtime_privilege_state(
+        inputs, base, {
+            "database_oid": restored_oid,
+            "mode": "SEALED_STAGING",
+            "database_name": base["databases"]["staging_name"],
+            "marker": base["databases"]["staging_marker"],
+            "connection_limit": 0,
+        },
+    )
+    return {
+        "report_raw": report_raw,
+        "report": report,
+        "migration_raw": migration_raw,
+        "migration": migration,
+        "security": security,
+        "security_state_sha256": digest_value(security),
+    }
+
+
+def _render_postgres_guarded_content_check(report_raw: bytes) -> str:
+    """Recompute the accepted report in the trusted staging proof session."""
+    validate_database_reconciliation_report(report_raw)
+    rows = [line.split("\t") for line in report_raw[:-1].decode("utf-8").split("\n")]
+    relations = [fields for fields in rows if fields[0] == "RELATION"]
+    sequences = [fields for fields in rows if fields[0] == "SEQUENCE"]
+    extensions = [fields[1:] for fields in rows if fields[0] == "EXTENSION"]
+    large_objects = next(fields for fields in rows if fields[0] == "LARGE_OBJECTS")
+
+    def values(items: list[list[str]], indexes: tuple[int, ...]) -> str:
+        return ",\n      ".join(
+            "(" + ",".join(_pg_literal(item[index]) for index in indexes) + ")"
+            for item in items
+        )
+
+    relation_loop = ""
+    if relations:
+        relation_loop = f"""
+  FOR expected IN
+    SELECT * FROM (VALUES
+      {values(relations, (1, 2, 3))}
+    ) AS source(identity_hex,row_count,row_sha256)
+  LOOP
+    SELECT namespace.nspname,relation.relname
+      INTO STRICT object_schema,object_name
+    FROM pg_catalog.pg_class relation
+    JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace
+    WHERE relation.relkind IN ('r','p','m') AND NOT relation.relispartition
+      AND namespace.nspname<>'information_schema' AND namespace.nspname!~'^pg_'
+      AND pg_catalog.encode(pg_catalog.convert_to(
+        namespace.nspname||'.'||relation.relname,'UTF8'),'hex')=expected.identity_hex;
+    EXECUTE pg_catalog.format($query$
+      WITH row_hashes AS (
+        SELECT pg_catalog.encode(pg_catalog.sha256(
+          pg_catalog.convert_to(pg_catalog.to_jsonb(source_row)::text,'UTF8')),
+          'hex') AS value
+        FROM %I.%I AS source_row
+      ), aggregate_hash AS (
+        SELECT count(*)::text AS row_count,
+          pg_catalog.coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,1,16))::bit(64)::bigint)::numeric),0)::text AS h1,
+          pg_catalog.coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,17,16))::bit(64)::bigint)::numeric),0)::text AS h2,
+          pg_catalog.coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,33,16))::bit(64)::bigint)::numeric),0)::text AS h3,
+          pg_catalog.coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,49,16))::bit(64)::bigint)::numeric),0)::text AS h4
+        FROM row_hashes
+      )
+      SELECT row_count,pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+        pg_catalog.concat_ws(':',row_count,h1,h2,h3,h4),'UTF8')),'hex')
+      FROM aggregate_hash
+    $query$,object_schema,object_name) INTO actual_count,actual_hash;
+    IF actual_count<>expected.row_count OR actual_hash<>expected.row_sha256 THEN
+      RAISE EXCEPTION 'guarded switch relation content mismatch';
+    END IF;
+  END LOOP;"""
+    sequence_loop = ""
+    if sequences:
+        sequence_loop = f"""
+  FOR expected IN
+    SELECT * FROM (VALUES
+      {values(sequences, (1, 2, 3))}
+    ) AS source(identity_hex,last_value,is_called)
+  LOOP
+    SELECT namespace.nspname,relation.relname
+      INTO STRICT object_schema,object_name
+    FROM pg_catalog.pg_class relation
+    JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace
+    WHERE relation.relkind='S' AND namespace.nspname<>'information_schema'
+      AND namespace.nspname!~'^pg_'
+      AND pg_catalog.encode(pg_catalog.convert_to(
+        namespace.nspname||'.'||relation.relname,'UTF8'),'hex')=expected.identity_hex;
+    EXECUTE pg_catalog.format(
+      'SELECT last_value::text,is_called::text FROM %I.%I',
+      object_schema,object_name) INTO actual_count,actual_hash;
+    IF actual_count<>expected.last_value
+       OR actual_hash NOT IN (expected.is_called,
+         CASE expected.is_called WHEN 'true' THEN 't' WHEN 'false' THEN 'f'
+           WHEN 't' THEN 'true' ELSE 'false' END) THEN
+      RAISE EXCEPTION 'guarded switch sequence content mismatch';
+    END IF;
+  END LOOP;"""
+    extension_json = json.dumps(extensions, ensure_ascii=False, separators=(",", ":"))
+    return f"""
+SET TimeZone='UTC';
+SET DateStyle='ISO, YMD';
+SET IntervalStyle='iso_8601';
+SET extra_float_digits=3;
+SET bytea_output='hex';
+SET default_transaction_read_only=on;
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY;
+SET LOCAL lock_timeout='5s';
+SET LOCAL statement_timeout='240s';
+SET LOCAL idle_in_transaction_session_timeout='15s';
+DO $cyd_guard_content$
+DECLARE
+  expected record;
+  object_schema text;
+  object_name text;
+  actual_count text;
+  actual_hash text;
+BEGIN
+  IF (SELECT count(*) FROM pg_catalog.pg_class relation
+      JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace
+      WHERE relation.relkind IN ('r','p','m') AND NOT relation.relispartition
+        AND namespace.nspname<>'information_schema' AND namespace.nspname!~'^pg_')
+      <> {len(relations)} THEN
+    RAISE EXCEPTION 'guarded switch relation inventory mismatch';
+  END IF;{relation_loop}
+  IF (SELECT count(*) FROM pg_catalog.pg_class relation
+      JOIN pg_catalog.pg_namespace namespace ON namespace.oid=relation.relnamespace
+      WHERE relation.relkind='S' AND namespace.nspname<>'information_schema'
+        AND namespace.nspname!~'^pg_') <> {len(sequences)} THEN
+    RAISE EXCEPTION 'guarded switch sequence inventory mismatch';
+  END IF;{sequence_loop}
+  IF pg_catalog.coalesce((
+      SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
+        pg_catalog.encode(pg_catalog.convert_to(extension.extname,'UTF8'),'hex'),
+        pg_catalog.encode(pg_catalog.convert_to(extension.extversion,'UTF8'),'hex'),
+        pg_catalog.encode(pg_catalog.convert_to(namespace.nspname,'UTF8'),'hex'))
+        ORDER BY extension.extname COLLATE "C")
+      FROM pg_catalog.pg_extension extension
+      JOIN pg_catalog.pg_namespace namespace ON namespace.oid=extension.extnamespace
+      WHERE extension.extname<>'plpgsql'), '[]'::jsonb)
+      <> {_pg_guarded_literal(extension_json)}::jsonb THEN
+    RAISE EXCEPTION 'guarded switch extension inventory mismatch';
+  END IF;
+  IF (SELECT count(*)::text FROM pg_catalog.pg_largeobject_metadata)
+      <> {_pg_literal(large_objects[1])}
+     OR {_pg_literal(large_objects[2])}<>'0'
+     OR pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+       '0:0:0:0:0:0','UTF8')),'hex') <> {_pg_literal(large_objects[3])} THEN
+    RAISE EXCEPTION 'guarded switch large object inventory mismatch';
+  END IF;
+END
+$cyd_guard_content$;
+COMMIT;
+SET default_transaction_read_only=off;
+"""
+
+
+def render_pg_guarded_switch_sql(
+        base: dict[str, Any], inputs: CapabilityInputs, bindings: dict[str, Any],
+) -> bytes:
+    """Render one closed psql session that re-proves, fences and switches."""
+    code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID"
+    base = validate_pg_rollback_base_spec(base)
+    bindings = exact(bindings, {
+        "privilege_receipt_sha256", "staging_oid", "before_observation_sha256",
+        "staging_content_proof_sha256", "expected_switched_identity_sha256",
+        "source_reconciliation_sha256", "expected_content_report_sha256",
+        "migration_ledger_file_sha256", "migration_allowlist_sha256",
+        "expected_security_state_sha256", "guarded_state_sha256",
+    }, code)
+    if OID.fullmatch(bindings.get("staging_oid") or "") is None \
+            or any(SHA256.fullmatch(bindings.get(field) or "") is None
+                   or bindings[field] == ZERO_SHA256
+                   for field in bindings if field != "staging_oid"):
+        reject(code)
+    material = _postgres_guarded_switch_material(
+        base, inputs, restored_oid=bindings["staging_oid"],
+    )
+    expected_bindings = {
+        "source_reconciliation_sha256":
+            base["snapshot"]["source_reconciliation_sha256"],
+        "expected_content_report_sha256": material["report"]["sha256"],
+        "migration_ledger_file_sha256":
+            material["migration"]["ledger_file_sha256"],
+        "migration_allowlist_sha256": material["migration"]["allowlist_sha256"],
+        "expected_security_state_sha256": material["security_state_sha256"],
+    }
+    guarded_state_sha256 = digest_value({
+        **expected_bindings,
+        "staging_content_proof_sha256": bindings["staging_content_proof_sha256"],
+        "staging_oid": bindings["staging_oid"],
+    })
+    expected_switched_identity_sha256 = digest_value({
+        "active_name": base["databases"]["active_name"],
+        "active_oid": bindings["staging_oid"],
+        "quarantine_name": base["databases"]["quarantine_name"],
+        "quarantine_oid": base["databases"]["candidate_oid"],
+        "state": "NEW_SEALED",
+    })
+    if any(bindings[field] != expected for field, expected in expected_bindings.items()) \
+            or bindings["guarded_state_sha256"] != guarded_state_sha256 \
+            or bindings["expected_switched_identity_sha256"] \
+                != expected_switched_identity_sha256:
+        reject(code)
+    migration_records = [
+        {"checksum": line.split("  ", 1)[0], "version": line.split("  ", 1)[1]}
+        for line in material["migration_raw"].decode("utf-8").splitlines()
+    ]
+    migration_json = json.dumps(
+        migration_records, ensure_ascii=False, separators=(",", ":"),
+    )
+    expected_security_json = canonical(material["security"]).decode("utf-8").rstrip("\n")
+    security_sql = embedded_postgres_sql(
+        POSTGRES_SECURITY_SQL_ZLIB_BASE64, POSTGRES_SECURITY_SQL_SHA256,
+    )
+    suffix = b")::text;\n\nCOMMIT;\n"
+    if security_sql.count(suffix) != 1:
+        reject(code)
+    security_capture = security_sql.replace(
+        suffix,
+        b")::text AS runtime_privilege_state\n"
+        b"\\gset cyd_guard_\n\nCOMMIT;\n",
+    ).decode("utf-8")
+    names = base["databases"]
+    postgres = base["postgres"]
+    active = _pg_identifier(names["active_name"])
+    staging = _pg_identifier(names["staging_name"])
+    quarantine = _pg_identifier(names["quarantine_name"])
+    active_name = _pg_literal(names["active_name"])
+    staging_name = _pg_literal(names["staging_name"])
+    quarantine_name = _pg_literal(names["quarantine_name"])
+    candidate_oid = _pg_literal(names["candidate_oid"])
+    staging_oid = _pg_literal(bindings["staging_oid"])
+    candidate_marker = _pg_literal(names["candidate_marker"])
+    staging_marker = _pg_literal(names["staging_marker"])
+    quarantine_marker = _pg_literal(names["quarantine_marker"])
+    system_identifier = _pg_literal(postgres["system_identifier"])
+    lock_name = _pg_literal(f"chenyida-erp-uat-rollback:{base['runtime_plan_sha256']}")
+    content_check = _render_postgres_guarded_content_check(material["report_raw"])
+    sql = f"""SELECT pg_catalog.pg_advisory_lock(
+  pg_catalog.hashtextextended({lock_name},0));
+{content_check}
+{security_capture}
+SELECT (:'cyd_guard_runtime_privilege_state'::jsonb=
+  {_pg_guarded_literal(expected_security_json)}::jsonb) AS cyd_guard_security_equal
+\gset
+\if :cyd_guard_security_equal
+\else
+  \echo 'guarded switch runtime privilege mismatch'
+  \quit 3
+\endif
+BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY;
+SET LOCAL lock_timeout='5s';
+SET LOCAL statement_timeout='60s';
+DO $cyd_guard_migration$
+BEGIN
+  IF pg_catalog.coalesce((SELECT pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object('checksum',checksum,'version',version)
+      ORDER BY version COLLATE "C") FROM public.schema_migrations),'[]'::jsonb)
+      <> {_pg_guarded_literal(migration_json)}::jsonb THEN
+    RAISE EXCEPTION 'guarded switch migration ledger mismatch';
+  END IF;
+END
+$cyd_guard_migration$;
+COMMIT;
+SET default_transaction_read_only=off;
+\connect postgres
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SET LOCAL statement_timeout='60s';
+SET LOCAL idle_in_transaction_session_timeout='15s';
+SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended({lock_name},0));
+DO $cyd_guard_switch$
+BEGIN
+  IF (SELECT system_identifier::text FROM pg_catalog.pg_control_system())
+       <> {system_identifier}
+     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_database d
+       WHERE d.datname={staging_name} AND d.oid::text={staging_oid}
+         AND pg_catalog.shobj_description(d.oid,'pg_database')={staging_marker}
+         AND d.datallowconn=true AND d.datconnlimit=0
+         AND EXISTS (SELECT 1 FROM pg_catalog.pg_db_role_setting s
+           WHERE s.setdatabase=d.oid AND s.setrole=0
+             AND 'default_transaction_read_only=on'=ANY(s.setconfig)))
+     OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_database d
+       WHERE d.datname={active_name} AND d.oid::text={candidate_oid}
+         AND pg_catalog.shobj_description(d.oid,'pg_database')={candidate_marker}
+         AND d.datallowconn=false AND d.datconnlimit=0)
+     OR EXISTS (SELECT 1 FROM pg_catalog.pg_database WHERE datname={quarantine_name})
+     OR EXISTS (SELECT 1 FROM pg_catalog.pg_stat_activity
+       WHERE datname IN ({active_name},{staging_name},{quarantine_name}))
+     OR EXISTS (SELECT 1 FROM pg_catalog.pg_prepared_xacts
+       WHERE database IN ({active_name},{staging_name},{quarantine_name}))
+  THEN RAISE EXCEPTION 'guarded switch commit precondition mismatch'; END IF;
+END
+$cyd_guard_switch$;
+ALTER DATABASE {staging} ALLOW_CONNECTIONS false;
+ALTER DATABASE {active} RENAME TO {quarantine};
+ALTER DATABASE {staging} RENAME TO {active};
+COMMENT ON DATABASE {quarantine} IS {quarantine_marker};
+COMMENT ON DATABASE {active} IS {candidate_marker};
+COMMIT;
+SELECT true;
+""".encode("utf-8")
+    if len(sql) > base["runtime_limits"]["sql_max_bytes"]:
+        reject(code)
+    return sql
+
+
+def derive_pg_guarded_switch_opcode_spec(
+        base: dict[str, Any], inputs: CapabilityInputs, bindings: dict[str, Any],
+) -> dict[str, Any]:
+    base = validate_pg_rollback_base_spec(base)
+    raw = render_pg_guarded_switch_sql(base, inputs, bindings)
+    body = {
+        "schema_version": 1,
+        "contract": POSTGRES_GUARDED_SWITCH_OPCODE_SPEC_CONTRACT,
+        "opcode": "PG_RB_GUARDED_SWITCH_V3",
+        "base_spec_sha256": base["base_spec_sha256"],
+        "database": base["databases"]["staging_name"],
+        "phase": "guardedswitch",
+        "timeout_seconds": 300,
+        "effectful": True,
+        "bindings": bindings,
+        "sql_sha256": hashlib.sha256(raw).hexdigest(),
+        "argv_template_sha256": digest_value([
+            "DOCKER_EXEC_POSTGRES_PSQL_V1", base["postgres"]["container_id"],
+            base["databases"]["staging_name"], "guardedswitch",
+            "SESSION_READ_WRITE_OVERRIDE_FIXED",
+        ]),
+    }
+    return validate_pg_guarded_switch_opcode_spec(
+        {**body, "opcode_spec_sha256": digest_value(body)}, base=base, inputs=inputs,
+    )
+
+
+def validate_pg_guarded_switch_opcode_spec(
+        value: Any, *, base: dict[str, Any], inputs: CapabilityInputs,
+) -> dict[str, Any]:
+    code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID"
+    base = validate_pg_rollback_base_spec(base)
+    spec = exact(value, {
+        "schema_version", "contract", "opcode", "base_spec_sha256", "database",
+        "phase", "timeout_seconds", "effectful", "bindings", "sql_sha256",
+        "argv_template_sha256", "opcode_spec_sha256",
+    }, code)
+    if spec.get("schema_version") != 1 \
+            or spec.get("contract") != POSTGRES_GUARDED_SWITCH_OPCODE_SPEC_CONTRACT \
+            or spec.get("opcode") != "PG_RB_GUARDED_SWITCH_V3" \
+            or spec.get("base_spec_sha256") != base["base_spec_sha256"] \
+            or spec.get("database") != base["databases"]["staging_name"] \
+            or spec.get("phase") != "guardedswitch" \
+            or spec.get("timeout_seconds") != 300 or spec.get("effectful") is not True \
+            or any(SHA256.fullmatch(spec.get(field) or "") is None
+                   for field in ("sql_sha256", "argv_template_sha256", "opcode_spec_sha256")) \
+            or digest_value(without(spec, "opcode_spec_sha256")) \
+                != spec["opcode_spec_sha256"]:
+        reject(code)
+    raw = render_pg_guarded_switch_sql(base, inputs, spec.get("bindings"))
+    if hashlib.sha256(raw).hexdigest() != spec["sql_sha256"] \
+            or digest_value([
+                "DOCKER_EXEC_POSTGRES_PSQL_V1", base["postgres"]["container_id"],
+                base["databases"]["staging_name"], "guardedswitch",
+                "SESSION_READ_WRITE_OVERRIDE_FIXED",
             ]) != spec["argv_template_sha256"]:
         reject(code)
     return spec
@@ -6634,6 +7739,221 @@ def parse_pg_state_observation(
         "observed_at": observed_at,
     }
     return {**body, "observation_sha256": digest_value(body)}
+
+
+def postgres_empty_restore_projection() -> dict[str, Any]:
+    return {
+        "user_schema_count": 0,
+        "relation_count": 0,
+        "sequence_count": 0,
+        "routine_count": 0,
+        "standalone_type_count": 0,
+        "unexpected_extension_count": 0,
+        "large_object_count": 0,
+        "schema_migrations_present": False,
+    }
+
+
+def validate_pg_restore_precondition_envelope(
+        value: Any,
+        code: str = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_RESTORE_PRECONDITION_INVALID",
+) -> dict[str, Any]:
+    """Validate the durable self-contained proof before context rebinding."""
+    item = exact(value, {
+        "schema_version", "contract", "base_spec_sha256", "opcode_spec_sha256",
+        "binding_sha256", "create_receipt_sha256", "dump_inventory_sha256",
+        "system_identifier", "server_version_num", "database",
+        "database_identity_sha256", "profile", "profile_sha256",
+        "empty_projection", "empty_projection_sha256", "raw_observation_sha256",
+        "restore_precondition_sha256",
+    }, code)
+    database = exact(item["database"], {
+        "name", "oid", "marker", "owner", "allow_connections", "connection_limit",
+        "default_transaction_read_only", "sessions", "prepared_xacts",
+    }, code)
+    profile = exact(item["profile"], {
+        "encoding", "locale_provider", "collate", "ctype", "collation_version",
+        "default_tablespace",
+    }, code)
+    projection = exact(
+        item["empty_projection"], set(postgres_empty_restore_projection()), code,
+    )
+    count_fields = (
+        "user_schema_count", "relation_count", "sequence_count", "routine_count",
+        "standalone_type_count", "unexpected_extension_count", "large_object_count",
+    )
+    if type(item["schema_version"]) is not int or item["schema_version"] != 1 \
+            or item["contract"] != POSTGRES_RESTORE_PRECONDITION_CONTRACT \
+            or item["binding_sha256"] != item["create_receipt_sha256"] \
+            or not SYSTEM_IDENTIFIER.fullmatch(item.get("system_identifier") or "") \
+            or not re.fullmatch(r"17[0-9]{4}", item.get("server_version_num") or "") \
+            or not DATABASE_IDENTIFIER.fullmatch(database.get("name") or "") \
+            or not OID.fullmatch(database.get("oid") or "") \
+            or not RESTORED_STAGING_MARKER.fullmatch(database.get("marker") or "") \
+            or database.get("owner") != "postgres" \
+            or database.get("allow_connections") is not True \
+            or type(database.get("connection_limit")) is not int \
+            or database.get("connection_limit") != 0 \
+            or database.get("default_transaction_read_only") is not True \
+            or type(database.get("sessions")) is not int \
+            or database.get("sessions") != 0 \
+            or type(database.get("prepared_xacts")) is not int \
+            or database.get("prepared_xacts") != 0 \
+            or any(not isinstance(profile.get(field), str)
+                   or not 1 <= len(profile[field]) <= 120
+                   for field in ("encoding", "locale_provider", "collate", "ctype")) \
+            or profile.get("collation_version") is not None \
+                and (not isinstance(profile["collation_version"], str)
+                     or not 1 <= len(profile["collation_version"]) <= 120) \
+            or profile.get("locale_provider") != "libc" \
+            or profile.get("default_tablespace") != "pg_default" \
+            or any(type(projection.get(field)) is not int
+                   for field in count_fields) \
+            or projection.get("schema_migrations_present") is not False \
+            or projection != postgres_empty_restore_projection() \
+            or item["empty_projection_sha256"] != digest_value(projection) \
+            or item["profile_sha256"] != digest_value(profile) \
+            or item["database_identity_sha256"] != digest_value({
+                "system_identifier": item["system_identifier"], **database,
+            }) \
+            or any(SHA256.fullmatch(item.get(field) or "") is None
+                   or item[field] == ZERO_SHA256 for field in (
+                       "base_spec_sha256", "opcode_spec_sha256", "binding_sha256",
+                       "create_receipt_sha256", "dump_inventory_sha256",
+                       "database_identity_sha256", "profile_sha256",
+                       "empty_projection_sha256", "raw_observation_sha256",
+                       "restore_precondition_sha256",
+                   )) \
+            or digest_value(without(item, "restore_precondition_sha256")) \
+                != item["restore_precondition_sha256"]:
+        reject(code)
+    return item
+
+
+def parse_pg_restore_precondition(
+        raw: bytes, *, base: dict[str, Any], opcode_spec: dict[str, Any],
+) -> dict[str, Any]:
+    code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_RESTORE_PRECONDITION_INVALID"
+    base = validate_pg_rollback_base_spec(base)
+    opcode_spec = validate_pg_opcode_spec(opcode_spec, base=base)
+    if opcode_spec["opcode"] != "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1":
+        reject(code)
+    value = exact(parse_tool_json(raw, code), {
+        "system_identifier", "server_version_num", "database", "profile", "projection",
+    }, code)
+    database = exact(value["database"], {
+        "name", "oid", "marker", "owner", "allow_connections", "connection_limit",
+        "default_transaction_read_only", "sessions", "prepared_xacts",
+    }, code)
+    observed_profile = exact(value["profile"], {
+        "encoding", "locale_provider", "collate", "ctype", "collation_version",
+        "tablespace",
+    }, code)
+    projection = exact(value["projection"], set(postgres_empty_restore_projection()), code)
+    bindings = opcode_spec["bindings"]
+    expected_observed_profile = {
+        "encoding": base["profile"]["encoding"],
+        "locale_provider": base["profile"]["locale_provider"],
+        "collate": base["profile"]["collate"],
+        "ctype": base["profile"]["ctype"],
+        "collation_version": base["profile"]["collation_version"],
+        "tablespace": base["profile"]["default_tablespace"],
+    }
+    profile = {
+        **without(observed_profile, "tablespace"),
+        "default_tablespace": observed_profile["tablespace"],
+    }
+    empty_projection = postgres_empty_restore_projection()
+    empty_projection_sha256 = digest_value(empty_projection)
+    if value["system_identifier"] != base["postgres"]["system_identifier"] \
+            or value["server_version_num"] != base["postgres"]["server_version_num"] \
+            or database != {
+                "name": base["databases"]["staging_name"],
+                "oid": bindings["staging_oid"],
+                "marker": base["databases"]["staging_marker"],
+                "owner": base["postgres"]["control_database_role"],
+                "allow_connections": True,
+                "connection_limit": 0,
+                "default_transaction_read_only": True,
+                "sessions": 0,
+                "prepared_xacts": 0,
+            } or observed_profile != expected_observed_profile \
+            or profile != without(base["profile"], "profile_sha256") \
+            or projection != empty_projection \
+            or bindings["expected_empty_projection_sha256"] \
+                != empty_projection_sha256:
+        reject(code)
+    body = {
+        "schema_version": 1,
+        "contract": POSTGRES_RESTORE_PRECONDITION_CONTRACT,
+        "base_spec_sha256": base["base_spec_sha256"],
+        "opcode_spec_sha256": opcode_spec["opcode_spec_sha256"],
+        "binding_sha256": bindings["create_receipt_sha256"],
+        "create_receipt_sha256": bindings["create_receipt_sha256"],
+        "dump_inventory_sha256": bindings["dump_inventory_sha256"],
+        "system_identifier": value["system_identifier"],
+        "server_version_num": value["server_version_num"],
+        "database": database,
+        "database_identity_sha256": digest_value({
+            "system_identifier": value["system_identifier"], **database,
+        }),
+        "profile": profile,
+        "profile_sha256": digest_value(profile),
+        "empty_projection": projection,
+        "empty_projection_sha256": empty_projection_sha256,
+        "raw_observation_sha256": hashlib.sha256(raw).hexdigest(),
+    }
+    return validate_pg_restore_precondition_proof(
+        {**body, "restore_precondition_sha256": digest_value(body)},
+        base=base, opcode_spec=opcode_spec,
+    )
+
+
+def validate_pg_restore_precondition_proof(
+        value: Any, *, base: dict[str, Any], opcode_spec: dict[str, Any],
+) -> dict[str, Any]:
+    code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_RESTORE_PRECONDITION_INVALID"
+    base = validate_pg_rollback_base_spec(base)
+    opcode_spec = validate_pg_opcode_spec(opcode_spec, base=base)
+    item = validate_pg_restore_precondition_envelope(value, code)
+    bindings = opcode_spec["bindings"]
+    database = item["database"]
+    profile = item["profile"]
+    projection = item["empty_projection"]
+    expected_profile = {
+        "encoding": base["profile"]["encoding"],
+        "locale_provider": base["profile"]["locale_provider"],
+        "collate": base["profile"]["collate"],
+        "ctype": base["profile"]["ctype"],
+        "collation_version": base["profile"]["collation_version"],
+        "default_tablespace": base["profile"]["default_tablespace"],
+    }
+    if item["base_spec_sha256"] != base["base_spec_sha256"] \
+            or item["opcode_spec_sha256"] != opcode_spec["opcode_spec_sha256"] \
+            or item["binding_sha256"] != bindings["create_receipt_sha256"] \
+            or item["create_receipt_sha256"] != bindings["create_receipt_sha256"] \
+            or item["dump_inventory_sha256"] != bindings["dump_inventory_sha256"] \
+            or item["system_identifier"] != base["postgres"]["system_identifier"] \
+            or item["server_version_num"] != base["postgres"]["server_version_num"] \
+            or database["name"] != base["databases"]["staging_name"] \
+            or database["oid"] != bindings["staging_oid"] \
+            or database["marker"] != base["databases"]["staging_marker"] \
+            or database["owner"] != base["postgres"]["control_database_role"] \
+            or database["allow_connections"] is not True \
+            or database["connection_limit"] != 0 \
+            or database["default_transaction_read_only"] is not True \
+            or database["sessions"] != 0 or database["prepared_xacts"] != 0 \
+            or profile != expected_profile \
+            or projection != postgres_empty_restore_projection() \
+            or item["empty_projection_sha256"] != digest_value(projection) \
+            or item["empty_projection_sha256"] \
+                != bindings["expected_empty_projection_sha256"] \
+            or item["profile_sha256"] != digest_value(profile) \
+            or item["database_identity_sha256"] != digest_value({
+                "system_identifier": item["system_identifier"], **database,
+            }):
+        reject(code)
+    return item
 
 
 def parse_postgres_capacity(raw: bytes, required_database_bytes: int) -> dict[str, Any]:
@@ -6716,6 +8036,7 @@ def parse_pg_mutation_ack(raw: bytes, opcode: str) -> dict[str, Any]:
     allowed = {
         "PG_RB_CREATE_STAGING_V1", "PG_RB_RESTORE_DUMP_V1",
         "PG_RB_RECONCILE_PRIVILEGES_V1", "PG_RB_ATOMIC_SWITCH_V1",
+        "PG_RB_GUARDED_SWITCH_V3",
         "PG_RB_UNSEAL_ACTIVE_V1", "PG_RB_SEAL_ACTIVE_V1",
     }
     if opcode not in allowed or not isinstance(raw, bytes) or len(raw) > 64 * 1024:
@@ -6726,6 +8047,9 @@ def parse_pg_mutation_ack(raw: bytes, opcode: str) -> dict[str, Any]:
         reject(code)
     if any(character not in " \t\r\nt" for character in text):
         reject(code)
+    if opcode == "PG_RB_GUARDED_SWITCH_V3" \
+            and [line.strip() for line in text.splitlines() if line.strip()] != ["t"]:
+        reject(code)
     body = {
         "schema_version": 1,
         "contract": "chenyida-erp-uat-rollback-postgresql-mutation-ack/v1",
@@ -6735,13 +8059,34 @@ def parse_pg_mutation_ack(raw: bytes, opcode: str) -> dict[str, Any]:
     return {**body, "ack_sha256": digest_value(body)}
 
 
+def migration_allowlist_digest(records: list[dict[str, str]]) -> str:
+    """Reproduce release-manifest-contract.mjs migrationAllowlistDigest exactly."""
+    entries = [
+        {"ordinal": index, "filename": item["version"], "sha256": item["checksum"]}
+        for index, item in enumerate(records, start=1)
+    ]
+    try:
+        raw = (json.dumps(
+            entries, ensure_ascii=False, sort_keys=False, separators=(",", ":"),
+            allow_nan=False,
+        ) + "\n").encode("utf-8", "strict")
+    except (KeyError, TypeError, ValueError, UnicodeError):
+        reject("ROLLBACK_FIXED_EXECUTOR_MIGRATION_LEDGER_INVALID")
+    return hashlib.sha256(raw).hexdigest()
+
+
 def validate_migration_ledger(
-        raw: bytes, *, expected_sha256: str, expected_head: str,
+        raw: bytes, *, expected_ledger_file_sha256: str,
+        expected_allowlist_sha256: str, expected_head: str,
 ) -> dict[str, Any]:
     code = "ROLLBACK_FIXED_EXECUTOR_MIGRATION_LEDGER_INVALID"
     if not isinstance(raw, bytes) or not 2 <= len(raw) <= MAX_JSON_BYTES \
             or not raw.endswith(b"\n") or b"\r" in raw or b"\x00" in raw \
-            or hashlib.sha256(raw).hexdigest() != expected_sha256 \
+            or SHA256.fullmatch(expected_ledger_file_sha256 or "") is None \
+            or SHA256.fullmatch(expected_allowlist_sha256 or "") is None \
+            or expected_ledger_file_sha256 == ZERO_SHA256 \
+            or expected_allowlist_sha256 == ZERO_SHA256 \
+            or hashlib.sha256(raw).hexdigest() != expected_ledger_file_sha256 \
             or MIGRATION.fullmatch(expected_head or "") is None:
         reject(code)
     try:
@@ -6759,8 +8104,13 @@ def validate_migration_ledger(
         records.append({"checksum": matched.group(1), "version": matched.group(2)})
     if not records or records[-1]["version"] != expected_head:
         reject(code)
+    allowlist_sha256 = migration_allowlist_digest(records)
+    if allowlist_sha256 != expected_allowlist_sha256:
+        reject(code)
     return {
-        "head": expected_head, "manifest_sha256": expected_sha256,
+        "head": expected_head,
+        "ledger_file_sha256": expected_ledger_file_sha256,
+        "allowlist_sha256": allowlist_sha256,
         "count": len(records), "ledger_sha256": digest_value(records),
     }
 
@@ -6889,13 +8239,35 @@ def derive_expected_runtime_privilege_state(
                     != base["security"]["catalog_artifact_sha256"] \
                 or policy["policy_sha256"] != base["security"]["policy_sha256"]:
             reject(code)
+        target_mode = target.get("mode", "RELEASED_ACTIVE")
+        if target_mode not in {"RELEASED_ACTIVE", "SEALED_STAGING"}:
+            reject(code)
+        target_database_name = target.get(
+            "database_name", base["databases"]["active_name"],
+        )
+        target_marker = target.get(
+            "marker", base["databases"]["candidate_marker"],
+        )
+        target_connection_limit = target.get(
+            "connection_limit", 0 if target_mode == "SEALED_STAGING" else 64,
+        )
+        if target_database_name != (
+                base["databases"]["staging_name"]
+                if target_mode == "SEALED_STAGING"
+                else base["databases"]["active_name"]
+        ) or target_marker != (
+                base["databases"]["staging_marker"]
+                if target_mode == "SEALED_STAGING"
+                else base["databases"]["candidate_marker"]
+        ) or target_connection_limit != (0 if target_mode == "SEALED_STAGING" else 64):
+            reject(code)
         expected_target = {
             "database_oid": target["database_oid"],
             "system_identifier_sha256": hashlib.sha256(
                 base["postgres"]["system_identifier"].encode("utf-8"),
             ).hexdigest(),
             "marker_sha256": hashlib.sha256(
-                base["databases"]["candidate_marker"].encode("utf-8"),
+                target_marker.encode("utf-8"),
             ).hexdigest(),
         }
         roles = sorted(({
@@ -6909,7 +8281,7 @@ def derive_expected_runtime_privilege_state(
         memberships = [dict(item) for item in policy["memberships"]]
 
         owners: dict[tuple[str, str], str] = {
-            ("DATABASE", policy["database"]["name"]): policy["database"]["owner"],
+            ("DATABASE", target_database_name): policy["database"]["owner"],
             ("SCHEMA", policy["schema"]["name"]): policy["schema"]["owner"],
         }
         for kind, field in (
@@ -6946,7 +8318,7 @@ def derive_expected_runtime_privilege_state(
             group = binding["privilege_group"]
             if binding["access_service"] != service or binding["direct_login_acl"] is not False:
                 reject(code)
-            add("DATABASE", policy["database"]["name"], policy["database"]["owner"],
+            add("DATABASE", target_database_name, policy["database"]["owner"],
                 group, "CONNECT")
             add("SCHEMA", policy["schema"]["name"], policy["schema"]["owner"],
                 group, "USAGE")
@@ -7030,15 +8402,19 @@ def derive_expected_runtime_privilege_state(
                 "collation_version": base["profile"]["collation_version"],
             },
             "database": {
-                "name": policy["database"]["name"],
+                "name": target_database_name,
                 "owner": policy["database"]["owner"],
                 "allow_connect": policy["database"]["allow_connect"],
-                "connection_limit": policy["database"]["connection_limit"],
+                "connection_limit": target_connection_limit,
                 "default_tablespace": policy["database"]["default_tablespace"],
             },
             "schema": {"name": policy["schema"]["name"],
                        "owner": policy["schema"]["owner"]},
-            "roles": roles, "memberships": memberships, "role_settings": [],
+            "roles": roles, "memberships": memberships,
+            "role_settings": [] if target_mode == "RELEASED_ACTIVE" else [{
+                "role_scope": "ALL", "database_scope": target_database_name,
+                "settings": ["default_transaction_read_only=on"],
+            }],
             "object_acl": acl, "object_acl_storage": storage,
             "column_acl": [], "column_acl_object_count": 0,
             "default_privilege_scopes": default_scopes,
@@ -7054,7 +8430,7 @@ def derive_expected_runtime_privilege_state(
 
 def parse_runtime_privilege_state(
         raw: bytes, *, inputs: CapabilityInputs, base: dict[str, Any],
-        restored_oid: str,
+        restored_oid: str | None = None, target: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_SECURITY_STATE_INVALID"
     if not isinstance(raw, bytes) or not 2 <= len(raw) <= MAX_JSON_BYTES \
@@ -7063,8 +8439,14 @@ def parse_runtime_privilege_state(
     actual = parse_tool_json(raw, code)
     if not isinstance(actual, dict):
         reject(code)
+    if target is None:
+        if restored_oid is None:
+            reject(code)
+        target = {"database_oid": restored_oid}
+    elif restored_oid is not None:
+        reject(code)
     expected = derive_expected_runtime_privilege_state(
-        inputs, base, {"database_oid": restored_oid},
+        inputs, base, target,
     )
     if actual != expected:
         reject(code)
@@ -7075,7 +8457,7 @@ def parse_postgres_session_observation(
         raw: bytes, *, database: str, allowed_clients: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_SESSION_OBSERVATION_INVALID"
-    if not isinstance(allowed_clients, dict) or not allowed_clients \
+    if not isinstance(allowed_clients, dict) \
             or list(allowed_clients) != sorted(allowed_clients):
         reject(code)
     for role, client in allowed_clients.items():
@@ -7131,7 +8513,10 @@ def parse_postgres_session_observation(
     }
 
 
-def parse_postgres_database_identity(raw: bytes) -> dict[str, Any]:
+def parse_postgres_database_identity(
+        raw: bytes, *, expected_connection_limit: int = 64,
+        expected_default_transaction_read_only: bool = False,
+) -> dict[str, Any]:
     code = "ROLLBACK_FIXED_EXECUTOR_POSTGRES_IDENTITY_OBSERVATION_INVALID"
     value = exact(parse_tool_json(raw, code), {
         "name", "system_identifier", "oid", "marker", "allow_connections",
@@ -7142,8 +8527,9 @@ def parse_postgres_database_identity(raw: bytes) -> dict[str, Any]:
             or OID.fullmatch(value.get("oid") or "") is None \
             or not isinstance(value.get("marker"), str) \
             or value.get("allow_connections") is not True \
-            or value.get("connection_limit") != 64 \
-            or value.get("default_transaction_read_only") is not False \
+            or value.get("connection_limit") != expected_connection_limit \
+            or value.get("default_transaction_read_only") \
+                is not expected_default_transaction_read_only \
             or value.get("prepared_xacts") != 0:
         reject(code)
     identity = {
@@ -7231,6 +8617,24 @@ def classify_pg_rollback_layout(
         )
     layout = "OLD" if old else "NEW_SEALED" if new_sealed \
         else "NEW_RELEASED" if new_released else "INVALID"
+    state_projection = {
+        "base_spec_sha256": base["base_spec_sha256"],
+        "runtime_plan_sha256": base["runtime_plan_sha256"],
+        "system_identifier": observation.get("system_identifier"),
+        "restored_oid": restored_oid,
+        "databases": [{
+            field: item[field] for field in (
+                "name", "oid", "marker", "allow_connections", "connection_limit",
+                "default_transaction_read_only", "prepared_xacts",
+            )
+        } for item in sorted(
+            observation.get("databases", []), key=lambda value: value.get("name", ""),
+        )],
+    }
+    if SYSTEM_IDENTIFIER.fullmatch(
+            state_projection.get("system_identifier") or "",
+    ) is None:
+        reject(code)
     body = {
         "schema_version": 1,
         "contract": "chenyida-erp-uat-rollback-postgresql-layout-classification/v1",
@@ -7239,6 +8643,7 @@ def classify_pg_rollback_layout(
         "observation_sha256": observation["observation_sha256"],
         "restored_oid": restored_oid,
         "layout": layout,
+        "state_projection_sha256": digest_value(state_projection),
         "safe_to_recover_switch_receipt": layout == "NEW_SEALED",
         "safe_to_recover_unseal_receipt": layout == "NEW_RELEASED",
     }
@@ -7290,6 +8695,55 @@ def postgres_layout_effect_identity(
     if SYSTEM_IDENTIFIER.fullmatch(body.get("system_identifier") or "") is None:
         reject(code)
     return {**body, "effect_identity_sha256": digest_value(body)}
+
+
+def postgres_guarded_switch_intent_argv(opcode: dict[str, Any]) -> dict[str, Any]:
+    """Project the exact effectful command identity stored in the durable intent."""
+    try:
+        projection = {
+            "opcode": opcode["opcode"],
+            "opcode_spec_sha256": opcode["opcode_spec_sha256"],
+            "sql_sha256": opcode["sql_sha256"],
+            "runner_argv_template_sha256": opcode["argv_template_sha256"],
+        }
+    except (KeyError, TypeError):
+        reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID")
+    if projection["opcode"] != "PG_RB_GUARDED_SWITCH_V3" \
+            or any(SHA256.fullmatch(projection[field] or "") is None for field in (
+                "opcode_spec_sha256", "sql_sha256", "runner_argv_template_sha256",
+            )):
+        reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID")
+    return projection
+
+
+def postgres_guarded_switch_intent_target(
+        opcode: dict[str, Any], *, restored_oid: str, candidate_oid: str,
+        staging_content_proof_sha256: str,
+) -> dict[str, Any]:
+    """Project the exact guarded state and database identities for the intent."""
+    try:
+        guarded_state_sha256 = opcode["bindings"]["guarded_state_sha256"]
+        expected_switched_identity_sha256 = \
+            opcode["bindings"]["expected_switched_identity_sha256"]
+    except (KeyError, TypeError):
+        reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID")
+    if OID.fullmatch(restored_oid or "") is None \
+            or OID.fullmatch(candidate_oid or "") is None \
+            or any(SHA256.fullmatch(value or "") is None for value in (
+                staging_content_proof_sha256, opcode.get("opcode_spec_sha256"),
+                opcode.get("sql_sha256"), guarded_state_sha256,
+                expected_switched_identity_sha256,
+            )):
+        reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID")
+    return {
+        "staging_oid": restored_oid,
+        "candidate_oid": candidate_oid,
+        "staging_content_proof_sha256": staging_content_proof_sha256,
+        "guarded_opcode_spec_sha256": opcode["opcode_spec_sha256"],
+        "guarded_sql_sha256": opcode["sql_sha256"],
+        "guarded_state_sha256": guarded_state_sha256,
+        "expected_switched_identity_sha256": expected_switched_identity_sha256,
+    }
 
 
 class UatRollbackCapabilityRuntime:
@@ -8141,8 +9595,10 @@ class UatRollbackCapabilityRuntime:
             "live_database_report_sha256":
                 base["snapshot"]["target_database_report_sha256"],
             "migration_head": base["snapshot"]["migration_head"],
-            "migration_manifest_sha256":
-                base["snapshot"]["migration_manifest_sha256"],
+            "migration_ledger_file_sha256":
+                base["snapshot"]["migration_ledger_file_sha256"],
+            "migration_allowlist_sha256":
+                base["snapshot"]["migration_allowlist_sha256"],
             "restored_database_oid": pg_evidence["restored_database_oid"],
             "restored_database_marker": base["databases"]["candidate_marker"],
             "system_identifier": base["postgres"]["system_identifier"],
@@ -8213,7 +9669,7 @@ class UatRollbackCapabilityRuntime:
             {"restored_database_oid": context["pg_evidence"]["restored_database_oid"],
              "prerequisites_sha256": context["prerequisites_sha256"]},
             {"opcode": "PG_RB_UNSEAL_ACTIVE_V1"},
-            context["pg_evidence"]["switch_transaction_sha256"],
+            context["pg_evidence"]["switch_receipt_sha256"],
             lambda: self.activation_driver.unseal(
                 context["base"], context["pg_evidence"],
                 activation_prerequisites_sha256=context["prerequisites_sha256"],
@@ -8307,7 +9763,7 @@ class UatRollbackCapabilityRuntime:
                 )
                 unseal_receipt = create_recovered_side_effect_receipt(
                     unseal_intent,
-                    context["pg_evidence"]["switch_transaction_sha256"],
+                    context["pg_evidence"]["switch_receipt_sha256"],
                     digest_value(effect_identity),
                     database_probe["observation"]["observation_sha256"], self.clock(),
                 )
@@ -8320,7 +9776,7 @@ class UatRollbackCapabilityRuntime:
         proof = effects.read_only_proof(PREACTIVATION_CONTENT_PROOF_NAME)
         assert unseal_receipt is not None
         if unseal_receipt["before_identity_sha256"] \
-                != context["pg_evidence"]["switch_transaction_sha256"]:
+                != context["pg_evidence"]["switch_receipt_sha256"]:
             raise HandlerOutcomeUnknown(
                 "DURABLE_STATE_DIVERGED", "PROBE", side_effects_started=True,
                 uncertain_action="EXECUTE",
@@ -8464,6 +9920,8 @@ class UatRollbackCapabilityRuntime:
             writer_stage_result_sha256: str, restored_oid: str,
             switch_outcome: dict[str, Any], capacity_receipt: dict[str, Any],
             restore_receipt: dict[str, Any], switch_receipt: dict[str, Any],
+            restore_precondition: dict[str, Any],
+            staging_content_proof: dict[str, Any],
     ) -> dict[str, Any]:
         rows = {
             item["name"]: item for item in switch_outcome["observation"]["databases"]
@@ -8475,6 +9933,16 @@ class UatRollbackCapabilityRuntime:
                 or active["oid"] != restored_oid \
                 or quarantine["oid"] != base["databases"]["candidate_oid"]:
             reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_SWITCH_RESULT_INVALID")
+        staging_proof = validate_staging_content_proof(staging_content_proof)
+        restore_proof = validate_pg_restore_precondition_envelope(restore_precondition)
+        try:
+            guarded_opcode = validate_pg_guarded_switch_opcode_spec(
+                switch_outcome["opcode"], base=base, inputs=inputs,
+            )
+        except (KeyError, TypeError):
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_SWITCH_RESULT_INVALID")
+        if switch_receipt.get("before_identity_sha256") != staging_proof["proof_sha256"]:
+            reject("ROLLBACK_FIXED_EXECUTOR_STAGING_CONTENT_PROOF_INVALID")
         try:
             activation_sha256 = \
                 inputs.package["sources"]["snapshot_policy_activation"]["sha256"]
@@ -8499,13 +9967,27 @@ class UatRollbackCapabilityRuntime:
             "candidate_database_quarantine_oid": base["databases"]["candidate_oid"],
             "runtime_plan_sha256": base["runtime_plan_sha256"],
             "manifest_sha256": base["snapshot"]["snapshot_manifest_sha256"],
-            "migration_manifest_sha256": base["snapshot"]["migration_manifest_sha256"],
+            "migration_ledger_file_sha256":
+                base["snapshot"]["migration_ledger_file_sha256"],
+            "migration_manifest_sha256":
+                base["snapshot"]["migration_allowlist_sha256"],
             "writer_containment_stage_result_sha256": writer_stage_result_sha256,
             "postgres_container_id": base["postgres"]["container_id"],
             "postgres_image_config_digest": base["postgres"]["image_digest"],
             "database_profile_sha256": base["profile"]["profile_sha256"],
-            "capacity_receipt_sha256": capacity_receipt["receipt_sha256"],
+            "postgres_base_spec_sha256": base["base_spec_sha256"],
+            "staging_create_receipt_sha256": capacity_receipt["receipt_sha256"],
             "restore_receipt_sha256": restore_receipt["receipt_sha256"],
+            "privilege_reconcile_receipt_sha256": staging_proof["binding_sha256"],
+            "restore_precondition_opcode_spec_sha256":
+                restore_proof["opcode_spec_sha256"],
+            "restore_precondition_sha256":
+                restore_proof["restore_precondition_sha256"],
+            "dump_inventory_sha256": restore_proof["dump_inventory_sha256"],
+            "empty_projection_sha256": restore_proof["empty_projection_sha256"],
+            "restore_precondition": restore_proof,
+            "pre_switch_content_proof_sha256": staging_proof["proof_sha256"],
+            "pre_switch_content_proof": staging_proof,
             "runtime_privilege_access_sha256": security["access_sha256"],
             "runtime_privilege_catalog_sha256": security["catalog_sha256"],
             "runtime_privilege_catalog_artifact_sha256":
@@ -8519,7 +10001,18 @@ class UatRollbackCapabilityRuntime:
             "staging_database_marker": base["databases"]["staging_marker"],
             "candidate_database_quarantine_marker":
                 base["databases"]["quarantine_marker"],
-            "switch_transaction_sha256": switch_receipt["receipt_sha256"],
+            "guarded_switch_opcode_spec_sha256":
+                guarded_opcode["opcode_spec_sha256"],
+            "guarded_switch_sql_sha256": guarded_opcode["sql_sha256"],
+            "guarded_switch_runner_argv_template_sha256":
+                guarded_opcode["argv_template_sha256"],
+            "guarded_switch_state_sha256":
+                guarded_opcode["bindings"]["guarded_state_sha256"],
+            "guarded_switch_expected_identity_sha256":
+                guarded_opcode["bindings"]["expected_switched_identity_sha256"],
+            "switch_receipt_sha256": switch_receipt["receipt_sha256"],
+            "switch_effect_identity_sha256": switch_receipt["after_identity_sha256"],
+            "switch_receipt": switch_receipt,
             "restored_database_allow_connections_at_commit": active["allow_connections"],
             "restored_database_connection_limit_at_commit": active["connection_limit"],
             "restored_database_sessions_at_commit": active["sessions"],
@@ -8552,10 +10045,26 @@ class UatRollbackCapabilityRuntime:
                 base, preflight["observation"],
             ),
         )
+        restore_precondition = self.postgres_driver.restore_precondition(
+            base,
+            create_receipt_sha256=create_receipt["receipt_sha256"],
+            restored_oid=created["restored_oid"],
+            dump_inventory_sha256=
+                preflight["dump_inventory"]["inventory_sha256"],
+        )["proof"]
+        restore_precondition = effects.record_read_only_proof(
+            POSTGRES_RESTORE_PRECONDITION_PROOF_NAME, restore_precondition,
+        )
         restored, restore_receipt = self._complete_effect(
             inputs, effects, "LOGICAL_DUMP_RESTORE",
             {"staging_oid": created["restored_oid"],
-             "dump_sha256": base["snapshot"]["dump_sha256"]},
+             "dump_sha256": base["snapshot"]["dump_sha256"],
+             "dump_inventory_sha256":
+                preflight["dump_inventory"]["inventory_sha256"],
+             "restore_precondition_sha256":
+                restore_precondition["restore_precondition_sha256"],
+             "empty_projection_sha256":
+                restore_precondition["empty_projection_sha256"]},
             {"opcode": "PG_RB_RESTORE_DUMP_V1"},
             create_receipt["receipt_sha256"],
             lambda: self.postgres_driver.restore_dump(
@@ -8564,6 +10073,9 @@ class UatRollbackCapabilityRuntime:
                 restored_oid=created["restored_oid"],
                 before_content_observation_sha256=
                     created["observation"]["observation_sha256"],
+                dump_inventory_sha256=
+                    preflight["dump_inventory"]["inventory_sha256"],
+                restore_precondition=restore_precondition,
             ),
         )
         reconciled, reconcile_receipt = self._complete_effect(
@@ -8577,16 +10089,38 @@ class UatRollbackCapabilityRuntime:
                 restored_oid=restored["restored_oid"],
             ),
         )
+        staging_content = self.postgres_driver.prove_staging_content(
+            inputs, base, restored_oid=restored["restored_oid"],
+            binding_sha256=reconcile_receipt["receipt_sha256"],
+        )
+        staging_proof = effects.record_read_only_proof(
+            STAGING_CONTENT_PROOF_NAME,
+            build_staging_content_proof(
+                staging_content, base, reconcile_receipt["receipt_sha256"],
+            ),
+        )
+        switch_opcode = self.postgres_driver.guarded_switch_opcode(
+            base, inputs,
+            privilege_receipt_sha256=reconcile_receipt["receipt_sha256"],
+            staging_content_proof_sha256=staging_proof["proof_sha256"],
+            restored_oid=restored["restored_oid"],
+            before_observation_sha256=staging_content["after"]["observation_sha256"],
+        )
+        switch_target = postgres_guarded_switch_intent_target(
+            switch_opcode,
+            restored_oid=restored["restored_oid"],
+            candidate_oid=base["databases"]["candidate_oid"],
+            staging_content_proof_sha256=staging_proof["proof_sha256"],
+        )
+        switch_argv = postgres_guarded_switch_intent_argv(switch_opcode)
         switched, switch_receipt = self._complete_effect(
             inputs, effects, "DATABASE_SWITCH",
-            {"staging_oid": restored["restored_oid"],
-             "candidate_oid": base["databases"]["candidate_oid"]},
-            {"opcode": "PG_RB_ATOMIC_SWITCH_V1"},
-            reconcile_receipt["receipt_sha256"],
-            lambda: self.postgres_driver.switch(
-                base, privilege_receipt_sha256=reconcile_receipt["receipt_sha256"],
+            switch_target,
+            switch_argv,
+            staging_proof["proof_sha256"],
+            lambda: self.postgres_driver.execute_guarded_switch(
+                base, inputs, opcode=switch_opcode,
                 restored_oid=restored["restored_oid"],
-                before_observation=reconciled["observation"],
             ),
             receipt_identity=lambda outcome: postgres_layout_effect_identity(
                 outcome["observation"], outcome["classification"],
@@ -8596,6 +10130,7 @@ class UatRollbackCapabilityRuntime:
         return self._postgres_execution_evidence(
             inputs, base, writer_stage_result_sha256, restored["restored_oid"],
             switched, create_receipt, restore_receipt, switch_receipt,
+            restore_precondition, staging_proof,
         )
 
     def _recover_postgres_execution(
@@ -8615,6 +10150,10 @@ class UatRollbackCapabilityRuntime:
         restore_receipt = receipts["LOGICAL_DUMP_RESTORE"]
         reconcile_receipt = receipts["PRIVILEGE_RECONCILE"]
         switch_receipt = receipts["DATABASE_SWITCH"]
+        restore_precondition = effects.read_only_proof(
+            POSTGRES_RESTORE_PRECONDITION_PROOF_NAME,
+        )
+        staging_proof = effects.read_only_proof(STAGING_CONTENT_PROOF_NAME)
         assert create_receipt is not None and restore_receipt is not None \
             and reconcile_receipt is not None
         base, _writer, writer_stage_result_sha256, _preflight = \
@@ -8631,8 +10170,18 @@ class UatRollbackCapabilityRuntime:
                 "DURABLE_STATE_DIVERGED", "PROBE", side_effects_started=True,
                 uncertain_action="EXECUTE",
             )
+        if staging_proof is None:
+            raise HandlerOutcomeUnknown(
+                "DURABLE_STATE_MISSING", "PROBE", side_effects_started=True,
+                uncertain_action="EXECUTE",
+            )
+        if restore_precondition is None:
+            raise HandlerOutcomeUnknown(
+                "DURABLE_STATE_MISSING", "PROBE", side_effects_started=True,
+                uncertain_action="EXECUTE",
+            )
         try:
-            self.postgres_driver.dump_inventory(
+            inventory = self.postgres_driver.dump_inventory(
                 base, inputs.fd("snapshot_postgresql"),
             )
         except FixedExecutorError as error:
@@ -8641,19 +10190,45 @@ class UatRollbackCapabilityRuntime:
                 uncertain_action="EXECUTE",
             ) from error
         try:
+            precondition_opcode = derive_pg_opcode_spec(
+                base, "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1", {
+                    "create_receipt_sha256": create_receipt["receipt_sha256"],
+                    "staging_oid": restore_precondition["database"]["oid"],
+                    "dump_inventory_sha256": inventory["inventory_sha256"],
+                    "expected_empty_projection_sha256":
+                        digest_value(postgres_empty_restore_projection()),
+                },
+            )
+            restore_precondition = validate_pg_restore_precondition_proof(
+                restore_precondition, base=base, opcode_spec=precondition_opcode,
+            )
+        except (FixedExecutorError, KeyError, TypeError) as error:
+            raise HandlerOutcomeUnknown(
+                "DURABLE_STATE_DIVERGED", "PROBE", side_effects_started=True,
+                uncertain_action="EXECUTE",
+            ) from error
+        try:
             switch_intent = effects.started_intent("DATABASE_SWITCH")
             if switch_intent is None:
                 raise ValueError("switch was not durably started")
-            observation = self.postgres_driver.observe(
-                base, "recover-switch", switch_intent["intent_sha256"],
+            restored_oid = staging_proof["staging_database_oid"]
+            if staging_proof["binding_sha256"] != reconcile_receipt["receipt_sha256"] \
+                    or staging_proof["base_spec_sha256"] != base["base_spec_sha256"] \
+                    or staging_proof["runtime_plan_sha256"] \
+                        != base["runtime_plan_sha256"] \
+                    or OID.fullmatch(restored_oid or "") is None \
+                    or restore_precondition["database"]["oid"] != restored_oid \
+                    or staging_proof["candidate_database_oid"] \
+                        != base["databases"]["candidate_oid"]:
+                raise ValueError("durable staging proof drift")
+            switch_opcode = self.postgres_driver.guarded_switch_opcode(
+                base, inputs,
+                privilege_receipt_sha256=reconcile_receipt["receipt_sha256"],
+                staging_content_proof_sha256=staging_proof["proof_sha256"],
+                restored_oid=restored_oid,
+                before_observation_sha256=
+                    staging_proof["after_observation_sha256"],
             )
-            active = next(
-                (
-                    item for item in observation["databases"]
-                    if item["name"] == base["databases"]["active_name"]
-                ),
-            )
-            restored_oid = active["oid"]
             expected_targets = {
                 "STAGING_DATABASE_CREATE": {
                     "base_spec_sha256": base["base_spec_sha256"],
@@ -8662,21 +10237,31 @@ class UatRollbackCapabilityRuntime:
                 "LOGICAL_DUMP_RESTORE": {
                     "staging_oid": restored_oid,
                     "dump_sha256": base["snapshot"]["dump_sha256"],
+                    "dump_inventory_sha256": inventory["inventory_sha256"],
+                    "restore_precondition_sha256":
+                        restore_precondition["restore_precondition_sha256"],
+                    "empty_projection_sha256":
+                        restore_precondition["empty_projection_sha256"],
                 },
                 "PRIVILEGE_RECONCILE": {
                     "staging_oid": restored_oid,
                     "sealed_security_projection_sha256": digest_value(base["security"]),
                 },
-                "DATABASE_SWITCH": {
-                    "staging_oid": restored_oid,
-                    "candidate_oid": base["databases"]["candidate_oid"],
-                },
+                "DATABASE_SWITCH": postgres_guarded_switch_intent_target(
+                    switch_opcode, restored_oid=restored_oid,
+                    candidate_oid=base["databases"]["candidate_oid"],
+                    staging_content_proof_sha256=staging_proof["proof_sha256"],
+                ),
             }
             expected_argv = {
-                "STAGING_DATABASE_CREATE": "PG_RB_CAPACITY_THEN_CREATE_STAGING_V1",
-                "LOGICAL_DUMP_RESTORE": "PG_RB_RESTORE_DUMP_V1",
-                "PRIVILEGE_RECONCILE": "PG_RB_RECONCILE_PRIVILEGES_V1",
-                "DATABASE_SWITCH": "PG_RB_ATOMIC_SWITCH_V1",
+                "STAGING_DATABASE_CREATE": {
+                    "opcode": "PG_RB_CAPACITY_THEN_CREATE_STAGING_V1",
+                },
+                "LOGICAL_DUMP_RESTORE": {"opcode": "PG_RB_RESTORE_DUMP_V1"},
+                "PRIVILEGE_RECONCILE": {
+                    "opcode": "PG_RB_RECONCILE_PRIVILEGES_V1",
+                },
+                "DATABASE_SWITCH": postgres_guarded_switch_intent_argv(switch_opcode),
             }
             intents = {
                 name: effects.started_intent(name)
@@ -8686,33 +10271,81 @@ class UatRollbackCapabilityRuntime:
                     intents[name]["target_identity_sha256"] \
                         != digest_value(expected_targets[name])
                     or intents[name]["argv_template_sha256"] \
-                        != digest_value({"opcode": expected_argv[name]})
+                        != digest_value(expected_argv[name])
                     for name in intents
             ):
                 raise ValueError("durable PostgreSQL intent drift")
+            observation = self.postgres_driver.observe(
+                base, "recover-switch", switch_intent["intent_sha256"],
+            )
             classification = classify_pg_rollback_layout(
                 observation, base=base, restored_oid=restored_oid,
             )
-            if classification["layout"] != "NEW_SEALED":
-                raise ValueError("not sealed")
-            effect_identity = postgres_layout_effect_identity(
-                observation, classification, expected_layout="NEW_SEALED",
-                restored_oid=restored_oid,
-            )
-        except (FixedExecutorError, KeyError, StopIteration, ValueError) as error:
+        except (FixedExecutorError, KeyError, TypeError, ValueError) as error:
             raise HandlerOutcomeUnknown(
                 "TARGET_IDENTITY_DRIFT", "PROBE", side_effects_started=True,
                 uncertain_action="EXECUTE",
             ) from error
+
+        if switch_receipt is None and classification["layout"] == "OLD":
+            try:
+                should_execute = effects.begin_recovery(
+                    "DATABASE_SWITCH", opcode=switch_opcode,
+                    before_observation_sha256=observation["observation_sha256"],
+                    candidate_oid=base["databases"]["candidate_oid"],
+                )
+            except FixedExecutorError as error:
+                raise HandlerOutcomeUnknown(
+                    "DURABLE_STATE_DIVERGED", "PROBE", side_effects_started=True,
+                    uncertain_action="EXECUTE",
+                ) from error
+            if not should_execute:
+                raise HandlerOutcomeUnknown(
+                    "SIDE_EFFECT_OUTCOME_UNKNOWN", "PROBE", side_effects_started=True,
+                    uncertain_action="EXECUTE",
+                )
+            try:
+                switched = self.postgres_driver.execute_guarded_switch(
+                    base, inputs, opcode=switch_opcode, restored_oid=restored_oid,
+                )
+                observation = switched["observation"]
+                classification = switched["classification"]
+            except HandlerOutcomeUnknown as error:
+                raise HandlerOutcomeUnknown(
+                    error.reason_code, error.phase, side_effects_started=True,
+                    uncertain_action="EXECUTE",
+                ) from error
+            except Exception as error:
+                raise HandlerOutcomeUnknown(
+                    "SIDE_EFFECT_OUTCOME_UNKNOWN", "AFTER_SIDE_EFFECT",
+                    side_effects_started=True, uncertain_action="EXECUTE",
+                ) from error
+
+        if classification["layout"] != "NEW_SEALED":
+            raise HandlerOutcomeUnknown(
+                "TARGET_IDENTITY_DRIFT", "PROBE", side_effects_started=True,
+                uncertain_action="EXECUTE",
+            )
+        try:
+            effect_identity = postgres_layout_effect_identity(
+                observation, classification, expected_layout="NEW_SEALED",
+                restored_oid=restored_oid,
+            )
+        except FixedExecutorError as error:
+            raise HandlerOutcomeUnknown(
+                "TARGET_IDENTITY_DRIFT", "PROBE", side_effects_started=True,
+                uncertain_action="EXECUTE",
+            ) from error
+
         if switch_receipt is None:
             switch_receipt = create_recovered_side_effect_receipt(
-                switch_intent, reconcile_receipt["receipt_sha256"],
+                switch_intent, staging_proof["proof_sha256"],
                 digest_value(effect_identity),
                 observation["observation_sha256"], self.clock(),
             )
             effects.complete("DATABASE_SWITCH", switch_receipt)
         elif switch_receipt.get("before_identity_sha256") \
-                != reconcile_receipt["receipt_sha256"] \
+                != staging_proof["proof_sha256"] \
                 or switch_receipt.get("after_identity_sha256") \
                     != digest_value(effect_identity):
             raise HandlerOutcomeUnknown(
@@ -8721,8 +10354,10 @@ class UatRollbackCapabilityRuntime:
             )
         return self._postgres_execution_evidence(
             inputs, base, writer_stage_result_sha256, restored_oid,
-            {"observation": observation, "classification": classification},
+            {"opcode": switch_opcode, "observation": observation,
+             "classification": classification},
             create_receipt, restore_receipt, switch_receipt,
+            restore_precondition, staging_proof,
         )
 
     @staticmethod
@@ -9028,8 +10663,10 @@ class UatRollbackCapabilityRuntime:
             "candidate_database_quarantine_oid": base["databases"]["candidate_oid"],
             "runtime_plan_sha256": base["runtime_plan_sha256"],
             "manifest_sha256": base["snapshot"]["snapshot_manifest_sha256"],
+            "migration_ledger_file_sha256":
+                base["snapshot"]["migration_ledger_file_sha256"],
             "migration_manifest_sha256":
-                base["snapshot"]["migration_manifest_sha256"],
+                base["snapshot"]["migration_allowlist_sha256"],
             "postgres_container_id": base["postgres"]["container_id"],
             "postgres_image_config_digest": base["postgres"]["image_digest"],
             "database_profile_sha256": base["profile"]["profile_sha256"],
@@ -9076,8 +10713,10 @@ class UatRollbackCapabilityRuntime:
             "live_database_report_sha256":
                 base["snapshot"]["target_database_report_sha256"],
             "migration_head": base["snapshot"]["migration_head"],
-            "migration_manifest_sha256":
-                base["snapshot"]["migration_manifest_sha256"],
+            "migration_ledger_file_sha256":
+                base["snapshot"]["migration_ledger_file_sha256"],
+            "migration_allowlist_sha256":
+                base["snapshot"]["migration_allowlist_sha256"],
             "restored_database_oid": stage_evidence["restored_database_oid"],
             "restored_database_marker": base["databases"]["candidate_marker"],
             "system_identifier": base["postgres"]["system_identifier"],
@@ -9125,7 +10764,8 @@ class UatRollbackCapabilityRuntime:
             "restored_database_marker": identity["marker"],
             "system_identifier": identity["system_identifier"],
             "migration_head": migration["head"],
-            "migration_manifest_sha256": migration["manifest_sha256"],
+            "migration_ledger_file_sha256": migration["ledger_file_sha256"],
+            "migration_manifest_sha256": migration["allowlist_sha256"],
             "restore_receipt_sha256": stage["restore_receipt_sha256"],
             "runtime_privilege_access_sha256": security["access_sha256"],
             "runtime_privilege_catalog_sha256": security["catalog_sha256"],
@@ -9189,7 +10829,9 @@ class UatRollbackCapabilityRuntime:
                     != plan["targets"]["database"]["active"] \
                 or evidence["migration_head"] != predecessor.get("migration_head") \
                 or evidence["migration_manifest_sha256"] \
-                    != predecessor.get("migration_manifest_sha256"):
+                    != predecessor.get("migration_manifest_sha256") \
+                or evidence["migration_ledger_file_sha256"] \
+                    != inputs.package["sources"]["snapshot_migrations"].get("sha256"):
             reject(code)
         validate_predecessor_migration_binding(
             inputs, expected_head=evidence["migration_head"],
@@ -9197,7 +10839,8 @@ class UatRollbackCapabilityRuntime:
         )
         validate_migration_ledger(
             inputs.raw("snapshot_migrations"),
-            expected_sha256=evidence["migration_manifest_sha256"],
+            expected_ledger_file_sha256=evidence["migration_ledger_file_sha256"],
+            expected_allowlist_sha256=evidence["migration_manifest_sha256"],
             expected_head=evidence["migration_head"],
         )
         return evidence, stage_result_sha256
@@ -9212,13 +10855,16 @@ class UatRollbackCapabilityRuntime:
             system_identifier=stage["system_identifier"],
             marker=stage["restored_database_marker"],
             expected_head=stage["migration_head"],
-            expected_sha256=stage["migration_manifest_sha256"],
+            expected_ledger_file_sha256=stage["migration_ledger_file_sha256"],
+            expected_allowlist_sha256=stage["migration_manifest_sha256"],
         )
         return validate_handler_evidence(
             "ROLLBACK_POSTVERIFY", "MIGRATION_HEAD", {
                 "migration_head": observed["migration"]["head"],
+                "migration_ledger_file_sha256":
+                    observed["migration"]["ledger_file_sha256"],
                 "migration_manifest_sha256":
-                    observed["migration"]["manifest_sha256"],
+                    observed["migration"]["allowlist_sha256"],
                 "database_identity_sha256":
                     observed["identity"]["identity_sha256"],
                 "postgresql_stage_result_sha256": stage_result_sha256,
@@ -9479,6 +11125,12 @@ class StructuredCapabilityBackend:
         self.runtime = runtime
         self.clock = clock
 
+    @staticmethod
+    def bind_terminal_evidence(
+            effects: DurableSideEffectRecorder, evidence: dict[str, Any],
+    ) -> None:
+        effects.validate_terminal_evidence(evidence)
+
     def prepare(
             self, request: dict[str, Any], manifest: dict[str, Any],
             events: list[dict[str, Any]],
@@ -9501,6 +11153,7 @@ class StructuredCapabilityBackend:
         evidence = validate_handler_evidence(
             request["operation"], request["label"], outcome["evidence"],
         )
+        self.bind_terminal_evidence(effects, evidence)
         record = create_handler_result_record(
             request, evidence, effects.assert_closed(), started, self.clock(),
         )
@@ -9520,6 +11173,7 @@ class StructuredCapabilityBackend:
         evidence = validate_handler_evidence(
             request["operation"], request["label"], outcome["evidence"],
         )
+        self.bind_terminal_evidence(effects, evidence)
         record = create_handler_result_record(
             request, evidence, effects.assert_closed(), started, self.clock(),
         )
@@ -9633,11 +11287,18 @@ class ClosedDockerRunner:
     def __init__(
             self, docker_fd: int, plan: dict[str, Any], *, action_deadline: str,
             wall_clock: Any = time.time, monotonic_clock: Any = time.monotonic,
+            execution_observer: Any | None = None,
     ):
         if not isinstance(docker_fd, int) or docker_fd < 3:
             reject("ROLLBACK_FIXED_EXECUTOR_DOCKER_FD_INVALID")
+        if execution_observer is not None and not callable(execution_observer):
+            reject("ROLLBACK_FIXED_EXECUTOR_EXECUTION_OBSERVER_INVALID")
         self.docker_fd = docker_fd
         self.plan = plan
+        # The observer is disabled in normal operation.  The isolated TASK70
+        # harness opts in so it can bind a completed Docker invocation to the
+        # exact stdin and output bytes without changing command semantics.
+        self.execution_observer = execution_observer
         self.volume_helper = validate_volume_helper_plan(
             plan.get("helpers", {}).get("volume_restore"),
         )
@@ -9703,8 +11364,11 @@ class ClosedDockerRunner:
             self, arguments: list[str], *, stdin_fd: int | None = None,
             environment: dict[str, str] | None = None, timeout_seconds: float = 60,
             maximum_output: int = MAX_JSON_BYTES, effectful: bool = False,
+            observe_execution: bool = False,
     ) -> bytes:
         selected_environment = environment or {}
+        if not isinstance(observe_execution, bool):
+            reject("ROLLBACK_FIXED_EXECUTOR_EXECUTION_OBSERVER_INVALID")
         if self._authorized_invocation is not None:
             reject("ROLLBACK_FIXED_EXECUTOR_DOCKER_REENTRANT_INVALID")
         self._authorized_invocation = (
@@ -9716,6 +11380,7 @@ class ClosedDockerRunner:
                 arguments, stdin_fd=stdin_fd, environment=selected_environment,
                 timeout_seconds=bounded_timeout, maximum_output=maximum_output,
                 side_effects_started=effectful,
+                observe_execution=observe_execution,
             )
         finally:
             self._authorized_invocation = None
@@ -10457,7 +12122,9 @@ COMMIT;
     def _postgres_psql_generated(
             self, database: str, phase: str, sql: bytes, *, effectful: bool,
             variables: dict[str, str] | None = None,
+            session_write_override: bool = False,
             maximum_output: int = MAX_JSON_BYTES,
+            observe_execution: bool = False,
     ) -> bytes:
         allowed_databases = {
             "postgres", *self.plan["targets"]["database"].values(),
@@ -10472,13 +12139,21 @@ COMMIT;
                               for character in value)
                        for key, value in selected_variables.items()) \
                 or not isinstance(maximum_output, int) \
-                or not MAX_JSON_BYTES <= maximum_output <= POSTGRES_CONTENT_REPORT_MAX_BYTES:
+                or not MAX_JSON_BYTES <= maximum_output <= POSTGRES_CONTENT_REPORT_MAX_BYTES \
+                or not isinstance(session_write_override, bool) \
+                or session_write_override and (
+                    database != self.plan["targets"]["database"]["staging"]
+                    or not effectful and phase != "preswitchsecurity"
+                ):
             reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_OPCODE_INVALID")
         postgres_id = self.plan["candidate"]["services"]["postgres"]["container_id"]
         token = self.plan["targets"]["database"]["staging"].rsplit("_", 1)[-1]
         arguments = [
             "exec", "--interactive", "--user", "999:999", "--env",
-            f"PGAPPNAME=cyd_rb_{token}_{phase}", "--", postgres_id,
+            f"PGAPPNAME=cyd_rb_{token}_{phase}",
+            *(["--env", "PGOPTIONS=-c default_transaction_read_only=off"]
+              if session_write_override else []),
+            "--", postgres_id,
             "psql", "--no-psqlrc", "--quiet", "--no-align", "--tuples-only",
             "--field-separator=\t", "--host=/var/run/postgresql", "--port=5432",
             "--username=postgres", "--no-password", f"--dbname={database}",
@@ -10492,6 +12167,7 @@ COMMIT;
             return self._call(
                 arguments, stdin_fd=sql_fd, timeout_seconds=300,
                 maximum_output=maximum_output, effectful=effectful,
+                observe_execution=observe_execution,
             )
         finally:
             os.close(sql_fd)
@@ -10549,8 +12225,35 @@ COMMIT;
             effectful=False, maximum_output=POSTGRES_CONTENT_REPORT_MAX_BYTES,
         )
 
+    def postgres_preswitch_content(self, base: dict[str, Any]) -> bytes:
+        self._validate_postverify_postgres(base)
+        return self._postgres_psql_generated(
+            base["databases"]["staging_name"], "preswitchcontent",
+            embedded_postgres_sql(
+                POSTGRES_CONTENT_SQL_ZLIB_BASE64, POSTGRES_CONTENT_SQL_SHA256,
+            ),
+            effectful=False, maximum_output=POSTGRES_CONTENT_REPORT_MAX_BYTES,
+        )
+
     def postgres_postverify_security(
             self, base: dict[str, Any], inputs: CapabilityInputs,
+    ) -> bytes:
+        return self._postgres_runtime_security_state(
+            base, inputs, database=base["databases"]["active_name"],
+            marker=base["databases"]["candidate_marker"], sealed_staging=False,
+        )
+
+    def postgres_preswitch_security(
+            self, base: dict[str, Any], inputs: CapabilityInputs,
+    ) -> bytes:
+        return self._postgres_runtime_security_state(
+            base, inputs, database=base["databases"]["staging_name"],
+            marker=base["databases"]["staging_marker"], sealed_staging=True,
+        )
+
+    def _postgres_runtime_security_state(
+            self, base: dict[str, Any], inputs: CapabilityInputs, *,
+            database: str, marker: str, sealed_staging: bool,
     ) -> bytes:
         self._validate_postverify_postgres(base)
         policy = inputs.json("snapshot_runtime_privilege_policy")
@@ -10561,28 +12264,35 @@ COMMIT;
         if migration_owner != base["security"]["database_owner"]:
             reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_POSTVERIFY_INVALID")
         return self._postgres_psql_generated(
-            base["databases"]["active_name"], "postverifysecurity",
+            database, "preswitchsecurity" if sealed_staging else "postverifysecurity",
             embedded_postgres_sql(
                 POSTGRES_SECURITY_SQL_ZLIB_BASE64, POSTGRES_SECURITY_SQL_SHA256,
             ),
             effectful=False,
             variables={
-                "controlled_runtime_mode": "1",
-                "expected_database": base["databases"]["active_name"],
-                "expected_marker": base["databases"]["candidate_marker"],
+                "sealed_staging_mode" if sealed_staging
+                    else "controlled_runtime_mode": "1",
+                "expected_database": database,
+                "expected_marker": marker,
                 "expected_system_identifier": base["postgres"]["system_identifier"],
                 "migration_owner": migration_owner,
             },
+            session_write_override=sealed_staging,
         )
 
-    def _postverify_database(self, database: str) -> None:
-        if database != self.plan["targets"]["database"]["active"]:
+    def _postverify_database(self, database: str, *, sealed_staging: bool = False) -> None:
+        expected = self.plan["targets"]["database"][
+            "staging" if sealed_staging else "active"
+        ]
+        if database != expected:
             reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_POSTVERIFY_INVALID")
 
-    def postgres_postverify_migrations(self, database: str) -> bytes:
-        self._postverify_database(database)
+    def postgres_postverify_migrations(
+            self, database: str, *, sealed_staging: bool = False,
+    ) -> bytes:
+        self._postverify_database(database, sealed_staging=sealed_staging)
         return self._postgres_psql_generated(
-            database, "postverifymigrations",
+            database, "preswitchmigrations" if sealed_staging else "postverifymigrations",
             b"BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY;\n"
             b"SET LOCAL lock_timeout='5s';\n"
             b"SET LOCAL statement_timeout='60s';\n"
@@ -10592,8 +12302,10 @@ COMMIT;
             effectful=False,
         )
 
-    def postgres_postverify_sessions(self, database: str) -> bytes:
-        self._postverify_database(database)
+    def postgres_postverify_sessions(
+            self, database: str, *, sealed_staging: bool = False,
+    ) -> bytes:
+        self._postverify_database(database, sealed_staging=sealed_staging)
         database_literal = _pg_literal(database)
         sql = f"""BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY;
 SET LOCAL lock_timeout='5s';
@@ -10620,11 +12332,14 @@ SELECT pg_catalog.jsonb_build_object(
 COMMIT;
 """.encode("utf-8")
         return self._postgres_psql_generated(
-            database, "postverifysessions", sql, effectful=False,
+            database, "preswitchsessions" if sealed_staging else "postverifysessions",
+            sql, effectful=False,
         )
 
-    def postgres_postverify_identity(self, database: str) -> bytes:
-        self._postverify_database(database)
+    def postgres_postverify_identity(
+            self, database: str, *, sealed_staging: bool = False,
+    ) -> bytes:
+        self._postverify_database(database, sealed_staging=sealed_staging)
         sql = b"""BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY;
 SET LOCAL lock_timeout='5s';
 SET LOCAL statement_timeout='60s';
@@ -10645,7 +12360,8 @@ WHERE d.datname=current_database();
 COMMIT;
 """
         return self._postgres_psql_generated(
-            database, "postverifyidentity", sql, effectful=False,
+            database, "preswitchidentity" if sealed_staging else "postverifyidentity",
+            sql, effectful=False,
         )
 
     def writer_sql_opcode(
@@ -10683,6 +12399,46 @@ COMMIT;
         sql = render_pg_reconciliation_sql(base, inputs, opcode_spec["bindings"])
         return self._postgres_psql_generated(
             opcode_spec["database"], opcode_spec["phase"], sql, effectful=True,
+            session_write_override=True,
+            observe_execution=True,
+        )
+
+    def postgres_guarded_switch_opcode(
+            self, base: dict[str, Any], inputs: CapabilityInputs,
+            opcode_spec: dict[str, Any],
+    ) -> bytes:
+        base = validate_pg_rollback_base_spec(base)
+        opcode_spec = validate_pg_guarded_switch_opcode_spec(
+            opcode_spec, base=base, inputs=inputs,
+        )
+        planned_postgres = self.plan["candidate"]["services"]["postgres"]
+        if base["runtime_plan_sha256"] != self.plan.get("runtime_plan_sha256") \
+                or base["postgres"]["container_id"] \
+                    != planned_postgres.get("container_id") \
+                or base["postgres"]["image_reference"] \
+                    != planned_postgres.get("image_reference") \
+                or base["postgres"]["image_digest"] \
+                    != planned_postgres.get("image_digest"):
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID")
+        try:
+            migration_owner = inputs.json(
+                "snapshot_runtime_privilege_policy",
+            )["identities"]["migration_owner"]
+        except (KeyError, TypeError, FixedExecutorError):
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID")
+        sql = render_pg_guarded_switch_sql(base, inputs, opcode_spec["bindings"])
+        return self._postgres_psql_generated(
+            opcode_spec["database"], opcode_spec["phase"], sql, effectful=True,
+            variables={
+                "capture_security_state": "1",
+                "sealed_staging_mode": "1",
+                "expected_database": base["databases"]["staging_name"],
+                "expected_marker": base["databases"]["staging_marker"],
+                "expected_system_identifier": base["postgres"]["system_identifier"],
+                "migration_owner": migration_owner,
+            },
+            session_write_override=True,
+            observe_execution=True,
         )
 
     def postgres_capacity(self) -> bytes:
@@ -10756,7 +12512,8 @@ COMMIT;
         output = self._call([
             "exec", "--interactive", "--user", "999:999", "--env",
             f"PGAPPNAME=cyd_rb_{token}_restore", "--env", "LC_ALL=C",
-            "--env", "LANG=C", "--", postgres_id,
+            "--env", "LANG=C", "--env",
+            "PGOPTIONS=-c default_transaction_read_only=off", "--", postgres_id,
             "pg_restore", "--host=/var/run/postgresql", "--port=5432",
             "--username=postgres", "--no-password", f"--dbname={staging}",
             "--format=custom", "--no-owner", "--no-acl", "--no-tablespaces",
@@ -10786,6 +12543,25 @@ COMMIT;
             return self.postgres_restore_list(
                 dump_fd, bindings["dump_sha256"], bindings["dump_bytes"],
             )
+        precondition_opcode = derive_pg_opcode_spec(
+            base, "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1", {
+                "create_receipt_sha256": bindings["create_receipt_sha256"],
+                "staging_oid": bindings["staging_oid"],
+                "dump_inventory_sha256": bindings["dump_inventory_sha256"],
+                "expected_empty_projection_sha256":
+                    bindings["empty_projection_sha256"],
+            },
+        )
+        if precondition_opcode["opcode_spec_sha256"] \
+                != bindings["restore_precondition_opcode_spec_sha256"]:
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_RESTORE_PRECONDITION_INVALID")
+        adjacent_precondition = parse_pg_restore_precondition(
+            self.postgres_sql_opcode(base, precondition_opcode),
+            base=base, opcode_spec=precondition_opcode,
+        )
+        if adjacent_precondition["restore_precondition_sha256"] \
+                != bindings["restore_precondition_sha256"]:
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_RESTORE_PRECONDITION_DRIFT")
         return self.postgres_restore_staging(
             dump_fd, bindings["dump_sha256"], bindings["dump_bytes"],
         )
@@ -10834,16 +12610,59 @@ COMMIT;
         except PermissionError:
             return True
 
+    def _observe_completed_execution(
+            self, *, arguments: list[str], environment: dict[str, str],
+            stdin_present: bool, stdin_bytes: int,
+            stdin_sha256: str | None, timeout_seconds: float,
+            maximum_output: int, side_effects_started: bool, return_code: int,
+            stdout: bytes, stderr: bytes,
+    ) -> None:
+        if self.execution_observer is None:
+            return
+        event = {
+            "arguments": list(arguments),
+            "environment": dict(sorted(environment.items())),
+            "stdin_present": stdin_present,
+            "stdin_bytes": stdin_bytes,
+            "stdin_sha256": stdin_sha256,
+            "timeout_milliseconds": int(round(timeout_seconds * 1000)),
+            "maximum_output_bytes": maximum_output,
+            "side_effects_started": side_effects_started,
+            "return_code": return_code,
+            "stdout": bytes(stdout),
+            "stderr": bytes(stderr),
+            "daemon_state": "COMPLETED_NO_UNTRACKED_PROCESS",
+        }
+        failed = False
+        try:
+            result = self.execution_observer(event)
+        except Exception:
+            failed = True
+            result = None
+        if failed or result is not None:
+            if side_effects_started:
+                raise HandlerOutcomeUnknown(
+                    "SIDE_EFFECT_OUTCOME_UNKNOWN", "AFTER_SIDE_EFFECT",
+                    side_effects_started=True,
+                )
+            reject("ROLLBACK_FIXED_EXECUTOR_EXECUTION_OBSERVER_INVALID")
+
     def _run_generated(
             self, arguments: list[str], *, stdin_fd: int | None = None,
             environment: dict[str, str] | None = None, timeout_seconds: float = 60,
             maximum_output: int = MAX_JSON_BYTES, side_effects_started: bool = False,
+            observe_execution: bool = False,
     ) -> bytes:
         selected_environment = environment or {}
         self._validate(arguments, selected_environment)
+        stdin_sha256 = None
+        stdin_bytes = 0
         if stdin_fd is not None:
             try:
-                os.fstat(stdin_fd)
+                metadata = os.fstat(stdin_fd)
+                if observe_execution and self.execution_observer is not None:
+                    stdin_bytes = metadata.st_size
+                    stdin_sha256 = sha256_fd(stdin_fd)
             except OSError:
                 reject("ROLLBACK_FIXED_EXECUTOR_DOCKER_STDIN_INVALID")
         if not 0.1 <= timeout_seconds <= 1800 or not 1 <= maximum_output <= 64 * 1024 * 1024:
@@ -10920,6 +12739,16 @@ COMMIT;
                 raise HandlerOutcomeUnknown(
                     "TOOL_DAEMON_LEFT_RUNNING", "AFTER_SIDE_EFFECT" if side_effects_started
                     else "BEFORE_SIDE_EFFECT", side_effects_started=side_effects_started,
+                )
+            if observe_execution and self.execution_observer is not None:
+                self._observe_completed_execution(
+                    arguments=arguments, environment=environment_value,
+                    stdin_present=stdin_fd is not None, stdin_bytes=stdin_bytes,
+                    stdin_sha256=stdin_sha256, timeout_seconds=timeout_seconds,
+                    maximum_output=maximum_output,
+                    side_effects_started=side_effects_started,
+                    return_code=return_code, stdout=bytes(streams["stdout"]),
+                    stderr=bytes(streams["stderr"]),
                 )
             if return_code != 0 or streams["stderr"]:
                 if side_effects_started:
@@ -11660,14 +13489,52 @@ class ClosedPostgresCapabilityDriver:
             "classification": classification,
         }
 
+    def restore_precondition(
+            self, base: dict[str, Any], *, create_receipt_sha256: str,
+            restored_oid: str, dump_inventory_sha256: str,
+    ) -> dict[str, Any]:
+        opcode = derive_pg_opcode_spec(
+            base, "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1", {
+                "create_receipt_sha256": create_receipt_sha256,
+                "staging_oid": restored_oid,
+                "dump_inventory_sha256": dump_inventory_sha256,
+                "expected_empty_projection_sha256":
+                    digest_value(postgres_empty_restore_projection()),
+            },
+        )
+        proof = parse_pg_restore_precondition(
+            self.runner.postgres_sql_opcode(base, opcode),
+            base=base, opcode_spec=opcode,
+        )
+        return {"opcode": opcode, "proof": proof}
+
     def restore_dump(
             self, base: dict[str, Any], dump_fd: int, *, create_receipt_sha256: str,
             restored_oid: str, before_content_observation_sha256: str,
+            dump_inventory_sha256: str, restore_precondition: dict[str, Any],
     ) -> dict[str, Any]:
+        precondition_opcode = derive_pg_opcode_spec(
+            base, "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1", {
+                "create_receipt_sha256": create_receipt_sha256,
+                "staging_oid": restored_oid,
+                "dump_inventory_sha256": dump_inventory_sha256,
+                "expected_empty_projection_sha256":
+                    digest_value(postgres_empty_restore_projection()),
+            },
+        )
+        precondition = validate_pg_restore_precondition_proof(
+            restore_precondition, base=base, opcode_spec=precondition_opcode,
+        )
         opcode = derive_pg_dump_opcode_spec(base, "PG_RB_RESTORE_DUMP_V1", {
             "create_receipt_sha256": create_receipt_sha256,
             "staging_oid": restored_oid,
             "before_content_observation_sha256": before_content_observation_sha256,
+            "dump_inventory_sha256": dump_inventory_sha256,
+            "restore_precondition_opcode_spec_sha256":
+                precondition_opcode["opcode_spec_sha256"],
+            "restore_precondition_sha256":
+                precondition["restore_precondition_sha256"],
+            "empty_projection_sha256": precondition["empty_projection_sha256"],
             "dump_sha256": base["snapshot"]["dump_sha256"],
             "dump_bytes": base["snapshot"]["dump_bytes"],
             "expected_content_sha256":
@@ -11676,7 +13543,10 @@ class ClosedPostgresCapabilityDriver:
         ack = parse_pg_mutation_ack(
             self.runner.postgres_dump_opcode(base, opcode, dump_fd), opcode["opcode"],
         )
-        return {"opcode": opcode, "ack": ack, "restored_oid": restored_oid}
+        return {
+            "opcode": opcode, "ack": ack, "restored_oid": restored_oid,
+            "restore_precondition": precondition,
+        }
 
     def reconcile(
             self, base: dict[str, Any], inputs: CapabilityInputs, *,
@@ -11710,19 +13580,142 @@ class ClosedPostgresCapabilityDriver:
             "classification": classification, "restored_oid": restored_oid,
         }
 
-    def switch(
-            self, base: dict[str, Any], *, privilege_receipt_sha256: str,
-            restored_oid: str, before_observation: dict[str, Any],
+    def prove_staging_content(
+            self, inputs: CapabilityInputs, base: dict[str, Any], *,
+            restored_oid: str, binding_sha256: str,
     ) -> dict[str, Any]:
-        before = classify_pg_rollback_layout(
-            before_observation, base=base, restored_oid=restored_oid,
+        code = "ROLLBACK_FIXED_EXECUTOR_STAGING_CONTENT_PROOF_INVALID"
+        base = validate_pg_rollback_base_spec(base)
+        if OID.fullmatch(restored_oid or "") is None \
+                or SHA256.fullmatch(binding_sha256 or "") is None:
+            reject(code)
+        inputs.fd("snapshot_postgresql")
+        source_report = snapshot_database_reconciliation(inputs, base)
+        source_migrations = inputs.raw("snapshot_migrations")
+        migration = validate_migration_ledger(
+            source_migrations,
+            expected_ledger_file_sha256=
+                base["snapshot"]["migration_ledger_file_sha256"],
+            expected_allowlist_sha256=
+                base["snapshot"]["migration_allowlist_sha256"],
+            expected_head=base["snapshot"]["migration_head"],
         )
-        if before["layout"] != "OLD":
-            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_SWITCH_RESULT_INVALID")
-        opcode = derive_pg_opcode_spec(base, "PG_RB_ATOMIC_SWITCH_V1", {
+        before = self.observe(base, "preswitch-before", binding_sha256)
+        if classify_pg_rollback_layout(
+                before, base=base, restored_oid=restored_oid,
+        )["layout"] != "OLD":
+            reject(code)
+        live_report = validate_database_reconciliation_report(
+            self.runner.postgres_preswitch_content(base),
+        )
+        if live_report["sha256"] != source_report["report_sha256"]:
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_CONTENT_DRIFT")
+        live_migrations = self.runner.postgres_postverify_migrations(
+            base["databases"]["staging_name"], sealed_staging=True,
+        )
+        live_migration = validate_migration_ledger(
+            live_migrations,
+            expected_ledger_file_sha256=
+                base["snapshot"]["migration_ledger_file_sha256"],
+            expected_allowlist_sha256=
+                base["snapshot"]["migration_allowlist_sha256"],
+            expected_head=base["snapshot"]["migration_head"],
+        )
+        if live_migrations != source_migrations or live_migration != migration:
+            reject("ROLLBACK_FIXED_EXECUTOR_MIGRATION_LEDGER_DRIFT")
+        security = parse_runtime_privilege_state(
+            self.runner.postgres_preswitch_security(base, inputs),
+            inputs=inputs, base=base, target={
+                "database_oid": restored_oid, "mode": "SEALED_STAGING",
+                "database_name": base["databases"]["staging_name"],
+                "marker": base["databases"]["staging_marker"],
+                "connection_limit": 0,
+            },
+        )
+        sessions = parse_postgres_session_observation(
+            self.runner.postgres_postverify_sessions(
+                base["databases"]["staging_name"], sealed_staging=True,
+            ),
+            database=base["databases"]["staging_name"], allowed_clients={},
+        )
+        identity = parse_postgres_database_identity(
+            self.runner.postgres_postverify_identity(
+                base["databases"]["staging_name"], sealed_staging=True,
+            ),
+            expected_connection_limit=0,
+            expected_default_transaction_read_only=True,
+        )
+        expected_identity = {
+            "name": base["databases"]["staging_name"],
+            "system_identifier": base["postgres"]["system_identifier"],
+            "oid": restored_oid, "marker": base["databases"]["staging_marker"],
+        }
+        if any(identity[field] != expected_value
+               for field, expected_value in expected_identity.items()):
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_IDENTITY_DRIFT")
+        after_binding = digest_value({
+            "binding_sha256": binding_sha256,
+            "content_sha256": live_report["sha256"],
+            "migration_ledger_sha256": live_migration["ledger_sha256"],
+            "security_state_sha256": security["state_sha256"],
+            "session_observation_sha256": sessions["observation_sha256"],
+            "database_identity_sha256": identity["identity_sha256"],
+        })
+        after = self.observe(base, "preswitch-after", after_binding)
+        if classify_pg_rollback_layout(
+                after, base=base, restored_oid=restored_oid,
+        )["layout"] != "OLD":
+            reject(code)
+        before_rows = {item["name"]: item for item in before["databases"]}
+        after_rows = {item["name"]: item for item in after["databases"]}
+        target = after_rows.get(base["databases"]["staging_name"])
+        candidate = after_rows.get(base["databases"]["active_name"])
+        before_target = before_rows.get(base["databases"]["staging_name"])
+        if not isinstance(target, dict) or not isinstance(candidate, dict) \
+                or not isinstance(before_target, dict) \
+                or sessions["total"] != 0 or before_target["sessions"] != 0 \
+                or target["sessions"] != 0:
+            reject(code)
+        return {
+            "source_report": source_report, "live_report": live_report,
+            "migration": migration, "security": security, "sessions": sessions,
+            "identity": identity, "before": before, "after": after,
+            "target": target, "candidate": candidate,
+        }
+
+    def guarded_switch_opcode(
+            self, base: dict[str, Any], inputs: CapabilityInputs, *,
+            privilege_receipt_sha256: str,
+            staging_content_proof_sha256: str, restored_oid: str,
+            before_observation_sha256: str,
+    ) -> dict[str, Any]:
+        """Derive the exact guarded-switch command before its durable intent."""
+        base = validate_pg_rollback_base_spec(base)
+        if OID.fullmatch(restored_oid or "") is None \
+                or any(SHA256.fullmatch(value or "") is None
+                       for value in (
+                           privilege_receipt_sha256,
+                           staging_content_proof_sha256,
+                           before_observation_sha256,
+                       )):
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID")
+        material = _postgres_guarded_switch_material(
+            base, inputs, restored_oid=restored_oid,
+        )
+        source_bindings = {
+            "source_reconciliation_sha256":
+                base["snapshot"]["source_reconciliation_sha256"],
+            "expected_content_report_sha256": material["report"]["sha256"],
+            "migration_ledger_file_sha256":
+                material["migration"]["ledger_file_sha256"],
+            "migration_allowlist_sha256": material["migration"]["allowlist_sha256"],
+            "expected_security_state_sha256": material["security_state_sha256"],
+        }
+        bindings = {
             "privilege_receipt_sha256": privilege_receipt_sha256,
             "staging_oid": restored_oid,
-            "before_observation_sha256": before_observation["observation_sha256"],
+            "before_observation_sha256": before_observation_sha256,
+            "staging_content_proof_sha256": staging_content_proof_sha256,
             "expected_switched_identity_sha256": digest_value({
                 "active_name": base["databases"]["active_name"],
                 "active_oid": restored_oid,
@@ -11730,9 +13723,31 @@ class ClosedPostgresCapabilityDriver:
                 "quarantine_oid": base["databases"]["candidate_oid"],
                 "state": "NEW_SEALED",
             }),
-        })
+            **source_bindings,
+            "guarded_state_sha256": digest_value({
+                **source_bindings,
+                "staging_content_proof_sha256": staging_content_proof_sha256,
+                "staging_oid": restored_oid,
+            }),
+        }
+        return derive_pg_guarded_switch_opcode_spec(
+            base, inputs, bindings,
+        )
+
+    def execute_guarded_switch(
+            self, base: dict[str, Any], inputs: CapabilityInputs, *,
+            opcode: dict[str, Any], restored_oid: str,
+    ) -> dict[str, Any]:
+        """Execute one already-bound guarded command and prove its final layout."""
+        base = validate_pg_rollback_base_spec(base)
+        opcode = validate_pg_guarded_switch_opcode_spec(
+            opcode, base=base, inputs=inputs,
+        )
+        if opcode["bindings"]["staging_oid"] != restored_oid:
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID")
         ack = parse_pg_mutation_ack(
-            self.runner.postgres_sql_opcode(base, opcode), opcode["opcode"],
+            self.runner.postgres_guarded_switch_opcode(base, inputs, opcode),
+            opcode["opcode"],
         )
         observation = self.observe(base, "after-switch", ack["ack_sha256"])
         classification = classify_pg_rollback_layout(
@@ -11744,6 +13759,28 @@ class ClosedPostgresCapabilityDriver:
             "opcode": opcode, "ack": ack, "observation": observation,
             "classification": classification, "restored_oid": restored_oid,
         }
+
+    def switch(
+            self, base: dict[str, Any], inputs: CapabilityInputs, *,
+            privilege_receipt_sha256: str,
+            staging_content_proof_sha256: str, restored_oid: str,
+            before_observation: dict[str, Any],
+    ) -> dict[str, Any]:
+        before = classify_pg_rollback_layout(
+            before_observation, base=base, restored_oid=restored_oid,
+        )
+        if before["layout"] != "OLD":
+            reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_SWITCH_RESULT_INVALID")
+        opcode = self.guarded_switch_opcode(
+            base, inputs,
+            privilege_receipt_sha256=privilege_receipt_sha256,
+            staging_content_proof_sha256=staging_content_proof_sha256,
+            restored_oid=restored_oid,
+            before_observation_sha256=before_observation["observation_sha256"],
+        )
+        return self.execute_guarded_switch(
+            base, inputs, opcode=opcode, restored_oid=restored_oid,
+        )
 
     def unseal(
             self, base: dict[str, Any], *, switch_receipt_sha256: str,
@@ -11801,7 +13838,10 @@ class ClosedPostgresCapabilityDriver:
         source_migrations = inputs.raw("snapshot_migrations")
         migration = validate_migration_ledger(
             source_migrations,
-            expected_sha256=base["snapshot"]["migration_manifest_sha256"],
+            expected_ledger_file_sha256=
+                base["snapshot"]["migration_ledger_file_sha256"],
+            expected_allowlist_sha256=
+                base["snapshot"]["migration_allowlist_sha256"],
             expected_head=base["snapshot"]["migration_head"],
         )
         before = self.observe(base, "postverify-before", binding_sha256)
@@ -11819,7 +13859,10 @@ class ClosedPostgresCapabilityDriver:
         )
         live_migration = validate_migration_ledger(
             live_migrations,
-            expected_sha256=base["snapshot"]["migration_manifest_sha256"],
+            expected_ledger_file_sha256=
+                base["snapshot"]["migration_ledger_file_sha256"],
+            expected_allowlist_sha256=
+                base["snapshot"]["migration_allowlist_sha256"],
             expected_head=base["snapshot"]["migration_head"],
         )
         if live_migrations != source_migrations or live_migration != migration:
@@ -11904,7 +13947,7 @@ class ClosedPostgresCapabilityDriver:
     def postverify_migration_head(
             self, inputs: CapabilityInputs, *, database: str, restored_oid: str,
             system_identifier: str, marker: str, expected_head: str,
-            expected_sha256: str,
+            expected_ledger_file_sha256: str, expected_allowlist_sha256: str,
     ) -> dict[str, Any]:
         code = "ROLLBACK_FIXED_EXECUTOR_MIGRATION_HEAD_INVALID"
         if database != inputs.plan["targets"]["database"]["active"] \
@@ -11913,15 +13956,20 @@ class ClosedPostgresCapabilityDriver:
                 or marker != "chenyida-erp-deployment/v2:UAT:chenyida-erp":
             reject(code)
         validate_predecessor_migration_binding(
-            inputs, expected_head=expected_head, expected_sha256=expected_sha256,
+            inputs, expected_head=expected_head,
+            expected_sha256=expected_allowlist_sha256,
         )
         source = inputs.raw("snapshot_migrations")
         source_ledger = validate_migration_ledger(
-            source, expected_sha256=expected_sha256, expected_head=expected_head,
+            source, expected_ledger_file_sha256=expected_ledger_file_sha256,
+            expected_allowlist_sha256=expected_allowlist_sha256,
+            expected_head=expected_head,
         )
         live = self.runner.postgres_postverify_migrations(database)
         live_ledger = validate_migration_ledger(
-            live, expected_sha256=expected_sha256, expected_head=expected_head,
+            live, expected_ledger_file_sha256=expected_ledger_file_sha256,
+            expected_allowlist_sha256=expected_allowlist_sha256,
+            expected_head=expected_head,
         )
         identity = parse_postgres_database_identity(
             self.runner.postgres_postverify_identity(database),
@@ -11987,7 +14035,7 @@ class ClosedActivationCapabilityDriver:
     ) -> dict[str, Any]:
         return self.postgres_driver.unseal(
             base,
-            switch_receipt_sha256=stage_evidence["switch_transaction_sha256"],
+            switch_receipt_sha256=stage_evidence["switch_receipt_sha256"],
             activation_prerequisites_sha256=activation_prerequisites_sha256,
             sealed_security_projection_sha256=
                 stage_evidence["sealed_security_projection_sha256"],

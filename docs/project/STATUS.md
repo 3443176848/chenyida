@@ -2,22 +2,23 @@
 
 最后更新时间：2026-08-21（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；首个PG机制动态证据已通过）
+## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；V3源码闭合，动态运行待执行）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-RESTORE-02 NEXT / PRODUCTION NO-GO | 当前唯一DOING；单容器PG17原子切换机制已通过，下一切片验证隔离dump/Migration/ACL恢复边界 |
-| 只读审计 | PASS / THREE LINES | 数据、应用测试、运维安全三线均确认现有动态runner/receipt消费路径缺失，且完整Compose与单临时容器硬规则冲突 |
-| 状态边界 | PASS / FAIL CLOSED | 已独立表达`HANDLERS_IMPLEMENTED_DORMANT`、隔离动态证明、host activation、真实UAT回退与人工UAT；当前4项阻断（P0=3、P1=1）且`PARTIAL_ONLY`不能清除 |
-| 合同/verifier | PASS / VERSIONED | 固定TEST/隔离合成、唯一case、PG17摘要、精确tmpfs/资源/对象/清理合同、六项非声明；安全文件读取及版本/Migration/source绑定通过 |
-| 机器审计 | PASS / BLOCKED AS DESIGNED | 动态artifact`867f3a7c…2f56`由Node/Git复算为`VERIFIED_PARTIAL_ONLY`；audit`a9d2e031…ddd1d`仍有4 blockers（P0=3、P1=1），`may_start=false` |
-| 自动验证 | PASS / SCOPED APPLICABLE | Python动态runner 24/24、Node审计20/20、release合同29/29、inventory262/238/24、官方凭据扫描1,785文件及生成物重放通过；共享数值golden vector覆盖`2.0`/`2`边界 |
-| 首个动态case | PASS PARTIAL / `DV70-PG-SWITCH-01` | 单一隔离PostgreSQL 17.10中5场景/9断言通过：成功切换、OID保持、重复失败关闭、前置漂移拒绝、首rename故障回滚及调用方丢弃结果后的只读观察 |
-| 资源边界 | PASS / 180 SECOND EVIDENCE | 37样本；最低available 1,900,601,344 bytes、Swap最大6.704%且60秒增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624/67,108,864 bytes、Load1最高0.23、restart/OOM增量0 |
-| 对象/清理 | PASS / ZERO TASK RESIDUE | cleanup receipt`68ee1d20…a700`；唯一PG容器按精确ID删除，任务容器/网络/卷/tmp根/进程均为0，既有Docker对象、四服务及四个受保护卷不变 |
-| Git恢复锚点 | PASS / PRIVATE FAST-FORWARD | 官方凭据扫描后确认private main `3e30dc3`为本地祖先，6个提交普通快进至证据提交`526fd4a`；本条治理提交按同一授权继续普通快进并复核远端等于本地HEAD。未force，未推送公开origin |
+| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 SOURCE READY / DYNAMIC RUN PENDING / PRODUCTION NO-GO | 当前唯一DOING；V3必须先提交为clean source并私有普通快进，再运行隔离PG17动态artifact |
+| 只读终审 | PASS / TWO INDEPENDENT LINES / NO P0 OR P1 | 两条终审分别复核跨语言证据、fixed executor observer/receipt、原始失败输出、资源时钟与整件篡改链；P0=0、P1=0，发布失败残留P2已用inode绑定清理和回归测试闭合 |
+| 状态边界 | PASS / FAIL CLOSED | V3只扩大隔离合成的数据库机制覆盖；dump/Volume、完整handler request/result commit边界、fresh-process恢复、host activation、真实UAT回退与人工UAT均继续阻断 |
+| V3合同/verifier | PASS / SOURCE READY | 固定46项Migration、9角色/4 membership、内容/Migration/security守卫、10场景/15断言、9条精确生产执行回执、strict JSON/gzip/artifact及monotonic-wall clock双语验证 |
+| 历史V2冻结 | PASS / BYTE IDENTICAL | producer/verifier/audit-test/policy/artifact五个SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91` |
+| 自动验证 | PASS / SOURCE SCOPED | Python V3 16/16、fixed executor 129/129、Node V3 13/13、受影响合同108/108、release 29/29、inventory263/239/24、Node syntax和diff门通过；初次35项EACCES已证明为容器夹具能力不足并以仅补`DAC_OVERRIDE`/`CHOWN`复现全绿 |
+| 已验证动态case | PASS PARTIAL / `DV70-PG-SWITCH-01` | 历史不可变artifact`867f3a7c…2f56`继续证明5场景/9断言；不被V3源码准备重写或扩大解释 |
+| 当前动态case | PENDING / `DV70-PG-GUARDED-SWITCH-02` | 源码已闭合但尚无V3 artifact；将验证完整Migration/权限/内容状态上的guarded switch、故障事务回滚及一次性恢复/no-replay，最多仍为`PARTIAL_ONLY` |
+| 当前资源边界 | PASS / PRE-SOURCE-TEST SNAPSHOTS | available约2.0—2.1GiB、Swap126MiB/1GiB、根盘11GiB、Load低；四服务稳定约3天、restart/OOM无变化。正式动态运行仍必须生成新鲜60/180秒机器证据 |
+| 对象/清理 | PASS / NO CURRENT TASK RESIDUE | 当前所有临时Node容器均已按任务名消失，未创建网络或Volume；发现的`/tmp/cyd-uat-promotion-*`均为8月15—16既有残留，不属于本轮且未删除 |
+| Git恢复锚点 | PENDING / AUTHORIZED PRIVATE FAST-FORWARD | 项目负责人已授权敏感信息检查通过后将main非强制推送到`recovery-private/main`；当前V3源码尚未提交/推送，不提前声称远端已同步 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不访问现有UAT数据库、受保护Volume、真实备份/凭据/业务数据，不执行host activation、Migration、部署或真实回退 |
-| 系统是否可用 | NO | 该证据不覆盖dump/Migration/ACL、文件域、Compose、host激活、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
+| 系统是否可用 | NO | V3源码和合成测试不能代替动态artifact，更不能代替dump/Volume恢复、源码匹配镜像、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
 
 ## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（完成；BuildKit限定清理与清理后门通过）
 

@@ -34,19 +34,24 @@ import { clusterSha256 } from "../scripts/postgresql-cluster-recovery-contract.m
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const image = (name) => `registry.example.invalid/chenyida/${name}@sha256:${hash(name)}`;
+const without = (value, field) => Object.fromEntries(
+  Object.entries(value).filter(([key]) => key !== field),
+);
 function preactivationContentProof({ bindingSha256, runtimePlanSha256, reconciliationSha256,
-  reportSha256, migrationHead, migrationManifestSha256, database, restoredOid,
+  reportSha256, migrationHead, migrationLedgerFileSha256, migrationAllowlistSha256,
+  database, restoredOid,
   quarantineName, quarantineMarker }) {
   const body = {
     schema_version: 1,
-    contract: "chenyida-erp-uat-promotion-rollback-preactivation-content-proof/v1",
+    contract: "chenyida-erp-uat-promotion-rollback-preactivation-content-proof/v2",
     binding_sha256: bindingSha256,
     runtime_plan_sha256: runtimePlanSha256,
     source_reconciliation_sha256: reconciliationSha256,
     source_database_report_sha256: reportSha256,
     live_database_report_sha256: reportSha256,
     migration_head: migrationHead,
-    migration_manifest_sha256: migrationManifestSha256,
+    migration_ledger_file_sha256: migrationLedgerFileSha256,
+    migration_allowlist_sha256: migrationAllowlistSha256,
     migration_ledger_sha256: hash("preactivation-migration-ledger"),
     live_security_state_sha256: hash("preactivation-security-state"),
     active_allowed_session_role_set_sha256: hash("preactivation-role-set"),
@@ -73,6 +78,108 @@ function preactivationContentProof({ bindingSha256, runtimePlanSha256, reconcili
     candidate_database_quarantine_prepared_xacts: 0,
     before_observation_sha256: hash("preactivation-before"),
     after_observation_sha256: hash("preactivation-after"),
+  };
+  return { ...body, proof_sha256: clusterSha256(body) };
+}
+
+function restorePreconditionProof({ baseSpecSha256, opcodeSpecSha256,
+  createReceiptSha256, dumpInventorySha256, systemIdentifier, databaseName,
+  databaseOid, databaseMarker }) {
+  const databaseValue = {
+    name: databaseName,
+    oid: databaseOid,
+    marker: databaseMarker,
+    owner: "postgres",
+    allow_connections: true,
+    connection_limit: 0,
+    default_transaction_read_only: true,
+    sessions: 0,
+    prepared_xacts: 0,
+  };
+  const profile = {
+    encoding: "UTF8",
+    locale_provider: "libc",
+    collate: "C.UTF-8",
+    ctype: "C.UTF-8",
+    collation_version: null,
+    default_tablespace: "pg_default",
+  };
+  const emptyProjection = {
+    user_schema_count: 0,
+    relation_count: 0,
+    sequence_count: 0,
+    routine_count: 0,
+    standalone_type_count: 0,
+    unexpected_extension_count: 0,
+    large_object_count: 0,
+    schema_migrations_present: false,
+  };
+  const body = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-rollback-postgresql-restore-precondition/v1",
+    base_spec_sha256: baseSpecSha256,
+    opcode_spec_sha256: opcodeSpecSha256,
+    binding_sha256: createReceiptSha256,
+    create_receipt_sha256: createReceiptSha256,
+    dump_inventory_sha256: dumpInventorySha256,
+    system_identifier: systemIdentifier,
+    server_version_num: "170006",
+    database: databaseValue,
+    database_identity_sha256: clusterSha256({
+      system_identifier: systemIdentifier, ...databaseValue,
+    }),
+    profile,
+    profile_sha256: clusterSha256(profile),
+    empty_projection: emptyProjection,
+    empty_projection_sha256: clusterSha256(emptyProjection),
+    raw_observation_sha256: hash("rollback-restore-precondition-observation"),
+  };
+  return { ...body, restore_precondition_sha256: clusterSha256(body) };
+}
+
+function stagingContentProof({ bindingSha256, baseSpecSha256, runtimePlanSha256,
+  reconciliationSha256, reportSha256, migrationHead, migrationLedgerFileSha256,
+  migrationAllowlistSha256, stagingName, stagingOid, stagingMarker,
+  systemIdentifier, candidateName, candidateOid, candidateMarker }) {
+  const body = {
+    schema_version: 1,
+    contract: "chenyida-erp-uat-promotion-rollback-staging-content-proof/v1",
+    binding_sha256: bindingSha256,
+    base_spec_sha256: baseSpecSha256,
+    runtime_plan_sha256: runtimePlanSha256,
+    source_reconciliation_sha256: reconciliationSha256,
+    source_database_report_sha256: reportSha256,
+    live_database_report_sha256: reportSha256,
+    migration_head: migrationHead,
+    migration_ledger_file_sha256: migrationLedgerFileSha256,
+    migration_allowlist_sha256: migrationAllowlistSha256,
+    migration_ledger_sha256: hash("rollback-staging-migration-ledger"),
+    live_security_state_sha256: hash("rollback-staging-security-state"),
+    staging_allowed_session_role_set_sha256: hash("rollback-staging-role-set"),
+    staging_session_client_policy_sha256: hash("rollback-staging-client-policy"),
+    staging_session_observation_sha256: hash("rollback-staging-session-observation"),
+    staging_writer_session_count: 0,
+    staging_database_identity_sha256: clusterSha256({
+      name: stagingName, system_identifier: systemIdentifier,
+      oid: stagingOid, marker: stagingMarker,
+    }),
+    staging_database_name: stagingName,
+    staging_database_oid: stagingOid,
+    staging_database_marker: stagingMarker,
+    system_identifier: systemIdentifier,
+    staging_allow_connections: true,
+    staging_connection_limit: 0,
+    staging_default_transaction_read_only: true,
+    staging_prepared_xacts: 0,
+    candidate_database_name: candidateName,
+    candidate_database_oid: candidateOid,
+    candidate_database_marker: candidateMarker,
+    candidate_database_allow_connections: false,
+    candidate_database_connection_limit: 0,
+    candidate_database_sessions: 0,
+    candidate_database_prepared_xacts: 0,
+    before_observation_sha256: hash("rollback-staging-before"),
+    after_observation_sha256: hash("rollback-staging-after"),
   };
   return { ...body, proof_sha256: clusterSha256(body) };
 }
@@ -349,6 +456,84 @@ function applicationService(name, imageReference, imageConfigDigest) {
 
 function stageEvidence(stage, intent, packageValue, priorStages = []) {
   const targets = deriveUatPromotionRollbackRuntimeTargets(intent.rollback_operation_id);
+  const restoredDatabaseOid = "17384";
+  const postgresBaseSpecSha256 = hash("rollback-postgresql-base-spec");
+  const capacityReceiptSha256 = hash("rollback-postgresql-capacity-receipt");
+  const restoreReceiptSha256 = hash("rollback-postgresql-restore-receipt");
+  const privilegeReconcileReceiptSha256 = hash("rollback-postgresql-reconcile-receipt");
+  const restorePrecondition = restorePreconditionProof({
+    baseSpecSha256: postgresBaseSpecSha256,
+    opcodeSpecSha256: hash("rollback-restore-precondition-opcode-spec"),
+    createReceiptSha256: capacityReceiptSha256,
+    dumpInventorySha256: hash("rollback-postgresql-dump-inventory"),
+    systemIdentifier: database.system_identifier,
+    databaseName: targets.database.staging,
+    databaseOid: restoredDatabaseOid,
+    databaseMarker:
+      `chenyida-erp-uat-rollback/v1:${intent.rollback_operation_id}:RESTORED_STAGING`,
+  });
+  const preSwitchContentProof = stagingContentProof({
+    bindingSha256: privilegeReconcileReceiptSha256,
+    baseSpecSha256: postgresBaseSpecSha256,
+    runtimePlanSha256: packageValue.runtime_plan_sha256,
+    reconciliationSha256: packageValue.content_reconciliation.source_reconciliation_sha256,
+    reportSha256: packageValue.content_reconciliation.database.report_sha256,
+    migrationHead: predecessor.migration_head,
+    migrationLedgerFileSha256: packageValue.sources.snapshot_migrations.sha256,
+    migrationAllowlistSha256: predecessor.migration_manifest_sha256,
+    stagingName: targets.database.staging,
+    stagingOid: restoredDatabaseOid,
+    stagingMarker:
+      `chenyida-erp-uat-rollback/v1:${intent.rollback_operation_id}:RESTORED_STAGING`,
+    systemIdentifier: database.system_identifier,
+    candidateName: database.name,
+    candidateOid: database.oid,
+    candidateMarker: database.marker,
+  });
+  const guardedSwitch = {
+    opcodeSpecSha256: hash("rollback-postgresql-guarded-opcode-spec"),
+    sqlSha256: hash("rollback-postgresql-guarded-sql"),
+    runnerArgvTemplateSha256: hash("rollback-postgresql-guarded-runner-argv"),
+    stateSha256: clusterSha256({
+      source_reconciliation_sha256: preSwitchContentProof.source_reconciliation_sha256,
+      expected_content_report_sha256: preSwitchContentProof.source_database_report_sha256,
+      migration_ledger_file_sha256: preSwitchContentProof.migration_ledger_file_sha256,
+      migration_allowlist_sha256: preSwitchContentProof.migration_allowlist_sha256,
+      expected_security_state_sha256: preSwitchContentProof.live_security_state_sha256,
+      staging_content_proof_sha256: preSwitchContentProof.proof_sha256,
+      staging_oid: preSwitchContentProof.staging_database_oid,
+    }),
+    expectedIdentitySha256: clusterSha256({
+      active_name: database.name,
+      active_oid: restoredDatabaseOid,
+      quarantine_name: targets.database.candidate_quarantine,
+      quarantine_oid: database.oid,
+      state: "NEW_SEALED",
+    }),
+  };
+  const switchReceiptBody = {
+    schema_version: 2,
+    contract: "chenyida-erp-uat-promotion-rollback-side-effect-receipt/v2",
+    status: "COMMITTED",
+    operation_id: intent.rollback_operation_id,
+    label: "POSTGRESQL_RESTORE",
+    side_effect_name: "DATABASE_SWITCH",
+    intent_sha256: hash("rollback-postgresql-switch-intent"),
+    before_identity_sha256: preSwitchContentProof.proof_sha256,
+    after_identity_sha256: hash("rollback-postgresql-switch-effect"),
+    argv_template_sha256: clusterSha256({
+      opcode: "PG_RB_GUARDED_SWITCH_V3",
+      opcode_spec_sha256: guardedSwitch.opcodeSpecSha256,
+      sql_sha256: guardedSwitch.sqlSha256,
+      runner_argv_template_sha256: guardedSwitch.runnerArgvTemplateSha256,
+    }),
+    recovery_observation_sha256: "0".repeat(64),
+    daemon_state: "COMPLETED_NO_UNTRACKED_PROCESS",
+    completed_at: "2026-08-15T02:00:02.500Z",
+  };
+  const switchReceipt = {
+    ...switchReceiptBody, receipt_sha256: clusterSha256(switchReceiptBody),
+  };
   const commonVolume = (domain) => ({
     strategy: packageValue.restore_strategies.file_domains,
     source_artifact_sha256: packageValue.sources[`snapshot_${domain}`].sha256,
@@ -410,7 +595,7 @@ function stageEvidence(stage, intent, packageValue, priorStages = []) {
       source_reconciliation_sha256: packageValue.content_reconciliation.source_reconciliation_sha256,
       target_content_sha256: packageValue.content_reconciliation.database.report_sha256,
       snapshot_database_oid: database.oid,
-      restored_database_oid: "17384",
+      restored_database_oid: restoredDatabaseOid,
       restored_database_name: database.name,
       system_identifier: database.system_identifier,
       migration_head: predecessor.migration_head,
@@ -420,14 +605,24 @@ function stageEvidence(stage, intent, packageValue, priorStages = []) {
       candidate_database_quarantine_oid: database.oid,
       runtime_plan_sha256: packageValue.runtime_plan_sha256,
       manifest_sha256: packageValue.sources.snapshot_manifest.sha256,
+      migration_ledger_file_sha256: packageValue.sources.snapshot_migrations.sha256,
       migration_manifest_sha256: predecessor.migration_manifest_sha256,
       writer_containment_stage_result_sha256:
         priorStages[1]?.stage_result_sha256 ?? hash("writer-containment-stage-result-unavailable"),
       postgres_container_id: hash("candidate-container:postgres"),
       postgres_image_config_digest: `sha256:${hash("candidate-image:postgres")}`,
-      database_profile_sha256: hash("rollback-database-profile"),
-      capacity_receipt_sha256: hash("rollback-postgresql-capacity-receipt"),
-      restore_receipt_sha256: hash("rollback-postgresql-restore-receipt"),
+      database_profile_sha256: restorePrecondition.profile_sha256,
+      postgres_base_spec_sha256: postgresBaseSpecSha256,
+      staging_create_receipt_sha256: capacityReceiptSha256,
+      restore_receipt_sha256: restoreReceiptSha256,
+      privilege_reconcile_receipt_sha256: privilegeReconcileReceiptSha256,
+      restore_precondition_opcode_spec_sha256: restorePrecondition.opcode_spec_sha256,
+      restore_precondition_sha256: restorePrecondition.restore_precondition_sha256,
+      dump_inventory_sha256: restorePrecondition.dump_inventory_sha256,
+      empty_projection_sha256: restorePrecondition.empty_projection_sha256,
+      restore_precondition: restorePrecondition,
+      pre_switch_content_proof_sha256: preSwitchContentProof.proof_sha256,
+      pre_switch_content_proof: preSwitchContentProof,
       runtime_privilege_access_sha256:
         packageValue.sources.snapshot_runtime_privilege_access.sha256,
       runtime_privilege_catalog_sha256: hash("rollback-runtime-privilege-catalog"),
@@ -444,7 +639,14 @@ function stageEvidence(stage, intent, packageValue, priorStages = []) {
         `chenyida-erp-uat-rollback/v1:${intent.rollback_operation_id}:RESTORED_STAGING`,
       candidate_database_quarantine_marker:
         `chenyida-erp-uat-rollback/v1:${intent.rollback_operation_id}:CANDIDATE_QUARANTINE`,
-      switch_transaction_sha256: hash("rollback-postgresql-switch-transaction"),
+      guarded_switch_opcode_spec_sha256: guardedSwitch.opcodeSpecSha256,
+      guarded_switch_sql_sha256: guardedSwitch.sqlSha256,
+      guarded_switch_runner_argv_template_sha256: guardedSwitch.runnerArgvTemplateSha256,
+      guarded_switch_state_sha256: guardedSwitch.stateSha256,
+      guarded_switch_expected_identity_sha256: guardedSwitch.expectedIdentitySha256,
+      switch_receipt_sha256: switchReceipt.receipt_sha256,
+      switch_effect_identity_sha256: switchReceipt.after_identity_sha256,
+      switch_receipt: switchReceipt,
       restored_database_allow_connections_at_commit: false,
       restored_database_connection_limit_at_commit: 0,
       restored_database_sessions_at_commit: 0,
@@ -511,7 +713,8 @@ function stageEvidence(stage, intent, packageValue, priorStages = []) {
           packageValue.content_reconciliation.source_reconciliation_sha256,
         reportSha256: packageValue.content_reconciliation.database.report_sha256,
         migrationHead: predecessor.migration_head,
-        migrationManifestSha256: predecessor.migration_manifest_sha256,
+        migrationLedgerFileSha256: packageValue.sources.snapshot_migrations.sha256,
+        migrationAllowlistSha256: predecessor.migration_manifest_sha256,
         database,
         restoredOid: priorStages[2]?.evidence.restored_database_oid ?? "17384",
         quarantineName: targets.database.candidate_quarantine,
@@ -672,6 +875,7 @@ function checkEvidence(check, rollback, packageValue, checkedAt) {
         restored_database_marker: stage.evidence.restored_database_marker,
         system_identifier: stage.evidence.system_identifier,
         migration_head: stage.evidence.migration_head,
+        migration_ledger_file_sha256: stage.evidence.migration_ledger_file_sha256,
         migration_manifest_sha256: stage.evidence.migration_manifest_sha256,
         restore_receipt_sha256: stage.evidence.restore_receipt_sha256,
         runtime_privilege_access_sha256: stage.evidence.runtime_privilege_access_sha256,
@@ -728,6 +932,8 @@ function checkEvidence(check, rollback, packageValue, checkedAt) {
   const values = {
     MIGRATION_HEAD: {
       migration_head: rollback.predecessor.migration_head,
+      migration_ledger_file_sha256:
+        rollback.stages[2].evidence.migration_ledger_file_sha256,
       migration_manifest_sha256: rollback.predecessor.migration_manifest_sha256,
       database_identity_sha256: clusterSha256(rollback.restored_database),
       postgresql_stage_result_sha256: rollback.stages[2].stage_result_sha256,
@@ -764,8 +970,19 @@ function checkEvidence(check, rollback, packageValue, checkedAt) {
       rollback_runtime_configuration_sha256: rollback.rollback_runtime_configuration_sha256,
     },
     HEALTH: (() => {
-      const receipt = JSON.parse(activation.rollback_postdeploy_receipt_json);
-      const readiness = { ...receipt.readiness, database_time: checkedAt };
+      const readiness = {
+        deployment_class: "UAT",
+        deployment_id: "chenyida-erp",
+        version: rollback.predecessor.application_version,
+        revision: rollback.predecessor.git_commit.slice(0, 12),
+        migration_head: rollback.predecessor.migration_head,
+        migration_manifest_sha256: rollback.predecessor.migration_manifest_sha256,
+        database_time: checkedAt,
+        components: {
+          postgresql: "READY", migration: "READY", worker: "READY",
+          uploads: "READY", attachments: "READY", runtime: "READY",
+        },
+      };
       const services = {
         caddy: activation.caddy, postgres: activation.postgres,
         web: activation.web, worker: activation.worker,
@@ -917,6 +1134,36 @@ test("stage results reject a zero side-effect receipt aggregate after result reh
   );
 });
 
+test("PostgreSQL stage rejects rehashed staging identity and guarded-switch binding forgery", () => {
+  const packageValue = executionPackage();
+  const intent = rollbackIntent(packageValue);
+  assert.throws(
+    () => rollbackResult(intent, packageValue, (stage, evidence) => {
+      if (stage !== "POSTGRESQL_RESTORE") return;
+      const proof = evidence.pre_switch_content_proof;
+      proof.staging_database_identity_sha256 = hash("forged-staging-identity");
+      proof.proof_sha256 = clusterSha256(without(proof, "proof_sha256"));
+      evidence.pre_switch_content_proof_sha256 = proof.proof_sha256;
+      evidence.switch_receipt.before_identity_sha256 = proof.proof_sha256;
+      evidence.switch_receipt.receipt_sha256 = clusterSha256(
+        without(evidence.switch_receipt, "receipt_sha256"),
+      );
+      evidence.switch_receipt_sha256 = evidence.switch_receipt.receipt_sha256;
+    }),
+    /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID/,
+  );
+  for (const field of [
+    "guarded_switch_state_sha256", "guarded_switch_expected_identity_sha256",
+  ]) {
+    assert.throws(
+      () => rollbackResult(intent, packageValue, (stage, evidence) => {
+        if (stage === "POSTGRESQL_RESTORE") evidence[field] = hash(`forged:${field}`);
+      }),
+      /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID/,
+    );
+  }
+});
+
 test("checkpoint 14 rejects missing privilege evidence and unusable capacity or restore receipts", () => {
   const packageValue = executionPackage();
   const intent = rollbackIntent(packageValue);
@@ -928,7 +1175,7 @@ test("checkpoint 14 rejects missing privilege evidence and unusable capacity or 
   );
   assert.throws(
     () => rollbackResult(intent, packageValue, (stage, evidence) => {
-      if (stage === "POSTGRESQL_RESTORE") evidence.capacity_receipt_sha256 = "0".repeat(64);
+      if (stage === "POSTGRESQL_RESTORE") evidence.staging_create_receipt_sha256 = "0".repeat(64);
     }),
     /UAT_PROMOTION_ROLLBACK_STAGE_RESULT_INVALID/,
   );

@@ -2344,7 +2344,7 @@ def validate_response(
         label_field = "stage" if request["operation"] == "ROLLBACK_EXECUTION" else "check"
         intent_field = f"{label_field}_intent_sha256"
         result_field = f"{label_field}_result_sha256"
-        contract = f"chenyida-erp-uat-promotion-rollback-{label_field}-result/v5"
+        contract = f"chenyida-erp-uat-promotion-rollback-{label_field}-result/v6"
         expected_status = "COMMITTED" if label_field == "stage" else "VERIFIED"
         fields = {
             "schema_version", "contract", "status", "promotion_id", "promotion_generation",
@@ -2354,7 +2354,7 @@ def validate_response(
             "evidence", "started_at", "completed_at", result_field,
         }
         result = exact(result, fields, "ROLLBACK_RUNTIME_RECORD_RESPONSE_INVALID")
-        if result.get("schema_version") != 5 or result.get("contract") != contract \
+        if result.get("schema_version") != 6 or result.get("contract") != contract \
                 or result.get("status") != expected_status \
                 or result.get("operation_id") != request["operation_id"] \
                 or result.get(label_field) != request["label"] \

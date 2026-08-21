@@ -33,7 +33,55 @@ SET statement_timeout = '60s';
   \quit 3
 \endif
 
-\if :{?controlled_runtime_mode}
+\if :{?sealed_staging_mode}
+  SELECT (
+    current_database()=:'expected_database'
+    AND shobj_description(database.oid,'pg_database')=:'expected_marker'
+    AND control.system_identifier::text=:'expected_system_identifier'
+    AND current_user=session_user
+    AND EXISTS (SELECT 1 FROM pg_roles role WHERE role.rolname=current_user AND role.rolsuper)
+    AND current_setting('server_version_num')='170010'
+    AND current_setting('default_transaction_read_only')='off'
+    AND database.datallowconn
+    AND database.datconnlimit=0
+    AND (SELECT count(*) FROM pg_db_role_setting setting
+         CROSS JOIN LATERAL unnest(setting.setconfig) item
+         WHERE setting.setdatabase=database.oid AND setting.setrole=0
+           AND item LIKE 'default_transaction_read_only=%')=1
+    AND EXISTS (
+      SELECT 1 FROM pg_db_role_setting setting
+      CROSS JOIN LATERAL unnest(setting.setconfig) item
+      WHERE setting.setdatabase=database.oid AND setting.setrole=0
+        AND item='default_transaction_read_only=on'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_db_role_setting setting
+      CROSS JOIN LATERAL unnest(setting.setconfig) item
+      WHERE (setting.setdatabase=0 OR setting.setdatabase=database.oid)
+        AND setting.setrole<>0 AND item LIKE 'default_transaction_read_only=%'
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_stat_activity activity
+      WHERE activity.datid=database.oid AND activity.pid<>pg_backend_pid()
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_prepared_xacts prepared
+      WHERE prepared.database=database.datname
+    )
+    AND NOT pg_is_in_recovery()
+    AND current_setting('listen_addresses')='*'
+    AND pg_get_userbyid(database.datdba)=:'migration_owner'
+  ) AS sealed_staging_target_valid
+  FROM pg_database database
+  CROSS JOIN pg_control_system() control
+  WHERE database.datname=current_database()
+  \gset
+  \if :sealed_staging_target_valid
+  \else
+    \echo 'RUNTIME_PRIVILEGE_STATE_SEALED_STAGING_TARGET_INVALID'
+    \quit 3
+  \endif
+\elif :{?controlled_runtime_mode}
   SELECT (
     current_database()=:'expected_database'
     AND shobj_description(database.oid,'pg_database')=:'expected_marker'
@@ -166,7 +214,9 @@ setting_records AS (
   FROM pg_db_role_setting setting
   LEFT JOIN pg_roles role ON role.oid=setting.setrole
   LEFT JOIN pg_database database ON database.oid=setting.setdatabase
-  WHERE setting.setrole=0 OR role.rolname LIKE 'chenyida\_erp\_%' ESCAPE '\' OR setting.setdatabase=(SELECT oid FROM pg_database WHERE datname=current_database())
+  WHERE setting.setdatabase=(SELECT oid FROM pg_database WHERE datname=current_database())
+     OR (setting.setdatabase=0
+         AND (setting.setrole=0 OR role.rolname LIKE 'chenyida\_erp\_%' ESCAPE '\'))
 ),
 object_acl_records AS (
   SELECT 'DATABASE'::text AS kind,database.datname::text AS identity,pg_temp.cyd_runtime_role_name(database.datdba) AS owner,

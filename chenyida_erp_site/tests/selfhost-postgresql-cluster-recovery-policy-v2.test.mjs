@@ -118,7 +118,7 @@ test("repository V2 is generated exactly from immutable V1 and current runtime p
   assert.equal(template.memberships.length, 4);
   assert.equal(template.credential_binding.login_roles.length, 5);
   assert.equal(template.runtime_privilege_binding.migration_head, "0046_runtime_lock_privilege_boundary.sql");
-  assert.equal(template.runtime_privilege_binding.policy_sha256, "e31413ae3b8fe8ef4c119e043db8d7777524ac5ad4515936727aab57dbd66ddf");
+  assert.equal(template.runtime_privilege_binding.policy_sha256, "b99cd7389dbb5a9f24b56400a61d0a05f3de2ca0ec84101560beab22cb07226c");
   assert.deepEqual(template.actual_recovery_controls.required_data_domains, ["POSTGRESQL", "attachments", "backup_status", "uploads"]);
   assert.ok(template.supported_object_kinds.includes("LARGE_OBJECT"));
   assert.equal(template.activation.status, "REPOSITORY_TEMPLATE");

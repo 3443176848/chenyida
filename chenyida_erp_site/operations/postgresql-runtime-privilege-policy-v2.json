@@ -11,22 +11,22 @@
       "code": "POSTGRESQL17_COMPILED_CATALOG_REQUIRED",
       "evidence_contract": "chenyida-erp-postgresql-runtime-compiled-catalog/v1",
       "evidence_catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
-      "evidence_artifact_sha256": "b8536bc18531a819e8baa77012f9ef91e67241cc769978df482b81aa6a869beb"
+      "evidence_artifact_sha256": "9e331334c1636b2ee46180df3aca6850c7831470782f7f03856a6efef962480b"
     }
   ],
   "source_binding": {
     "access_intent": {
       "path": "operations/postgresql-runtime-privilege-access-v2.json",
       "contract": "chenyida-erp-postgresql-runtime-privilege-access/v2",
-      "access_sha256": "8eece185f306dc3d1c54275329068c16620b3ffbd5c8d703849166fb07f6fc76",
-      "file_sha256": "2ab41ef7cd693f241400755bdec908e616cdd9c1fd7d024c2818e5c4ed65f9d4"
+      "access_sha256": "bcd714c9af16a634279eb38f01b665d3f927d16af41e64c1a065eea1ee17dd17",
+      "file_sha256": "5f797bc4948bd201ae3647a2198a574e717e46f8f1fa7843ca7c7e2afdecf1a9"
     },
     "compiled_catalog": {
       "path": "operations/postgresql-runtime-privilege-compiled-catalog-v1.json",
       "contract": "chenyida-erp-postgresql-runtime-compiled-catalog/v1",
       "catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
-      "artifact_sha256": "b8536bc18531a819e8baa77012f9ef91e67241cc769978df482b81aa6a869beb",
-      "file_sha256": "e5f3c321e78a938ae8c1fb2dec3cba6d0ea7202d9c71fcddc9ea5b87fa1c71e3"
+      "artifact_sha256": "9e331334c1636b2ee46180df3aca6850c7831470782f7f03856a6efef962480b",
+      "file_sha256": "8eedab4e2d6f074b08396cb629d47c5f3400fd2f97e00c9a00469165276e14e8"
     },
     "migrations": {
       "count": 46,
@@ -56,7 +56,7 @@
       },
       {
         "path": "scripts/postgresql-runtime-privilege-state.sql",
-        "sha256": "d155ca04fea4728ae2bdf6481e043dc243b20a0b15e6e396affe9a99587ab6f4"
+        "sha256": "b42f6bb969bfd931579e0a12e800399d3e4c0404981ab695b01bdac84232ac41"
       }
     ]
   },
@@ -520,5 +520,5 @@
     "owner": "PLATFORM_OWNER",
     "privileges": []
   },
-  "policy_sha256": "e31413ae3b8fe8ef4c119e043db8d7777524ac5ad4515936727aab57dbd66ddf"
+  "policy_sha256": "b99cd7389dbb5a9f24b56400a61d0a05f3de2ca0ec84101560beab22cb07226c"
 }

@@ -1347,7 +1347,64 @@ function assertStageEvidenceBindings(
       || evidence.candidate_database_quarantine_name !== targets.database.candidate_quarantine
       || evidence.candidate_database_quarantine_oid !== plan.deployment.database.oid
       || evidence.manifest_sha256 !== packageValue.sources.snapshot_manifest.sha256
+      || evidence.migration_ledger_file_sha256
+        !== packageValue.sources.snapshot_migrations.sha256
       || evidence.migration_manifest_sha256 !== parameters.predecessor.migration_manifest_sha256
+      || evidence.restore_precondition_sha256
+        !== evidence.restore_precondition.restore_precondition_sha256
+      || evidence.restore_precondition_opcode_spec_sha256
+        !== evidence.restore_precondition.opcode_spec_sha256
+      || evidence.dump_inventory_sha256
+        !== evidence.restore_precondition.dump_inventory_sha256
+      || evidence.empty_projection_sha256
+        !== evidence.restore_precondition.empty_projection_sha256
+      || evidence.restore_precondition.base_spec_sha256
+        !== evidence.postgres_base_spec_sha256
+      || evidence.restore_precondition.binding_sha256
+        !== evidence.staging_create_receipt_sha256
+      || evidence.restore_precondition.create_receipt_sha256
+        !== evidence.staging_create_receipt_sha256
+      || evidence.restore_precondition.system_identifier
+        !== parameters.database.system_identifier
+      || evidence.restore_precondition.database.name !== targets.database.staging
+      || evidence.restore_precondition.database.oid !== evidence.restored_database_oid
+      || evidence.restore_precondition.database.marker !== evidence.staging_database_marker
+      || evidence.restore_precondition.profile_sha256 !== evidence.database_profile_sha256
+      || evidence.pre_switch_content_proof_sha256
+        !== evidence.pre_switch_content_proof.proof_sha256
+      || evidence.pre_switch_content_proof.binding_sha256
+        !== evidence.privilege_reconcile_receipt_sha256
+      || evidence.pre_switch_content_proof.base_spec_sha256
+        !== evidence.postgres_base_spec_sha256
+      || evidence.pre_switch_content_proof.runtime_plan_sha256
+        !== packageValue.runtime_plan_sha256
+      || evidence.pre_switch_content_proof.source_reconciliation_sha256
+        !== packageValue.content_reconciliation.source_reconciliation_sha256
+      || evidence.pre_switch_content_proof.source_database_report_sha256
+        !== packageValue.content_reconciliation.database.report_sha256
+      || evidence.pre_switch_content_proof.live_database_report_sha256
+        !== packageValue.content_reconciliation.database.report_sha256
+      || evidence.pre_switch_content_proof.migration_head
+        !== parameters.predecessor.migration_head
+      || evidence.pre_switch_content_proof.migration_ledger_file_sha256
+        !== packageValue.sources.snapshot_migrations.sha256
+      || evidence.pre_switch_content_proof.migration_allowlist_sha256
+        !== parameters.predecessor.migration_manifest_sha256
+      || evidence.pre_switch_content_proof.staging_database_name
+        !== targets.database.staging
+      || evidence.pre_switch_content_proof.staging_database_oid
+        !== evidence.restored_database_oid
+      || evidence.pre_switch_content_proof.staging_database_marker
+        !== evidence.staging_database_marker
+      || evidence.pre_switch_content_proof.system_identifier
+        !== parameters.database.system_identifier
+      || evidence.pre_switch_content_proof.candidate_database_name
+        !== parameters.database.name
+      || evidence.pre_switch_content_proof.candidate_database_oid
+        !== plan.deployment.database.oid
+      || evidence.pre_switch_content_proof.candidate_database_marker
+        !== parameters.database.marker
+      || evidence.switch_receipt.operation_id !== intent.rollback_operation_id
       || !recordIntent
       || evidence.writer_containment_stage_result_sha256
         !== recordIntent.previous_result_sha256
@@ -1513,7 +1570,8 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
       : stage.evidence.target_volume_identity_sha256;
     const postgresqlSharedFields = [
       "runtime_plan_sha256", "restored_database_oid", "restored_database_marker",
-      "system_identifier", "migration_head", "migration_manifest_sha256",
+      "system_identifier", "migration_head", "migration_ledger_file_sha256",
+      "migration_manifest_sha256",
       "restore_receipt_sha256", "runtime_privilege_access_sha256",
       "runtime_privilege_catalog_sha256", "runtime_privilege_catalog_artifact_sha256",
       "runtime_privilege_policy_sha256", "runtime_privilege_operator_policy_sha256",
@@ -1576,6 +1634,8 @@ function assertCheckEvidenceBindings(check, evidence, rollbackResult, packageVal
   }
   const activationStageSha256 = rollbackResult.stages[7].stage_result_sha256;
   if (check === "MIGRATION_HEAD" && (evidence.migration_head !== rollbackResult.predecessor.migration_head
+    || evidence.migration_ledger_file_sha256
+      !== packageValue.sources.snapshot_migrations.sha256
     || evidence.migration_manifest_sha256 !== rollbackResult.predecessor.migration_manifest_sha256
     || evidence.database_identity_sha256 !== clusterSha256(rollbackResult.restored_database)
     || evidence.postgresql_stage_result_sha256 !== rollbackResult.stages[2].stage_result_sha256)) {

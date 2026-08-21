@@ -10,8 +10,8 @@ import { validateOfficialTestRuntimePolicy } from "./release-manifest-contract.m
 
 export const RELEASE_TEST_INVENTORY_CONTRACT = "chenyida-erp-release-test-inventory/v1";
 export const RELEASE_TEST_INVENTORY_REPOSITORY_PATH = "chenyida_erp_site/release/release-test-inventory-v1.json";
-export const RELEASE_TEST_INVENTORY_TOTAL = 262;
-export const RELEASE_TEST_INVENTORY_REQUIRED = 238;
+export const RELEASE_TEST_INVENTORY_TOTAL = 263;
+export const RELEASE_TEST_INVENTORY_REQUIRED = 239;
 export const RELEASE_TEST_INVENTORY_NOT_APPLICABLE = 24;
 export const RELEASE_TEST_MAX_BYTES = 1024 * 1024;
 export const RELEASE_TYPESCRIPT_CONFIGS = Object.freeze([
@@ -62,7 +62,7 @@ const OFFICIAL_CATEGORY_COUNTS = Object.freeze({
   HISTORICAL_D1_SITES: 22,
   POSTGRES: 84,
   POSTGRES_ALIAS: 2,
-  PURE_NODE: 130,
+  PURE_NODE: 131,
   RELEASE_CONTRACT: 11,
   SPECIAL_HARNESS: 7,
 });

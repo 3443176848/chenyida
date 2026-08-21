@@ -4,15 +4,15 @@
   "root": "chenyida_erp_site",
   "test_pattern": "tests/*.test.mjs",
   "max_test_bytes": 1048576,
-  "total_tests": 262,
-  "required_tests": 238,
+  "total_tests": 263,
+  "required_tests": 239,
   "not_applicable_tests": 24,
   "category_counts": {
     "BROWSER": 6,
     "HISTORICAL_D1_SITES": 22,
     "POSTGRES": 84,
     "POSTGRES_ALIAS": 2,
-    "PURE_NODE": 130,
+    "PURE_NODE": 131,
     "RELEASE_CONTRACT": 11,
     "SPECIAL_HARNESS": 7
   },
@@ -1234,7 +1234,7 @@
     },
     {
       "path": "tests/selfhost-postgresql-cluster-recovery-policy-v2.test.mjs",
-      "sha256": "035be97b22651327bf1c10cc878c57f466bcbbf5810e6031f3612d0cf63f3267",
+      "sha256": "502d22dc1f261941470b502f896a587a2950e8076d20f634ee1daa860530f431",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",
@@ -1891,7 +1891,7 @@
     },
     {
       "path": "tests/selfhost-release-gate-contract.test.mjs",
-      "sha256": "011eff01106c0b94431fb304e4df098a8296ff9d6b0a6886c467ea97c558e03d",
+      "sha256": "04936341b7b9d813925cb17207952749215fd78067e341b39fc00f3710ef77b9",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2304,6 +2304,15 @@
       "canonical_path": null
     },
     {
+      "path": "tests/selfhost-uat-promotion-dynamic-evidence-v3.test.mjs",
+      "sha256": "ec5e1161e1a3956acfa0b0c14d5676dc6d2dbc30cb914b783507e80b3d0f0560",
+      "category": "PURE_NODE",
+      "applicability": "REQUIRED",
+      "harness": "NODE_SOURCE",
+      "reason": null,
+      "canonical_path": null
+    },
+    {
       "path": "tests/selfhost-uat-promotion-migration-execution-contract.test.mjs",
       "sha256": "ce529f23e7a3f82cdeaa482e0576d1fc1303fd802abd7d9d5c3acced8f5ad4c8",
       "category": "RELEASE_CONTRACT",
@@ -2323,7 +2332,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-rollback-contract.test.mjs",
-      "sha256": "fccea33467003b6b892080579e3ee3c5970faab4ad7e649123e04c37371bb0ad",
+      "sha256": "b4a06168bd114baf33d9b099d56afb7dcc415159501a6f6bd6aaba80197c1167",
       "category": "RELEASE_CONTRACT",
       "applicability": "REQUIRED",
       "harness": "NODE_RELEASE_CONTRACT",
@@ -2350,7 +2359,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-transaction-journal.test.mjs",
-      "sha256": "9f1ff546defced7303dfd411d9768f78c0ef6f11d58c1f0145689ba78590b167",
+      "sha256": "4d81aa7c734f7ec874bb0589893d0818bb72126691ebd1377eb35b72e30538de",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

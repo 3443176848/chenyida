@@ -1783,7 +1783,7 @@
     },
     "BACKUP": {
       "derivation": "REVIEWED_ZERO_LARGE_OBJECT_LOGICAL_CAPTURE_SOURCE_INTENT",
-      "source_evidence_sha256": "bb737fcef1e4bbe19fd8b13ed4e84b00e3b1d8902f2b27a69c70229f3fc1b986",
+      "source_evidence_sha256": "b2eb90b9144ee37fa4c55229e5326ccddc23067d4891df134ca21b82c7437065",
       "source_files": [
         "scripts/backup-reconciliation.sql",
         "scripts/backup-recovery-contract.mjs",
@@ -2508,7 +2508,7 @@
     },
     "WEB": {
       "derivation": "SOURCE_GRAPH_CANDIDATE_REVIEWED",
-      "source_evidence_sha256": "90a5ffe22458e3a9ff9d73f85e792b575bf7431227eb30961104a35b6e9fa7bf",
+      "source_evidence_sha256": "3450621aca43e7d0625efdf2e7a66646a3567f1bdca420437bbdfe3d0c2c85d6",
       "source_files": [
         "app/lib/ai-governance-suggestion-selfhost/adapter.ts",
         "app/lib/ai-governance-suggestion-selfhost/canonical.ts",
@@ -3909,7 +3909,7 @@
     },
     "WORKER": {
       "derivation": "REVIEWED_WORKER_CALL_GRAPH",
-      "source_evidence_sha256": "069aeca2fcc4a8939bbbc17ea3d63738dc1d1426f4579a53eef995750e2a4a6b",
+      "source_evidence_sha256": "8663430650b4ee5c5cfa8a1fe4dcc37fe845e4b5a24a8e21becdfb8effc85e7c",
       "source_files": [
         "app/lib/application-version.ts",
         "app/lib/exact-decimal.ts",
@@ -4223,5 +4223,5 @@
       }
     }
   },
-  "access_sha256": "8eece185f306dc3d1c54275329068c16620b3ffbd5c8d703849166fb07f6fc76"
+  "access_sha256": "bcd714c9af16a634279eb38f01b665d3f927d16af41e64c1a065eea1ee17dd17"
 }

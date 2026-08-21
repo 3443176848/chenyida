@@ -4,6 +4,18 @@
 
 ## 2026-08-21
 
+### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `test: add TASK70 guarded switch dynamic contract`
+
+- 调度/边界：D-160将原计划`DV70-PG-RESTORE-02`拆为当前可由固定生产executor精确复用的`DV70-PG-GUARDED-SWITCH-02`和仍未证明的dump/Volume恢复；本提交只完成V3源码与合成合同，动态artifact必须在clean source提交后运行。未连接UAT/生产、读取备份/受保护卷/凭据或执行业务Migration、部署与host动作。
+- PostgreSQL/权限：V3单case物化全部0001—0046 Migration、9个受管角色、4项membership、relation/large-object canonical content report及live ACL/default privilege/role/security摘要；生产`PG_RB_GUARDED_SWITCH_V3`拒绝内容、Migration ledger和security漂移，ordinary role不能进入sealed staging，首rename故障必须事务回滚。
+- fixed executor回执：`ClosedDockerRunner`新增默认关闭的完成态observer，仅V3隔离runner注入；在EOF、退出码及无遗留daemon确定后，9次生产psql调用分别绑定argv、固定env、stdin、timeout/output上界、side-effect、rc、原始stdout/stderr和自摘要。回调在副作用后异常转typed UNKNOWN；默认路径不增加stdin哈希或复制。
+- 恢复/no-replay：场景覆盖OLD布局一次耐久恢复、恢复attempt unknown不二次执行及调用方丢弃已完成NEW_SEALED结果不重放。字段与17项non-claim明确该合成模型不证明进程终止/新进程恢复、传输层PostgreSQL COMMIT响应丢失、dump/Volume、完整handler request/result commit边界或真实UAT。
+- 证据安全：Python/Node独立重建固定executor SQL/argv/env/序列/原始输出；setup/reset/drift SQL均有精确receipt。SQL只接受单一mtime=0 canonical gzip member；artifact为稳定root-owned `0400`单硬链接，整件篡改harness在合法级联重哈希后仍须语义拒绝。发布失败仅按本次inode清理精确路径，并覆盖hardlink后unlink/fsync失败。
+- 资源/对象：monotonic elapsed与wall clock逐样本绑定，最大漂移1.5秒，容器创建前≥60秒前检且总窗口≥180秒；仍限制一个本机已有固定摘要PG17容器、断网、只读rootfs、全有界tmpfs、无bind/Volume/build/pull。当前源码测试前后available约2.0—2.1GiB、Swap126MiB/1GiB、根盘11GiB、Load低，四服务无restart/OOM变化且无当前任务容器残留。
+- 验证：Python V3 16/16、fixed executor 129/129、Node V3 13/13、受影响合同108/108、release合同29/29、inventory263/239/24及Node syntax/diff门通过，两条独立终审P0=0/P1=0。首次108项组合的35个失败均为drop-all容器无法覆盖`0440`夹具并chown reader GID的同源EACCES；离线容器仅补`DAC_OVERRIDE`/`CHOWN`后108/108，无断言修改。
+- 追溯：V2 producer/verifier/audit-test/policy/artifact五个SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91`。V3 policy raw SHA-256`9245a099…dc22`；release inventory/runtime policy为`c4775f60…6485`/`8f6fb710…85d2`。敏感信息门和私有普通fast-forward是提交后动态执行的强制前置，不提前声称artifact或远端同步完成。
+- 数据库/API/运行面：无Schema/Migration文件或普通业务API变化；修改的是runtime privilege/recovery合同、rollback fixed executor/control/adapter、V3证据producer/verifier/policy和发布测试链。系统继续`PRODUCTION NO-GO`，TASK70保持唯一`DOING`。
+
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `test: publish TASK70 PostgreSQL switch evidence`
 
 - 实施/追溯：在合同提交`9db10d7`后，以`422a26f`修正psql advisory-lock命令成功执行前输出的精确单换行，以`2dcc011`使当前审计断言同时覆盖“无证据”和`VERIFIED_PARTIAL_ONLY`合法状态，以`c793cdd`统一Python/Node整数型浮点规范化并拒绝超JavaScript safe integer；最终证据绑定source`c793cdd07d2d9b5fedd63055558aed3ac90723cf`、tree`c7453b28db2db46c4bc7483a4176354195131478`、alpha.47及Migration`0046_runtime_lock_privilege_boundary.sql`。

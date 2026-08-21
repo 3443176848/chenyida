@@ -58,7 +58,10 @@ def preactivation_proof(base, binding_sha256, **overrides):
             base["snapshot"]["target_database_report_sha256"],
         "live_database_report_sha256": base["snapshot"]["target_database_report_sha256"],
         "migration_head": base["snapshot"]["migration_head"],
-        "migration_manifest_sha256": base["snapshot"]["migration_manifest_sha256"],
+        "migration_ledger_file_sha256":
+            base["snapshot"]["migration_ledger_file_sha256"],
+        "migration_allowlist_sha256":
+            base["snapshot"]["migration_allowlist_sha256"],
         "migration_ledger_sha256": digest("preactivation-migration-ledger"),
         "live_security_state_sha256": digest("preactivation-security-state"),
         "active_allowed_session_role_set_sha256": digest("preactivation-role-set"),
@@ -473,6 +476,168 @@ class HandlerJournalTest(unittest.TestCase):
             ["SIDE_EFFECT_STARTED", "SIDE_EFFECT_RECORDED", "READ_ONLY_PROOF_RECORDED"],
         )
 
+    def test_database_switch_recovery_attempt_is_reserved_once_before_replay(self):
+        execute_request = {
+            **self.request, "action": "EXECUTE",
+            "request_sha256": digest("postgres-execute-request"),
+        }
+        effects = EXECUTOR.DurableSideEffectRecorder(
+            self.journal, execute_request, self.activation_receipt,
+            clock=lambda: "2026-08-16T01:00:00.000Z",
+        )
+        for name in (
+                "STAGING_DATABASE_CREATE", "LOGICAL_DUMP_RESTORE",
+                "PRIVILEGE_RECONCILE"):
+            intent = EXECUTOR.create_side_effect_intent(
+                execute_request, name, digest(f"target:{name}"), digest(f"argv:{name}"),
+                "2026-08-16T01:00:00.000Z",
+            )
+            effects.begin(name, intent)
+            effects.complete(name, EXECUTOR.create_side_effect_receipt(
+                intent, digest(f"before:{name}"), digest(f"after:{name}"),
+                "2026-08-16T01:00:00.000Z",
+            ))
+        opcode = {
+            "opcode": "PG_RB_GUARDED_SWITCH_V3",
+            "opcode_spec_sha256": digest("guarded-opcode-spec"),
+            "sql_sha256": digest("guarded-sql"),
+            "argv_template_sha256": digest("guarded-runner-argv"),
+            "bindings": {
+                "guarded_state_sha256": digest("guarded-state"),
+                "before_observation_sha256": digest("opcode-old-observation"),
+                "staging_content_proof_sha256": digest("staging-proof"),
+                "staging_oid": "16385",
+                "expected_switched_identity_sha256": digest("switched-identity"),
+            },
+        }
+        switch_argv = EXECUTOR.postgres_guarded_switch_intent_argv(opcode)
+        switch_intent = EXECUTOR.create_side_effect_intent(
+            execute_request, "DATABASE_SWITCH", digest("guarded-target"),
+            EXECUTOR.digest_value(switch_argv), "2026-08-16T01:00:00.000Z",
+        )
+        effects.begin("DATABASE_SWITCH", switch_intent)
+        probe_request = {
+            **execute_request, "action": "PROBE",
+            "request_sha256": digest("postgres-probe-request"),
+        }
+        def crash_after_reservation(point, _request):
+            if point == "AFTER_SIDE_EFFECT_RECOVERY_STARTED_DATABASE_SWITCH":
+                raise RuntimeError("simulated-crash-after-recovery-reservation")
+
+        crashing_probe_effects = EXECUTOR.DurableSideEffectRecorder(
+            self.journal, probe_request, self.activation_receipt,
+            clock=lambda: "2026-08-16T01:00:01.000Z",
+            fault=crash_after_reservation,
+        )
+        with self.assertRaisesRegex(
+            RuntimeError, "simulated-crash-after-recovery-reservation",
+        ):
+            crashing_probe_effects.begin_recovery(
+                "DATABASE_SWITCH", opcode=opcode,
+                before_observation_sha256=digest("old-observation-first"),
+                candidate_oid="16384",
+            )
+        reopened_journal = EXECUTOR.HandlerJournal(
+            probe_request["operation"], probe_request["operation_id"],
+            probe_request["label"], str(self.root),
+        )
+        probe_effects = EXECUTOR.DurableSideEffectRecorder(
+            reopened_journal, probe_request, self.activation_receipt,
+            clock=lambda: "2026-08-16T01:00:02.000Z",
+        )
+        self.assertFalse(probe_effects.begin_recovery(
+            "DATABASE_SWITCH", opcode=opcode,
+            before_observation_sha256=digest("old-observation-second"),
+            candidate_oid="16384",
+        ))
+        recovery_events = [
+            event for event in self.journal.load()
+            if event["event"] == "SIDE_EFFECT_RECOVERY_STARTED"
+        ]
+        self.assertEqual(len(recovery_events), 1)
+        self.assertEqual(
+            recovery_events[0]["payload"]["recovery_kind"],
+            "EXACT_OLD_GUARDED_DATABASE_SWITCH_REPLAY",
+        )
+
+    def test_postgres_terminal_evidence_is_bound_to_durable_switch_intent_and_receipt(self):
+        request = {
+            **self.request, "action": "EXECUTE",
+            "request_sha256": digest("postgres-terminal-binding-request"),
+        }
+        effects = EXECUTOR.DurableSideEffectRecorder(
+            self.journal, request, self.activation_receipt,
+            clock=lambda: "2026-08-16T01:00:00.000Z",
+        )
+        for name in (
+                "STAGING_DATABASE_CREATE", "LOGICAL_DUMP_RESTORE",
+                "PRIVILEGE_RECONCILE"):
+            intent = EXECUTOR.create_side_effect_intent(
+                request, name, digest(f"target:{name}"), digest(f"argv:{name}"),
+                "2026-08-16T01:00:00.000Z",
+            )
+            effects.begin(name, intent)
+            effects.complete(name, EXECUTOR.create_side_effect_receipt(
+                intent, EXECUTOR.ZERO_SHA256, digest(f"after:{name}"),
+                "2026-08-16T01:00:00.000Z",
+            ))
+        evidence = copy.deepcopy(valid_handler_evidence("POSTGRESQL_RESTORE"))
+        target = {
+            "staging_oid": evidence["restored_database_oid"],
+            "candidate_oid": evidence["snapshot_database_oid"],
+            "staging_content_proof_sha256":
+                evidence["pre_switch_content_proof_sha256"],
+            "guarded_opcode_spec_sha256":
+                evidence["guarded_switch_opcode_spec_sha256"],
+            "guarded_sql_sha256": evidence["guarded_switch_sql_sha256"],
+            "guarded_state_sha256": evidence["guarded_switch_state_sha256"],
+            "expected_switched_identity_sha256":
+                evidence["guarded_switch_expected_identity_sha256"],
+        }
+        argv = {
+            "opcode": "PG_RB_GUARDED_SWITCH_V3",
+            "opcode_spec_sha256": evidence["guarded_switch_opcode_spec_sha256"],
+            "sql_sha256": evidence["guarded_switch_sql_sha256"],
+            "runner_argv_template_sha256":
+                evidence["guarded_switch_runner_argv_template_sha256"],
+        }
+        switch_intent = EXECUTOR.create_side_effect_intent(
+            request, "DATABASE_SWITCH", EXECUTOR.digest_value(target),
+            EXECUTOR.digest_value(argv), "2026-08-16T01:00:00.000Z",
+        )
+        effects.begin("DATABASE_SWITCH", switch_intent)
+        switch_receipt = EXECUTOR.create_side_effect_receipt(
+            switch_intent, evidence["pre_switch_content_proof_sha256"],
+            evidence["switch_effect_identity_sha256"],
+            "2026-08-16T01:00:00.000Z",
+        )
+        effects.complete("DATABASE_SWITCH", switch_receipt)
+        evidence["switch_receipt"] = switch_receipt
+        evidence["switch_receipt_sha256"] = switch_receipt["receipt_sha256"]
+        effects.validate_terminal_evidence(evidence)
+
+        forged = copy.deepcopy(evidence)
+        forged["guarded_switch_opcode_spec_sha256"] = digest("forged-opcode")
+        forged["guarded_switch_sql_sha256"] = digest("forged-sql")
+        forged["guarded_switch_runner_argv_template_sha256"] = digest("forged-runner")
+        forged_receipt = forged["switch_receipt"]
+        forged_receipt["argv_template_sha256"] = EXECUTOR.digest_value({
+            "opcode": "PG_RB_GUARDED_SWITCH_V3",
+            "opcode_spec_sha256": forged["guarded_switch_opcode_spec_sha256"],
+            "sql_sha256": forged["guarded_switch_sql_sha256"],
+            "runner_argv_template_sha256":
+                forged["guarded_switch_runner_argv_template_sha256"],
+        })
+        forged_receipt["receipt_sha256"] = EXECUTOR.digest_value(
+            EXECUTOR.without(forged_receipt, "receipt_sha256"),
+        )
+        forged["switch_receipt_sha256"] = forged_receipt["receipt_sha256"]
+        with self.assertRaisesRegex(
+            EXECUTOR.FixedExecutorError,
+            "ROLLBACK_FIXED_EXECUTOR_POSTGRES_TERMINAL_BINDING_INVALID",
+        ):
+            effects.validate_terminal_evidence(forged)
+
 
 def engine_request(operation, label, action, operation_id, *, execution_mode="ORIGINAL"):
     labels = EXECUTOR.STAGES if operation == "ROLLBACK_EXECUTION" else EXECUTOR.CHECKS
@@ -625,6 +790,136 @@ def valid_handler_evidence(label):
             "stopped": True, "sealed": True, "runtime_plan_sha256": value_hash("plan"),
         }
     if label == "POSTGRESQL_RESTORE":
+        empty_projection = EXECUTOR.postgres_empty_restore_projection()
+        restore_database = {
+            "name": "chenyida_erp_rb_deadbeefdeadbeef",
+            "oid": "16385",
+            "marker":
+                "chenyida-erp-uat-rollback/v1:rollback-runner-deadbeef:RESTORED_STAGING",
+            "owner": "postgres", "allow_connections": True,
+            "connection_limit": 0, "default_transaction_read_only": True,
+            "sessions": 0, "prepared_xacts": 0,
+        }
+        restore_profile = {
+            "encoding": "UTF8", "locale_provider": "libc", "collate": "C",
+            "ctype": "C", "collation_version": None,
+            "default_tablespace": "pg_default",
+        }
+        restore_body = {
+            "schema_version": 1,
+            "contract": EXECUTOR.POSTGRES_RESTORE_PRECONDITION_CONTRACT,
+            "base_spec_sha256": value_hash("base-spec"),
+            "opcode_spec_sha256": value_hash("restore-precondition-opcode-spec"),
+            "binding_sha256": value_hash("capacity-receipt"),
+            "create_receipt_sha256": value_hash("capacity-receipt"),
+            "dump_inventory_sha256": value_hash("dump-inventory"),
+            "system_identifier": "7612345678901234567",
+            "server_version_num": "170010",
+            "database": restore_database,
+            "database_identity_sha256": EXECUTOR.digest_value({
+                "system_identifier": "7612345678901234567", **restore_database,
+            }),
+            "profile": restore_profile,
+            "profile_sha256": EXECUTOR.digest_value(restore_profile),
+            "empty_projection": empty_projection,
+            "empty_projection_sha256": EXECUTOR.digest_value(empty_projection),
+            "raw_observation_sha256": value_hash("restore-precondition-observation"),
+        }
+        restore_proof = {
+            **restore_body,
+            "restore_precondition_sha256": EXECUTOR.digest_value(restore_body),
+        }
+        staging_body = {
+            "schema_version": 1,
+            "contract": EXECUTOR.STAGING_CONTENT_PROOF_CONTRACT,
+            "binding_sha256": value_hash("privilege-reconcile-receipt"),
+            "base_spec_sha256": value_hash("base-spec"),
+            "runtime_plan_sha256": value_hash("plan"),
+            "source_reconciliation_sha256": value_hash("reconciliation"),
+            "source_database_report_sha256": value_hash("content"),
+            "live_database_report_sha256": value_hash("content"),
+            "migration_head": "0046_runtime_lock_privilege_boundary.sql",
+            "migration_ledger_file_sha256": value_hash("migration-ledger-file"),
+            "migration_allowlist_sha256": value_hash("migration-manifest"),
+            "migration_ledger_sha256": value_hash("migration-ledger"),
+            "live_security_state_sha256": value_hash("staging-security"),
+            "staging_allowed_session_role_set_sha256": value_hash("staging-roles"),
+            "staging_session_client_policy_sha256": value_hash("staging-clients"),
+            "staging_session_observation_sha256": value_hash("staging-sessions"),
+            "staging_writer_session_count": 0,
+            "staging_database_identity_sha256": EXECUTOR.digest_value({
+                "name": "chenyida_erp_rb_deadbeefdeadbeef",
+                "system_identifier": "7612345678901234567",
+                "oid": "16385",
+                "marker":
+                    "chenyida-erp-uat-rollback/v1:rollback-runner-deadbeef:RESTORED_STAGING",
+            }),
+            "staging_database_name": "chenyida_erp_rb_deadbeefdeadbeef",
+            "staging_database_oid": "16385",
+            "staging_database_marker":
+                "chenyida-erp-uat-rollback/v1:rollback-runner-deadbeef:RESTORED_STAGING",
+            "system_identifier": "7612345678901234567",
+            "staging_allow_connections": True, "staging_connection_limit": 0,
+            "staging_default_transaction_read_only": True,
+            "staging_prepared_xacts": 0,
+            "candidate_database_name": "chenyida_erp",
+            "candidate_database_oid": "16384",
+            "candidate_database_marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp",
+            "candidate_database_allow_connections": False,
+            "candidate_database_connection_limit": 0,
+            "candidate_database_sessions": 0, "candidate_database_prepared_xacts": 0,
+            "before_observation_sha256": value_hash("staging-before"),
+            "after_observation_sha256": value_hash("staging-after"),
+        }
+        staging_proof = {
+            **staging_body, "proof_sha256": EXECUTOR.digest_value(staging_body),
+        }
+        guarded_opcode_spec_sha256 = value_hash("guarded-opcode-spec")
+        guarded_sql_sha256 = value_hash("guarded-sql")
+        guarded_runner_argv_sha256 = value_hash("guarded-runner-argv")
+        guarded_state_sha256 = EXECUTOR.digest_value({
+            "source_reconciliation_sha256":
+                staging_proof["source_reconciliation_sha256"],
+            "expected_content_report_sha256":
+                staging_proof["source_database_report_sha256"],
+            "migration_ledger_file_sha256":
+                staging_proof["migration_ledger_file_sha256"],
+            "migration_allowlist_sha256":
+                staging_proof["migration_allowlist_sha256"],
+            "expected_security_state_sha256":
+                staging_proof["live_security_state_sha256"],
+            "staging_content_proof_sha256": staging_proof["proof_sha256"],
+            "staging_oid": staging_proof["staging_database_oid"],
+        })
+        guarded_expected_identity_sha256 = EXECUTOR.digest_value({
+            "active_name": "chenyida_erp", "active_oid": "16385",
+            "quarantine_name": "chenyida_erp_candidate_deadbeefdeadbeef",
+            "quarantine_oid": "16384", "state": "NEW_SEALED",
+        })
+        switch_receipt_body = {
+            "schema_version": 2,
+            "contract": EXECUTOR.SIDE_EFFECT_RECEIPT_CONTRACT,
+            "status": "COMMITTED",
+            "operation_id": "rollback-runner-deadbeef",
+            "label": "POSTGRESQL_RESTORE",
+            "side_effect_name": "DATABASE_SWITCH",
+            "intent_sha256": value_hash("switch-intent"),
+            "before_identity_sha256": staging_proof["proof_sha256"],
+            "after_identity_sha256": value_hash("switch-effect"),
+            "argv_template_sha256": EXECUTOR.digest_value({
+                "opcode": "PG_RB_GUARDED_SWITCH_V3",
+                "opcode_spec_sha256": guarded_opcode_spec_sha256,
+                "sql_sha256": guarded_sql_sha256,
+                "runner_argv_template_sha256": guarded_runner_argv_sha256,
+            }),
+            "recovery_observation_sha256": EXECUTOR.ZERO_SHA256,
+            "daemon_state": "COMPLETED_NO_UNTRACKED_PROCESS",
+            "completed_at": "2026-08-16T02:00:00.000Z",
+        }
+        switch_receipt = {
+            **switch_receipt_body,
+            "receipt_sha256": EXECUTOR.digest_value(switch_receipt_body),
+        }
         return {
             "strategy": "RESTORE_TO_STAGING_DATABASE_ATOMIC_RENAME_RETAIN_CANDIDATE_QUARANTINED",
             "source_artifact_sha256": value_hash("artifact"), "source_artifact_bytes": 1024,
@@ -639,13 +934,26 @@ def valid_handler_evidence(label):
             "candidate_database_quarantine_oid": "16384",
             "runtime_plan_sha256": value_hash("plan"),
             "manifest_sha256": value_hash("manifest"),
+            "migration_ledger_file_sha256": value_hash("migration-ledger-file"),
             "migration_manifest_sha256": value_hash("migration-manifest"),
             "writer_containment_stage_result_sha256": value_hash("writer-containment"),
             "postgres_container_id": value_hash("postgres-container"),
             "postgres_image_config_digest": f"sha256:{value_hash('postgres-image-config')}",
-            "database_profile_sha256": value_hash("database-profile"),
-            "capacity_receipt_sha256": value_hash("capacity-receipt"),
+            "database_profile_sha256": restore_proof["profile_sha256"],
+            "postgres_base_spec_sha256": value_hash("base-spec"),
+            "staging_create_receipt_sha256": value_hash("capacity-receipt"),
             "restore_receipt_sha256": value_hash("restore-receipt"),
+            "privilege_reconcile_receipt_sha256":
+                value_hash("privilege-reconcile-receipt"),
+            "restore_precondition_opcode_spec_sha256":
+                restore_proof["opcode_spec_sha256"],
+            "restore_precondition_sha256":
+                restore_proof["restore_precondition_sha256"],
+            "dump_inventory_sha256": restore_proof["dump_inventory_sha256"],
+            "empty_projection_sha256": restore_proof["empty_projection_sha256"],
+            "restore_precondition": restore_proof,
+            "pre_switch_content_proof_sha256": staging_proof["proof_sha256"],
+            "pre_switch_content_proof": staging_proof,
             "runtime_privilege_access_sha256": value_hash("runtime-privilege-access"),
             "runtime_privilege_catalog_sha256": value_hash("runtime-privilege-catalog"),
             "runtime_privilege_catalog_artifact_sha256": value_hash("runtime-privilege-artifact"),
@@ -658,7 +966,17 @@ def valid_handler_evidence(label):
                 "chenyida-erp-uat-rollback/v1:rollback-runner-deadbeef:RESTORED_STAGING",
             "candidate_database_quarantine_marker":
                 "chenyida-erp-uat-rollback/v1:rollback-runner-deadbeef:CANDIDATE_QUARANTINE",
-            "switch_transaction_sha256": value_hash("switch-transaction"),
+            "guarded_switch_opcode_spec_sha256": guarded_opcode_spec_sha256,
+            "guarded_switch_sql_sha256": guarded_sql_sha256,
+            "guarded_switch_runner_argv_template_sha256":
+                guarded_runner_argv_sha256,
+            "guarded_switch_state_sha256": guarded_state_sha256,
+            "guarded_switch_expected_identity_sha256":
+                guarded_expected_identity_sha256,
+            "switch_receipt_sha256": switch_receipt["receipt_sha256"],
+            "switch_effect_identity_sha256":
+                switch_receipt["after_identity_sha256"],
+            "switch_receipt": switch_receipt,
             "restored_database_allow_connections_at_commit": False,
             "restored_database_connection_limit_at_commit": 0,
             "restored_database_sessions_at_commit": 0,
@@ -720,7 +1038,8 @@ def valid_handler_evidence(label):
             "source_database_report_sha256": value_hash("database-report"),
             "live_database_report_sha256": value_hash("database-report"),
             "migration_head": "0046_runtime_lock_privilege_boundary.sql",
-            "migration_manifest_sha256": value_hash("migration-manifest"),
+            "migration_ledger_file_sha256": value_hash("migration-ledger-file"),
+            "migration_allowlist_sha256": value_hash("migration-manifest"),
             "migration_ledger_sha256": value_hash("migration-ledger"),
             "live_security_state_sha256": value_hash("live-security-state"),
             "active_allowed_session_role_set_sha256": value_hash("allowed-role-set"),
@@ -797,6 +1116,7 @@ def valid_handler_evidence(label):
                 "restored_database_marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp",
                 "system_identifier": "7612345678901234567",
                 "migration_head": "0046_runtime_lock_privilege_boundary.sql",
+                "migration_ledger_file_sha256": value_hash("migration-ledger-file"),
                 "migration_manifest_sha256": value_hash("migration-manifest"),
                 "restore_receipt_sha256": value_hash("restore-receipt"),
                 "runtime_privilege_access_sha256": value_hash("runtime-privilege-access"),
@@ -850,6 +1170,7 @@ def valid_handler_evidence(label):
     if label == "MIGRATION_HEAD":
         return {
             "migration_head": "0046_runtime_lock_privilege_boundary.sql",
+            "migration_ledger_file_sha256": value_hash("ledger-file"),
             "migration_manifest_sha256": value_hash("manifest"),
             "database_identity_sha256": value_hash("database"),
             "postgresql_stage_result_sha256": value_hash("stage"),
@@ -914,6 +1235,131 @@ def valid_handler_evidence(label):
     raise AssertionError(label)
 
 
+def bind_postgres_stage_proofs(evidence, base):
+    """Rebind the synthetic stage fixture after its outer source facts change."""
+    restore = evidence["restore_precondition"]
+    restore_database = {
+        "name": base["databases"]["staging_name"],
+        "oid": evidence["restored_database_oid"],
+        "marker": base["databases"]["staging_marker"],
+        "owner": base["postgres"]["control_database_role"],
+        "allow_connections": True,
+        "connection_limit": 0,
+        "default_transaction_read_only": True,
+        "sessions": 0,
+        "prepared_xacts": 0,
+    }
+    profile = EXECUTOR.without(base["profile"], "profile_sha256")
+    precondition_opcode = EXECUTOR.derive_pg_opcode_spec(
+        base, "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1", {
+            "create_receipt_sha256": evidence["staging_create_receipt_sha256"],
+            "staging_oid": evidence["restored_database_oid"],
+            "dump_inventory_sha256": evidence["dump_inventory_sha256"],
+            "expected_empty_projection_sha256":
+                EXECUTOR.digest_value(EXECUTOR.postgres_empty_restore_projection()),
+        },
+    )
+    restore.update({
+        "base_spec_sha256": base["base_spec_sha256"],
+        "opcode_spec_sha256": precondition_opcode["opcode_spec_sha256"],
+        "binding_sha256": evidence["staging_create_receipt_sha256"],
+        "create_receipt_sha256": evidence["staging_create_receipt_sha256"],
+        "system_identifier": base["postgres"]["system_identifier"],
+        "server_version_num": base["postgres"]["server_version_num"],
+        "database": restore_database,
+        "database_identity_sha256": EXECUTOR.digest_value({
+            "system_identifier": base["postgres"]["system_identifier"],
+            **restore_database,
+        }),
+        "profile": profile,
+        "profile_sha256": EXECUTOR.digest_value(profile),
+    })
+    restore["restore_precondition_sha256"] = EXECUTOR.digest_value(
+        EXECUTOR.without(restore, "restore_precondition_sha256"),
+    )
+    evidence.update({
+        "postgres_base_spec_sha256": base["base_spec_sha256"],
+        "database_profile_sha256": restore["profile_sha256"],
+        "restore_precondition_opcode_spec_sha256": restore["opcode_spec_sha256"],
+        "restore_precondition_sha256": restore["restore_precondition_sha256"],
+        "dump_inventory_sha256": restore["dump_inventory_sha256"],
+        "empty_projection_sha256": restore["empty_projection_sha256"],
+    })
+    staging = evidence["pre_switch_content_proof"]
+    identity = {
+        "name": base["databases"]["staging_name"],
+        "system_identifier": base["postgres"]["system_identifier"],
+        "oid": evidence["restored_database_oid"],
+        "marker": base["databases"]["staging_marker"],
+    }
+    staging.update({
+        "binding_sha256": evidence["privilege_reconcile_receipt_sha256"],
+        "base_spec_sha256": base["base_spec_sha256"],
+        "runtime_plan_sha256": base["runtime_plan_sha256"],
+        "source_reconciliation_sha256":
+            base["snapshot"]["source_reconciliation_sha256"],
+        "source_database_report_sha256":
+            base["snapshot"]["target_database_report_sha256"],
+        "live_database_report_sha256":
+            base["snapshot"]["target_database_report_sha256"],
+        "migration_head": base["snapshot"]["migration_head"],
+        "migration_ledger_file_sha256":
+            base["snapshot"]["migration_ledger_file_sha256"],
+        "migration_allowlist_sha256":
+            base["snapshot"]["migration_allowlist_sha256"],
+        "staging_database_identity_sha256": EXECUTOR.digest_value(identity),
+        "staging_database_name": base["databases"]["staging_name"],
+        "staging_database_oid": evidence["restored_database_oid"],
+        "staging_database_marker": base["databases"]["staging_marker"],
+        "system_identifier": base["postgres"]["system_identifier"],
+        "candidate_database_name": base["databases"]["active_name"],
+        "candidate_database_oid": base["databases"]["candidate_oid"],
+        "candidate_database_marker": base["databases"]["candidate_marker"],
+    })
+    staging["proof_sha256"] = EXECUTOR.digest_value(
+        EXECUTOR.without(staging, "proof_sha256"),
+    )
+    evidence["pre_switch_content_proof_sha256"] = staging["proof_sha256"]
+    evidence["guarded_switch_state_sha256"] = EXECUTOR.digest_value({
+        "source_reconciliation_sha256": staging["source_reconciliation_sha256"],
+        "expected_content_report_sha256":
+            staging["source_database_report_sha256"],
+        "migration_ledger_file_sha256": staging["migration_ledger_file_sha256"],
+        "migration_allowlist_sha256": staging["migration_allowlist_sha256"],
+        "expected_security_state_sha256": staging["live_security_state_sha256"],
+        "staging_content_proof_sha256": staging["proof_sha256"],
+        "staging_oid": staging["staging_database_oid"],
+    })
+    evidence["guarded_switch_expected_identity_sha256"] = EXECUTOR.digest_value({
+        "active_name": base["databases"]["active_name"],
+        "active_oid": evidence["restored_database_oid"],
+        "quarantine_name": base["databases"]["quarantine_name"],
+        "quarantine_oid": base["databases"]["candidate_oid"],
+        "state": "NEW_SEALED",
+    })
+    switch_receipt = evidence["switch_receipt"]
+    switch_receipt.update({
+        "operation_id": base["rollback_operation_id"],
+        "before_identity_sha256": staging["proof_sha256"],
+        "argv_template_sha256": EXECUTOR.digest_value({
+            "opcode": "PG_RB_GUARDED_SWITCH_V3",
+            "opcode_spec_sha256":
+                evidence["guarded_switch_opcode_spec_sha256"],
+            "sql_sha256": evidence["guarded_switch_sql_sha256"],
+            "runner_argv_template_sha256":
+                evidence["guarded_switch_runner_argv_template_sha256"],
+        }),
+    })
+    switch_receipt["receipt_sha256"] = EXECUTOR.digest_value(
+        EXECUTOR.without(switch_receipt, "receipt_sha256"),
+    )
+    evidence["switch_receipt_sha256"] = switch_receipt["receipt_sha256"]
+    evidence["switch_effect_identity_sha256"] = (
+        switch_receipt["after_identity_sha256"]
+    )
+    return evidence
+
+
 class HandlerEvidenceBoundaryTest(unittest.TestCase):
     def test_all_twenty_two_exact_evidence_shapes_are_accepted(self):
         for operation, labels in (
@@ -944,6 +1390,133 @@ class HandlerEvidenceBoundaryTest(unittest.TestCase):
                             "ROLLBACK_FIXED_EXECUTOR_HANDLER_EVIDENCE_INVALID",
                         ):
                             EXECUTOR.validate_handler_evidence(operation, label, mutated)
+
+    def test_postgres_staging_identity_and_guarded_bindings_reject_rehashed_forgery(self):
+        evidence = valid_handler_evidence("POSTGRESQL_RESTORE")
+        proof = evidence["pre_switch_content_proof"]
+        proof["staging_database_identity_sha256"] = digest("forged-staging-identity")
+        proof["proof_sha256"] = EXECUTOR.digest_value(
+            EXECUTOR.without(proof, "proof_sha256"),
+        )
+        evidence["pre_switch_content_proof_sha256"] = proof["proof_sha256"]
+        evidence["guarded_switch_state_sha256"] = EXECUTOR.digest_value({
+            "source_reconciliation_sha256": proof["source_reconciliation_sha256"],
+            "expected_content_report_sha256": proof["source_database_report_sha256"],
+            "migration_ledger_file_sha256": proof["migration_ledger_file_sha256"],
+            "migration_allowlist_sha256": proof["migration_allowlist_sha256"],
+            "expected_security_state_sha256": proof["live_security_state_sha256"],
+            "staging_content_proof_sha256": proof["proof_sha256"],
+            "staging_oid": proof["staging_database_oid"],
+        })
+        receipt = evidence["switch_receipt"]
+        receipt["before_identity_sha256"] = proof["proof_sha256"]
+        receipt["receipt_sha256"] = EXECUTOR.digest_value(
+            EXECUTOR.without(receipt, "receipt_sha256"),
+        )
+        evidence["switch_receipt_sha256"] = receipt["receipt_sha256"]
+        with self.assertRaisesRegex(
+            EXECUTOR.FixedExecutorError,
+            "ROLLBACK_FIXED_EXECUTOR_HANDLER_EVIDENCE_INVALID",
+        ):
+            EXECUTOR.validate_handler_evidence(
+                "ROLLBACK_EXECUTION", "POSTGRESQL_RESTORE", evidence,
+            )
+
+        for field in (
+                "guarded_switch_state_sha256",
+                "guarded_switch_expected_identity_sha256"):
+            forged = valid_handler_evidence("POSTGRESQL_RESTORE")
+            forged[field] = digest(f"forged:{field}")
+            with self.subTest(field=field), self.assertRaisesRegex(
+                EXECUTOR.FixedExecutorError,
+                "ROLLBACK_FIXED_EXECUTOR_HANDLER_EVIDENCE_INVALID",
+            ):
+                EXECUTOR.validate_handler_evidence(
+                    "ROLLBACK_EXECUTION", "POSTGRESQL_RESTORE", forged,
+                )
+
+    def test_postgres_staging_proof_rejects_boolean_integer_substitution(self):
+        fields = (
+            "schema_version", "staging_writer_session_count",
+            "staging_connection_limit", "staging_prepared_xacts",
+            "candidate_database_connection_limit", "candidate_database_sessions",
+            "candidate_database_prepared_xacts",
+        )
+        for field in fields:
+            proof = copy.deepcopy(
+                valid_handler_evidence("POSTGRESQL_RESTORE")
+                ["pre_switch_content_proof"],
+            )
+            proof[field] = True if field == "schema_version" else False
+            proof["proof_sha256"] = EXECUTOR.digest_value(
+                EXECUTOR.without(proof, "proof_sha256"),
+            )
+            with self.subTest(field=field), self.assertRaisesRegex(
+                EXECUTOR.FixedExecutorError,
+                "ROLLBACK_FIXED_EXECUTOR_STAGING_CONTENT_PROOF_INVALID",
+            ):
+                EXECUTOR.validate_staging_content_proof(proof)
+
+    def test_postgres_restore_precondition_rejects_boolean_integer_substitution(self):
+        cases = [
+            ("schema_version", None),
+            *[("database", field) for field in (
+                "connection_limit", "sessions", "prepared_xacts",
+            )],
+            *[("empty_projection", field) for field in (
+                "user_schema_count", "relation_count", "sequence_count",
+                "routine_count", "standalone_type_count",
+                "unexpected_extension_count", "large_object_count",
+            )],
+            ("empty_projection", "schema_migrations_present"),
+        ]
+        for parent, field in cases:
+            proof = copy.deepcopy(
+                valid_handler_evidence("POSTGRESQL_RESTORE")["restore_precondition"],
+            )
+            if parent == "schema_version":
+                proof["schema_version"] = True
+            elif parent == "database":
+                proof["database"][field] = False
+                proof["database_identity_sha256"] = EXECUTOR.digest_value({
+                    "system_identifier": proof["system_identifier"],
+                    **proof["database"],
+                })
+            else:
+                proof["empty_projection"][field] = (
+                    0 if field == "schema_migrations_present" else False
+                )
+                proof["empty_projection_sha256"] = EXECUTOR.digest_value(
+                    proof["empty_projection"],
+                )
+            proof["restore_precondition_sha256"] = EXECUTOR.digest_value(
+                EXECUTOR.without(proof, "restore_precondition_sha256"),
+            )
+            with self.subTest(parent=parent, field=field), self.assertRaisesRegex(
+                EXECUTOR.FixedExecutorError,
+                "ROLLBACK_FIXED_EXECUTOR_POSTGRES_RESTORE_PRECONDITION_INVALID",
+            ):
+                EXECUTOR.validate_pg_restore_precondition_envelope(proof)
+
+    def test_postgres_final_evidence_rejects_boolean_commit_counters(self):
+        fields = (
+            "restored_database_connection_limit_at_commit",
+            "restored_database_sessions_at_commit",
+            "restored_database_prepared_xacts_at_commit",
+            "candidate_database_quarantine_connection_limit_at_commit",
+            "candidate_database_quarantine_sessions_at_commit",
+            "candidate_database_quarantine_prepared_xacts_at_commit",
+        )
+        for field in fields:
+            evidence = valid_handler_evidence("POSTGRESQL_RESTORE")
+            evidence[field] = False
+            with self.subTest(field=field), self.assertRaisesRegex(
+                EXECUTOR.FixedExecutorError,
+                "ROLLBACK_FIXED_EXECUTOR_HANDLER_EVIDENCE_INVALID",
+            ):
+                EXECUTOR.validate_handler_evidence(
+                    "ROLLBACK_EXECUTION", "POSTGRESQL_RESTORE", evidence,
+                )
 
 
 class SafeArchiveInventoryTest(unittest.TestCase):
@@ -1424,6 +1997,7 @@ class VolumeCapabilityRuntimeTest(unittest.TestCase):
             self.receipts = {}
             self.intents = {}
             self.proofs = {}
+            self.recovery_attempts = {}
 
         def begin(self, name, intent):
             self.started.append(name)
@@ -1440,6 +2014,18 @@ class VolumeCapabilityRuntimeTest(unittest.TestCase):
 
         def started_intent(self, name):
             return self.intents.get(name)
+
+        def begin_recovery(
+                self, name, *, opcode, before_observation_sha256, candidate_oid,
+        ):
+            if name in self.recovery_attempts:
+                return False
+            self.recovery_attempts[name] = {
+                "opcode": opcode,
+                "before_observation_sha256": before_observation_sha256,
+                "candidate_oid": candidate_oid,
+            }
+            return True
 
         def record_read_only_proof(self, name, proof):
             self.proofs[name] = proof
@@ -2264,7 +2850,14 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
             f"{index:04d}_{'runtime_lock_privilege_boundary' if index == 46 else 'fixture'}.sql\n"
             for index in range(1, 47)
         ).encode()
-        migration_manifest_sha256 = hashlib.sha256(migration_raw).hexdigest()
+        migration_ledger_file_sha256 = hashlib.sha256(migration_raw).hexdigest()
+        migration_records = [
+            {"checksum": line.split("  ", 1)[0], "version": line.split("  ", 1)[1]}
+            for line in migration_raw.decode().splitlines()
+        ]
+        migration_manifest_sha256 = EXECUTOR.migration_allowlist_digest(
+            migration_records,
+        )
         report_raw = (
             "RELATION\t7075626c69632e6170705f7573657273\t0\t"
             f"{digest('empty-app-users')}\n"
@@ -2295,7 +2888,8 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
                 "allowlist_sha256": migration_manifest_sha256,
             },
         }
-        snapshot_manifest["migration"]["manifest_sha256"] = migration_manifest_sha256
+        snapshot_manifest["migration"]["manifest_sha256"] = \
+            migration_ledger_file_sha256
         snapshot_manifest["reconciliation"]["sha256"] = reconciliation_sha256
         snapshot_manifest_sha256 = EXECUTOR.digest_value(snapshot_manifest)
         runtime_plan_sha256 = digest("postgres-base-runtime-plan")
@@ -2323,7 +2917,8 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
                 "snapshot_manifest": {"sha256": snapshot_manifest_sha256},
                 "snapshot_postgresql": {"sha256": digest("snapshot-dump"), "bytes": 4096},
                 "snapshot_migrations": {
-                    "sha256": migration_manifest_sha256, "bytes": len(migration_raw),
+                    "sha256": migration_ledger_file_sha256,
+                    "bytes": len(migration_raw),
                 },
                 "snapshot_reconciliation": {
                     "sha256": reconciliation_sha256,
@@ -2440,6 +3035,10 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
         self.assertIsNone(spec["profile"]["collation_version"])
         self.assertEqual(spec["databases"]["candidate_oid"], "16384")
         self.assertEqual(spec["runtime_limits"]["execute_seconds"], 1800)
+        self.assertNotEqual(
+            spec["snapshot"]["migration_ledger_file_sha256"],
+            spec["snapshot"]["migration_allowlist_sha256"],
+        )
         self.assertNotEqual(spec["base_spec_sha256"], EXECUTOR.ZERO_SHA256)
 
     def test_source_drift_and_mutated_or_extra_spec_fail_closed(self):
@@ -2481,10 +3080,18 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
                 "journal_state_sha256": digest("pg-journal"),
                 "observation_scope_sha256": digest("pg-observation-scope"),
             },
+            "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1": {
+                "create_receipt_sha256": digest("pg-create-receipt"),
+                "staging_oid": "16385",
+                "dump_inventory_sha256": digest("pg-dump-inventory"),
+                "expected_empty_projection_sha256":
+                    EXECUTOR.digest_value(EXECUTOR.postgres_empty_restore_projection()),
+            },
             "PG_RB_ATOMIC_SWITCH_V1": {
                 "privilege_receipt_sha256": digest("pg-privilege-receipt"),
                 "staging_oid": "16385",
                 "before_observation_sha256": digest("pg-switch-before"),
+                "staging_content_proof_sha256": digest("pg-staging-proof"),
                 "expected_switched_identity_sha256": digest("pg-switched-identity"),
             },
             "PG_RB_UNSEAL_ACTIVE_V1": {
@@ -2505,11 +3112,20 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
                 self.assertEqual(
                     EXECUTOR.validate_pg_opcode_spec(spec, base=base), spec,
                 )
-                self.assertEqual(spec["database"], "postgres")
+                self.assertEqual(
+                    spec["database"],
+                    base["databases"]["staging_name"]
+                    if opcode == "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1"
+                    else "postgres",
+                )
                 self.assertEqual(spec["timeout_seconds"], 300)
                 self.assertEqual(
-                    spec["effectful"], opcode != "PG_RB_OBSERVE_STATE_V1",
+                    spec["effectful"], opcode not in EXECUTOR.POSTGRES_READ_ONLY_SQL_OPCODES,
                 )
+        create_sql = EXECUTOR.render_pg_sql(
+            base, "PG_RB_CREATE_STAGING_V1", bindings["PG_RB_CREATE_STAGING_V1"],
+        ).decode()
+        self.assertIn("SET default_transaction_read_only TO 'on'", create_sql)
         switch_sql = EXECUTOR.render_pg_sql(
             base, "PG_RB_ATOMIC_SWITCH_V1", bindings["PG_RB_ATOMIC_SWITCH_V1"],
         ).decode()
@@ -2550,6 +3166,94 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
                     base, "PG_RB_OBSERVE_STATE_V1", mutation,
                 )
 
+    def test_guarded_switch_v3_reproves_then_atomically_fences_and_renames(self):
+        inputs = self.inputs()
+        base = EXECUTOR.derive_pg_rollback_base_spec(inputs)
+        material = EXECUTOR._postgres_guarded_switch_material(
+            base, inputs, restored_oid="16385",
+        )
+        source_bindings = {
+            "source_reconciliation_sha256":
+                base["snapshot"]["source_reconciliation_sha256"],
+            "expected_content_report_sha256": material["report"]["sha256"],
+            "migration_ledger_file_sha256":
+                material["migration"]["ledger_file_sha256"],
+            "migration_allowlist_sha256":
+                material["migration"]["allowlist_sha256"],
+            "expected_security_state_sha256": material["security_state_sha256"],
+        }
+        bindings = {
+            "privilege_receipt_sha256": digest("guard-v3-privilege"),
+            "staging_oid": "16385",
+            "before_observation_sha256": digest("guard-v3-before"),
+            "staging_content_proof_sha256": digest("guard-v3-proof"),
+            "expected_switched_identity_sha256": EXECUTOR.digest_value({
+                "active_name": base["databases"]["active_name"],
+                "active_oid": "16385",
+                "quarantine_name": base["databases"]["quarantine_name"],
+                "quarantine_oid": base["databases"]["candidate_oid"],
+                "state": "NEW_SEALED",
+            }),
+            **source_bindings,
+            "guarded_state_sha256": EXECUTOR.digest_value({
+                **source_bindings,
+                "staging_content_proof_sha256": digest("guard-v3-proof"),
+                "staging_oid": "16385",
+            }),
+        }
+        spec = EXECUTOR.derive_pg_guarded_switch_opcode_spec(base, inputs, bindings)
+        self.assertEqual(spec["opcode"], "PG_RB_GUARDED_SWITCH_V3")
+        self.assertEqual(
+            spec["contract"],
+            "chenyida-erp-uat-rollback-postgresql-guarded-switch-opcode-spec/v2",
+        )
+        sql = EXECUTOR.render_pg_guarded_switch_sql(base, inputs, bindings).decode()
+        self.assertNotIn("pg_catalog.digest", sql)
+        self.assertIn("pg_catalog.sha256", sql)
+        self.assertIn("0:0:0:0:0:0", sql)
+        reset = sql.index("SET default_transaction_read_only=off;")
+        security = sql.index("\\set ON_ERROR_STOP on")
+        switch_connection = sql.index("\\connect postgres")
+        management_begin = sql.index("BEGIN;", switch_connection)
+        management_lock_timeout = sql.index(
+            "SET LOCAL lock_timeout='5s';", management_begin,
+        )
+        management_statement_timeout = sql.index(
+            "SET LOCAL statement_timeout='60s';", management_begin,
+        )
+        management_idle_timeout = sql.index(
+            "SET LOCAL idle_in_transaction_session_timeout='15s';", management_begin,
+        )
+        management_lock = sql.index("pg_advisory_xact_lock", management_begin)
+        fence = sql.index("ALLOW_CONNECTIONS false")
+        first_rename = sql.index('ALTER DATABASE "chenyida_erp" RENAME TO')
+        second_rename = sql.index(
+            'ALTER DATABASE "chenyida_erp_rb_deadbeefdeadbeef" RENAME TO "chenyida_erp";',
+        )
+        self.assertLess(reset, security)
+        self.assertLess(security, switch_connection)
+        self.assertLess(management_begin, management_lock_timeout)
+        self.assertLess(management_lock_timeout, management_statement_timeout)
+        self.assertLess(management_statement_timeout, management_idle_timeout)
+        self.assertLess(management_idle_timeout, management_lock)
+        self.assertLess(switch_connection, fence)
+        self.assertLess(fence, first_rename)
+        self.assertLess(first_rename, second_rename)
+        self.assertNotIn("ALLOW_CONNECTIONS false", sql[:switch_connection])
+        self.assertNotIn("SWITCH_READY", sql)
+        self.assertEqual(sql.count("ALLOW_CONNECTIONS false"), 1)
+        self.assertTrue(sql.endswith("COMMIT;\nSELECT true;\n"))
+        with self.assertRaisesRegex(
+            EXECUTOR.FixedExecutorError,
+            "ROLLBACK_FIXED_EXECUTOR_POSTGRES_GUARDED_SWITCH_INVALID",
+        ):
+            EXECUTOR.derive_pg_guarded_switch_opcode_spec(
+                base, inputs, {
+                    **bindings,
+                    "expected_switched_identity_sha256": digest("guard-v3-after-drift"),
+                },
+            )
+
     def test_live_state_parser_classifies_old_new_and_partial_layouts(self):
         base = EXECUTOR.derive_pg_rollback_base_spec(self.inputs())
         names = base["databases"]
@@ -2582,6 +3286,28 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
                 old, base=base, restored_oid="16385",
             )["layout"],
             "OLD",
+        )
+        old_later = EXECUTOR.parse_pg_state_observation(
+            EXECUTOR.canonical({
+                "system_identifier": base["postgres"]["system_identifier"],
+                "server_version_num": base["postgres"]["server_version_num"],
+                "databases": old["databases"],
+            }),
+            base=base, observed_at="2026-08-16T02:00:05.000Z",
+        )
+        old_classification = EXECUTOR.classify_pg_rollback_layout(
+            old, base=base, restored_oid="16385",
+        )
+        old_later_classification = EXECUTOR.classify_pg_rollback_layout(
+            old_later, base=base, restored_oid="16385",
+        )
+        self.assertNotEqual(
+            old_classification["classification_sha256"],
+            old_later_classification["classification_sha256"],
+        )
+        self.assertEqual(
+            old_classification["state_projection_sha256"],
+            old_later_classification["state_projection_sha256"],
         )
         sealed = observe([
             row(names["active_name"], "16385", names["candidate_marker"], False, 0, True),
@@ -2628,6 +3354,11 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
             "create_receipt_sha256": digest("pg-create-receipt"),
             "staging_oid": "16385",
             "before_content_observation_sha256": digest("pg-before-content"),
+            "dump_inventory_sha256": digest("pg-dump-inventory"),
+            "restore_precondition_opcode_spec_sha256": digest("pg-precondition-opcode"),
+            "restore_precondition_sha256": digest("pg-precondition"),
+            "empty_projection_sha256":
+                EXECUTOR.digest_value(EXECUTOR.postgres_empty_restore_projection()),
             "dump_sha256": base["snapshot"]["dump_sha256"],
             "dump_bytes": base["snapshot"]["dump_bytes"],
             "expected_content_sha256": digest("pg-expected-content"),
@@ -2723,6 +3454,14 @@ class PostgresCapabilityParserTest(unittest.TestCase):
                 )
         ack = EXECUTOR.parse_pg_mutation_ack(b"\nt\n", "PG_RB_CREATE_STAGING_V1")
         self.assertNotEqual(ack["ack_sha256"], EXECUTOR.ZERO_SHA256)
+        for ambiguous in (b"\n", b"t\nt\n", b" \t\r\n"):
+            with self.subTest(ambiguous=ambiguous), self.assertRaisesRegex(
+                EXECUTOR.FixedExecutorError,
+                "ROLLBACK_FIXED_EXECUTOR_POSTGRES_MUTATION_ACK_INVALID",
+            ):
+                EXECUTOR.parse_pg_mutation_ack(
+                    ambiguous, "PG_RB_GUARDED_SWITCH_V3",
+                )
         with self.assertRaisesRegex(
             EXECUTOR.FixedExecutorError,
             "ROLLBACK_FIXED_EXECUTOR_POSTGRES_MUTATION_ACK_INVALID",
@@ -2850,8 +3589,14 @@ class PostgresPostverifyParserTest(unittest.TestCase):
             f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
             for path in migrations
         ).encode()
+        records = [
+            {"checksum": line.split("  ", 1)[0], "version": line.split("  ", 1)[1]}
+            for line in raw.decode().splitlines()
+        ]
+        allowlist_sha256 = EXECUTOR.migration_allowlist_digest(records)
         evidence = EXECUTOR.validate_migration_ledger(
-            raw, expected_sha256=hashlib.sha256(raw).hexdigest(),
+            raw, expected_ledger_file_sha256=hashlib.sha256(raw).hexdigest(),
+            expected_allowlist_sha256=allowlist_sha256,
             expected_head=migrations[-1].name,
         )
         self.assertEqual(evidence["count"], 46)
@@ -2862,7 +3607,9 @@ class PostgresPostverifyParserTest(unittest.TestCase):
             "ROLLBACK_FIXED_EXECUTOR_MIGRATION_LEDGER_INVALID",
         ):
             EXECUTOR.validate_migration_ledger(
-                reversed_raw, expected_sha256=hashlib.sha256(reversed_raw).hexdigest(),
+                reversed_raw,
+                expected_ledger_file_sha256=hashlib.sha256(reversed_raw).hexdigest(),
+                expected_allowlist_sha256=allowlist_sha256,
                 expected_head=migrations[0].name,
             )
         gap_raw = b"\n".join(
@@ -2873,7 +3620,9 @@ class PostgresPostverifyParserTest(unittest.TestCase):
             "ROLLBACK_FIXED_EXECUTOR_MIGRATION_LEDGER_INVALID",
         ):
             EXECUTOR.validate_migration_ledger(
-                gap_raw, expected_sha256=hashlib.sha256(gap_raw).hexdigest(),
+                gap_raw,
+                expected_ledger_file_sha256=hashlib.sha256(gap_raw).hexdigest(),
+                expected_allowlist_sha256=allowlist_sha256,
                 expected_head=migrations[-1].name,
             )
 
@@ -2962,6 +3711,27 @@ class ClosedPostgresCapabilityDriverTest(unittest.TestCase):
                     "server_version_num": self.base["postgres"]["server_version_num"],
                     "databases": databases,
                 }, separators=(", ", ": ")) + "\n").encode()
+            if opcode["opcode"] == "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1":
+                return (json.dumps({
+                    "system_identifier": self.base["postgres"]["system_identifier"],
+                    "server_version_num": self.base["postgres"]["server_version_num"],
+                    "database": {
+                        "name": self.base["databases"]["staging_name"],
+                        "oid": "16385", "marker": self.base["databases"]["staging_marker"],
+                        "owner": "postgres", "allow_connections": True,
+                        "connection_limit": 0, "default_transaction_read_only": True,
+                        "sessions": 0, "prepared_xacts": 0,
+                    },
+                    "profile": {
+                        "encoding": self.base["profile"]["encoding"],
+                        "locale_provider": self.base["profile"]["locale_provider"],
+                        "collate": self.base["profile"]["collate"],
+                        "ctype": self.base["profile"]["ctype"],
+                        "collation_version": self.base["profile"]["collation_version"],
+                        "tablespace": self.base["profile"]["default_tablespace"],
+                    },
+                    "projection": EXECUTOR.postgres_empty_restore_projection(),
+                }) + "\n").encode()
             return b"\nt\n"
 
         def postgres_capacity(self):
@@ -2971,6 +3741,10 @@ class ClosedPostgresCapabilityDriverTest(unittest.TestCase):
         def postgres_reconcile_opcode(self, _base, _inputs, opcode):
             self.calls.append(opcode["opcode"])
             return b"\n"
+
+        def postgres_guarded_switch_opcode(self, _base, _inputs, opcode):
+            self.calls.append(opcode["opcode"])
+            return b"\nt\n"
 
     def test_full_staging_restore_driver_reaches_only_new_sealed_layout(self):
         inputs = PostgresRollbackBaseSpecTest.inputs()
@@ -2982,10 +3756,17 @@ class ClosedPostgresCapabilityDriverTest(unittest.TestCase):
         preflight = driver.preflight(base, 99)
         created = driver.create_staging(base, preflight["observation"])
         self.assertEqual(created["classification"]["layout"], "OLD")
+        precondition = driver.restore_precondition(
+            base, create_receipt_sha256=digest("pg-create-receipt"),
+            restored_oid=created["restored_oid"],
+            dump_inventory_sha256=preflight["dump_inventory"]["inventory_sha256"],
+        )["proof"]
         restored = driver.restore_dump(
             base, 99, create_receipt_sha256=digest("pg-create-receipt"),
             restored_oid=created["restored_oid"],
             before_content_observation_sha256=created["observation"]["observation_sha256"],
+            dump_inventory_sha256=preflight["dump_inventory"]["inventory_sha256"],
+            restore_precondition=precondition,
         )
         self.assertEqual(restored["restored_oid"], "16385")
         reconciled = driver.reconcile(
@@ -2993,7 +3774,9 @@ class ClosedPostgresCapabilityDriverTest(unittest.TestCase):
             restored_oid=created["restored_oid"],
         )
         switched = driver.switch(
-            base, privilege_receipt_sha256=digest("pg-privilege-receipt"),
+            base, inputs,
+            privilege_receipt_sha256=digest("pg-privilege-receipt"),
+            staging_content_proof_sha256=digest("pg-staging-content-proof"),
             restored_oid=created["restored_oid"],
             before_observation=reconciled["observation"],
         )
@@ -3009,8 +3792,8 @@ class ClosedPostgresCapabilityDriverTest(unittest.TestCase):
         self.assertFalse(runner.observations)
         self.assertIn("POSTGRES_CAPACITY", runner.calls)
         self.assertEqual(
-            [item for item in runner.calls if item == "PG_RB_ATOMIC_SWITCH_V1"],
-            ["PG_RB_ATOMIC_SWITCH_V1"],
+            [item for item in runner.calls if item == "PG_RB_GUARDED_SWITCH_V3"],
+            ["PG_RB_GUARDED_SWITCH_V3"],
         )
 
     def test_driver_rejects_a_post_switch_partial_layout(self):
@@ -3023,10 +3806,17 @@ class ClosedPostgresCapabilityDriverTest(unittest.TestCase):
         )
         preflight = driver.preflight(base, 99)
         created = driver.create_staging(base, preflight["observation"])
+        precondition = driver.restore_precondition(
+            base, create_receipt_sha256=digest("pg-create-receipt"),
+            restored_oid=created["restored_oid"],
+            dump_inventory_sha256=preflight["dump_inventory"]["inventory_sha256"],
+        )["proof"]
         driver.restore_dump(
             base, 99, create_receipt_sha256=digest("pg-create-receipt"),
             restored_oid=created["restored_oid"],
             before_content_observation_sha256=created["observation"]["observation_sha256"],
+            dump_inventory_sha256=preflight["dump_inventory"]["inventory_sha256"],
+            restore_precondition=precondition,
         )
         reconciled = driver.reconcile(
             base, inputs, restore_receipt_sha256=digest("pg-restore-receipt"),
@@ -3037,7 +3827,9 @@ class ClosedPostgresCapabilityDriverTest(unittest.TestCase):
             "ROLLBACK_FIXED_EXECUTOR_POSTGRES_SWITCH_RESULT_INVALID",
         ):
             driver.switch(
-                base, privilege_receipt_sha256=digest("pg-privilege-receipt"),
+                base, inputs,
+                privilege_receipt_sha256=digest("pg-privilege-receipt"),
+                staging_content_proof_sha256=digest("pg-staging-content-proof"),
                 restored_oid=created["restored_oid"],
                 before_observation=reconciled["observation"],
             )
@@ -3113,13 +3905,104 @@ class PostgresCapabilityRuntimeTest(unittest.TestCase):
             self.calls.append(("restore", dump_fd, bindings["restored_oid"]))
             return {"restored_oid": self.restored_oid, "ack": {"fixture": "restore"}}
 
+        def restore_precondition(self, base, **bindings):
+            self.calls.append(("restore-precondition", bindings["restored_oid"]))
+            opcode = EXECUTOR.derive_pg_opcode_spec(
+                base, "PG_RB_OBSERVE_STAGING_RESTORE_PRECONDITION_V1", {
+                    "create_receipt_sha256": bindings["create_receipt_sha256"],
+                    "staging_oid": bindings["restored_oid"],
+                    "dump_inventory_sha256": bindings["dump_inventory_sha256"],
+                    "expected_empty_projection_sha256":
+                        EXECUTOR.digest_value(EXECUTOR.postgres_empty_restore_projection()),
+                },
+            )
+            raw = canonical({
+                "system_identifier": base["postgres"]["system_identifier"],
+                "server_version_num": base["postgres"]["server_version_num"],
+                "database": {
+                    "name": base["databases"]["staging_name"],
+                    "oid": bindings["restored_oid"],
+                    "marker": base["databases"]["staging_marker"],
+                    "owner": "postgres", "allow_connections": True,
+                    "connection_limit": 0, "default_transaction_read_only": True,
+                    "sessions": 0, "prepared_xacts": 0,
+                },
+                "profile": {
+                    "encoding": base["profile"]["encoding"],
+                    "locale_provider": base["profile"]["locale_provider"],
+                    "collate": base["profile"]["collate"],
+                    "ctype": base["profile"]["ctype"],
+                    "collation_version": base["profile"]["collation_version"],
+                    "tablespace": base["profile"]["default_tablespace"],
+                },
+                "projection": EXECUTOR.postgres_empty_restore_projection(),
+            })
+            return {
+                "opcode": opcode,
+                "proof": EXECUTOR.parse_pg_restore_precondition(
+                    raw, base=base, opcode_spec=opcode,
+                ),
+            }
+
         def reconcile(self, _base, _inputs, **bindings):
             self.calls.append(("reconcile", bindings["restored_oid"]))
             return {"restored_oid": self.restored_oid, "observation": self.old}
 
-        def switch(self, _base, **bindings):
-            self.calls.append(("switch", bindings["restored_oid"]))
+        def prove_staging_content(self, _inputs, base, **bindings):
+            self.calls.append(("prove-staging", bindings["restored_oid"]))
+            migration = EXECUTOR.validate_migration_ledger(
+                _inputs.raw("snapshot_migrations"),
+                expected_ledger_file_sha256=
+                    base["snapshot"]["migration_ledger_file_sha256"],
+                expected_allowlist_sha256=
+                    base["snapshot"]["migration_allowlist_sha256"],
+                expected_head=base["snapshot"]["migration_head"],
+            )
+            target = next(
+                item for item in self.old["databases"]
+                if item["name"] == base["databases"]["staging_name"]
+            )
+            candidate = next(
+                item for item in self.old["databases"]
+                if item["name"] == base["databases"]["active_name"]
+            )
+            identity = {
+                "name": target["name"],
+                "system_identifier": base["postgres"]["system_identifier"],
+                "oid": target["oid"], "marker": target["marker"],
+            }
+            guarded_material = EXECUTOR._postgres_guarded_switch_material(
+                base, _inputs, restored_oid=bindings["restored_oid"],
+            )
             return {
+                "source_report": {
+                    "source_sha256": base["snapshot"]["source_reconciliation_sha256"],
+                    "report_sha256": base["snapshot"]["target_database_report_sha256"],
+                },
+                "live_report": {"sha256": base["snapshot"]["target_database_report_sha256"]},
+                "migration": migration,
+                "security": {
+                    "state_sha256": guarded_material["security_state_sha256"],
+                },
+                "sessions": {
+                    "total": 0, "allowed_role_set_sha256": digest("runtime-empty-roles"),
+                    "client_policy_sha256": digest("runtime-empty-clients"),
+                    "observation_sha256": digest("runtime-empty-sessions"),
+                },
+                "identity": {**identity, "identity_sha256": EXECUTOR.digest_value(identity)},
+                "before": self.old, "after": self.old,
+                "target": target, "candidate": candidate,
+            }
+
+        def guarded_switch_opcode(self, base, inputs, **bindings):
+            return EXECUTOR.ClosedPostgresCapabilityDriver.guarded_switch_opcode(
+                self, base, inputs, **bindings,
+            )
+
+        def execute_guarded_switch(self, _base, _inputs, *, opcode, restored_oid):
+            self.calls.append(("switch", restored_oid))
+            return {
+                "opcode": opcode,
                 "restored_oid": self.restored_oid, "observation": self.sealed,
                 "classification": EXECUTOR.classify_pg_rollback_layout(
                     self.sealed, base=self.base, restored_oid=self.restored_oid,
@@ -3133,6 +4016,30 @@ class PostgresCapabilityRuntimeTest(unittest.TestCase):
         def observe(self, _base, purpose, _binding):
             self.calls.append(("observe", purpose))
             return self.sealed
+
+    class RollbackBeforeCommitDriver(Driver):
+        def __init__(self, base):
+            super().__init__(base)
+            self.fail_once = True
+            self.current = self.old
+
+        def execute_guarded_switch(self, _base, _inputs, *, opcode, restored_oid):
+            self.calls.append(("switch", restored_oid))
+            if self.fail_once:
+                self.fail_once = False
+                EXECUTOR.reject("ROLLBACK_FIXED_EXECUTOR_POSTGRES_SWITCH_RESULT_INVALID")
+            self.current = self.sealed
+            return {
+                "opcode": opcode, "restored_oid": restored_oid,
+                "observation": self.current,
+                "classification": EXECUTOR.classify_pg_rollback_layout(
+                    self.current, base=self.base, restored_oid=restored_oid,
+                ),
+            }
+
+        def observe(self, _base, purpose, _binding):
+            self.calls.append(("observe", purpose))
+            return self.current
 
     @staticmethod
     def inputs():
@@ -3221,6 +4128,61 @@ class PostgresCapabilityRuntimeTest(unittest.TestCase):
             effects.receipts["DATABASE_SWITCH"]["recovery_observation_sha256"],
             EXECUTOR.ZERO_SHA256,
         )
+        self.assertEqual(driver.calls.count(("switch", driver.restored_oid)), 1)
+
+    def test_exact_old_precommit_rollback_gets_one_durable_guarded_recovery_attempt(self):
+        inputs, base = self.inputs()
+        driver = self.RollbackBeforeCommitDriver(base)
+        runtime = EXECUTOR.UatRollbackCapabilityRuntime(
+            postgres_driver=driver, clock=lambda: "2026-08-16T02:00:00.000Z",
+        )
+        effects = VolumeCapabilityRuntimeTest.Effects()
+        with self.assertRaises(EXECUTOR.HandlerOutcomeUnknown):
+            runtime._execute_postgres(inputs, effects)
+        self.assertEqual(driver.current, driver.old)
+        self.assertIsNone(effects.receipt("DATABASE_SWITCH"))
+        recovered = runtime._recover_postgres_execution(inputs, effects)
+        self.assertEqual(recovered["restored_database_oid"], driver.restored_oid)
+        self.assertEqual(effects.receipts["DATABASE_SWITCH"]["status"], "RECOVERED_COMMITTED")
+        self.assertEqual(driver.calls.count(("switch", driver.restored_oid)), 2)
+        self.assertEqual(set(effects.recovery_attempts), {"DATABASE_SWITCH"})
+
+    def test_exact_old_with_prior_recovery_reservation_never_replays_again(self):
+        inputs, base = self.inputs()
+        driver = self.RollbackBeforeCommitDriver(base)
+        runtime = EXECUTOR.UatRollbackCapabilityRuntime(
+            postgres_driver=driver, clock=lambda: "2026-08-16T02:00:00.000Z",
+        )
+        effects = VolumeCapabilityRuntimeTest.Effects()
+        with self.assertRaises(EXECUTOR.HandlerOutcomeUnknown):
+            runtime._execute_postgres(inputs, effects)
+        effects.recovery_attempts["DATABASE_SWITCH"] = {"fixture": "already-reserved"}
+        with self.assertRaises(EXECUTOR.HandlerOutcomeUnknown) as caught:
+            runtime._recover_postgres_execution(inputs, effects)
+        self.assertEqual(caught.exception.reason_code, "SIDE_EFFECT_OUTCOME_UNKNOWN")
+        self.assertEqual(driver.calls.count(("switch", driver.restored_oid)), 1)
+
+    def test_exact_old_marker_drift_fails_closed_without_recovery_replay(self):
+        inputs, base = self.inputs()
+        driver = self.RollbackBeforeCommitDriver(base)
+        runtime = EXECUTOR.UatRollbackCapabilityRuntime(
+            postgres_driver=driver, clock=lambda: "2026-08-16T02:00:00.000Z",
+        )
+        effects = VolumeCapabilityRuntimeTest.Effects()
+        with self.assertRaises(EXECUTOR.HandlerOutcomeUnknown):
+            runtime._execute_postgres(inputs, effects)
+        drifted = copy.deepcopy(driver.old)
+        next(
+            row for row in drifted["databases"]
+            if row["name"] == base["databases"]["staging_name"]
+        )["marker"] = "chenyida-erp-uat-rollback/v1:rollback-runner-deadbeef:DRIFT"
+        drifted["observation_sha256"] = EXECUTOR.digest_value(
+            EXECUTOR.without(drifted, "observation_sha256"),
+        )
+        driver.current = drifted
+        with self.assertRaises(EXECUTOR.HandlerOutcomeUnknown) as caught:
+            runtime._recover_postgres_execution(inputs, effects)
+        self.assertEqual(caught.exception.reason_code, "TARGET_IDENTITY_DRIFT")
         self.assertEqual(driver.calls.count(("switch", driver.restored_oid)), 1)
 
     def test_switch_recovery_binds_current_oid_to_durable_restore_intents(self):
@@ -3341,7 +4303,10 @@ class PostgresPostverifyRuntimeTest(unittest.TestCase):
             "candidate_database_quarantine_oid": base["databases"]["candidate_oid"],
             "runtime_plan_sha256": base["runtime_plan_sha256"],
             "manifest_sha256": base["snapshot"]["snapshot_manifest_sha256"],
-            "migration_manifest_sha256": base["snapshot"]["migration_manifest_sha256"],
+            "migration_ledger_file_sha256":
+                base["snapshot"]["migration_ledger_file_sha256"],
+            "migration_manifest_sha256":
+                base["snapshot"]["migration_allowlist_sha256"],
             "postgres_container_id": base["postgres"]["container_id"],
             "postgres_image_config_digest": base["postgres"]["image_digest"],
             "database_profile_sha256": base["profile"]["profile_sha256"],
@@ -3359,6 +4324,7 @@ class PostgresPostverifyRuntimeTest(unittest.TestCase):
             "staging_database_marker": base["databases"]["staging_marker"],
             "candidate_database_quarantine_marker": base["databases"]["quarantine_marker"],
         })
+        bind_postgres_stage_proofs(stage, base)
         activation = valid_handler_evidence("WEB_WORKER_PREDECESSOR_ACTIVATION")
         activation.update({
             "runtime_plan_sha256": base["runtime_plan_sha256"],
@@ -3481,7 +4447,11 @@ class PostgresPostverifyRuntimeTest(unittest.TestCase):
         self.assertEqual(evidence["migration_head"], base["snapshot"]["migration_head"])
         self.assertEqual(
             evidence["migration_manifest_sha256"],
-            base["snapshot"]["migration_manifest_sha256"],
+            base["snapshot"]["migration_allowlist_sha256"],
+        )
+        self.assertEqual(
+            evidence["migration_ledger_file_sha256"],
+            base["snapshot"]["migration_ledger_file_sha256"],
         )
         self.assertEqual(runner.calls, ["migrations", "identity"])
 
@@ -3671,7 +4641,10 @@ class ActivationCapabilityRuntimeTest(unittest.TestCase):
             "candidate_database_quarantine_oid": base["databases"]["candidate_oid"],
             "runtime_plan_sha256": base["runtime_plan_sha256"],
             "manifest_sha256": base["snapshot"]["snapshot_manifest_sha256"],
-            "migration_manifest_sha256": base["snapshot"]["migration_manifest_sha256"],
+            "migration_ledger_file_sha256":
+                base["snapshot"]["migration_ledger_file_sha256"],
+            "migration_manifest_sha256":
+                base["snapshot"]["migration_allowlist_sha256"],
             "postgres_container_id": base["postgres"]["container_id"],
             "postgres_image_config_digest": base["postgres"]["image_digest"],
             "database_profile_sha256": base["profile"]["profile_sha256"],
@@ -3687,6 +4660,7 @@ class ActivationCapabilityRuntimeTest(unittest.TestCase):
             "staging_database_marker": base["databases"]["staging_marker"],
             "candidate_database_quarantine_marker": base["databases"]["quarantine_marker"],
         })
+        bind_postgres_stage_proofs(pg, base)
         stages = [
             {
                 "stage_result_sha256": digest(f"activation-stage:{index}"),
@@ -3859,8 +4833,10 @@ class ActivationCapabilityRuntimeTest(unittest.TestCase):
                 "live_database_report_sha256":
                     base["snapshot"]["target_database_report_sha256"],
                 "migration_head": base["snapshot"]["migration_head"],
-                "migration_manifest_sha256":
-                    base["snapshot"]["migration_manifest_sha256"],
+                "migration_ledger_file_sha256":
+                    base["snapshot"]["migration_ledger_file_sha256"],
+                "migration_allowlist_sha256":
+                    base["snapshot"]["migration_allowlist_sha256"],
                 "migration_ledger_sha256": digest("activation-migration-ledger"),
                 "live_security_state_sha256": digest("activation-security-state"),
                 "active_allowed_session_role_set_sha256": digest("activation-role-set"),
@@ -4857,6 +5833,153 @@ class HealthPostverifyRuntimeTest(unittest.TestCase):
 
 
 class ClosedDockerRunnerTest(unittest.TestCase):
+    def test_execution_observer_is_opt_in_and_default_path_does_not_hash_stdin(self):
+        descriptor = os.open("/usr/bin/echo", os.O_RDONLY)
+        try:
+            runner = EXECUTOR.ClosedDockerRunner(
+                descriptor, docker_runner_plan(), action_deadline=TEST_ACTION_DEADLINE,
+            )
+            stdin_fd = runner._sealed_input(b"SELECT true;\n", "observer-off", 1024)
+            try:
+                with patch.object(
+                        EXECUTOR, "sha256_fd",
+                        side_effect=AssertionError("default path hashed stdin"),
+                ):
+                    self.assertEqual(
+                        runner._call(
+                            ["version"], stdin_fd=stdin_fd,
+                            effectful=True, observe_execution=True,
+                        ),
+                        b"version\n",
+                    )
+            finally:
+                os.close(stdin_fd)
+
+            events = []
+            observed = EXECUTOR.ClosedDockerRunner(
+                descriptor, docker_runner_plan(), action_deadline=TEST_ACTION_DEADLINE,
+                execution_observer=lambda value: events.append(value),
+            )
+            output = observed.postgres_psql("CONTROL_DATABASE_IDENTITY")
+            self.assertIn(b"PGAPPNAME=cyd_rb_deadbeefdeadbeef_controlidentity", output)
+            self.assertEqual(events, [])
+        finally:
+            os.close(descriptor)
+
+    def test_execution_observer_records_completed_results_and_preserves_unknown(self):
+        with tempfile.TemporaryDirectory(prefix="uat-rollback-observer-", dir="/tmp") as root:
+            executable = Path(root) / "docker-observer.py"
+            executable.write_text(
+                "#!/usr/bin/python3\n"
+                "import sys, time\n"
+                "raw = sys.stdin.buffer.read()\n"
+                "mode = sys.argv[1]\n"
+                "if mode == 'success': sys.stdout.buffer.write(b't\\n')\n"
+                "elif mode == 'fatal':\n"
+                " sys.stderr.write('psql: fatal\\n'); sys.exit(2)\n"
+                "elif mode == 'marker':\n"
+                " sys.stdout.write('guarded switch runtime privilege mismatch\\n'); sys.exit(3)\n",
+                encoding="utf-8",
+            )
+            executable.chmod(0o555)
+            descriptor = os.open(executable, os.O_RDONLY)
+            try:
+                events = []
+                runner = EXECUTOR.ClosedDockerRunner(
+                    descriptor, docker_runner_plan(), action_deadline=TEST_ACTION_DEADLINE,
+                    execution_observer=lambda value: events.append(value),
+                )
+                for mode, return_code in (("success", 0), ("fatal", 2), ("marker", 3)):
+                    stdin_fd = runner._sealed_input(
+                        b"SELECT true;\n", f"observer-{mode}", 1024,
+                    )
+                    try:
+                        if return_code == 0:
+                            self.assertEqual(runner._call(
+                                [mode], stdin_fd=stdin_fd, effectful=True,
+                                observe_execution=True,
+                            ), b"t\n")
+                        else:
+                            with self.assertRaises(EXECUTOR.HandlerOutcomeUnknown) as raised:
+                                runner._call(
+                                    [mode], stdin_fd=stdin_fd, effectful=True,
+                                    observe_execution=True,
+                                )
+                            self.assertEqual(
+                                raised.exception.reason_code,
+                                "SIDE_EFFECT_OUTCOME_UNKNOWN",
+                            )
+                    finally:
+                        os.close(stdin_fd)
+                    self.assertEqual(events[-1]["return_code"], return_code)
+                    self.assertEqual(events[-1]["stdin_bytes"], len(b"SELECT true;\n"))
+                    self.assertEqual(
+                        events[-1]["stdin_sha256"], digest(b"SELECT true;\n"),
+                    )
+                    self.assertEqual(
+                        events[-1]["daemon_state"],
+                        "COMPLETED_NO_UNTRACKED_PROCESS",
+                    )
+                self.assertEqual(len(events), 3)
+
+                rejecting = EXECUTOR.ClosedDockerRunner(
+                    descriptor, docker_runner_plan(), action_deadline=TEST_ACTION_DEADLINE,
+                    execution_observer=lambda _value: (_ for _ in ()).throw(
+                        RuntimeError("observer failed"),
+                    ),
+                )
+                stdin_fd = rejecting._sealed_input(
+                    b"SELECT true;\n", "observer-reject", 1024,
+                )
+                try:
+                    with self.assertRaises(EXECUTOR.HandlerOutcomeUnknown) as raised:
+                        rejecting._call(
+                            ["success"], stdin_fd=stdin_fd, effectful=True,
+                            observe_execution=True,
+                        )
+                    self.assertEqual(
+                        raised.exception.reason_code, "SIDE_EFFECT_OUTCOME_UNKNOWN",
+                    )
+                    self.assertTrue(raised.exception.side_effects_started)
+                finally:
+                    os.close(stdin_fd)
+            finally:
+                os.close(descriptor)
+
+    def test_execution_observer_does_not_record_incomplete_tool_outcomes(self):
+        with tempfile.TemporaryDirectory(prefix="uat-rollback-observer-incomplete-", dir="/tmp") as root:
+            executable = Path(root) / "docker-incomplete.py"
+            executable.write_text(
+                "#!/usr/bin/python3\n"
+                "import sys, time\n"
+                "if sys.argv[1] == 'timeout': time.sleep(2)\n"
+                "else: sys.stdout.write('x' * 4096)\n",
+                encoding="utf-8",
+            )
+            executable.chmod(0o555)
+            descriptor = os.open(executable, os.O_RDONLY)
+            try:
+                events = []
+                runner = EXECUTOR.ClosedDockerRunner(
+                    descriptor, docker_runner_plan(), action_deadline=TEST_ACTION_DEADLINE,
+                    execution_observer=lambda value: events.append(value),
+                )
+                with self.assertRaises(EXECUTOR.HandlerOutcomeUnknown) as timeout:
+                    runner._call(
+                        ["timeout"], timeout_seconds=0.1, effectful=True,
+                        observe_execution=True,
+                    )
+                self.assertEqual(timeout.exception.reason_code, "TOOL_TIMEOUT")
+                with self.assertRaises(EXECUTOR.HandlerOutcomeUnknown) as output:
+                    runner._call(
+                        ["output"], maximum_output=32, effectful=True,
+                        observe_execution=True,
+                    )
+                self.assertEqual(output.exception.reason_code, "TOOL_OUTPUT_LIMIT")
+                self.assertEqual(events, [])
+            finally:
+                os.close(descriptor)
+
     def test_verified_descriptor_is_invoked_without_shell_or_path_lookup(self):
         descriptor = os.open("/usr/bin/echo", os.O_RDONLY)
         try:

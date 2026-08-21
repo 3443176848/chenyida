@@ -27,8 +27,8 @@
     "access_intent": {
       "path": "operations/postgresql-runtime-privilege-access-v2.json",
       "contract": "chenyida-erp-postgresql-runtime-privilege-access/v2",
-      "access_sha256": "8eece185f306dc3d1c54275329068c16620b3ffbd5c8d703849166fb07f6fc76",
-      "file_sha256": "2ab41ef7cd693f241400755bdec908e616cdd9c1fd7d024c2818e5c4ed65f9d4"
+      "access_sha256": "bcd714c9af16a634279eb38f01b665d3f927d16af41e64c1a065eea1ee17dd17",
+      "file_sha256": "5f797bc4948bd201ae3647a2198a574e717e46f8f1fa7843ca7c7e2afdecf1a9"
     },
     "compiler": [
       {
@@ -13692,5 +13692,5 @@
     }
   },
   "catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
-  "artifact_sha256": "b8536bc18531a819e8baa77012f9ef91e67241cc769978df482b81aa6a869beb"
+  "artifact_sha256": "9e331334c1636b2ee46180df3aca6850c7831470782f7f03856a6efef962480b"
 }

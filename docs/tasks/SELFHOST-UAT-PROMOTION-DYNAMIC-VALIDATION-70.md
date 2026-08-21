@@ -1,6 +1,6 @@
 # SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 UAT晋升与回滚隔离动态验证
 
-> 状态：`DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-RESTORE-02 NEXT / ISOLATED SYNTHETIC ONLY / PRODUCTION NO-GO`
+> 状态：`DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 SOURCE READY / DYNAMIC RUN PENDING / ISOLATED SYNTHETIC ONLY / PRODUCTION NO-GO`
 > 日期：2026-08-21（Asia/Shanghai）
 > 责任：Codex主智能体串行调度；项目负责人保留任何UAT/生产、真实数据、host和凭据动作的专项授权
 
@@ -54,11 +54,26 @@ TASK70于2026-08-21正式启动为唯一`DOING`。首个提交先完成版本化
 6. 适用测试为Python24/24、Node20/20、release29/29、inventory262/238/24、官方凭据扫描1,785文件、生成物重放和diff门。该结果仅为`PASS_PARTIAL / VERIFIED_PARTIAL_ONLY`，明确不证明传输层COMMIT响应丢失、dump/Migration/ACL、文件域、Compose、host activation、真实UAT、人工UAT或生产就绪。
 7. 证据提交`526fd4af306441a65090f33c66cfdefc7ecfcf74`在敏感信息检查后从private main `3e30dc36a63461ed7bebe39d0b46fd8742b5dd66`普通fast-forward送达`recovery-private/main`；本条治理提交按同一授权继续普通快进。未force、未推送公开origin，且未扩大任何运行或数据权限。
 
-## 8. 下一切片验收标准
+## 8. `DV70-PG-GUARDED-SWITCH-02`源码切片
 
-下一切片固定为`DV70-PG-RESTORE-02`，仍属于同一TASK70且只允许隔离合成：
+只读映射证明“dump/卷恢复”与“生产固定executor在完整Migration/权限状态上的切换与一次性恢复”是两个不同信任边界。为先关闭可由现有固定生产opcode精确复用、且不需要读取任何备份正文的最高风险缺口，D-160将原计划`DV70-PG-RESTORE-02`拆分：当前先执行`DV70-PG-GUARDED-SWITCH-02`；dump和文件Volume恢复继续明确未证明，不能从本case推断。
 
-1. 先只读映射现有PostgreSQL staging restore handler、46项Migration allowlist/ledger、目标角色/ACL/default privilege及失败保全路径，形成版本化case和独立失败关闭证据合同；不得把`DV70-PG-SWITCH-01`外推为完整数据库恢复。
-2. 只使用本机固定摘要镜像、单一任务容器、断网/只读rootfs/有界tmpfs、无bind/Volume、无build/pull；先证明最坏磁盘和内存上界并通过新鲜60/180秒资源门。
-3. 合成dump必须去敏且可丢弃，覆盖空目标/已有目标、Migration ledger 0001—0046、角色与schema/table/default privileges、失败回滚、重复执行和只读reconciliation；不得连接UAT/生产或读取真实备份正文。
-4. 证据继续最多为`PARTIAL_ONLY`，必须保留host activation、真实UAT回退、人工UAT和生产阻断；任何source、镜像、Migration、资源或清理漂移均失败关闭。
+当前源码已完成、动态运行尚未执行：
+
+1. policy v3固定唯一case、46个不可变Migration、9个受管角色、4项membership、完整content report、runtime privilege来源、`PG_RB_GUARDED_SWITCH_V3`生产SQL及V2 policy/artifact逐字节冻结；证据仍只能是`PARTIAL_ONLY`。
+2. 生产fixed executor仅在本隔离runner注入完成态observer；默认路径不计算额外stdin摘要、不回调。observer在子进程EOF、退出码和无遗留daemon均确定后，为9次精确生产调用记录argv、固定环境、stdin、timeout/output上界、原始stdout/stderr、退出码、side-effect状态和自摘要；任何回调异常在副作用后转为typed UNKNOWN。
+3. 十个场景覆盖精确成功、重复失败关闭、内容/Migration/security漂移、ordinary role拒绝、首rename故障事务回滚、OLD布局一次恢复、恢复attempt unknown不二次重放，以及调用方丢弃已完成结果后NEW_SEALED不重放。证据明确不声称进程终止/新进程恢复或传输层PostgreSQL COMMIT响应丢失。
+4. Python与Node独立重建固定executor SQL/argv/env/序列/限制和原始输出；setup/reset/drift SQL也各自绑定精确执行receipt。SQL证据只接受单一mtime=0 canonical gzip member，artifact读取要求稳定root-owned `0400`单硬链接，整件篡改harness会级联重算合法上层摘要再验证语义拒绝。
+5. 资源门把monotonic elapsed与wall clock逐样本绑定，漂移不得超过1.5秒；容器创建必须晚于至少60秒前检，总窗口至少180秒。仍只允许一个本机既有固定摘要PG17容器、断网、只读rootfs、全有界tmpfs、无bind/Volume/build/pull。
+6. artifact发布使用本次创建inode和精确路径验证；若hardlink后unlink、目录fsync或metadata失败，只删除与该inode匹配的本任务路径并同步目录，保证安全重试且不误删外来文件。
+7. 源码验收已通过：Python V3 16/16、fixed executor 129/129、Node V3 13/13、受影响合同108/108、release 29/29、inventory 263/239/24及两份Node语法门；两条只读终审均无P0/P1。首次108项组合因全量drop capabilities不能覆盖夹具中的`0440`文件并chown reader GID而产生35个同源EACCES，使用离线临时容器仅补`DAC_OVERRIDE`/`CHOWN`后108/108通过，未修改断言。
+8. 历史V2五个文件的SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91`。当前V3 policy raw SHA-256为`9245a099…dc22`，canonical policy摘要由双语测试固定；release inventory/runtime policy分别为`c4775f60…6485`/`8f6fb710…85d2`。
+
+## 9. 当前动态执行验收标准
+
+源码提交并完成敏感信息检查、普通fast-forward推送到`recovery-private/main`后，立即在clean source上串行运行该case；这是source binding的必要条件，不是等待额外业务授权：
+
+1. 运行前后重新执行完整资源、Docker对象、四服务和四保护卷门；不得重复TASK84命令，不得删除镜像、既有容器或Volume。
+2. 只允许producer创建并清理一个有精确label/ID的临时PostgreSQL容器和本case临时目录；禁止UAT/生产数据库、真实备份、业务数据、凭据、host activation、Migration部署或现有运行面写入。
+3. 最终artifact必须由Node verifier和独立整件篡改harness通过，且对象、服务、V2字节和源提交绑定保持；任何失败先保全事实、只清理经身份核验的本任务资源，再修复源码并独立提交重跑。
+4. 即使全部通过，结论仍只能是`DV70-PG-GUARDED-SWITCH-02 VERIFIED PARTIAL`。dump/Volume恢复、完整fixed-handler request/result commit边界、fresh-process恢复、host activation、真实UAT回退、人工UAT和生产授权继续阻断，TASK70不得仅凭本case转`DONE`。
