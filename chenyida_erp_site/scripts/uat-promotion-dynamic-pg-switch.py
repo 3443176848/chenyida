@@ -17,6 +17,7 @@ import fcntl
 import hashlib
 import importlib.util
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -56,6 +57,7 @@ PRECONDITION_ERROR_OUTPUTS = {
 }
 EMPTY_SHA256 = hashlib.sha256(b"").hexdigest()
 MAX_COMMAND_OUTPUT = 1024 * 1024
+JSON_SAFE_INTEGER = 9_007_199_254_740_991
 # Updated whenever the closed v2 policy changes.  The runner refuses every
 # semantic policy variant before its first Docker command.
 EXPECTED_POLICY_SHA256 = "bace6ac8d7749d4a777fd3a9b40a309db1aa00d44af2f62e82d5a78e339e7b01"
@@ -93,10 +95,28 @@ def load_module(name: str, path: Path):
     return module
 
 
+def canonical_number_projection(value: Any) -> Any:
+    """Match JSON.stringify for the bounded numeric evidence domain."""
+    if isinstance(value, float):
+        if not math.isfinite(value) or abs(value) > JSON_SAFE_INTEGER:
+            reject("TASK70_DYNAMIC_JSON_INVALID")
+        return int(value) if value.is_integer() else value
+    if isinstance(value, int) and not isinstance(value, bool):
+        if abs(value) > JSON_SAFE_INTEGER:
+            reject("TASK70_DYNAMIC_JSON_INVALID")
+        return value
+    if isinstance(value, dict):
+        return {key: canonical_number_projection(child) for key, child in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [canonical_number_projection(child) for child in value]
+    return value
+
+
 def canonical(value: Any, *, newline: bool = False) -> bytes:
     try:
         raw = json.dumps(
-            value, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+            canonical_number_projection(value), ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"),
             allow_nan=False,
         ).encode("utf-8", "strict")
     except (TypeError, ValueError, UnicodeError):

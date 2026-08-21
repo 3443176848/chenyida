@@ -793,6 +793,16 @@ function redigestScenarioArtifact(artifact, scenarioIndex) {
   return redigestArtifact(artifact);
 }
 
+test("dynamic canonical number vector matches the Python producer", () => {
+  const value = [2.0, -0.0, 0.0, 2.4, 6.705056040609911];
+  const expected = "[2,0,0,2.4,6.705056040609911]";
+  assert.equal(canonicalTask70DynamicJson(value), expected);
+  assert.equal(
+    task70DynamicSha256(expected),
+    "bea9d5d76ee15662830f364a68a8babc57ced8cc7edbb79a207bab5053a75207",
+  );
+});
+
 test("current repository audit is valid but UAT promotion remains blocked", () => {
   const result = buildUatPromotionRollbackAudit(inputs());
   assert.deepEqual(result.errors, []);

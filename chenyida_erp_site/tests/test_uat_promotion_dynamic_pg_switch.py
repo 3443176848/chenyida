@@ -83,6 +83,24 @@ class DynamicPgSwitchPureContractTest(unittest.TestCase):
         self.assertEqual(RUNNER.SAFE_ENV["GIT_NO_REPLACE_OBJECTS"], "1")
         self.assertEqual(RUNNER.SAFE_ENV["GIT_OPTIONAL_LOCKS"], "0")
 
+    def test_canonical_json_normalizes_integral_floats_for_cross_runtime_digest(self):
+        value = [2.0, -0.0, 0.0, 2.4, 6.705056040609911]
+        expected = b'[2,0,0,2.4,6.705056040609911]'
+        expected_sha256 = "bea9d5d76ee15662830f364a68a8babc57ced8cc7edbb79a207bab5053a75207"
+        self.assertEqual(RUNNER.canonical(value), expected)
+        self.assertEqual(
+            RUNNER.digest_value(value),
+            expected_sha256,
+        )
+        with self.assertRaisesRegex(
+            RUNNER.DynamicPgSwitchError, "TASK70_DYNAMIC_JSON_INVALID",
+        ):
+            RUNNER.canonical({"unsafe": float("inf")})
+        with self.assertRaisesRegex(
+            RUNNER.DynamicPgSwitchError, "TASK70_DYNAMIC_JSON_INVALID",
+        ):
+            RUNNER.canonical({"unsafe": RUNNER.JSON_SAFE_INTEGER + 1})
+
     def test_repository_source_excludes_only_the_user_protected_report(self):
         status_arguments = None
 
