@@ -5,11 +5,11 @@
 ## 1. 权威绑定与当前判定
 
 - 制品合同：`chenyida-erp-cross-role-uat-evidence-contract/v1`
-- 制品 SHA-256：`774507108df0d5e042d4116daecce66b58e7b7acadfc23bc58df43339ac6874a`
+- 制品 SHA-256：`2d43b01ac318a97d37735caf6582eea79223720a45b92ea932db465a34326654`
 - TASK66 权限矩阵 artifact：`741bb74249fe9a88468a70c6d1f05b18cf6989ea7a6a7d10dd38b0b7ceb29a34`
 - TASK66 权限源码 manifest：`2c4870ca99fc93627f487962182a00c0a530bcdc6df7db8750c4db10af1a1863`
 - UAT证据源码 manifest：`a79005537170e95854598908f75c044dbe58bd5578585da75429ca9e523d70fc`
-- release test inventory：`74094fe2a98de757ecab741aa81858666f42d58df4f13fdde5bec082f13251b4`（262项）
+- release test inventory：`ba303db75eeaecc0e24d826cf5c985f8fbb259bfd5f3a65dbadccba4e7e7f696`（262项）
 - 判定：`BLOCKED`；该制品只定义合成执行与证据合同，不授权登录、写入、迁移、部署或生产操作。
 
 ### 未解除阻塞项

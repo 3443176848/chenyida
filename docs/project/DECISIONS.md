@@ -3299,6 +3299,40 @@
 - 拒绝覆盖activation current/alias、复用过期原授权恢复、猜测未知partial，或在能力检查前消费一次性授权。
 - 拒绝因15个checkpoint静态SUPPORTED、固定executor已进bundle或fake-root激活成功而移除动态回退与人工UAT阻断。
 
+## D-159 TASK70动态证据分离仓库能力、隔离证明、host激活与真实UAT，首版只允许PARTIAL_ONLY
+
+- 日期：2026-08-21
+- 状态：`ACCEPTED / VERSIONED DYNAMIC EVIDENCE CONTRACT VERIFIED / FIRST PG CASE PENDING / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据TASK70三条只读审计、TASK82固定handler边界、单临时容器与低资源保护规则，以及版本化policy/verifier和17项失败关闭测试
+- 确认边界：只接受仓库与隔离合成证据；不授权或声称host安装/激活、真实UAT/生产、受保护Volume/备份读取、数据恢复/迁移、员工验收或切换已发生
+
+### Context
+
+- TASK82源码中固定handler已实现但生产catalog仍故意失败关闭。若把“代码存在”“隔离case通过”“host已激活”和“真实UAT回退成功”合并成一个布尔值，任何局部测试都可能错误放行高权限回退入口。
+- 当前最多允许一个任务临时容器，完整Compose演练需要多个同时运行的服务，不能在该资源规则下被诚实声明为已覆盖。首个可安全动态切片只能是一个全tmpfs PostgreSQL 17容器。
+- 生产opcode字面量必须继续要求UAT候选marker，但本任务实际执行目标只能是TEST隔离cluster；两种身份若不显式区分，合成fixture可能被误报为真实UAT证据。
+
+### Decision
+
+1. 审计分别记录仓库handler能力、隔离动态证据、host activation、真实UAT回退和人工跨岗UAT。任何一项不得从其他项推断；当前固定为4个执行阻断（动态、host、真实UAT回退、人工UAT）。
+2. 动态policy v1固定`ISOLATED_SYNTHETIC_ONLY / TEST / PARTIAL_ONLY`，只列`DV70-PG-SWITCH-01`。即使该case通过，也不得清除动态总阻断、host/真实UAT/人工UAT阻断或声称TASK70/生产就绪。
+3. 首case只验证现有executor生成的`PG_RB_ATOMIC_SWITCH_V1`机制：原样成功切换、重复执行失败关闭、前置漂移拒绝、首rename故障事务回滚、COMMIT响应丢失后只读判定且不重放。dump、Migration、ACL、文件域、Compose及九阶段/十三检查整体均不在证明范围。
+4. 运行只使用本机已有固定摘要PG17镜像；禁止build/pull/network/Volume，rootfs只读，PGDATA/socket/temp使用精确UID/GID/mode和有界tmpfs。宿主最坏磁盘增量固定≤64MiB，启动前根盘必须满足10GiB硬线再加该上界。
+5. receipt必须绑定源码、版本、Migration head、镜像与Docker身份，记录至少60秒Swap、180秒Load停止线、OOM/restart、全局容器/镜像/Volume、四保护卷、四服务以及精确任务对象清理；任何类型、摘要、权限、时序、资源或对象漂移均失败关闭。
+6. 生产base spec中的UAT marker只作为opcode fixture；actual target guard必须同时证明TEST隔离cluster、本机local-only、无真实凭据/端点、无受保护Volume挂载。六项non-claim进入artifact并由verifier逐字节要求。
+
+### Consequences
+
+- 新policy/verifier、审计状态拆分及篡改/弱化测试通过；审计保持`BLOCKED`，artifact self-digest`b6b3c244…58d4b`，`assert-ready`稳定返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+- 两份生成器与17/17专项测试在一个断网只读Node容器内通过；容器、镜像、Volume和四服务指纹前后一致，任务零残留。未运行PostgreSQL、Compose、Migration、恢复、部署或真实UAT。
+- TASK70继续为唯一`DOING`，下一切片按本决策运行`DV70-PG-SWITCH-01`。完成该case后仍只能发布`VERIFIED_PARTIAL_ONLY`证据。
+
+### Rejected alternatives
+
+- 拒绝因handler源码存在而把catalog标为ready，或因一个隔离PG case通过而删除动态、host、真实UAT或人工UAT阻断。
+- 拒绝在单容器硬规则下把模拟依赖或顺序启动描述为完整Compose；也拒绝挂载现有服务socket、数据库或受保护Volume以缩短测试。
+- 拒绝允许自由镜像tag、pull/build、宽泛临时目录清理、仅记录最终资源快照，或用operator声明替代源码/对象/清理收据。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

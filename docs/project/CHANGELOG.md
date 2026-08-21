@@ -4,6 +4,16 @@
 
 ## 2026-08-21
 
+### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `test: add fail-closed TASK70 dynamic evidence contract`
+
+- 调度/范围：TASK84完成后将TASK70转为唯一`DOING`；数据、应用测试、运维安全三条智能体线只读审计，主智能体唯一写入。首提交只建立隔离合成动态证据合同与审计消费，不连接PostgreSQL、不读取Volume/备份/凭据、不运行UAT/生产或host activation。
+- 合同：新增版本化policy/verifier，固定`ISOLATED_SYNTHETIC_ONLY`、TEST、`PARTIAL_ONLY`、唯一`DV70-PG-SWITCH-01`、既有PG17镜像摘要、64MiB宿主磁盘增量、1 CPU/768MiB/192 PIDs、断网/只读rootfs/精确tmpfs以及资源、全局对象、保护卷、服务和零残留收据。
+- 安全/追溯：artifact使用`O_NOFOLLOW`、单硬链接/大小/权限/TOCTOU门；数值类型、端点、Swap/Load/OOM/restart/磁盘关系严格交叉校验。source bindings绑定policy、verifier、executor、inventory/runtime policy、`package.json`与0046 Migration，六项non-claim禁止越权解释。
+- 审计：仓库handler固定为`HANDLERS_IMPLEMENTED_DORMANT`，隔离动态、host activation、真实UAT回退和人工UAT分别建模；当前artifact self-digest`b6b3c244…58d4b`且4项阻断（P0=3、P1=1），有效`PARTIAL_ONLY`回执也不能移除阻断或放行`assert-ready`。
+- 测试：既有Node镜像中断网、只读、384MiB/1 CPU/128 PIDs串行运行；跨岗与回退审计生成器逐字节重放，policy验证及17/17专项测试通过。缺失动态artifact返回`TASK70_DYNAMIC_ARTIFACT_NOT_EXECUTED`，晋升门返回`UAT_PROMOTION_EXECUTOR_NOT_READY`；inventory262/238/24，raw SHA-256`ba303db7…7f696`。
+- 资源/清理：测试前后容器、镜像、Volume、四服务集合SHA-256完全一致；临时容器按精确label/ID删除，无网络、Volume、数据库、临时目录或进程残留。收口available约1.8GiB、Swap48MiB/1GiB、根盘约10.74GiB、Load`0.61/0.49/0.46`，四服务稳定且无restart/OOM变化。
+- 数据库/API/运行面：无Schema、Migration、业务API、镜像、Compose或运行面变化；生成artifact仅为仓库审计资料。TASK70保持`DOING`，下一提交只执行`DV70-PG-SWITCH-01`，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84 - `ops: complete bounded BuildKit cache cleanup`
 
 - 调度/授权：从clean `main@9fc999cde40a03071cc295a99e357b78f4ea92a5`、tree`0fbbb79ea78e778971f71e68ab9a60befa95598b`恢复TASK84。项目负责人专项授权仅执行一次`docker builder prune --force --filter until=24h`并禁止镜像、容器和Volume删除；数据迁移、应用测试、运维安全三条智能体线只读审计，主智能体唯一写入和执行Docker mutation。

@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "e2d57cc84807cd3ac5bac0685751af949bf27b998c0f32afd99a73e5dae02364",
+  "artifact_sha256": "b6b3c244bd668bff5385fa024370ca4677c123ec7d61633c944265a844258d4b",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -199,13 +199,18 @@
   "deployment_class": "UAT",
   "execution_blockers": [
     {
-      "finding": "固定执行器、v2内容寻址激活协议、Supervisor v7一次性授权和安装互锁已进入bundle；但UAT数据库、四数据域及Web/Worker回退处理器仍显式不可用，且没有受信主机激活证据，预检会在授权消耗前失败。",
-      "id": "ROLLBACK_RUNTIME_CAPABILITIES_NOT_IMPLEMENTED_OR_HOST_NOT_ACTIVATED",
+      "finding": "尚无通过版本化合同和清理门的隔离动态回退证据；仓库单元测试不能替代真实引擎动态证明。",
+      "id": "ISOLATED_ROLLBACK_DYNAMIC_VALIDATION_NOT_VERIFIED",
+      "severity": "P0"
+    },
+    {
+      "finding": "仓库handler已实现但仍dormant，catalog保持失败关闭；没有受信主机activation回执，隔离合成证据不得提升此状态。",
+      "id": "ROLLBACK_RUNTIME_HOST_NOT_ACTIVATED",
       "severity": "P0"
     },
     {
       "finding": "尚无受信UAT隔离回退演练回执，不能把仓库fake-root测试解释为真实恢复或回滚。",
-      "id": "UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED",
+      "id": "ACTUAL_UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED",
       "severity": "P0"
     },
     {
@@ -217,29 +222,29 @@
   "execution_class": "AUDIT_ONLY_NOT_AUTHORIZED",
   "execution_readiness": {
     "blocking_checkpoint_count": 0,
-    "blocking_condition_count": 3,
+    "blocking_condition_count": 4,
     "code": "UAT_PROMOTION_EXECUTOR_NOT_READY",
     "may_start": false,
-    "p0_blocker_count": 2,
+    "p0_blocker_count": 3,
     "p1_blocker_count": 1,
-    "statement": "仓库检查点控制链与受信回退网关已闭合，但真实运行时执行器/激活、隔离回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
+    "statement": "仓库检查点控制链与dormant回退handler已闭合，但隔离动态证明、受信host激活、真实UAT回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
     "status": "BLOCKED"
   },
   "findings": [],
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "30d69ec3d295c50770445049f2b63715f2f5e5ea0e796d21523667dec3b08672"
+      "sha256": "8485c352712a654c1ca076dfe59bad1585ef091dc6acb26c82a8e80145befe3d"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
-      "sha256": "fae69252f52518e4801e91e024ccb2b3f667e109038f9eca5e485024e1c6e7a4"
+      "sha256": "f3029dd00b924890c2a7308c33e3109b8d28128ab326869e76f61e1e16d6d6aa"
     },
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 238,
-      "sha256": "74094fe2a98de757ecab741aa81858666f42d58df4f13fdde5bec082f13251b4",
+      "sha256": "ba303db75eeaecc0e24d826cf5c985f8fbb259bfd5f3a65dbadccba4e7e7f696",
       "total_tests": 262
     },
     "source_manifest": {
@@ -280,11 +285,32 @@
         },
         {
           "markers": [
+            "cyd_web_lock_finance_ar_source",
+            "cyd_web_lock_operation_upstream_sources",
+            "REVOKE ALL ON FUNCTION"
+          ],
+          "path": "chenyida_erp_site/drizzle-postgres/0046_runtime_lock_privilege_boundary.sql",
+          "sha256": "ad68aaa4f20d16324fcdc7b234928ac363ecb73313921970d3b4840f4db6d66b"
+        },
+        {
+          "markers": [
             "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED",
             "\"status\": \"BLOCKED\""
           ],
           "path": "chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json",
-          "sha256": "50cf7b9cfe5baf0c563d3f6a828d78f4cea56cbff6bbdb76b54084f104537135"
+          "sha256": "f3bbbe870aee0442a3f194f8d6894b6cf08b6f6e5b304f12a4591e2a5ff9b0bf"
+        },
+        {
+          "markers": [
+            "chenyida-erp-uat-promotion-dynamic-validation-policy/v1",
+            "ISOLATED_SYNTHETIC_ONLY",
+            "PARTIAL_ONLY",
+            "DV70-PG-SWITCH-01",
+            "DOES_NOT_PROVE_HOST_ACTIVATION",
+            "require_preexisting_container_set_unchanged"
+          ],
+          "path": "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v1.json",
+          "sha256": "656f39c584cbf70eaed0847c48daaf72517969081bb8219d43e168917fe02274"
         },
         {
           "markers": [
@@ -299,6 +325,30 @@
           ],
           "path": "chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json",
           "sha256": "c1fe967ab455af92ee385925dab53fcfa59ad6db97ca266d4971fbd632eb8075"
+        },
+        {
+          "markers": [
+            "chenyida-erp-selfhosted",
+            "0.1.0-alpha.47"
+          ],
+          "path": "chenyida_erp_site/package.json",
+          "sha256": "0aad1ae9aba73f24462b7f712f56033e380e8da661b31392a9a4588c88bf3f46"
+        },
+        {
+          "markers": [
+            "chenyida-erp-release-test-inventory/v1",
+            "selfhost-uat-promotion-rollback-audit.test.mjs"
+          ],
+          "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
+          "sha256": "ba303db75eeaecc0e24d826cf5c985f8fbb259bfd5f3a65dbadccba4e7e7f696"
+        },
+        {
+          "markers": [
+            "chenyida-erp-release-test-runtime-policy/v1",
+            "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394"
+          ],
+          "path": "chenyida_erp_site/release/test-runtime-policy-v1.json",
+          "sha256": "8c2f20c2cabf61962cc44a4e1120d5aa600228c98c05e7464986002bf2879911"
         },
         {
           "markers": [
@@ -393,7 +443,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "3d819c9ced89c80b26f285b40699326aad8f71184ba7de07dd66831b3a8434cc"
+          "sha256": "012c67162af100ce0009ba867ba0ad931d7bf114892f29f57b1a4fb8d3e981e5"
         },
         {
           "markers": [
@@ -472,6 +522,18 @@
         },
         {
           "markers": [
+            "TASK70_DYNAMIC_POLICY_CONTRACT",
+            "validateTask70DynamicPolicy",
+            "validateTask70DynamicArtifact",
+            "summarizeTask70DynamicEvidence",
+            "PARTIAL_ONLY",
+            "TASK70_DYNAMIC_CLEANUP_FAILED"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-dynamic-evidence.mjs",
+          "sha256": "204a5145712dd80a5f6f59310790185b2ac01a98c2f565c653df16e808121e0a"
+        },
+        {
+          "markers": [
             "DATABASE_FENCE_AND_EXACT_ALLOWLIST_MIGRATION",
             "MIGRATION_FENCED",
             "CONTAIN_EXACT_UAT_PROMOTION_MIGRATION_BEFORE_RECOVERY"
@@ -487,6 +549,16 @@
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-migration-execution-contract.mjs",
           "sha256": "c859a89c79f81c51f8f75d2c61b7ed2ee1884a8868b1349d0b99f7973d176ac2"
+        },
+        {
+          "markers": [
+            "ISOLATED_ROLLBACK_DYNAMIC_VALIDATION_NOT_VERIFIED",
+            "ROLLBACK_RUNTIME_HOST_NOT_ACTIVATED",
+            "ACTUAL_UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED",
+            "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
+          "sha256": "8485c352712a654c1ca076dfe59bad1585ef091dc6acb26c82a8e80145befe3d"
         },
         {
           "markers": [
@@ -531,6 +603,10 @@
         {
           "markers": [
             "CAPABILITY_STATUS = \"BLOCKED_MISSING_UAT_CAPABLE_HANDLERS\"",
+            "UNAVAILABLE: set[str] = set()",
+            "DORMANT_CAPABILITY_HANDLERS",
+            "dispatch_dormant_metadata_handler",
+            "ClosedPostgresCapabilityDriver",
             "ROLLBACK_FIXED_EXECUTOR_FD_MANIFEST_INVALID",
             "ROLLBACK_FIXED_EXECUTOR_UAT_CAPABILITY_UNAVAILABLE",
             "inherited_fds",
@@ -620,6 +696,15 @@
         },
         {
           "markers": [
+            "current repository audit is valid but UAT promotion remains blocked",
+            "valid partial-only dynamic evidence cannot clear host or actual UAT blockers",
+            "dynamic evidence tampering fails closed"
+          ],
+          "path": "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-audit.test.mjs",
+          "sha256": "4173b234f5e3487eca318ca64a43bc749ea19ca3de3d947d4b47759eec025b4b"
+        },
+        {
+          "markers": [
             "fixed catalog is an exact 9-stage/13-check closed set",
             "production prepare fails before creating activation state",
             "fake-root install, upgrade, and rollback append generations",
@@ -630,14 +715,21 @@
           "sha256": "943f51b319f62ce487214de8bd8ba241e29dcf044e600abc2bcc88ecc19c1c54"
         }
       ],
-      "sha256": "b4ca700641d3ea071892e29db5992f79673f4b156e35eca10426ef6c092e12b9"
+      "sha256": "bcebc7663d71ae26facfe10d19c52277a47d3989b89d21b4b53441427cfcdaf9"
     }
   },
   "observations": {
+    "actual_uat_rollback_rehearsal": "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT",
     "compose_release_image_binding": "SUPERVISOR_CHECKPOINT_9_FENCED_WEB_WORKER_REPLACEMENT",
     "cross_role_uat_readiness": "BLOCKED",
     "cross_role_uat_transaction_binding": "SUPERVISOR_CHECKPOINT_12_CONTENT_ADDRESSED_AND_RECOVERABLE",
+    "dynamic_evidence_audit_clearance": "PARTIAL_ONLY",
+    "dynamic_evidence_may_claim_actual_uat": false,
+    "dynamic_evidence_may_claim_host_activation": false,
+    "dynamic_evidence_may_claim_production_readiness": false,
+    "dynamic_evidence_may_clear_blocker": false,
     "finalization_transaction_binding": "SUPERVISOR_CHECKPOINT_13_AGGREGATED_AND_RECOVERABLE",
+    "host_runtime_activation": "NOT_ACTIVATED_NO_TRUSTED_HOST_RECEIPT",
     "implemented_required_promotion_operations": [
       "BEGIN_UAT_PROMOTION",
       "CAPTURE_UAT_PROMOTION_SNAPSHOT",
@@ -656,15 +748,19 @@
       "ROLLBACK_UAT_ROLLBACK_RUNTIME_V2",
       "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"
     ],
+    "isolated_dynamic_artifact_sha256": null,
+    "isolated_dynamic_validation": "NOT_EXECUTED_NO_VERIFIED_RECEIPT",
+    "isolated_dynamic_verified_case_ids": [],
     "migration_authorization": "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED",
     "missing_required_promotion_operations": [],
     "postdeploy_transaction_binding": "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE",
+    "repository_handler_capability": "HANDLERS_IMPLEMENTED_DORMANT",
     "required_promotion_operation_count": 16,
     "restore_target_policy": "TEST_ONLY",
     "rollback_rehearsal_evidence": "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT",
-    "rollback_runtime_adapter": "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_CAPABILITIES_BLOCKED_HOST_NOT_ACTIVATED",
+    "rollback_runtime_adapter": "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_HANDLERS_IMPLEMENTED_DORMANT_CATALOG_BLOCKED_HOST_NOT_ACTIVATED",
     "rollback_transaction_binding": "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE",
-    "supervisor_operation_count": 35,
+    "supervisor_operation_count": 36,
     "supervisor_operations": [
       "ACTIVATE_MONITORING_NOTIFIER_EGRESS_V1",
       "ACTIVATE_POSTGRESQL_CLUSTER_RECOVERY_POLICY_V2",
@@ -675,6 +771,7 @@
       "CAPTURE_UAT_PROMOTION_SNAPSHOT",
       "CREATE_IMAGE_EVIDENCE",
       "CREATE_RELEASE_MANIFEST",
+      "CREATE_VOLUME_HELPER_IMAGE_EVIDENCE",
       "DEPLOY_UAT_RELEASE",
       "DISABLE_MONITORING_HOST_DELIVERY",
       "FINALIZE_UAT_PROMOTION",

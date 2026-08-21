@@ -2,18 +2,34 @@
 
 最后更新时间：2026-08-21（Asia/Shanghai）
 
+## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；动态证据合同已通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / DYNAMIC EVIDENCE CONTRACT VERIFIED / DV70-PG-SWITCH-01 NEXT / PRODUCTION NO-GO | 当前唯一DOING；首个仓库合同切片已通过，下一切片运行单容器PG17原子切换机制验证 |
+| 只读审计 | PASS / THREE LINES | 数据、应用测试、运维安全三线均确认现有动态runner/receipt消费路径缺失，且完整Compose与单临时容器硬规则冲突 |
+| 状态边界 | PASS / FAIL CLOSED | 已独立表达`HANDLERS_IMPLEMENTED_DORMANT`、隔离动态证明、host activation、真实UAT回退与人工UAT；当前4项阻断（P0=3、P1=1）且`PARTIAL_ONLY`不能清除 |
+| 合同/verifier | PASS / VERSIONED | 固定TEST/隔离合成、唯一case、PG17摘要、精确tmpfs/资源/对象/清理合同、六项非声明；安全文件读取及版本/Migration/source绑定通过 |
+| 机器审计 | PASS / BLOCKED AS DESIGNED | audit artifact self-digest`b6b3c244…58d4b`、4 blockers；动态artifact缺失返回`TASK70_DYNAMIC_ARTIFACT_NOT_EXECUTED`，`assert-ready`返回`UAT_PROMOTION_EXECUTOR_NOT_READY` |
+| 自动验证 | PASS / 17 OF 17 | 两份生成器逐字节重放、policy verify、合法PARTIAL与篡改/弱化/数值漂移失败关闭测试全部通过；inventory为262/238/24且摘要已级联 |
+| 首个动态case | PENDING / `DV70-PG-SWITCH-01` | 只证明生产生成SQL在单一隔离PostgreSQL 17中的原子切换、事务失败和结果未知只读判定 |
+| 资源边界 | PASS FOR CONTRACT / PG STILL GATED | 合同测试后available约1.8GiB、Swap48MiB/1GiB、根盘约10.74GiB、Load1 0.61；PG运行前仍须新鲜60/180秒门和64MiB最坏增量 |
+| 对象/清理 | PASS / ZERO TASK RESIDUE | 断网只读Node容器串行运行；前后容器、镜像、Volume、四服务摘要一致，无任务容器/网络/卷/临时目录残留，四服务稳定 |
+| 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不访问现有UAT数据库、受保护Volume、真实备份/凭据/业务数据，不执行host activation、Migration、部署或真实回退 |
+| 系统是否可用 | NO | 首个PG case及其余动态矩阵、host激活、真实恢复/迁移、人工UAT、员工试运行和正式切换均未闭合 |
+
 ## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（完成；BuildKit限定清理与清理后门通过）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / BUILDKIT-ONLY CLEANUP COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED / PRODUCTION NO-GO | TASK84已释放；当前零DOING，TASK70为TODO并可正式启动隔离合成切片 |
+| 当前状态 | DONE / BUILDKIT-ONLY CLEANUP COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED / PRODUCTION NO-GO | TASK84已释放；TASK70现为唯一DOING并先实施动态证据合同 |
 | 专项授权 | PASS / EXACT ONCE | 项目负责人仅授权一次`docker builder prune --force --filter until=24h`并禁止镜像、容器和卷删除；命令原样唯一执行 |
 | BuildKit结果 | PASS / BOUNDED | 退出0、回收475MB；Build Cache由192项/10.79GB/6.149GB reclaimable变为174项/10.31GB/5.674GB reclaimable，active 0 |
 | Docker对象保护 | PASS / IDENTICAL | 容器/镜像/Volume均保持6/75/277，三组集合SHA-256前后一致；四服务ID、restart0/OOM false、Web/PostgreSQL health和四保护卷不变 |
 | 清理后60秒门 | PASS | available最低约1.82GiB；Swap最高3.14%、增长约1.16MiB；根盘最低约10.39GiB；Load1最高1.51、PSI/OOM增量0 |
 | 保护范围 | PASS / EXACT | 未执行system/image/volume prune，未删除镜像/容器/卷，未读取数据库/Volume/备份正文，未重启服务或修改Swap/host |
 | 收口资源/临时项 | PASS / NO TASK RESIDUE | 本任务未创建临时文件、容器、网络、Volume、数据库或测试数据；根盘余量仅约0.39GiB，TASK70每个切片必须重做门禁并证明磁盘上界 |
-| 下一正式任务 | READY / NOT STARTED | TASK70先建立九阶段/十三检查动态矩阵、资源上界与清理收据，再运行最小隔离PostgreSQL故障注入切片 |
+| 下一正式任务 | STARTED / TASK70 DOING | TASK70先建立九阶段/十三检查动态矩阵、资源上界与清理收据，再运行最小隔离PostgreSQL故障注入切片 |
 | 系统是否可用 | NO | 动态回退、host激活、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
 
 ## SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83（完成；只读归因与恢复入口已固定）

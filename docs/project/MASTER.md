@@ -51,15 +51,17 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0046`，46/head`0046_runtime_lock_privilege_boundary.sql`，0046 SQL/Snapshot SHA-256分别为`ad68aaa4f20d16324fcdc7b234928ac363ecb73313921970d3b4840f4db6d66b`/`c8fe259a7838475bc41ffaf0e843ba9ca69a8ca0c5688d42275a81ea8b21f60d`；0001—0045未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0046只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / CHECKPOINT 4—15 CONTROL PLANE + REPOSITORY ROLLBACK HANDLERS COMPLETE / BUILDKIT-ONLY REMEDIATION AND POST-CLEANUP RESOURCE GATE VERIFIED / ISOLATED DYNAMIC VALIDATION NEXT / CATALOG AND HOST ACTIVATION BLOCKED / ACTUAL HUMAN UAT ABSENT / LOCAL IMAGE CANDIDATE STALE / PRODUCTION NO-GO`。TASK84已关闭D-158资源停止线，但根盘最低仅约10.39GiB；TASK70每个动态切片仍须先证明磁盘上界并执行新鲜资源门 |
-| 当前任务 | 当前零`DOING`。`SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84`已为`DONE / BUILDKIT-ONLY CLEANUP COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED`；`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`转为`TODO / READY FOR FORMAL START`。本轮未访问运行数据库、Volume或备份正文，未执行UAT/生产、Migration、部署或数据动作 |
-| 下一任务 | 正式启动TASK70并先建立九阶段/十三检查的机器可审计动态矩阵、资源上界和清理收据，再在不会跌破根盘10GiB硬线的前提下串行运行最小隔离PostgreSQL故障注入切片。真实target/凭据、host安装/政策激活、账号/systemd/网络/告警、A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
+| 当前阶段 | `PRODUCTION READINESS CONTINUOUS DELIVERY / TASK70 ISOLATED DYNAMIC VALIDATION DOING / DYNAMIC EVIDENCE CONTRACT VERIFIED / CATALOG AND HOST ACTIVATION BLOCKED / ACTUAL HUMAN UAT ABSENT / LOCAL IMAGE CANDIDATE STALE / PRODUCTION NO-GO`。TASK84已关闭D-158资源停止线；TASK70合同切片已通过，但每个动态切片仍须先证明磁盘上界并执行新鲜资源门 |
+| 当前任务 | 唯一`DOING`为`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`。版本化动态证据/verifier、四类运行事实拆分、审计消费路径和17/17失败关闭测试已通过；当前审计仍有4项阻断，下一切片才运行单容器PostgreSQL 17原子切换case。未授权真实数据库、受保护Volume、真实备份正文、UAT/生产、Migration或部署 |
+| 下一任务 | 在新鲜60秒Swap/180秒Load门、64MiB最坏磁盘增量与精确清理合同均通过时串行执行`DV70-PG-SWITCH-01`。真实target/凭据、host安装/政策激活、账号/systemd/网络/告警、A1/A3及真实异机恢复/UAT/数据/员工/切换仍须专项授权 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
-- SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84已按D-158完成受控资源恢复：项目负责人授权的唯一BuildKit命令仅执行一次并回收475MB；6个容器、75个镜像、277个Volume及三组集合摘要前后一致，四服务restart0/OOM false、Web/PostgreSQL healthy、四保护卷不变。清理后60秒门最低available约1.82GiB、Swap最高3.14%/增长约1.16MiB、根盘最低约10.39GiB、Load/PSI/OOM通过。资源停止线解除，TASK70转TODO待正式启动；这不授权真实UAT/生产或数据动作
+- SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70已完成首个仓库合同切片但任务保持DOING：D-159固定handler实现、隔离动态证明、host activation、真实UAT回退和人工UAT的独立状态；v1只接受`PARTIAL_ONLY`。动态policy/verifier绑定PG17摘要、TEST guard、精确tmpfs、资源/对象/清理门和源码，晋升审计固定4项阻断；两份生成器及17/17专项测试通过，缺失artifact与`assert-ready`均按预期拒绝。没有运行PostgreSQL、Volume、Compose、UAT或真实回退，下一切片为`DV70-PG-SWITCH-01`
+
+- SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84已按D-158完成受控资源恢复：项目负责人授权的唯一BuildKit命令仅执行一次并回收475MB；6个容器、75个镜像、277个Volume及三组集合摘要前后一致，四服务restart0/OOM false、Web/PostgreSQL healthy、四保护卷不变。清理后60秒门最低available约1.82GiB、Swap最高3.14%/增长约1.16MiB、根盘最低约10.39GiB、Load/PSI/OOM通过。资源停止线解除，TASK70已正式启动；这不授权真实UAT/生产或数据动作
 
 - SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83已完成只读资源归因：两段60秒窗口memory PSI/OOM均为0、Swap增长远低于256MiB，但最终仍约82.7%。长期Codex session约317MiB Swap/2.01GiB memory，Docker daemon约102MiB Swap，四个ERP容器约291MiB Swap；根盘约11GiB，BuildKit至少约7.87GB private cache可回收。当时未修改host或清理对象并等待TASK84专项授权；该历史阻断已由2026-08-21 TASK84受控清理解除
 
@@ -404,7 +406,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前零`DOING`：TASK84已按专项授权仅执行一次BuildKit-only清理并完成对象保护与清理后60秒门，状态转DONE；TASK70资源和执行器前置已满足并转TODO，下一步正式启动隔离动态矩阵。根盘最低仅约10.39GiB，任何重任务必须先证明磁盘上界；真实UAT、host activation、数据、员工签字和切换仍未授权，系统继续`PRODUCTION NO-GO`。
+- 当前唯一`DOING`为TASK70：动态证据合同和机器审计消费路径已通过，下一提交运行有界单容器PostgreSQL 17 `DV70-PG-SWITCH-01`。合同测试后根盘约10.74GiB，PG切片仍须先通过60/180秒资源门与64MiB磁盘上界；真实UAT、host activation、数据、员工签字和切换仍未授权，系统继续`PRODUCTION NO-GO`。
 - `SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已按D-132完成并释放active slot：冻结源码`b93d838`/tree`269165d4`与manifest-only直接子提交`2136aa3`/tree`c5b78dab`形成49文件bundle，manifest SHA-256`699cdd2a…7dd6`。cluster catalog/security/tablespace、秘密分离、加密传输、V4 readiness、Dashboard/monitor与崩溃安全executor均通过合成双PostgreSQL cluster及完整适用回归；没有真实恢复或部署。
 - `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已按D-131完成并释放active slot：源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle；签名密文来源、双向ACK、恢复强绑定、调度/保留和V3 readiness通过合成密文双集群恢复及适用回归。真实异机、密钥托管、timer/WORM、真实数据与RPO/RTO均未执行。
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。

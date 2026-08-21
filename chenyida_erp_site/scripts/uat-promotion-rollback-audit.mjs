@@ -3,6 +3,11 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  loadTask70DynamicRepositoryInputs,
+  summarizeTask70DynamicEvidence,
+} from "./uat-promotion-dynamic-evidence.mjs";
+
 export const UAT_PROMOTION_AUDIT_POLICY_CONTRACT = "chenyida-erp-uat-promotion-rollback-audit-policy/v1";
 export const UAT_PROMOTION_AUDIT_ARTIFACT_CONTRACT = "chenyida-erp-uat-promotion-rollback-audit/v1";
 export const UAT_PROMOTION_AUDIT_POLICY_PATH = "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json";
@@ -140,7 +145,9 @@ function validateCapabilities(policy, sourceBodies, errors) {
   return policy.capabilities.map((entry, index) => ({ ...structuredClone(entry), ordinal: index + 1 }));
 }
 
-function inspectRepository(policy, sourceBodies, errors) {
+function inspectRepository(
+  policy, sourceBodies, errors, dynamicEvidence = null, dynamicEvidenceLoadError = null,
+) {
   const launcher = sourceBodies.get("chenyida_erp_site/scripts/release-supervisor-launcher.py") ?? "";
   const mappings = [
     "ENTRYPOINTS", "RUNTIME_PRIVILEGE_OPERATIONS", "CLUSTER_POLICY_OPERATIONS",
@@ -174,6 +181,31 @@ function inspectRepository(policy, sourceBodies, errors) {
   const installer = sourceBodies.get("chenyida_erp_site/scripts/install-release-supervisor.py") ?? "";
   const compose = sourceBodies.get("chenyida_erp_site/compose.release.yml") ?? "";
   const crossRole = JSON.parse(sourceBodies.get("chenyida_erp_site/operations/cross-role-uat-evidence-contract-v1.json") ?? "null");
+  let dynamicEvidenceSummary;
+  try {
+    if (dynamicEvidenceLoadError !== null) throw new Error(dynamicEvidenceLoadError);
+    dynamicEvidenceSummary = summarizeTask70DynamicEvidence(dynamicEvidence, {
+      policy: JSON.parse(sourceBodies.get(
+        "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v1.json",
+      ) ?? "null"),
+      sourceBodies,
+    });
+  } catch (failure) {
+    error(errors, "AUDIT_DYNAMIC_EVIDENCE_INVALID", failure?.code || failure?.message || "UNKNOWN");
+    dynamicEvidenceSummary = {
+      repository_handler_capability: "UNKNOWN",
+      isolated_dynamic_validation: "INVALID_FAIL_CLOSED",
+      host_runtime_activation: "NOT_ACTIVATED_NO_TRUSTED_HOST_RECEIPT",
+      actual_uat_rollback_rehearsal: "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT",
+      audit_clearance: "UNKNOWN",
+      verified_case_ids: [],
+      artifact_sha256: null,
+      may_clear_dynamic_blocker: false,
+      may_claim_host_activation: false,
+      may_claim_actual_uat: false,
+      may_claim_production_readiness: false,
+    };
+  }
   const observations = {
     supervisor_operation_count: supervisorOperations.length,
     supervisor_operations: supervisorOperations,
@@ -295,6 +327,10 @@ function inspectRepository(policy, sourceBodies, errors) {
       && rollbackFixedExecutorContract.includes("BLOCKED_MISSING_UAT_CAPABLE_HANDLERS")
       && rollbackFixedExecutorContract.includes("PROBE_THEN_CONTAIN_NEVER_BLINDLY_REEXECUTE")
       && rollbackFixedExecutor.includes('CAPABILITY_STATUS = "BLOCKED_MISSING_UAT_CAPABLE_HANDLERS"')
+      && rollbackFixedExecutor.includes("UNAVAILABLE: set[str] = set()")
+      && rollbackFixedExecutor.includes("DORMANT_CAPABILITY_HANDLERS")
+      && rollbackFixedExecutor.includes("dispatch_dormant_metadata_handler")
+      && rollbackFixedExecutor.includes("ClosedPostgresCapabilityDriver")
       && rollbackFixedExecutor.includes("ROLLBACK_FIXED_EXECUTOR_UAT_CAPABILITY_UNAVAILABLE")
       && rollbackFixedExecutor.includes("ROLLBACK_FIXED_EXECUTOR_FD_MANIFEST_INVALID")
       && rollbackActivationPublisher.includes("chenyida-erp-uat-promotion-rollback-runtime-activation-context/v2")
@@ -304,8 +340,20 @@ function inspectRepository(policy, sourceBodies, errors) {
       && rollbackActivationPublisher.includes("UAT_ROLLBACK_RUNTIME_ACTIVATION_PARTIAL_UNKNOWN")
       && installer.includes("assert_no_uat_rollback_runtime_activation_interlock")
       && installer.includes("SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_RECOVERY_REQUIRED")
-      ? "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_CAPABILITIES_BLOCKED_HOST_NOT_ACTIVATED" : "UNKNOWN",
-    rollback_rehearsal_evidence: "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT",
+      ? "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_HANDLERS_IMPLEMENTED_DORMANT_CATALOG_BLOCKED_HOST_NOT_ACTIVATED" : "UNKNOWN",
+    repository_handler_capability: dynamicEvidenceSummary.repository_handler_capability,
+    isolated_dynamic_validation: dynamicEvidenceSummary.isolated_dynamic_validation,
+    isolated_dynamic_verified_case_ids: dynamicEvidenceSummary.verified_case_ids,
+    isolated_dynamic_artifact_sha256: dynamicEvidenceSummary.artifact_sha256,
+    host_runtime_activation: dynamicEvidenceSummary.host_runtime_activation,
+    actual_uat_rollback_rehearsal: dynamicEvidenceSummary.actual_uat_rollback_rehearsal,
+    rollback_rehearsal_evidence: dynamicEvidenceSummary.actual_uat_rollback_rehearsal,
+    dynamic_evidence_audit_clearance: dynamicEvidenceSummary.audit_clearance,
+    dynamic_evidence_may_clear_blocker: dynamicEvidenceSummary.may_clear_dynamic_blocker,
+    dynamic_evidence_may_claim_host_activation: dynamicEvidenceSummary.may_claim_host_activation,
+    dynamic_evidence_may_claim_actual_uat: dynamicEvidenceSummary.may_claim_actual_uat,
+    dynamic_evidence_may_claim_production_readiness:
+      dynamicEvidenceSummary.may_claim_production_readiness,
     cross_role_uat_readiness: crossRole?.readiness?.status ?? "UNKNOWN",
   };
   if (!Array.isArray(expectedImplemented) || expectedImplemented.some((item) => !IDENTIFIER.test(item))
@@ -317,8 +365,19 @@ function inspectRepository(policy, sourceBodies, errors) {
   if (observations.cross_role_uat_transaction_binding !== "SUPERVISOR_CHECKPOINT_12_CONTENT_ADDRESSED_AND_RECOVERABLE") error(errors, "AUDIT_CROSS_ROLE_UAT_TRANSACTION_BINDING_DRIFT");
   if (observations.finalization_transaction_binding !== "SUPERVISOR_CHECKPOINT_13_AGGREGATED_AND_RECOVERABLE") error(errors, "AUDIT_FINALIZATION_TRANSACTION_BINDING_DRIFT");
   if (observations.rollback_transaction_binding !== "SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE") error(errors, "AUDIT_ROLLBACK_TRANSACTION_BINDING_DRIFT");
-  if (observations.rollback_runtime_adapter !== "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_CAPABILITIES_BLOCKED_HOST_NOT_ACTIVATED") error(errors, "AUDIT_ROLLBACK_RUNTIME_BOUNDARY_DRIFT");
-  if (observations.rollback_rehearsal_evidence !== "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT") error(errors, "AUDIT_ROLLBACK_REHEARSAL_BOUNDARY_DRIFT");
+  if (observations.rollback_runtime_adapter !== "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_HANDLERS_IMPLEMENTED_DORMANT_CATALOG_BLOCKED_HOST_NOT_ACTIVATED"
+    || observations.repository_handler_capability !== "HANDLERS_IMPLEMENTED_DORMANT") error(errors, "AUDIT_ROLLBACK_RUNTIME_BOUNDARY_DRIFT");
+  if (!["NOT_EXECUTED_NO_VERIFIED_RECEIPT", "VERIFIED_PARTIAL_ONLY"].includes(
+    observations.isolated_dynamic_validation,
+  ) || observations.dynamic_evidence_audit_clearance !== "PARTIAL_ONLY"
+    || observations.dynamic_evidence_may_clear_blocker !== false
+    || observations.dynamic_evidence_may_claim_host_activation !== false
+    || observations.dynamic_evidence_may_claim_actual_uat !== false
+    || observations.dynamic_evidence_may_claim_production_readiness !== false) {
+    error(errors, "AUDIT_ISOLATED_DYNAMIC_BOUNDARY_DRIFT");
+  }
+  if (observations.host_runtime_activation !== "NOT_ACTIVATED_NO_TRUSTED_HOST_RECEIPT") error(errors, "AUDIT_HOST_ACTIVATION_BOUNDARY_DRIFT");
+  if (observations.actual_uat_rollback_rehearsal !== "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT") error(errors, "AUDIT_ROLLBACK_REHEARSAL_BOUNDARY_DRIFT");
   if (observations.cross_role_uat_readiness !== "BLOCKED") error(errors, "AUDIT_CROSS_ROLE_UAT_BOUNDARY_DRIFT");
   return observations;
 }
@@ -334,7 +393,10 @@ export function assertUatPromotionMayStart(artifact) {
 }
 
 export function buildUatPromotionRollbackAudit(inputs) {
-  const { policy, sourceBodies, rawDigests, inventory } = inputs;
+  const {
+    policy, sourceBodies, rawDigests, inventory,
+    dynamicEvidence = null, dynamicEvidenceLoadError = null,
+  } = inputs;
   const errors = [];
   if (policy.schema_version !== 1 || policy.contract !== UAT_PROMOTION_AUDIT_POLICY_CONTRACT || policy.authority !== "SELFHOSTED_NODE_POSTGRESQL_REPOSITORY_SOURCE" || policy.execution_class !== "AUDIT_ONLY_NOT_AUTHORIZED" || policy.deployment_class !== "UAT") error(errors, "AUDIT_POLICY_CONTRACT_INVALID");
   for (const [name, digest] of Object.entries(rawDigests ?? {})) if (!SHA256.test(digest ?? "")) error(errors, "AUDIT_INPUT_DIGEST_INVALID", name);
@@ -350,15 +412,23 @@ export function buildUatPromotionRollbackAudit(inputs) {
   }
   const manifest = validateSourceFiles(policy, sourceBodies, errors);
   const capabilities = validateCapabilities(policy, sourceBodies, errors);
-  const observations = inspectRepository(policy, sourceBodies, errors);
+  const observations = inspectRepository(
+    policy, sourceBodies, errors, dynamicEvidence, dynamicEvidenceLoadError,
+  );
   const incomplete = capabilities.filter((entry) => entry.status !== "SUPPORTED");
   const executionBlockers = [
-    ...(observations.rollback_runtime_adapter === "BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_CAPABILITIES_BLOCKED_HOST_NOT_ACTIVATED" ? [{
-      id: "ROLLBACK_RUNTIME_CAPABILITIES_NOT_IMPLEMENTED_OR_HOST_NOT_ACTIVATED", severity: "P0",
-      finding: "固定执行器、v2内容寻址激活协议、Supervisor v7一次性授权和安装互锁已进入bundle；但UAT数据库、四数据域及Web/Worker回退处理器仍显式不可用，且没有受信主机激活证据，预检会在授权消耗前失败。",
+    ...(!["VERIFIED_COMPLETE"].includes(observations.isolated_dynamic_validation) ? [{
+      id: "ISOLATED_ROLLBACK_DYNAMIC_VALIDATION_NOT_VERIFIED", severity: "P0",
+      finding: observations.isolated_dynamic_validation === "VERIFIED_PARTIAL_ONLY"
+        ? "已验证的隔离合成case仅为PARTIAL_ONLY，不能代表九阶段、十三检查与全部故障窗口完成。"
+        : "尚无通过版本化合同和清理门的隔离动态回退证据；仓库单元测试不能替代真实引擎动态证明。",
     }] : []),
-    ...(observations.rollback_rehearsal_evidence === "NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT" ? [{
-      id: "UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED", severity: "P0",
+    ...(observations.host_runtime_activation !== "ACTIVATED_TRUSTED_HOST_RECEIPT" ? [{
+      id: "ROLLBACK_RUNTIME_HOST_NOT_ACTIVATED", severity: "P0",
+      finding: "仓库handler已实现但仍dormant，catalog保持失败关闭；没有受信主机activation回执，隔离合成证据不得提升此状态。",
+    }] : []),
+    ...(observations.actual_uat_rollback_rehearsal !== "EXECUTED_TRUSTED_UAT_RECEIPT" ? [{
+      id: "ACTUAL_UAT_ROLLBACK_REHEARSAL_NOT_EXECUTED", severity: "P0",
       finding: "尚无受信UAT隔离回退演练回执，不能把仓库fake-root测试解释为真实恢复或回滚。",
     }] : []),
     ...(observations.cross_role_uat_readiness !== "READY" ? [{
@@ -396,7 +466,7 @@ export function buildUatPromotionRollbackAudit(inputs) {
       code: blocked ? "UAT_PROMOTION_EXECUTOR_NOT_READY" : "UAT_PROMOTION_EXECUTOR_READY",
       statement: !blocked
         ? "全部逐检查点执行、恢复与回退能力已由同一内容寻址控制链证明。"
-        : "仓库检查点控制链与受信回退网关已闭合，但真实运行时执行器/激活、隔离回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
+        : "仓库检查点控制链与dormant回退handler已闭合，但隔离动态证明、受信host激活、真实UAT回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。",
     },
     audit_validation: { result: errors.length ? "FAIL" : "PASS", errors: [...errors] },
   };
@@ -410,10 +480,19 @@ export function loadUatPromotionRollbackAuditInputs() {
   const generatorRaw = readRepositoryFile(UAT_PROMOTION_AUDIT_GENERATOR_PATH);
   const policy = JSON.parse(policyRaw);
   const sourceBodies = new Map((policy.source_files ?? []).map((entry) => [entry.path, readRepositoryFile(entry.path)]));
+  let dynamicEvidence = null;
+  let dynamicEvidenceLoadError = null;
+  try {
+    dynamicEvidence = loadTask70DynamicRepositoryInputs().artifact;
+  } catch (failure) {
+    dynamicEvidenceLoadError = failure?.code || failure?.message || "TASK70_DYNAMIC_EVIDENCE_LOAD_FAILED";
+  }
   return {
     policy,
     inventory: JSON.parse(inventoryRaw),
     sourceBodies,
+    dynamicEvidence,
+    dynamicEvidenceLoadError,
     rawDigests: { policy: sha256(policyRaw), inventory: sha256(inventoryRaw), generator: sha256(generatorRaw) },
   };
 }
@@ -426,7 +505,7 @@ export function renderMarkdown(artifact) {
   const lines = [
     "# 晨亿达 ERP UAT 晋升与快照回滚执行器审计 v1",
     "",
-    "> 当前结论：`BLOCKED / CONTROL PLANE AND TRUSTED GATEWAY COMPLETE / EXECUTOR ACTIVATION AND REAL EVIDENCE MISSING`。本报告是源码摘要绑定的机器审计，不是UAT、Migration、部署、恢复或回滚授权。",
+    "> 当前结论：`BLOCKED / CONTROL PLANE AND DORMANT HANDLERS COMPLETE / DYNAMIC PROOF, HOST ACTIVATION AND REAL EVIDENCE MISSING`。本报告是源码摘要绑定的机器审计，不是UAT、Migration、部署、恢复或回滚授权。",
     "",
     "## 1. 审计结论",
     "",
@@ -436,7 +515,7 @@ export function renderMarkdown(artifact) {
     `- 执行判定：\`${artifact.execution_readiness.code}\`；检查点缺口=${artifact.execution_readiness.blocking_checkpoint_count}，全部阻塞=${artifact.execution_readiness.blocking_condition_count}，P0=${artifact.execution_readiness.p0_blocker_count}，P1=${artifact.execution_readiness.p1_blocker_count}，may_start=\`${artifact.execution_readiness.may_start}\`。`,
     `- ${artifact.execution_readiness.statement}`,
     "",
-    "仓库已有checkpoint 4—15的内容寻址意图、结果、恢复与隔离控制链，其中checkpoint 14/15绑定精确前代、四数据域、独立授权和ROLLED_BACK终态；受信无shell网关已进入bundle，但固定数据库/卷/容器物化执行器及其激活仍不存在，隔离UAT回退演练与人工UAT也尚未执行。",
+    "仓库已有checkpoint 4—15的内容寻址意图、结果、恢复与隔离控制链，其中checkpoint 14/15绑定精确前代、四数据域、独立授权和ROLLED_BACK终态；固定数据库/卷/容器handler已实现但保持dormant，隔离动态证明、host activation、真实UAT回退演练与人工UAT均未完成。",
     "",
     "## 2. Supervisor操作面",
     "",
@@ -462,8 +541,9 @@ export function renderMarkdown(artifact) {
     `- 跨岗位UAT事务：\`${artifact.observations.cross_role_uat_transaction_binding}\`；checkpoint 12只摄取已由事前人工授权、精确账号/人员映射、结构化步骤与控制、共同证据主题及三方签字闭合的结果；人工执行授权与后续Supervisor摄取授权必须不同，恢复只续写journal且不重跑人工步骤。`,
     `- 晋升终态事务：\`${artifact.observations.finalization_transaction_binding}\`；checkpoint 13以独立一次性授权聚合checkpoint 4—12 receipt、evidence、intent和authorization链，最终证据绑定checkpoint 12完整result摘要；不释放数据库或备份保护，也不声明checkpoint 14/15回退就绪。`,
     `- 回退事务：\`${artifact.observations.rollback_transaction_binding}\`；checkpoint 14逐阶段先写intent再调用适配器并绑定精确前代，checkpoint 15用独立授权逐项核验后只允许写入ROLLED_BACK；partial/unknown只能隔离，恢复不得重跑阶段。`,
-    `- 回退运行时：\`${artifact.observations.rollback_runtime_adapter}\`；固定执行器、v2内容寻址激活/恢复、Supervisor v7一次性授权和bundle切换互锁均已纳入受信链，但生产catalog仍显式拒绝缺失的UAT数据库、四数据域及Web/Worker处理器，且没有主机激活证据。`,
-    `- 回退演练：\`${artifact.observations.rollback_rehearsal_evidence}\`；fake-root自动测试不是UAT恢复或回退证据。`,
+    `- 回退运行时：\`${artifact.observations.rollback_runtime_adapter}\`；仓库handler为\`${artifact.observations.repository_handler_capability}\`，生产catalog仍失败关闭，且没有受信host activation回执。`,
+    `- 隔离动态证明：\`${artifact.observations.isolated_dynamic_validation}\`；clearance=\`${artifact.observations.dynamic_evidence_audit_clearance}\`，已验证case=\`${artifact.observations.isolated_dynamic_verified_case_ids.join(",") || "NONE"}\`。PARTIAL_ONLY不得关闭动态、host或真实UAT阻断。`,
+    `- 真实UAT回退演练：\`${artifact.observations.actual_uat_rollback_rehearsal}\`；fake-root或隔离合成自动测试不是UAT恢复或回退证据。`,
     "- Writer静默回执只覆盖精确Compose项目与working directory；checkpoint 8在SQL前重验静默并以数据库级围栏拒绝未标记或外部业务客户端，围栏保持至后续部署或保全恢复接管。",
     `- TASK67人工UAT状态：\`${artifact.observations.cross_role_uat_readiness}\`。`,
     "",
@@ -471,7 +551,7 @@ export function renderMarkdown(artifact) {
     "",
     "任何工具、手册或operator在本artifact仍为BLOCKED时调用晋升断言，必须得到`UAT_PROMOTION_EXECUTOR_NOT_READY`。不得用root手工Compose、可重复环境变量、TEST恢复回执、旧postdeploy receipt或最终health页面绕过缺失检查点。",
     "",
-    "下一实现必须补齐受信、最小权限且可隔离测试的UAT数据库、四数据域及Web/Worker固定处理器，再经专项授权执行主机激活并形成真实UAT回退演练回执；实际人工UAT仍需独立事前授权、UAT资源、人员映射和签字，不能由仓库测试替代。",
+    "下一实现必须按版本化TASK70合同完成九阶段、十三检查及故障窗口的隔离动态证明；之后仍需专项授权执行host activation并形成真实UAT回退演练回执。实际人工UAT还需独立事前授权、UAT资源、人员映射和签字，不能由仓库测试替代。",
     "",
     "## 6. 源码manifest",
     "",

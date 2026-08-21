@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-uat-promotion-dynamic-validation-policy/v1",
+  "authority": "SELFHOSTED_NODE_POSTGRESQL_REPOSITORY_SOURCE",
+  "task_id": "SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70",
+  "execution_class": "ISOLATED_SYNTHETIC_ONLY_NOT_UAT_AUTHORIZED",
+  "evidence_scope": "ISOLATED_SYNTHETIC_ONLY",
+  "deployment_class": "TEST",
+  "audit_clearance": "PARTIAL_ONLY",
+  "artifact_path": "chenyida_erp_site/operations/uat-promotion-dynamic-evidence-v1.json",
+  "artifact_contract": "chenyida-erp-task70-isolated-dynamic-validation/v1",
+  "artifact_max_bytes": 1048576,
+  "handler_implementation_status": "HANDLERS_IMPLEMENTED_DORMANT",
+  "required_stage_order": [
+    "PRECONDITION_RECHECK",
+    "WRITER_CONTAINMENT",
+    "POSTGRESQL_RESTORE",
+    "UPLOADS_RESTORE",
+    "ATTACHMENTS_RESTORE",
+    "BACKUP_STATUS_RESTORE",
+    "RUNTIME_CONFIGURATION_RESTORE",
+    "WEB_WORKER_PREDECESSOR_ACTIVATION",
+    "PROTECTED_RESOURCE_RECHECK"
+  ],
+  "required_check_order": [
+    "POSTGRESQL_CONTENT",
+    "UPLOADS_CONTENT",
+    "ATTACHMENTS_CONTENT",
+    "BACKUP_STATUS_CONTENT",
+    "MIGRATION_HEAD",
+    "CADDY_IDENTITY",
+    "POSTGRES_IDENTITY",
+    "WEB_IDENTITY",
+    "WORKER_IDENTITY",
+    "RUNTIME_CONFIGURATION",
+    "STRICT_RELEASE_IDENTITY",
+    "HEALTH",
+    "PROTECTED_RESOURCES"
+  ],
+  "source_paths": [
+    "chenyida_erp_site/drizzle-postgres/0046_runtime_lock_privilege_boundary.sql",
+    "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v1.json",
+    "chenyida_erp_site/package.json",
+    "chenyida_erp_site/release/release-test-inventory-v1.json",
+    "chenyida_erp_site/release/test-runtime-policy-v1.json",
+    "chenyida_erp_site/scripts/uat-promotion-dynamic-evidence.mjs",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor-contract.mjs",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py",
+    "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs"
+  ],
+  "case_catalog": [
+    {
+      "case_id": "DV70-PG-SWITCH-01",
+      "evidence_class": "POSTGRESQL_ATOMIC_SWITCH_MECHANISM_ONLY",
+      "stage_id": "POSTGRESQL_RESTORE",
+      "stage_coverage": "PARTIAL",
+      "postgres_image_reference": "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394",
+      "maximum_disk_delta_bytes": 67108864,
+      "container_limits": {
+        "cpus": 1,
+        "memory_bytes": 805306368,
+        "memory_swap_bytes": 805306368,
+        "pids": 192,
+        "user": "999:999",
+        "network_mode": "none",
+        "rootfs_read_only": true,
+        "cap_drop": [
+          "ALL"
+        ],
+        "cap_add": [],
+        "security_opt": [
+          "no-new-privileges"
+        ],
+        "restart_policy": "no",
+        "privileged": false,
+        "devices": [],
+        "mounts": [],
+        "pull_policy": "never",
+        "log_driver": "none",
+        "image_must_preexist": true,
+        "build_forbidden": true,
+        "tmpfs": {
+          "/tmp": {
+            "size_bytes": 33554432,
+            "options": "rw,nosuid,nodev,noexec,uid=999,gid=999,mode=1777"
+          },
+          "/var/lib/postgresql/data": {
+            "size_bytes": 402653184,
+            "options": "rw,nosuid,nodev,noexec,uid=999,gid=999,mode=0700"
+          },
+          "/var/run/postgresql": {
+            "size_bytes": 16777216,
+            "options": "rw,nosuid,nodev,noexec,uid=999,gid=999,mode=0700"
+          }
+        }
+      },
+      "required_assertions": [
+        "PRODUCTION_SQL_SHA_BOUND",
+        "EXACT_SWITCH_NEW_SEALED",
+        "DATABASE_OIDS_PRESERVED",
+        "REPEAT_EXECUTION_FAILS_CLOSED",
+        "PRECONDITION_DRIFT_REJECTED",
+        "FIRST_RENAME_FAULT_ROLLS_BACK",
+        "COMMIT_RESPONSE_LOSS_PROBED_READ_ONLY",
+        "NO_PERSISTENT_MIXED_LAYOUT",
+        "EXISTING_RUNTIME_AND_PROTECTED_VOLUMES_UNCHANGED"
+      ]
+    }
+  ],
+  "required_non_claims": [
+    "DOES_NOT_PROVE_HOST_ACTIVATION",
+    "DOES_NOT_PROVE_ACTUAL_UAT_ROLLBACK",
+    "DOES_NOT_PROVE_HUMAN_UAT",
+    "DOES_NOT_PROVE_PRODUCTION_READINESS",
+    "DOES_NOT_PROVE_FULL_TASK70_COMPLETION",
+    "DOES_NOT_PROVE_DUMP_MIGRATION_ACL_VOLUME_OR_COMPOSE_RECOVERY"
+  ],
+  "required_target_guard": {
+    "deployment_class": "TEST",
+    "actual_execution_class": "TEST_ISOLATED_CONTAINER",
+    "isolated_cluster_marker": "chenyida-erp-task70-isolated-test/v1",
+    "base_spec_literal_scope": "PRODUCTION_OPCODE_FIXTURE_NOT_REAL_UAT_TARGET",
+    "executor_fixture_candidate_marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp",
+    "local_only": true,
+    "real_credentials_used": false,
+    "production_endpoints": [],
+    "uat_endpoints": [],
+    "protected_volume_mounts": [],
+    "preexisting_image_only": true
+  },
+  "resource_policy": {
+    "minimum_available_memory_bytes": 805306368,
+    "maximum_swap_percent": 80,
+    "maximum_swap_growth_bytes": 268435456,
+    "minimum_root_available_bytes": 10737418240,
+    "maximum_load1": 4,
+    "minimum_swap_sample_window_seconds": 60,
+    "minimum_load_breach_window_seconds": 180,
+    "require_zero_oom_kill_delta": true,
+    "require_zero_service_restart_delta": true
+  },
+  "cleanup_policy": {
+    "task_label": "chenyida.erp.task70-run-id",
+    "require_zero_remaining_containers": true,
+    "require_zero_remaining_networks": true,
+    "require_zero_remaining_volumes": true,
+    "require_zero_remaining_temp_roots": true,
+    "require_preexisting_container_set_unchanged": true,
+    "require_preexisting_image_set_unchanged": true,
+    "require_preexisting_volume_set_unchanged": true,
+    "require_protected_volume_set_unchanged": true,
+    "require_service_runtime_set_unchanged": true,
+    "protected_volume_names": [
+      "chenyida-erp-parallel_erp_attachments",
+      "chenyida-erp-parallel_erp_backup_status",
+      "chenyida-erp-parallel_erp_postgres",
+      "chenyida-erp-parallel_erp_uploads"
+    ]
+  }
+}
