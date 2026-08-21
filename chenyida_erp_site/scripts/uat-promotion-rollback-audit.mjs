@@ -146,7 +146,8 @@ function validateCapabilities(policy, sourceBodies, errors) {
 }
 
 function inspectRepository(
-  policy, sourceBodies, errors, dynamicEvidence = null, dynamicEvidenceLoadError = null,
+  policy, sourceBodies, errors, dynamicEvidence = null,
+  dynamicEvidenceRepositoryGit = null, dynamicEvidenceLoadError = null,
 ) {
   const launcher = sourceBodies.get("chenyida_erp_site/scripts/release-supervisor-launcher.py") ?? "";
   const mappings = [
@@ -186,9 +187,10 @@ function inspectRepository(
     if (dynamicEvidenceLoadError !== null) throw new Error(dynamicEvidenceLoadError);
     dynamicEvidenceSummary = summarizeTask70DynamicEvidence(dynamicEvidence, {
       policy: JSON.parse(sourceBodies.get(
-        "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v1.json",
+        "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v2.json",
       ) ?? "null"),
       sourceBodies,
+      repositoryGit: dynamicEvidenceRepositoryGit,
     });
   } catch (failure) {
     error(errors, "AUDIT_DYNAMIC_EVIDENCE_INVALID", failure?.code || failure?.message || "UNKNOWN");
@@ -395,7 +397,8 @@ export function assertUatPromotionMayStart(artifact) {
 export function buildUatPromotionRollbackAudit(inputs) {
   const {
     policy, sourceBodies, rawDigests, inventory,
-    dynamicEvidence = null, dynamicEvidenceLoadError = null,
+    dynamicEvidence = null, dynamicEvidenceRepositoryGit = null,
+    dynamicEvidenceLoadError = null,
   } = inputs;
   const errors = [];
   if (policy.schema_version !== 1 || policy.contract !== UAT_PROMOTION_AUDIT_POLICY_CONTRACT || policy.authority !== "SELFHOSTED_NODE_POSTGRESQL_REPOSITORY_SOURCE" || policy.execution_class !== "AUDIT_ONLY_NOT_AUTHORIZED" || policy.deployment_class !== "UAT") error(errors, "AUDIT_POLICY_CONTRACT_INVALID");
@@ -413,7 +416,8 @@ export function buildUatPromotionRollbackAudit(inputs) {
   const manifest = validateSourceFiles(policy, sourceBodies, errors);
   const capabilities = validateCapabilities(policy, sourceBodies, errors);
   const observations = inspectRepository(
-    policy, sourceBodies, errors, dynamicEvidence, dynamicEvidenceLoadError,
+    policy, sourceBodies, errors, dynamicEvidence,
+    dynamicEvidenceRepositoryGit, dynamicEvidenceLoadError,
   );
   const incomplete = capabilities.filter((entry) => entry.status !== "SUPPORTED");
   const executionBlockers = [
@@ -481,9 +485,12 @@ export function loadUatPromotionRollbackAuditInputs() {
   const policy = JSON.parse(policyRaw);
   const sourceBodies = new Map((policy.source_files ?? []).map((entry) => [entry.path, readRepositoryFile(entry.path)]));
   let dynamicEvidence = null;
+  let dynamicEvidenceRepositoryGit = null;
   let dynamicEvidenceLoadError = null;
   try {
-    dynamicEvidence = loadTask70DynamicRepositoryInputs().artifact;
+    const dynamicInputs = loadTask70DynamicRepositoryInputs();
+    dynamicEvidence = dynamicInputs.artifact;
+    dynamicEvidenceRepositoryGit = dynamicInputs.repositoryGit;
   } catch (failure) {
     dynamicEvidenceLoadError = failure?.code || failure?.message || "TASK70_DYNAMIC_EVIDENCE_LOAD_FAILED";
   }
@@ -492,6 +499,7 @@ export function loadUatPromotionRollbackAuditInputs() {
     inventory: JSON.parse(inventoryRaw),
     sourceBodies,
     dynamicEvidence,
+    dynamicEvidenceRepositoryGit,
     dynamicEvidenceLoadError,
     rawDigests: { policy: sha256(policyRaw), inventory: sha256(inventoryRaw), generator: sha256(generatorRaw) },
   };

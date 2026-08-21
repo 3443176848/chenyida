@@ -48,6 +48,6 @@ TASK70于2026-08-21正式启动为唯一`DOING`。首个提交先完成版本化
 
 1. 仅使用本机已存在的固定摘要PostgreSQL 17镜像，不build、不pull、`network=none`、只读rootfs、全部数据/socket/temp位于有界tmpfs，不挂载任何Volume。
 2. 原样执行现有executor生成的生产`PG_RB_ATOMIC_SWITCH_V1`成功SQL，并验证新库封存、数据库OID保持和重复执行失败关闭。
-3. 覆盖前置漂移拒绝、首个rename后固定故障触发事务回滚、COMMIT响应丢失后的只读判定且绝不重放，以及任何时点都不存在持久混合布局。
+3. 覆盖前置漂移拒绝、首个rename后固定故障触发事务回滚、命令精确完成后调用方丢弃结果并仅做只读观察，以及任何时点都不存在持久混合布局；明确不声称已经证明传输层COMMIT响应丢失或生产运行时恢复路径。
 4. 运行前后完成至少60秒Swap窗口、180秒Load停止线监控、OOM/restart、根盘64MiB上界及全局Docker/保护对象指纹；只按精确任务label/ID清理并生成机器收据。
 5. 结果最多形成`VERIFIED_PARTIAL_ONLY`，不得声称九阶段/十三检查、host activation、真实UAT、人工UAT或生产就绪。

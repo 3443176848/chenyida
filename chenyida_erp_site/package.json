@@ -66,6 +66,8 @@
     "uat:promotion-audit:verify": "node scripts/uat-promotion-rollback-audit.mjs verify",
     "uat:promotion-audit:assert-ready": "node scripts/uat-promotion-rollback-audit.mjs assert-ready",
     "uat:promotion-dynamic-evidence:verify-policy": "node scripts/uat-promotion-dynamic-evidence.mjs verify-policy",
+    "uat:promotion-dynamic-evidence:verify": "node scripts/uat-promotion-dynamic-evidence.mjs verify",
+    "uat:promotion-dynamic-evidence:run-pg-switch": "/usr/bin/python3 -I scripts/uat-promotion-dynamic-pg-switch.py --execute",
     "test:identity:ui": "node --experimental-strip-types --test tests/selfhost-identity-ui-contract.test.mjs",
     "test:identity:postgres": "node --experimental-strip-types --test --test-concurrency=1 tests/selfhost-identity-postgres.test.mjs",
     "test:identity:migration-upgrade": "node --experimental-strip-types --test tests/selfhost-identity-migration-upgrade.test.mjs",

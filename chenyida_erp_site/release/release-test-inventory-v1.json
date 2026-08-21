@@ -2314,7 +2314,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-rollback-audit.test.mjs",
-      "sha256": "4173b234f5e3487eca318ca64a43bc749ea19ca3de3d947d4b47759eec025b4b",
+      "sha256": "a02b0dafc699eeaff2963786e032542bf7e882081f687c2954dd565f0c94801a",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

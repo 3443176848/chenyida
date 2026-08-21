@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "b6b3c244bd668bff5385fa024370ca4677c123ec7d61633c944265a844258d4b",
+  "artifact_sha256": "b6eb511eb2d46b7d8a1a4b8f747e59de3ac300bc72ec70cdd764a0e4b31ae72a",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -234,17 +234,17 @@
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "8485c352712a654c1ca076dfe59bad1585ef091dc6acb26c82a8e80145befe3d"
+      "sha256": "3e20809ca602dcc7da019987c4a0a3d0a039db19fe51dcf7079fb32e44516db5"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
-      "sha256": "f3029dd00b924890c2a7308c33e3109b8d28128ab326869e76f61e1e16d6d6aa"
+      "sha256": "d36370cd3d634043c31d3fe3c1291feebf0c67411b340ae2f43afc67c633f12f"
     },
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 238,
-      "sha256": "ba303db75eeaecc0e24d826cf5c985f8fbb259bfd5f3a65dbadccba4e7e7f696",
+      "sha256": "98807995be436b77ffd7626940cc7d828b2fc3a4f2f46fb32ded960d24a73269",
       "total_tests": 262
     },
     "source_manifest": {
@@ -302,15 +302,16 @@
         },
         {
           "markers": [
-            "chenyida-erp-uat-promotion-dynamic-validation-policy/v1",
+            "chenyida-erp-uat-promotion-dynamic-validation-policy/v2",
             "ISOLATED_SYNTHETIC_ONLY",
             "PARTIAL_ONLY",
             "DV70-PG-SWITCH-01",
             "DOES_NOT_PROVE_HOST_ACTIVATION",
-            "require_preexisting_container_set_unchanged"
+            "required_scenarios",
+            "require_preexisting_network_set_unchanged"
           ],
-          "path": "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v1.json",
-          "sha256": "656f39c584cbf70eaed0847c48daaf72517969081bb8219d43e168917fe02274"
+          "path": "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v2.json",
+          "sha256": "fe9932e26535fbd9b25c41259143c73b82c20ad5157b3a65d47e86b1200cc6b8"
         },
         {
           "markers": [
@@ -332,7 +333,7 @@
             "0.1.0-alpha.47"
           ],
           "path": "chenyida_erp_site/package.json",
-          "sha256": "0aad1ae9aba73f24462b7f712f56033e380e8da661b31392a9a4588c88bf3f46"
+          "sha256": "26b615a779da0c6f4c30b0a9804191853c7c74842e57ad6a78a12c091ab189b6"
         },
         {
           "markers": [
@@ -340,7 +341,7 @@
             "selfhost-uat-promotion-rollback-audit.test.mjs"
           ],
           "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-          "sha256": "ba303db75eeaecc0e24d826cf5c985f8fbb259bfd5f3a65dbadccba4e7e7f696"
+          "sha256": "98807995be436b77ffd7626940cc7d828b2fc3a4f2f46fb32ded960d24a73269"
         },
         {
           "markers": [
@@ -348,7 +349,7 @@
             "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394"
           ],
           "path": "chenyida_erp_site/release/test-runtime-policy-v1.json",
-          "sha256": "8c2f20c2cabf61962cc44a4e1120d5aa600228c98c05e7464986002bf2879911"
+          "sha256": "923823ed8860ac9d4a2a38ce9f852e531f0698d9fdb507524cea42bc666e30e7"
         },
         {
           "markers": [
@@ -443,7 +444,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "012c67162af100ce0009ba867ba0ad931d7bf114892f29f57b1a4fb8d3e981e5"
+          "sha256": "2d5f8984017097c55f9f441ed0ff9f620f97c4928254520662d0d3230129facc"
         },
         {
           "markers": [
@@ -526,11 +527,23 @@
             "validateTask70DynamicPolicy",
             "validateTask70DynamicArtifact",
             "summarizeTask70DynamicEvidence",
+            "GIT_NO_REPLACE_OBJECTS",
             "PARTIAL_ONLY",
             "TASK70_DYNAMIC_CLEANUP_FAILED"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-dynamic-evidence.mjs",
-          "sha256": "204a5145712dd80a5f6f59310790185b2ac01a98c2f565c653df16e808121e0a"
+          "sha256": "3a2b8ecd7305603bbcf88349e5d4380ee96c1a11574ad667b415e3c92610335f"
+        },
+        {
+          "markers": [
+            "DV70-PG-SWITCH-01",
+            "--pull=never",
+            "DERIVED_FIRST_RENAME_BARRIER_EOF_V1",
+            "CALLER_RESULT_DISCARDED_AFTER_EXACT_COMMAND_COMPLETION",
+            "ZERO_TASK_RESIDUE"
+          ],
+          "path": "chenyida_erp_site/scripts/uat-promotion-dynamic-pg-switch.py",
+          "sha256": "9f06921a87a8740d5636826b4413f0a4763d1b778030b39f728bc7e349a7ed30"
         },
         {
           "markers": [
@@ -558,7 +571,7 @@
             "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-          "sha256": "8485c352712a654c1ca076dfe59bad1585ef091dc6acb26c82a8e80145befe3d"
+          "sha256": "3e20809ca602dcc7da019987c4a0a3d0a039db19fe51dcf7079fb32e44516db5"
         },
         {
           "markers": [
@@ -701,7 +714,7 @@
             "dynamic evidence tampering fails closed"
           ],
           "path": "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-audit.test.mjs",
-          "sha256": "4173b234f5e3487eca318ca64a43bc749ea19ca3de3d947d4b47759eec025b4b"
+          "sha256": "a02b0dafc699eeaff2963786e032542bf7e882081f687c2954dd565f0c94801a"
         },
         {
           "markers": [
@@ -713,9 +726,27 @@
           ],
           "path": "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-fixed-executor.test.mjs",
           "sha256": "943f51b319f62ce487214de8bd8ba241e29dcf044e600abc2bcc88ecc19c1c54"
+        },
+        {
+          "markers": [
+            "DynamicPgSwitchPureContractTest",
+            "test_fault_stream_is_the_unique_production_prefix_plus_fixed_barrier",
+            "test_task_container_projection_recomputes_exact_security_limits"
+          ],
+          "path": "chenyida_erp_site/tests/test_uat_promotion_dynamic_pg_switch.py",
+          "sha256": "3198b4bf85a79580f867475aeb1187744c4cd79b02e9173cf27bd841761ac936"
+        },
+        {
+          "markers": [
+            "PostgresRollbackBaseSpecTest",
+            "test_closed_sql_opcodes_bind_fixed_database_timeout_and_atomic_switch",
+            "test_live_state_parser_classifies_old_new_and_partial_layouts"
+          ],
+          "path": "chenyida_erp_site/tests/test_uat_promotion_rollback_fixed_executor.py",
+          "sha256": "c0ae0891094b76edc974a72628b0d9d2e6eef894de24a4c00e6ec83074a832ca"
         }
       ],
-      "sha256": "bcebc7663d71ae26facfe10d19c52277a47d3989b89d21b4b53441427cfcdaf9"
+      "sha256": "5ead9703df557214d33ab836957a80320f641fb8fd46462d09712af2ed711c06"
     }
   },
   "observations": {

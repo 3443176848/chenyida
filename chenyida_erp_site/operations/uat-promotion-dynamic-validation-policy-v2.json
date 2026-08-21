@@ -1,14 +1,14 @@
 {
-  "schema_version": 1,
-  "contract": "chenyida-erp-uat-promotion-dynamic-validation-policy/v1",
+  "schema_version": 2,
+  "contract": "chenyida-erp-uat-promotion-dynamic-validation-policy/v2",
   "authority": "SELFHOSTED_NODE_POSTGRESQL_REPOSITORY_SOURCE",
   "task_id": "SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70",
   "execution_class": "ISOLATED_SYNTHETIC_ONLY_NOT_UAT_AUTHORIZED",
   "evidence_scope": "ISOLATED_SYNTHETIC_ONLY",
   "deployment_class": "TEST",
   "audit_clearance": "PARTIAL_ONLY",
-  "artifact_path": "chenyida_erp_site/operations/uat-promotion-dynamic-evidence-v1.json",
-  "artifact_contract": "chenyida-erp-task70-isolated-dynamic-validation/v1",
+  "artifact_path": "chenyida_erp_site/operations/uat-promotion-dynamic-evidence-v2.json",
+  "artifact_contract": "chenyida-erp-task70-isolated-dynamic-validation/v2",
   "artifact_max_bytes": 1048576,
   "handler_implementation_status": "HANDLERS_IMPLEMENTED_DORMANT",
   "required_stage_order": [
@@ -39,15 +39,19 @@
   ],
   "source_paths": [
     "chenyida_erp_site/drizzle-postgres/0046_runtime_lock_privilege_boundary.sql",
-    "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v1.json",
+    "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v2.json",
     "chenyida_erp_site/package.json",
     "chenyida_erp_site/release/release-test-inventory-v1.json",
     "chenyida_erp_site/release/test-runtime-policy-v1.json",
     "chenyida_erp_site/scripts/uat-promotion-dynamic-evidence.mjs",
+    "chenyida_erp_site/scripts/uat-promotion-dynamic-pg-switch.py",
     "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
     "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor-contract.mjs",
     "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py",
-    "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs"
+    "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-contract.mjs",
+    "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-audit.test.mjs",
+    "chenyida_erp_site/tests/test_uat_promotion_dynamic_pg_switch.py",
+    "chenyida_erp_site/tests/test_uat_promotion_rollback_fixed_executor.py"
   ],
   "case_catalog": [
     {
@@ -55,13 +59,26 @@
       "evidence_class": "POSTGRESQL_ATOMIC_SWITCH_MECHANISM_ONLY",
       "stage_id": "POSTGRESQL_RESTORE",
       "stage_coverage": "PARTIAL",
-      "postgres_image_reference": "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394",
+      "producer_path": "chenyida_erp_site/scripts/uat-promotion-dynamic-pg-switch.py",
+      "production_opcode": "PG_RB_ATOMIC_SWITCH_V1",
+      "observation_opcode": "PG_RB_OBSERVE_STATE_V1",
+      "postgres_image_reference": "docker.io/library/postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394",
       "maximum_disk_delta_bytes": 67108864,
+      "fault_derivation": "PRODUCTION_SQL_PREFIX_AFTER_FIRST_RENAME_PLUS_FIXED_BARRIER_THEN_EOF_V1",
+      "required_scenarios": [
+        "EXACT_SUCCESS",
+        "REPEAT_FAIL_CLOSED",
+        "PRECONDITION_DRIFT_REJECTED",
+        "FIRST_RENAME_FAULT_ROLLBACK",
+        "CALLER_RESULT_DISCARDED_AFTER_EXACT_COMMAND_COMPLETION_READ_ONLY_OBSERVATION"
+      ],
       "container_limits": {
         "cpus": 1,
         "memory_bytes": 805306368,
         "memory_swap_bytes": 805306368,
         "pids": 192,
+        "shared_memory_bytes": 67108864,
+        "stop_timeout_seconds": 5,
         "user": "999:999",
         "network_mode": "none",
         "rootfs_read_only": true,
@@ -76,6 +93,7 @@
         "privileged": false,
         "devices": [],
         "mounts": [],
+        "published_ports": [],
         "pull_policy": "never",
         "log_driver": "none",
         "image_must_preexist": true,
@@ -102,7 +120,7 @@
         "REPEAT_EXECUTION_FAILS_CLOSED",
         "PRECONDITION_DRIFT_REJECTED",
         "FIRST_RENAME_FAULT_ROLLS_BACK",
-        "COMMIT_RESPONSE_LOSS_PROBED_READ_ONLY",
+        "CALLER_RESULT_DISCARD_PROBED_READ_ONLY",
         "NO_PERSISTENT_MIXED_LAYOUT",
         "EXISTING_RUNTIME_AND_PROTECTED_VOLUMES_UNCHANGED"
       ]
@@ -114,34 +132,48 @@
     "DOES_NOT_PROVE_HUMAN_UAT",
     "DOES_NOT_PROVE_PRODUCTION_READINESS",
     "DOES_NOT_PROVE_FULL_TASK70_COMPLETION",
-    "DOES_NOT_PROVE_DUMP_MIGRATION_ACL_VOLUME_OR_COMPOSE_RECOVERY"
+    "DOES_NOT_PROVE_DUMP_MIGRATION_ACL_VOLUME_OR_COMPOSE_RECOVERY",
+    "DOES_NOT_PROVE_TRANSPORT_LEVEL_COMMIT_RESPONSE_LOSS_OR_RUNTIME_RECOVERY"
   ],
   "required_target_guard": {
     "deployment_class": "TEST",
     "actual_execution_class": "TEST_ISOLATED_CONTAINER",
     "isolated_cluster_marker": "chenyida-erp-task70-isolated-test/v1",
+    "management_database": "postgres",
+    "management_database_comment": "chenyida-erp-task70-isolated-test/v1",
+    "authentication_mode": "LOCAL_UNIX_TRUST_SYNTHETIC_ONLY",
+    "postgres_listen_addresses": "*",
+    "docker_network_mode": "none",
+    "tcp_publish_allowed": false,
     "base_spec_literal_scope": "PRODUCTION_OPCODE_FIXTURE_NOT_REAL_UAT_TARGET",
     "executor_fixture_candidate_marker": "chenyida-erp-deployment/v2:UAT:chenyida-erp",
     "local_only": true,
     "real_credentials_used": false,
     "production_endpoints": [],
     "uat_endpoints": [],
+    "postgres_port_bindings": [],
     "protected_volume_mounts": [],
     "preexisting_image_only": true
   },
   "resource_policy": {
     "minimum_available_memory_bytes": 805306368,
+    "minimum_start_available_memory_bytes": 1610612736,
     "maximum_swap_percent": 80,
     "maximum_swap_growth_bytes": 268435456,
     "minimum_root_available_bytes": 10737418240,
     "maximum_load1": 4,
+    "sample_interval_seconds": 5,
+    "maximum_sample_gap_seconds": 10,
+    "minimum_preflight_sample_window_seconds": 60,
     "minimum_swap_sample_window_seconds": 60,
+    "minimum_total_sample_window_seconds": 180,
     "minimum_load_breach_window_seconds": 180,
     "require_zero_oom_kill_delta": true,
     "require_zero_service_restart_delta": true
   },
   "cleanup_policy": {
     "task_label": "chenyida.erp.task70-run-id",
+    "isolation_label": "chenyida.erp.execution-scope=isolated-synthetic-test",
     "require_zero_remaining_containers": true,
     "require_zero_remaining_networks": true,
     "require_zero_remaining_volumes": true,
@@ -149,6 +181,7 @@
     "require_preexisting_container_set_unchanged": true,
     "require_preexisting_image_set_unchanged": true,
     "require_preexisting_volume_set_unchanged": true,
+    "require_preexisting_network_set_unchanged": true,
     "require_protected_volume_set_unchanged": true,
     "require_service_runtime_set_unchanged": true,
     "protected_volume_names": [
@@ -156,6 +189,12 @@
       "chenyida-erp-parallel_erp_backup_status",
       "chenyida-erp-parallel_erp_postgres",
       "chenyida-erp-parallel_erp_uploads"
+    ],
+    "protected_service_names": [
+      "caddy",
+      "postgres",
+      "web",
+      "worker"
     ]
   }
 }
