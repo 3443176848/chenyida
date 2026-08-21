@@ -13,7 +13,7 @@
 | 历史V2冻结 | PASS / BYTE IDENTICAL | producer/verifier/audit-test/policy/artifact五个SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91` |
 | 自动验证 | PASS / SOURCE SCOPED | Python V3 16/16、fixed executor 129/129、Node V3 13/13、受影响合同108/108、release 29/29、inventory263/239/24、Node syntax和diff门通过；初次35项EACCES已证明为容器夹具能力不足并以仅补`DAC_OVERRIDE`/`CHOWN`复现全绿 |
 | 已验证动态case | PASS PARTIAL / `DV70-PG-SWITCH-01` | 历史不可变artifact`867f3a7c…2f56`继续证明5场景/9断言；不被V3源码准备重写或扩大解释 |
-| 当前动态case | PENDING / `DV70-PG-GUARDED-SWITCH-02` | 源码已闭合但尚无V3 artifact；将验证完整Migration/权限/内容状态上的guarded switch、故障事务回滚及一次性恢复/no-replay，最多仍为`PARTIAL_ONLY` |
+| 当前动态case | RETRY PENDING / `DV70-PG-GUARDED-SWITCH-02` | 首次run`dv70-3tbcp9x1`通过60秒前检和PG17.10启动后，在内容报告执行前因producer 32MiB上限与executor 64MiB合同不一致而失败关闭；精确修复及64MiB/+1测试已通过，待新提交/private fast-forward后重跑 |
 | 当前资源边界 | PASS / PRE-SOURCE-TEST SNAPSHOTS | available约2.0—2.1GiB、Swap126MiB/1GiB、根盘11GiB、Load低；四服务稳定约3天、restart/OOM无变化。正式动态运行仍必须生成新鲜60/180秒机器证据 |
 | 对象/清理 | PASS / NO CURRENT TASK RESIDUE | 当前所有临时Node容器均已按任务名消失，未创建网络或Volume；发现的`/tmp/cyd-uat-promotion-*`均为8月15—16既有残留，不属于本轮且未删除 |
 | Git恢复锚点 | PENDING / AUTHORIZED PRIVATE FAST-FORWARD | 项目负责人已授权敏感信息检查通过后将main非强制推送到`recovery-private/main`；当前V3源码尚未提交/推送，不提前声称远端已同步 |

@@ -4,6 +4,13 @@
 
 ## 2026-08-21
 
+### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: align TASK70 content report output limit`
+
+- 失败关闭：source`d1d8ae8`通过1,791文件敏感信息检查并普通快进到private main后，run`dv70-3tbcp9x1`完成60秒前检和隔离PG17.10启动，但baseline content capture在执行前返回`TASK70_V3_PSQL_INPUT_INVALID`；没有生成artifact或进入既有/UAT数据库。
+- 根因/修复：producer通用psql包装器上限为32MiB，而fixed executor的`POSTGRES_CONTENT_REPORT_MAX_BYTES`合同固定64MiB。改为直接复用同一权威常量，避免两处魔数漂移；新增精确64MiB接受、64MiB+1拒绝及实际docker调用参数断言。
+- 验证/清理：Python V3仍为16/16、Node V3 13/13、inventory263/239/24通过；失败run后任务容器、tmp根和artifact均为0，宿主`oom_kill=0`，四服务和受保护卷未变化。修复必须经独立提交、重复敏感信息检查和private普通fast-forward后才允许重跑。
+- 数据库/API/运行面：无Schema/Migration、业务API、镜像、Compose或运行UAT变化；只修正隔离证据runner输入上界。TASK70保持`DOING / RETRY PENDING`，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `test: add TASK70 guarded switch dynamic contract`
 
 - 调度/边界：D-160将原计划`DV70-PG-RESTORE-02`拆为当前可由固定生产executor精确复用的`DV70-PG-GUARDED-SWITCH-02`和仍未证明的dump/Volume恢复；本提交只完成V3源码与合成合同，动态artifact必须在clean source提交后运行。未连接UAT/生产、读取备份/受保护卷/凭据或执行业务Migration、部署与host动作。

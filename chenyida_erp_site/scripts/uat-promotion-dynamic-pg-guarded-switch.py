@@ -1199,7 +1199,7 @@ def execute_psql_bound(
             or not isinstance(timeout, int) or isinstance(timeout, bool) \
             or not 1 <= timeout <= 1800 \
             or not isinstance(maximum_output, int) or isinstance(maximum_output, bool) \
-            or not 1 <= maximum_output <= 32 * 1024 * 1024 \
+            or not 1 <= maximum_output <= EXECUTOR.POSTGRES_CONTENT_REPORT_MAX_BYTES \
             or variables is not None and not isinstance(variables, dict):
         reject("TASK70_V3_PSQL_INPUT_INVALID")
     selected = {

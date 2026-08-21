@@ -68,6 +68,7 @@ TASK70于2026-08-21正式启动为唯一`DOING`。首个提交先完成版本化
 6. artifact发布使用本次创建inode和精确路径验证；若hardlink后unlink、目录fsync或metadata失败，只删除与该inode匹配的本任务路径并同步目录，保证安全重试且不误删外来文件。
 7. 源码验收已通过：Python V3 16/16、fixed executor 129/129、Node V3 13/13、受影响合同108/108、release 29/29、inventory 263/239/24及两份Node语法门；两条只读终审均无P0/P1。首次108项组合因全量drop capabilities不能覆盖夹具中的`0440`文件并chown reader GID而产生35个同源EACCES，使用离线临时容器仅补`DAC_OVERRIDE`/`CHOWN`后108/108通过，未修改断言。
 8. 历史V2五个文件的SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91`。当前V3 policy raw SHA-256为`9245a099…dc22`，canonical policy摘要由双语测试固定；release inventory/runtime policy分别为`c4775f60…6485`/`8f6fb710…85d2`。
+9. 源码提交`d1d8ae8`经1,791文件敏感信息检查后普通快进到`recovery-private/main`。首次动态run`dv70-3tbcp9x1`通过60秒前检并启动隔离PG17.10，但在baseline content capture执行前由`TASK70_V3_PSQL_INPUT_INVALID`失败关闭：producer包装器只允许32MiB输出，而fixed executor内容报告合同固定为64MiB。任务容器/tmp/artifact均为0、`oom_kill`保持0；修复改为直接复用`POSTGRES_CONTENT_REPORT_MAX_BYTES`并测试精确64MiB接受、+1拒绝，必须形成新提交和private fast-forward后重跑。
 
 ## 9. 当前动态执行验收标准
 

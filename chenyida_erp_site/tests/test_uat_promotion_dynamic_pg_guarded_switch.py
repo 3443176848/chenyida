@@ -627,6 +627,34 @@ class DynamicPostgresGuardedSwitchV3Test(unittest.TestCase):
         receipt_sha256 = receipt_body.pop("receipt_sha256")
         self.assertEqual(receipt_sha256, PRODUCER.digest_value(receipt_body))
 
+        content_limit = PRODUCER.EXECUTOR.POSTGRES_CONTENT_REPORT_MAX_BYTES
+        with mock.patch.object(
+                PRODUCER.LEGACY, "docker_command", return_value=completed,
+        ) as command:
+            _result, _arguments, content_execution = PRODUCER.execute_psql_bound(
+                container_id, "content_report", sql,
+                database="chenyida_erp_rb_deadbeefdeadbeef",
+                maximum_output=content_limit,
+            )
+        command.assert_called_once_with(
+            PRODUCER.psql_arguments(
+                container_id, "content_report",
+                database="chenyida_erp_rb_deadbeefdeadbeef",
+            ),
+            input_bytes=sql, timeout=300, maximum_output=content_limit,
+        )
+        self.assertEqual(
+            content_execution["maximum_output_bytes"], content_limit,
+        )
+        with self.assertRaisesRegex(
+                PRODUCER.DynamicGuardedSwitchError,
+                "TASK70_V3_PSQL_INPUT_INVALID",
+        ):
+            PRODUCER.execute_psql_bound(
+                container_id, "content_report", sql,
+                maximum_output=content_limit + 1,
+            )
+
     def test_v3_journal_projection_keeps_full_recorder_events_and_payload_identity(self):
         _policy, _records, _ledger, inputs = self.inputs()
         base = PRODUCER.EXECUTOR.derive_pg_rollback_base_spec(inputs)
