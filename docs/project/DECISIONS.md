@@ -3395,14 +3395,48 @@
 ### Consequences
 
 - reconciliation normalized SHA-256更新为`067255c7e6b319dbea1660bebca1b3259bb6e61363f5818ec88f226fc99ce339`；V3 policy raw/canonical为`e62b16ccd7b4d0228f07c31a35a3f49085cfa7c0888f029812b24d12e81a5e4d`/`90188fadc024e62912c5c6cfc85e97f254757ee274aba1e8bb55bd2c6e951d12`。setup为2,538 bytes、SHA-256`919ec37296b6d65b3ddb33ba4ba3c8f4cf8f9b6d5883a762a7af56e9c4cfd626`。
-- 定向Python V3 16/16、fixed executor 129/129、Node V3 13/13、release 29/29及inventory263/239/24通过；当前修复后的受影响合同108项与隔离动态artifact仍须在clean source上串行验证。
+- 定向Python V3 16/16、fixed executor 129/129、Node V3 13/13、release 29/29及inventory263/239/24通过；当前修复后的受影响合同必须按inventory实际集合在clean source上串行验证，D-162随后确认当前组合为110项。
 - 两次失败run及一次诊断run均无artifact、任务容器、tmp根或进程残留；系统仍为`PRODUCTION NO-GO`，本决策不关闭dump/Volume、fresh-process、host activation、真实UAT、人工验收或正式切换阻断。
 
 ### Rejected alternatives
 
 - 拒绝修改security parser、忽略owner aclitem或把期望count降为4来适配错误输出；也拒绝把PostgreSQL owner隐式权限误当作显式ACL状态已经相等。
 - 拒绝在生产staging reconciliation中修改cluster-global tablespace，或把合成fixture的tablespace物化外推为UAT/生产权限变更。
-- 拒绝在dirty source上直接重跑、手改artifact、跳过受影响合同108项，或因rename尚未发生而忽略此次安全守卫失败。
+- 拒绝在dirty source上直接重跑、手改artifact、跳过受影响完整合同组合，或因rename尚未发生而忽略此次安全守卫失败。
+
+## D-162 冻结动态证据按artifact绑定Git blobs验证，当前审计manifest仍按当前源码生成
+
+- 日期：2026-08-21
+- 状态：`ACCEPTED / HISTORICAL SOURCE BINDING CORRECTIVE SOURCE VERIFIED / CLEAN DYNAMIC RETRY PENDING / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据d7ce clean-source 110项回归的四个失败、V2 artifact source bindings、现有Git ancestry投影、两条独立只读安全审计和audit20/20+110/110复验
+- 确认边界：只修正仓库审计读取历史证据的source时态并重生成审计文件；不改五个冻结V2文件，不授权或执行UAT/生产、数据库、Volume、真实备份、host或部署动作
+
+### Context
+
+- V2 artifact由c793源码生成并绑定14个source path的SHA-256与Git blob。后续V3和D-161合法修改inventory、runtime policy、fixed executor及测试；若当前audit把历史artifact与当前文件正文组合，冻结verifier必然返回`TASK70_DYNAMIC_SOURCE_BINDING_MISMATCH`。
+- `loadTask70DynamicRepositoryInputs()`已经从artifact commit验证tree、HEAD祖先关系及每个`commit:path` blob，但此前同时返回当前工作树的source bodies。Git projection正确不等于正文时态正确。
+- 当前UAT promotion audit本身必须反映最新inventory、handler与控制平面；若把其全部source manifest回退到c793，又会掩盖当前仓库漂移。历史动态证据验证与当前能力审计必须使用两个明确source map。
+
+### Decision
+
+1. 五个冻结V2 producer/verifier/audit-test/policy/artifact保持字节不变，不重新生成、不修改校验语义。历史artifact仍只声明`VERIFIED_PARTIAL_ONLY`。
+2. 当前audit loader在V2 artifact存在时，使用已由artifact commit派生的严格顺序`source_blobs`，通过固定`/usr/bin/git cat-file blob <40hex>`读取14个历史正文；只有artifact SHA仍精确等于loader最初读取值时才使用该map。
+3. synthetic、tamper或调用方替换的artifact SHA不同，继续使用caller/current bodies，使既有负向测试落在被测语义而非被历史map掩盖。当前audit的45文件source manifest、capability和release inventory检查始终读取当前工作树。
+4. Git子进程禁止shell、replace refs、lazy fetch、交互prompt和用户/system config；固定PATH/locale/TZ、5秒timeout、2MiB maxBuffer及fatal UTF-8。path、顺序、重复和object格式先验证；冻结V2 verifier随后必须重算每个SHA-256、Git blob SHA-1及commit/tree/ancestor。
+5. 任一Git、blob、UTF-8、大小、摘要或projection异常都进入`dynamicEvidenceLoadError`并生成`INVALID_FAIL_CLOSED`，不得fallback到当前正文后把历史artifact标为有效。
+
+### Consequences
+
+- 当前audit generator SHA-256为`66c83fa5157e6b5a076088da63090efc74d46e9e4628633c2e8d52e1e5839cfd`；重生成audit semantic/raw/Markdown/source-manifest SHA-256分别为`6aa3f2bf7f593f0cb0ea4f472f518bac1335a17e23efb1c94cb267c72147a4a3`、`de3a5b49c6fe96c618b9bf46c61becb61f5d5bbe5288398ef045adea5a8257d6`、`53418ec4088bb364448aabe329cc8af8d18b5972546b788254e87c7d07232bbb`、`758044cf645ecdc6bf8b8593d835f19c2e713a7e71a9b6d9d76e5a8ead45fbf2`。
+- audit继续PASS但BLOCKED：4 blockers、P0=3、P1=1、`may_start=false`。audit20/20、clean-source110/110、V3 13/13、release29/29及inventory263/239/24通过，两条只读终审P0=0/P1=0。
+- 冻结V2五文件SHA继续为`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91`。如果未来历史source path从当前工作树彻底删除，冻结loader会先失败关闭；支持path删除需要新的非冻结读取入口，不在本修复范围。
+- 系统仍为`PRODUCTION NO-GO`；本决策不关闭V3 dynamic artifact、dump/Volume、fresh-process、host activation、真实UAT、人工验收或切换阻断。
+
+### Rejected alternatives
+
+- 拒绝修改或重生成冻结V2文件，也拒绝把历史artifact直接与current bodies比较后将预期失败视为无害。
+- 拒绝把当前audit manifest整体回退到c793，或仅按artifact自报path读取当前文件；两者都会混淆历史证据真实性与当前能力状态。
+- 拒绝自由Git argv、shell、replace refs、网络lazy fetch、无大小/超时边界读取，或在历史blob读取失败后fallback并继续标记动态证据有效。
 
 ## 待确认业务决策
 

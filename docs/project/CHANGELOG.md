@@ -4,6 +4,16 @@
 
 ## 2026-08-21
 
+### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: verify frozen TASK70 evidence from bound Git blobs`
+
+- 发现：owner ACL修复`d7ce5f6`经1,791文件committed-tree敏感门普通快进到private main后，clean-source组合实际运行110项得到106/110。四个失败集中在当前UAT promotion audit：冻结V2 artifact绑定c793的14个source blobs，但loader向verifier传入当前inventory/runtime/fixed-executor bodies，产生source-binding/runtime-boundary错误并使audit JSON/Markdown过期。
+- 边界决策：五个V2 producer/verifier/audit-test/policy/artifact继续逐字节冻结；当前audit的source manifest与能力检查继续读取当前工作树。仅当输入artifact SHA精确等于repository loader最初读取值时，V2验证改用其已证明为HEAD祖先的commit/source blob；synthetic或tamper fixture SHA不同，继续使用caller bodies，避免历史源码掩盖负测。
+- Git读取安全：固定绝对`/usr/bin/git cat-file blob`、`shell=false`、净化Git环境、禁replace/lazy fetch/prompt、5秒timeout、2MiB上界和fatal UTF-8；path顺序、40hex object及唯一性先验证，随后冻结V2 verifier仍重算SHA-256、Git blob SHA-1、commit/tree/ancestor。任何读取、类型、内容或摘要失败都进入`INVALID_FAIL_CLOSED`。
+- 生成物：重新生成audit JSON/Markdown；semantic/raw/Markdown/source-manifest SHA-256分别为`6aa3f2bf…a4a3`/`de3a5b49…57d6`/`53418ec4…2bbb`/`758044cf…fbf2`。结论仍为4 blockers（P0=3、P1=1）、`may_start=false`，`assert-ready`仍精确返回`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+- 验证：audit专项20/20、完整clean-source组合110/110、V3 13/13、release29/29、inventory263/239/24、audit generate/verify、V3 policy verify及预期assert-ready阻断通过；两条独立只读复核P0=0/P1=0，`git diff --check`通过。此前文档的108项来自旧测试集合，当前真实组合为110项。
+- 资源/清理：组合测试前后available约2.0GiB、Swap133MiB/1GiB、根盘11GiB、Docker service `oom_kill=0`，四服务资源稳定；所有`cyd-task70-*`临时容器均为0。未重复TASK84或删除镜像/Volume，未运行现有Compose/数据库、UAT/生产、Migration、部署或业务写。
+- 数据库/API/运行面：无Schema/Migration、普通业务API、镜像、Compose或运行面变化；只修正仓库审计对历史证据的source时态并刷新审计生成物。当前仍无V3动态artifact，TASK70保持`DOING / CLEAN COMMIT AND DYNAMIC RETRY PENDING`，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: restore TASK70 owner ACL materialization`
 
 - 失败关闭：输出上限修复`cb731df`完成敏感门并普通快进到private main后，隔离run`dv70-aazofvib`通过60秒前检、PG17.10启动和baseline物化，在任何rename前由`ROLLBACK_FIXED_EXECUTOR_POSTGRES_SECURITY_STATE_INVALID`拒绝；只读诊断run`dv70-mz485olk`把首差异固定为`$.object_acl_storage[0].acl_item_count actual=4 expected=5`。没有生成V3 artifact，任务容器、tmp根和进程均为0。

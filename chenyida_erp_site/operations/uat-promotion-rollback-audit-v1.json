@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "a9d2e03132e387dd19cde9f312f9dc05c5202e231742183c5884fe2df75ddd1d",
+  "artifact_sha256": "6aa3f2bf7f593f0cb0ea4f472f518bac1335a17e23efb1c94cb267c72147a4a3",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -234,7 +234,7 @@
   "generated_from": {
     "generator": {
       "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-      "sha256": "3e20809ca602dcc7da019987c4a0a3d0a039db19fe51dcf7079fb32e44516db5"
+      "sha256": "66c83fa5157e6b5a076088da63090efc74d46e9e4628633c2e8d52e1e5839cfd"
     },
     "policy": {
       "path": "chenyida_erp_site/operations/uat-promotion-rollback-audit-policy-v1.json",
@@ -243,9 +243,9 @@
     "release_test_inventory": {
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-      "required_tests": 238,
-      "sha256": "8b00a6cdfec0f91870bcc2aab9f24c1331a860b1999859bc4b3ab6fa7f8d4f47",
-      "total_tests": 262
+      "required_tests": 239,
+      "sha256": "bc5045f7f8ec45a9ab50fd08d7aae7381f97f33f08f7f3faafca70de9339bb4f",
+      "total_tests": 263
     },
     "source_manifest": {
       "files": [
@@ -333,7 +333,7 @@
             "0.1.0-alpha.47"
           ],
           "path": "chenyida_erp_site/package.json",
-          "sha256": "26b615a779da0c6f4c30b0a9804191853c7c74842e57ad6a78a12c091ab189b6"
+          "sha256": "19bf5556ff3f25f3e330eb2da281e1a02756a99c4263d1ab2d8c14df5f05f88b"
         },
         {
           "markers": [
@@ -341,7 +341,7 @@
             "selfhost-uat-promotion-rollback-audit.test.mjs"
           ],
           "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-          "sha256": "8b00a6cdfec0f91870bcc2aab9f24c1331a860b1999859bc4b3ab6fa7f8d4f47"
+          "sha256": "bc5045f7f8ec45a9ab50fd08d7aae7381f97f33f08f7f3faafca70de9339bb4f"
         },
         {
           "markers": [
@@ -349,7 +349,7 @@
             "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394"
           ],
           "path": "chenyida_erp_site/release/test-runtime-policy-v1.json",
-          "sha256": "02f888a4812488dc12ea00a41f3d1a21749238f0925dd7b9597452dfe316db6f"
+          "sha256": "8d86bac32d104d4934faaa9b1fc8c7396bac2bb71da2abff3e58136936b00cd2"
         },
         {
           "markers": [
@@ -444,7 +444,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "e8c59658e42a48aefa3aed68b93ee09f8b2b43847f7131e94f087885b0be5087"
+          "sha256": "a89852bfa271bae3abdce21fed5db3c315a5209e8d59b4f43eef9778e1351a40"
         },
         {
           "markers": [
@@ -571,7 +571,7 @@
             "HUMAN_CROSS_ROLE_UAT_NOT_EXECUTED"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-audit.mjs",
-          "sha256": "3e20809ca602dcc7da019987c4a0a3d0a039db19fe51dcf7079fb32e44516db5"
+          "sha256": "66c83fa5157e6b5a076088da63090efc74d46e9e4628633c2e8d52e1e5839cfd"
         },
         {
           "markers": [
@@ -581,7 +581,7 @@
             "UAT_PROMOTION_ROLLBACK_POSTVERIFY_RESULT_CONTRACT"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-contract.mjs",
-          "sha256": "d8e5ca6471f447385997cdd7a0ce86368982e422c9e8f35b032858225dedb621"
+          "sha256": "f3c000d9287237c01ffa71afb1a58dbb9e7930c4a65b4e3568d0dd710b09f9f0"
         },
         {
           "markers": [
@@ -598,7 +598,7 @@
             "uat-promotion-rollback-runtime-adapter.py"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-control.mjs",
-          "sha256": "2ceb8edeb04db858e3b9978f76febc3613f9ce56ba844fd8a1208a43c4c0a654"
+          "sha256": "0ee5aadaa3ec7610fa4b6a0ed5a0cdc905b1407e601565659e0e133f73806a8e"
         },
         {
           "markers": [
@@ -626,7 +626,7 @@
             "runtime_plan_sha256"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py",
-          "sha256": "71e4f10cff046a0dd90a7e10fcdf96520834805ddd5a7c2979cdb94a203f0cf8"
+          "sha256": "cfbff02b51f7b6e6db52560bb9fadf28bd670fb4d42ba3bc260d155b2c05fd3f"
         },
         {
           "markers": [
@@ -654,7 +654,7 @@
             "contain database, volume, or Compose mutation logic itself"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-runtime-adapter.py",
-          "sha256": "d68611af48daf32ada0a4b85aec0f24b3c04b33ac2a40fe5239cb4a3ed084e90"
+          "sha256": "45a9bc0cd17813504702a3c6dc848dfbd48053f1fb13c3d78a33c752aaf0b758"
         },
         {
           "markers": [
@@ -743,10 +743,10 @@
             "test_live_state_parser_classifies_old_new_and_partial_layouts"
           ],
           "path": "chenyida_erp_site/tests/test_uat_promotion_rollback_fixed_executor.py",
-          "sha256": "c0ae0891094b76edc974a72628b0d9d2e6eef894de24a4c00e6ec83074a832ca"
+          "sha256": "f4b0b2ea00304ae31e2244f52d796ff46400ddfab9a8f49ff99733e790596120"
         }
       ],
-      "sha256": "993c84616a71b6e7e832a4d0c0b2426fb4b96b03f250f0ec72112fcaabe4909f"
+      "sha256": "758044cf645ecdc6bf8b8593d835f19c2e713a7e71a9b6d9d76e5a8ead45fbf2"
     }
   },
   "observations": {

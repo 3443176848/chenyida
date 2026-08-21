@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { TextDecoder } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
@@ -22,6 +24,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SAFE_PATH = /^(?:chenyida_erp_site|docs)\/[A-Za-z0-9._/-]+$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Z][A-Z0-9_]{2,100}$/;
+const GIT_OBJECT = /^[0-9a-f]{40}$/;
+const MAXIMUM_DYNAMIC_SOURCE_BLOB_BYTES = 2 * 1024 * 1024;
 const ALLOWED_STATUS = new Set(["SUPPORTED", "PARTIAL", "MISSING", "CONTRACT_ONLY"]);
 const REQUIRED_STATUS = Object.freeze({
   CANDIDATE_SOURCE_SNAPSHOT: "SUPPORTED",
@@ -74,6 +78,53 @@ function error(errors, code, detail = "") {
 
 function exactSet(actual, expected) {
   return canonicalJson([...actual].sort()) === canonicalJson([...expected].sort());
+}
+
+function loadArtifactBoundDynamicSourceBodies(dynamicInputs) {
+  if (dynamicInputs.artifact === null) return dynamicInputs.sourceBodies;
+  const sourcePaths = dynamicInputs.policy?.source_paths;
+  const sourceBlobs = dynamicInputs.repositoryGit?.source_blobs;
+  if (!Array.isArray(sourcePaths) || !Array.isArray(sourceBlobs)
+    || sourcePaths.length !== sourceBlobs.length) {
+    throw new Error("TASK70_DYNAMIC_HISTORICAL_SOURCE_SET_INVALID");
+  }
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const bodies = new Map();
+  for (let index = 0; index < sourcePaths.length; index += 1) {
+    const repositoryPath = sourcePaths[index];
+    const projection = sourceBlobs[index];
+    if (typeof repositoryPath !== "string" || !SAFE_PATH.test(repositoryPath)
+      || repositoryPath.includes("..") || projection?.path !== repositoryPath
+      || !GIT_OBJECT.test(projection?.git_blob ?? "") || bodies.has(repositoryPath)) {
+      throw new Error("TASK70_DYNAMIC_HISTORICAL_SOURCE_PROJECTION_INVALID");
+    }
+    const result = spawnSync(
+      "/usr/bin/git", ["cat-file", "blob", projection.git_blob], {
+        cwd: ROOT,
+        encoding: "buffer",
+        maxBuffer: MAXIMUM_DYNAMIC_SOURCE_BLOB_BYTES,
+        timeout: 5_000,
+        shell: false,
+        env: {
+          PATH: "/usr/bin:/bin", LC_ALL: "C", LANG: "C", TZ: "UTC",
+          GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null",
+          GIT_NO_REPLACE_OBJECTS: "1", GIT_OPTIONAL_LOCKS: "0",
+          GIT_NO_LAZY_FETCH: "1", GIT_TERMINAL_PROMPT: "0",
+        },
+      },
+    );
+    if (result.error || result.status !== 0 || result.signal !== null
+      || !Buffer.isBuffer(result.stdout) || result.stdout.length < 1
+      || result.stdout.length >= MAXIMUM_DYNAMIC_SOURCE_BLOB_BYTES) {
+      throw new Error("TASK70_DYNAMIC_HISTORICAL_SOURCE_READ_FAILED");
+    }
+    try {
+      bodies.set(repositoryPath, decoder.decode(result.stdout));
+    } catch {
+      throw new Error("TASK70_DYNAMIC_HISTORICAL_SOURCE_UTF8_INVALID");
+    }
+  }
+  return bodies;
 }
 
 function extractPythonMappingKeys(source, mappingName, errors) {
@@ -148,6 +199,7 @@ function validateCapabilities(policy, sourceBodies, errors) {
 function inspectRepository(
   policy, sourceBodies, errors, dynamicEvidence = null,
   dynamicEvidenceRepositoryGit = null, dynamicEvidenceLoadError = null,
+  dynamicEvidenceSourceBodies = null,
 ) {
   const launcher = sourceBodies.get("chenyida_erp_site/scripts/release-supervisor-launcher.py") ?? "";
   const mappings = [
@@ -189,7 +241,7 @@ function inspectRepository(
       policy: JSON.parse(sourceBodies.get(
         "chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v2.json",
       ) ?? "null"),
-      sourceBodies,
+      sourceBodies: dynamicEvidenceSourceBodies ?? sourceBodies,
       repositoryGit: dynamicEvidenceRepositoryGit,
     });
   } catch (failure) {
@@ -398,7 +450,8 @@ export function buildUatPromotionRollbackAudit(inputs) {
   const {
     policy, sourceBodies, rawDigests, inventory,
     dynamicEvidence = null, dynamicEvidenceRepositoryGit = null,
-    dynamicEvidenceLoadError = null,
+    dynamicEvidenceLoadError = null, dynamicEvidenceSourceBodies = null,
+    artifactBoundDynamicEvidenceSha256 = null,
   } = inputs;
   const errors = [];
   if (policy.schema_version !== 1 || policy.contract !== UAT_PROMOTION_AUDIT_POLICY_CONTRACT || policy.authority !== "SELFHOSTED_NODE_POSTGRESQL_REPOSITORY_SOURCE" || policy.execution_class !== "AUDIT_ONLY_NOT_AUTHORIZED" || policy.deployment_class !== "UAT") error(errors, "AUDIT_POLICY_CONTRACT_INVALID");
@@ -418,6 +471,8 @@ export function buildUatPromotionRollbackAudit(inputs) {
   const observations = inspectRepository(
     policy, sourceBodies, errors, dynamicEvidence,
     dynamicEvidenceRepositoryGit, dynamicEvidenceLoadError,
+    dynamicEvidence?.artifact_sha256 === artifactBoundDynamicEvidenceSha256
+      ? dynamicEvidenceSourceBodies : null,
   );
   const incomplete = capabilities.filter((entry) => entry.status !== "SUPPORTED");
   const executionBlockers = [
@@ -486,11 +541,15 @@ export function loadUatPromotionRollbackAuditInputs() {
   const sourceBodies = new Map((policy.source_files ?? []).map((entry) => [entry.path, readRepositoryFile(entry.path)]));
   let dynamicEvidence = null;
   let dynamicEvidenceRepositoryGit = null;
+  let dynamicEvidenceSourceBodies = null;
+  let artifactBoundDynamicEvidenceSha256 = null;
   let dynamicEvidenceLoadError = null;
   try {
     const dynamicInputs = loadTask70DynamicRepositoryInputs();
     dynamicEvidence = dynamicInputs.artifact;
     dynamicEvidenceRepositoryGit = dynamicInputs.repositoryGit;
+    dynamicEvidenceSourceBodies = loadArtifactBoundDynamicSourceBodies(dynamicInputs);
+    artifactBoundDynamicEvidenceSha256 = dynamicInputs.artifact?.artifact_sha256 ?? null;
   } catch (failure) {
     dynamicEvidenceLoadError = failure?.code || failure?.message || "TASK70_DYNAMIC_EVIDENCE_LOAD_FAILED";
   }
@@ -500,6 +559,8 @@ export function loadUatPromotionRollbackAuditInputs() {
     sourceBodies,
     dynamicEvidence,
     dynamicEvidenceRepositoryGit,
+    dynamicEvidenceSourceBodies,
+    artifactBoundDynamicEvidenceSha256,
     dynamicEvidenceLoadError,
     rawDigests: { policy: sha256(policyRaw), inventory: sha256(inventoryRaw), generator: sha256(generatorRaw) },
   };
