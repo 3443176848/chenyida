@@ -11,10 +11,11 @@
 | 状态边界 | PASS / FAIL CLOSED | 已独立表达`HANDLERS_IMPLEMENTED_DORMANT`、隔离动态证明、host activation、真实UAT回退与人工UAT；当前4项阻断（P0=3、P1=1）且`PARTIAL_ONLY`不能清除 |
 | 合同/verifier | PASS / VERSIONED | 固定TEST/隔离合成、唯一case、PG17摘要、精确tmpfs/资源/对象/清理合同、六项非声明；安全文件读取及版本/Migration/source绑定通过 |
 | 机器审计 | PASS / BLOCKED AS DESIGNED | 动态artifact`867f3a7c…2f56`由Node/Git复算为`VERIFIED_PARTIAL_ONLY`；audit`a9d2e031…ddd1d`仍有4 blockers（P0=3、P1=1），`may_start=false` |
-| 自动验证 | PASS / SCOPED APPLICABLE | Python动态runner 24/24、Node审计20/20、release合同29/29、inventory262/238/24、官方凭据扫描1,784文件及生成物重放通过；共享数值golden vector覆盖`2.0`/`2`边界 |
+| 自动验证 | PASS / SCOPED APPLICABLE | Python动态runner 24/24、Node审计20/20、release合同29/29、inventory262/238/24、官方凭据扫描1,785文件及生成物重放通过；共享数值golden vector覆盖`2.0`/`2`边界 |
 | 首个动态case | PASS PARTIAL / `DV70-PG-SWITCH-01` | 单一隔离PostgreSQL 17.10中5场景/9断言通过：成功切换、OID保持、重复失败关闭、前置漂移拒绝、首rename故障回滚及调用方丢弃结果后的只读观察 |
 | 资源边界 | PASS / 180 SECOND EVIDENCE | 37样本；最低available 1,900,601,344 bytes、Swap最大6.704%且60秒增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624/67,108,864 bytes、Load1最高0.23、restart/OOM增量0 |
 | 对象/清理 | PASS / ZERO TASK RESIDUE | cleanup receipt`68ee1d20…a700`；唯一PG容器按精确ID删除，任务容器/网络/卷/tmp根/进程均为0，既有Docker对象、四服务及四个受保护卷不变 |
+| Git恢复锚点 | PASS / PRIVATE FAST-FORWARD | 官方凭据扫描后确认private main `3e30dc3`为本地祖先，6个提交普通快进至证据提交`526fd4a`；本条治理提交按同一授权继续普通快进并复核远端等于本地HEAD。未force，未推送公开origin |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不访问现有UAT数据库、受保护Volume、真实备份/凭据/业务数据，不执行host activation、Migration、部署或真实回退 |
 | 系统是否可用 | NO | 该证据不覆盖dump/Migration/ACL、文件域、Compose、host激活、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
 

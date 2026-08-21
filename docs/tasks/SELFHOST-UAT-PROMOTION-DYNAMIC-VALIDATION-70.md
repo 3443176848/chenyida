@@ -51,7 +51,8 @@ TASK70于2026-08-21正式启动为唯一`DOING`。首个提交先完成版本化
 3. 最终artifact为`root:root 0400`、单硬链接、359,133 bytes；语义SHA-256`867f3a7c2ee0b1c3ff6dc70bd167d55e76aa55ccf5969a0b6ad2923420272f56`、raw SHA-256`8e7b9c6576fe369f9264445947ece3cc94ac79832871311fa2e59296c3260f91`，独立Node/Git复算PASS。audit SHA-256`a9d2e03132e387dd19cde9f312f9dc05c5202e231742183c5884fe2df75ddd1d`仍为4 blockers、`may_start=false`。
 4. 资源证据含37样本/180秒及60秒前检：最低available 1,900,601,344 bytes、最大Swap 6.704%且rolling增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624/67,108,864 bytes、Load1最高0.23、restart/OOM增量0。cleanup receipt`68ee1d2002ed0b3c1514c7fb15cc44a38939739d51ffe5e9f428b6ad9350a700`，任务容器/网络/Volume/tmp根/进程均为0。
 5. 首次真实运行按设计暴露psql advisory-lock在错误前输出精确`\n`，以`422a26f`修复并补测试；有效旧证据因当前状态断言需改为双状态而主动失效，以`2dcc011`修复。下一次运行又由独立Node门拦截Python `2.0`/Node `2`的顶层及resource双摘要分歧，以`c793cdd`加入递归数值规范化、safe integer拒绝和Python/Node共享golden vector。两份失效artifact均在精确核验身份/摘要后删除重跑，所有失败路径零残留。
-6. 适用测试为Python24/24、Node20/20、release29/29、inventory262/238/24、官方凭据扫描1,784文件、生成物重放和diff门。该结果仅为`PASS_PARTIAL / VERIFIED_PARTIAL_ONLY`，明确不证明传输层COMMIT响应丢失、dump/Migration/ACL、文件域、Compose、host activation、真实UAT、人工UAT或生产就绪。
+6. 适用测试为Python24/24、Node20/20、release29/29、inventory262/238/24、官方凭据扫描1,785文件、生成物重放和diff门。该结果仅为`PASS_PARTIAL / VERIFIED_PARTIAL_ONLY`，明确不证明传输层COMMIT响应丢失、dump/Migration/ACL、文件域、Compose、host activation、真实UAT、人工UAT或生产就绪。
+7. 证据提交`526fd4af306441a65090f33c66cfdefc7ecfcf74`在敏感信息检查后从private main `3e30dc36a63461ed7bebe39d0b46fd8742b5dd66`普通fast-forward送达`recovery-private/main`；本条治理提交按同一授权继续普通快进。未force、未推送公开origin，且未扩大任何运行或数据权限。
 
 ## 8. 下一切片验收标准
 

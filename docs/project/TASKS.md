@@ -27,7 +27,7 @@
 
 2026-08-21 TASK70合同切片事件：版本化policy/verifier及机器审计消费路径完成，`HANDLERS_IMPLEMENTED_DORMANT`、隔离动态、host activation、真实UAT回退和人工UAT分别失败关闭；当前审计4项阻断（P0=3、P1=1），任何`PARTIAL_ONLY`证据都不能移除。断网只读Node容器内两份生成器与17/17测试通过，缺失artifact及`assert-ready`按预期拒绝；容器/镜像/Volume/四服务摘要前后一致且零任务残留。TASK70保持`DOING`，下一切片为`DV70-PG-SWITCH-01`。
 
-2026-08-21 TASK70 PG切换事件：`DV70-PG-SWITCH-01`最终在clean source`c793cdd07d2d9b5fedd63055558aed3ac90723cf`上以单一断网、只读rootfs、全tmpfs PostgreSQL 17.10容器通过5个场景和9项断言，artifact`867f3a7c…2f56`由独立Node/Git复算通过，audit`a9d2e031…ddd1d`仍保持4 blockers。首次执行发现psql advisory-lock输出含精确单换行并在零残留下失败关闭；后续跨语言门又拦截Python `2.0`/Node `2`摘要差异，均经专项测试、独立提交和重跑解决。最终资源证据为37样本/180秒、最低available 1,900,601,344 bytes、Swap增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624 bytes、Load1最高0.23、restart/OOM增量0，cleanup receipt`68ee1d20…a700`且零任务残留。TASK70保持`DOING`，下一切片为`DV70-PG-RESTORE-02`；未访问UAT/真实数据/受保护卷。
+2026-08-21 TASK70 PG切换事件：`DV70-PG-SWITCH-01`最终在clean source`c793cdd07d2d9b5fedd63055558aed3ac90723cf`上以单一断网、只读rootfs、全tmpfs PostgreSQL 17.10容器通过5个场景和9项断言，artifact`867f3a7c…2f56`由独立Node/Git复算通过，audit`a9d2e031…ddd1d`仍保持4 blockers。首次执行发现psql advisory-lock输出含精确单换行并在零残留下失败关闭；后续跨语言门又拦截Python `2.0`/Node `2`摘要差异，均经专项测试、独立提交和重跑解决。最终资源证据为37样本/180秒、最低available 1,900,601,344 bytes、Swap增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624 bytes、Load1最高0.23、restart/OOM增量0，cleanup receipt`68ee1d20…a700`且零任务残留。证据提交`526fd4a`在1,785文件官方凭据扫描后由private main `3e30dc3`普通快进接收，本条治理提交按同一授权继续普通快进；未force或推送公开origin。TASK70保持`DOING`，下一切片为`DV70-PG-RESTORE-02`；未访问UAT/真实数据/受保护卷。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 

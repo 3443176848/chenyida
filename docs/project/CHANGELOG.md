@@ -10,8 +10,9 @@
 - 动态数据库：`dv70-f2tu2jie`仅在固定摘要、本机已存在的PostgreSQL 17.10镜像中运行；`network=none`、只读rootfs、无bind/Volume、data/socket/tmp全在有界tmpfs。5个场景和9项断言验证生产`PG_RB_ATOMIC_SWITCH_V1`精确成功、数据库OID保持、重复执行失败关闭、前置漂移拒绝、首rename后故障事务回滚、调用方丢弃完成结果后的只读观察及无稳定混合布局。
 - 失败关闭修复：首次真实运行因psql在错误前输出advisory-lock的`\n`而拒绝，独立最小PG诊断确认rc=3/stdout=`0a`后新增精确合同；后续Node门拦截采样`load1: 2.0`导致的Python `2.0`/Node `2`双层摘要分歧。两份失效合成artifact均在核对owner/mode/link/inode/摘要后精确删除并重跑，没有手工改摘要或降低断言。
 - 证据/审计：最终不可变artifact为`root:root 0400`、单硬链接、359,133 bytes，语义SHA-256`867f3a7c2ee0b1c3ff6dc70bd167d55e76aa55ccf5969a0b6ad2923420272f56`、raw SHA-256`8e7b9c6576fe369f9264445947ece3cc94ac79832871311fa2e59296c3260f91`；独立Node/Git复算PASS。晋升audit SHA-256`a9d2e03132e387dd19cde9f312f9dc05c5202e231742183c5884fe2df75ddd1d`仍为4 blockers（P0=3、P1=1）和`may_start=false`。
-- 测试：Python专项24/24、Node动态审计20/20、release合同29/29、inventory262/238/24、官方凭据扫描1,784文件及`git diff --check`通过；Python/Node共享固定数值golden SHA-256`bea9d5d7…207b`，覆盖`2.0`、`-0.0`、`0.0`、`2.4`和真实Swap百分比。
+- 测试：Python专项24/24、Node动态审计20/20、release合同29/29、inventory262/238/24、官方凭据扫描1,785文件及`git diff --check`通过；Python/Node共享固定数值golden SHA-256`bea9d5d7…207b`，覆盖`2.0`、`-0.0`、`0.0`、`2.4`和真实Swap百分比。
 - 资源/清理：最终机器证据37样本/180秒、60秒前检；最低available 1,900,601,344 bytes、最大Swap 6.704%且rolling增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624/67,108,864 bytes、Load1最高0.23、restart/OOM增量0。cleanup receipt`68ee1d20…a700`，任务容器/网络/Volume/tmp根/进程全部为0，常驻四服务及四个受保护卷不变。
+- Git恢复锚点：证据提交`526fd4af306441a65090f33c66cfdefc7ecfcf74`在敏感信息检查后，从已证明为本地祖先的private main `3e30dc36a63461ed7bebe39d0b46fd8742b5dd66`普通fast-forward送达`recovery-private/main`；本条治理提交按同一授权继续普通快进并复核远端与本地HEAD一致。未force、未推送公开origin或改写历史。
 - 数据库/API/运行面：无Schema、Migration、业务API、镜像、Compose或运行UAT变化；没有连接UAT数据库、读取受保护卷/真实备份/凭据或执行业务写。结果仅为`PASS_PARTIAL / VERIFIED_PARTIAL_ONLY`，TASK70保持`DOING`并转入`DV70-PG-RESTORE-02`，系统继续`PRODUCTION NO-GO`。
 
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `test: add fail-closed TASK70 dynamic evidence contract`
