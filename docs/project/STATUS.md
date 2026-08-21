@@ -2,21 +2,21 @@
 
 最后更新时间：2026-08-21（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；动态证据合同已通过）
+## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；首个PG机制动态证据已通过）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / DYNAMIC EVIDENCE CONTRACT VERIFIED / DV70-PG-SWITCH-01 NEXT / PRODUCTION NO-GO | 当前唯一DOING；首个仓库合同切片已通过，下一切片运行单容器PG17原子切换机制验证 |
+| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-RESTORE-02 NEXT / PRODUCTION NO-GO | 当前唯一DOING；单容器PG17原子切换机制已通过，下一切片验证隔离dump/Migration/ACL恢复边界 |
 | 只读审计 | PASS / THREE LINES | 数据、应用测试、运维安全三线均确认现有动态runner/receipt消费路径缺失，且完整Compose与单临时容器硬规则冲突 |
 | 状态边界 | PASS / FAIL CLOSED | 已独立表达`HANDLERS_IMPLEMENTED_DORMANT`、隔离动态证明、host activation、真实UAT回退与人工UAT；当前4项阻断（P0=3、P1=1）且`PARTIAL_ONLY`不能清除 |
 | 合同/verifier | PASS / VERSIONED | 固定TEST/隔离合成、唯一case、PG17摘要、精确tmpfs/资源/对象/清理合同、六项非声明；安全文件读取及版本/Migration/source绑定通过 |
-| 机器审计 | PASS / BLOCKED AS DESIGNED | audit artifact self-digest`b6b3c244…58d4b`、4 blockers；动态artifact缺失返回`TASK70_DYNAMIC_ARTIFACT_NOT_EXECUTED`，`assert-ready`返回`UAT_PROMOTION_EXECUTOR_NOT_READY` |
-| 自动验证 | PASS / 17 OF 17 | 两份生成器逐字节重放、policy verify、合法PARTIAL与篡改/弱化/数值漂移失败关闭测试全部通过；inventory为262/238/24且摘要已级联 |
-| 首个动态case | PENDING / `DV70-PG-SWITCH-01` | 只证明生产生成SQL在单一隔离PostgreSQL 17中的原子切换、事务失败和结果未知只读判定 |
-| 资源边界 | PASS FOR CONTRACT / PG STILL GATED | 合同测试后available约1.8GiB、Swap48MiB/1GiB、根盘约10.74GiB、Load1 0.61；PG运行前仍须新鲜60/180秒门和64MiB最坏增量 |
-| 对象/清理 | PASS / ZERO TASK RESIDUE | 断网只读Node容器串行运行；前后容器、镜像、Volume、四服务摘要一致，无任务容器/网络/卷/临时目录残留，四服务稳定 |
+| 机器审计 | PASS / BLOCKED AS DESIGNED | 动态artifact`867f3a7c…2f56`由Node/Git复算为`VERIFIED_PARTIAL_ONLY`；audit`a9d2e031…ddd1d`仍有4 blockers（P0=3、P1=1），`may_start=false` |
+| 自动验证 | PASS / SCOPED APPLICABLE | Python动态runner 24/24、Node审计20/20、release合同29/29、inventory262/238/24、官方凭据扫描1,784文件及生成物重放通过；共享数值golden vector覆盖`2.0`/`2`边界 |
+| 首个动态case | PASS PARTIAL / `DV70-PG-SWITCH-01` | 单一隔离PostgreSQL 17.10中5场景/9断言通过：成功切换、OID保持、重复失败关闭、前置漂移拒绝、首rename故障回滚及调用方丢弃结果后的只读观察 |
+| 资源边界 | PASS / 180 SECOND EVIDENCE | 37样本；最低available 1,900,601,344 bytes、Swap最大6.704%且60秒增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624/67,108,864 bytes、Load1最高0.23、restart/OOM增量0 |
+| 对象/清理 | PASS / ZERO TASK RESIDUE | cleanup receipt`68ee1d20…a700`；唯一PG容器按精确ID删除，任务容器/网络/卷/tmp根/进程均为0，既有Docker对象、四服务及四个受保护卷不变 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不访问现有UAT数据库、受保护Volume、真实备份/凭据/业务数据，不执行host activation、Migration、部署或真实回退 |
-| 系统是否可用 | NO | 首个PG case及其余动态矩阵、host激活、真实恢复/迁移、人工UAT、员工试运行和正式切换均未闭合 |
+| 系统是否可用 | NO | 该证据不覆盖dump/Migration/ACL、文件域、Compose、host激活、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
 
 ## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（完成；BuildKit限定清理与清理后门通过）
 

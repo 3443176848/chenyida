@@ -4,7 +4,7 @@
 
 ## 1. 审计结论
 
-- artifact SHA-256：`b75b16f08d93958a3853bc4c8b35f8de0b012e675721dbb23628195174dfccd7`
+- artifact SHA-256：`a9d2e03132e387dd19cde9f312f9dc05c5202e231742183c5884fe2df75ddd1d`
 - source manifest SHA-256：`993c84616a71b6e7e832a4d0c0b2426fb4b96b03f250f0ec72112fcaabe4909f`（45文件）
 - release inventory SHA-256：`8b00a6cdfec0f91870bcc2aab9f24c1331a860b1999859bc4b3ab6fa7f8d4f47`（262项）
 - 执行判定：`UAT_PROMOTION_EXECUTOR_NOT_READY`；检查点缺口=0，全部阻塞=4，P0=3，P1=1，may_start=`false`。
@@ -50,7 +50,7 @@
 - 晋升终态事务：`SUPERVISOR_CHECKPOINT_13_AGGREGATED_AND_RECOVERABLE`；checkpoint 13以独立一次性授权聚合checkpoint 4—12 receipt、evidence、intent和authorization链，最终证据绑定checkpoint 12完整result摘要；不释放数据库或备份保护，也不声明checkpoint 14/15回退就绪。
 - 回退事务：`SUPERVISOR_CHECKPOINT_14_15_CONTENT_ADDRESSED_AND_RECOVERABLE`；checkpoint 14逐阶段先写intent再调用适配器并绑定精确前代，checkpoint 15用独立授权逐项核验后只允许写入ROLLED_BACK；partial/unknown只能隔离，恢复不得重跑阶段。
 - 回退运行时：`BUNDLED_FIXED_EXECUTOR_AND_RECOVERABLE_ACTIVATION_PROTOCOL_HANDLERS_IMPLEMENTED_DORMANT_CATALOG_BLOCKED_HOST_NOT_ACTIVATED`；仓库handler为`HANDLERS_IMPLEMENTED_DORMANT`，生产catalog仍失败关闭，且没有受信host activation回执。
-- 隔离动态证明：`NOT_EXECUTED_NO_VERIFIED_RECEIPT`；clearance=`PARTIAL_ONLY`，已验证case=`NONE`。PARTIAL_ONLY不得关闭动态、host或真实UAT阻断。
+- 隔离动态证明：`VERIFIED_PARTIAL_ONLY`；clearance=`PARTIAL_ONLY`，已验证case=`DV70-PG-SWITCH-01`。PARTIAL_ONLY不得关闭动态、host或真实UAT阻断。
 - 真实UAT回退演练：`NOT_EXECUTED_NO_TRUSTED_UAT_RECEIPT`；fake-root或隔离合成自动测试不是UAT恢复或回退证据。
 - Writer静默回执只覆盖精确Compose项目与working directory；checkpoint 8在SQL前重验静默并以数据库级围栏拒绝未标记或外部业务客户端，围栏保持至后续部署或保全恢复接管。
 - TASK67人工UAT状态：`BLOCKED`。

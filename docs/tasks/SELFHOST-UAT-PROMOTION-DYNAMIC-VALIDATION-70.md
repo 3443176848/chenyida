@@ -1,6 +1,6 @@
 # SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 UAT晋升与回滚隔离动态验证
 
-> 状态：`DOING / DYNAMIC EVIDENCE CONTRACT VERIFIED / DV70-PG-SWITCH-01 NEXT / ISOLATED SYNTHETIC ONLY / PRODUCTION NO-GO`
+> 状态：`DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-RESTORE-02 NEXT / ISOLATED SYNTHETIC ONLY / PRODUCTION NO-GO`
 > 日期：2026-08-21（Asia/Shanghai）
 > 责任：Codex主智能体串行调度；项目负责人保留任何UAT/生产、真实数据、host和凭据动作的专项授权
 
@@ -36,18 +36,28 @@ TASK70于2026-08-21正式启动为唯一`DOING`。首个提交先完成版本化
 
 2026-08-21首个仓库切片已通过，TASK70本身仍为`DOING`：
 
-- 新增`uat-promotion-dynamic-validation-policy-v1.json`与失败关闭verifier，固定`ISOLATED_SYNTHETIC_ONLY`、`TEST`、`PARTIAL_ONLY`、唯一case、PG17镜像摘要、单容器限制、精确tmpfs、64MiB宿主磁盘增量上界、资源硬门、对象指纹、零残留和六项明确非声明。
+- 新增`uat-promotion-dynamic-validation-policy-v2.json`与失败关闭verifier，固定`ISOLATED_SYNTHETIC_ONLY`、`TEST`、`PARTIAL_ONLY`、唯一case、PG17镜像摘要、单容器限制、精确tmpfs、64MiB宿主磁盘增量上界、资源硬门、对象指纹、零残留和六项明确非声明。
 - 证据读取使用`O_NOFOLLOW`、普通文件/单硬链接/大小/权限门和读取前后inode/mtime/ctime复核；版本号与Migration head绑定真实`package.json`及`0046_runtime_lock_privilege_boundary.sql`，资源字段类型、端点、计数和峰值必须交叉一致。
 - 晋升审计已把`HANDLERS_IMPLEMENTED_DORMANT`、隔离动态证据、host activation、真实UAT回退及人工UAT分别表达；当前固定为4项阻断（P0=3、P1=1），`PARTIAL_ONLY`回执不能移除任何一项。
-- 断网、只读rootfs、384MiB/1 CPU/128 PIDs的既有Node镜像容器中，两份生成器重放及17/17专项测试通过；动态artifact缺失和`assert-ready`分别稳定返回`TASK70_DYNAMIC_ARTIFACT_NOT_EXECUTED`与`UAT_PROMOTION_EXECUTOR_NOT_READY`。
+- 断网、只读rootfs、受限Node镜像容器中，两份生成器重放、Python24/24、Node动态审计20/20、release29/29及inventory262/238/24通过；动态artifact缺失和`assert-ready`分别稳定返回`TASK70_DYNAMIC_ARTIFACT_NOT_EXECUTED`与`UAT_PROMOTION_EXECUTOR_NOT_READY`。
 - 运行前后全局容器、镜像、Volume与四服务集合摘要完全相同；无任务容器、网络、Volume、临时目录或进程残留。available约1.8GiB、Swap 48MiB/1GiB、根盘约10.74GiB、Load1 0.61，四服务稳定且无restart/OOM变化。
 
-## 7. 下一切片验收标准
+## 7. `DV70-PG-SWITCH-01`验收结果
 
-下一提交只实现并运行`DV70-PG-SWITCH-01`：
+2026-08-21该case在最终source`c793cdd07d2d9b5fedd63055558aed3ac90723cf`、tree`c7453b28db2db46c4bc7483a4176354195131478`上通过，范围仍严格为隔离合成：
 
-1. 仅使用本机已存在的固定摘要PostgreSQL 17镜像，不build、不pull、`network=none`、只读rootfs、全部数据/socket/temp位于有界tmpfs，不挂载任何Volume。
-2. 原样执行现有executor生成的生产`PG_RB_ATOMIC_SWITCH_V1`成功SQL，并验证新库封存、数据库OID保持和重复执行失败关闭。
-3. 覆盖前置漂移拒绝、首个rename后固定故障触发事务回滚、命令精确完成后调用方丢弃结果并仅做只读观察，以及任何时点都不存在持久混合布局；明确不声称已经证明传输层COMMIT响应丢失或生产运行时恢复路径。
-4. 运行前后完成至少60秒Swap窗口、180秒Load停止线监控、OOM/restart、根盘64MiB上界及全局Docker/保护对象指纹；只按精确任务label/ID清理并生成机器收据。
-5. 结果最多形成`VERIFIED_PARTIAL_ONLY`，不得声称九阶段/十三检查、host activation、真实UAT、人工UAT或生产就绪。
+1. 最终运行`dv70-f2tu2jie`只使用本机已存在的固定摘要PostgreSQL 17.10镜像；`network=none`、只读rootfs、全部data/socket/tmp为有界tmpfs，无bind、Volume、build或pull。
+2. 生产executor生成的`PG_RB_ATOMIC_SWITCH_V1`按原始SQL执行；`EXACT_SUCCESS`、`REPEAT_FAIL_CLOSED`、`PRECONDITION_DRIFT_REJECTED`、`FIRST_RENAME_FAULT_ROLLBACK`和`CALLER_RESULT_DISCARDED_AFTER_EXACT_COMMAND_COMPLETION_READ_ONLY_OBSERVATION`五个场景通过。九项断言覆盖生产SQL摘要、NEW_SEALED、OID保持、重复失败关闭、漂移拒绝、首rename故障事务回滚、调用方丢弃结果后的只读观察、无稳定混合布局及既有运行面/保护卷不变。
+3. 最终artifact为`root:root 0400`、单硬链接、359,133 bytes；语义SHA-256`867f3a7c2ee0b1c3ff6dc70bd167d55e76aa55ccf5969a0b6ad2923420272f56`、raw SHA-256`8e7b9c6576fe369f9264445947ece3cc94ac79832871311fa2e59296c3260f91`，独立Node/Git复算PASS。audit SHA-256`a9d2e03132e387dd19cde9f312f9dc05c5202e231742183c5884fe2df75ddd1d`仍为4 blockers、`may_start=false`。
+4. 资源证据含37样本/180秒及60秒前检：最低available 1,900,601,344 bytes、最大Swap 6.704%且rolling增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624/67,108,864 bytes、Load1最高0.23、restart/OOM增量0。cleanup receipt`68ee1d2002ed0b3c1514c7fb15cc44a38939739d51ffe5e9f428b6ad9350a700`，任务容器/网络/Volume/tmp根/进程均为0。
+5. 首次真实运行按设计暴露psql advisory-lock在错误前输出精确`\n`，以`422a26f`修复并补测试；有效旧证据因当前状态断言需改为双状态而主动失效，以`2dcc011`修复。下一次运行又由独立Node门拦截Python `2.0`/Node `2`的顶层及resource双摘要分歧，以`c793cdd`加入递归数值规范化、safe integer拒绝和Python/Node共享golden vector。两份失效artifact均在精确核验身份/摘要后删除重跑，所有失败路径零残留。
+6. 适用测试为Python24/24、Node20/20、release29/29、inventory262/238/24、官方凭据扫描1,784文件、生成物重放和diff门。该结果仅为`PASS_PARTIAL / VERIFIED_PARTIAL_ONLY`，明确不证明传输层COMMIT响应丢失、dump/Migration/ACL、文件域、Compose、host activation、真实UAT、人工UAT或生产就绪。
+
+## 8. 下一切片验收标准
+
+下一切片固定为`DV70-PG-RESTORE-02`，仍属于同一TASK70且只允许隔离合成：
+
+1. 先只读映射现有PostgreSQL staging restore handler、46项Migration allowlist/ledger、目标角色/ACL/default privilege及失败保全路径，形成版本化case和独立失败关闭证据合同；不得把`DV70-PG-SWITCH-01`外推为完整数据库恢复。
+2. 只使用本机固定摘要镜像、单一任务容器、断网/只读rootfs/有界tmpfs、无bind/Volume、无build/pull；先证明最坏磁盘和内存上界并通过新鲜60/180秒资源门。
+3. 合成dump必须去敏且可丢弃，覆盖空目标/已有目标、Migration ledger 0001—0046、角色与schema/table/default privileges、失败回滚、重复执行和只读reconciliation；不得连接UAT/生产或读取真实备份正文。
+4. 证据继续最多为`PARTIAL_ONLY`，必须保留host activation、真实UAT回退、人工UAT和生产阻断；任何source、镜像、Migration、资源或清理漂移均失败关闭。

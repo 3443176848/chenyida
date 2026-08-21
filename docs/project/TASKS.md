@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`。版本化动态证据合同、失败关闭verifier、四类运行状态拆分及17/17专项验证已通过；下一切片在新鲜60/180秒资源门与64MiB磁盘上界通过后运行单一隔离PostgreSQL 17容器case。真实备份恢复、A1—A8、外部锚点、host activation、UAT/生产、受保护Volume正文和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`。版本化动态证据合同及`DV70-PG-SWITCH-01`已通过，最终artifact`867f3a7c…2f56`由Node/Git复算为`VERIFIED_PARTIAL_ONLY`；机器审计仍有4项阻断（P0=3、P1=1）。下一切片为隔离`DV70-PG-RESTORE-02`，覆盖dump/Migration ledger/角色ACL恢复边界。真实备份恢复、A1—A8、外部锚点、host activation、UAT/生产、受保护Volume正文和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-16调度事件：`SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82 DOING → DONE`。D-157固定逐副作用耐久回执、派生数据库/卷身份、commit-before-receipt只读恢复、精确前代镜像与live postverify；source`c2f071c`→manifest-only`aa77732`形成156文件canonical bundle`3674e011…35fb`。轻量组合201/201、manifest后installer21/21、inventory262/238/24及三路只读复核通过。未运行真实PG/Volume/Compose/恢复/回退，catalog与TASK70继续失败关闭。
 
@@ -26,6 +26,8 @@
 2026-08-21 TASK70调度事件：主智能体从零`DOING`正式执行`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 TODO → DOING`。三条智能体线只读复核应用测试、数据迁移和运维安全边界，确认首个提交必须先建立机器动态证据合同并拆分handler实现、隔离证明、host activation和真实UAT回退状态；首个重切片固定为单容器`DV70-PG-SWITCH-01`。不接触现有UAT数据库、四个受保护卷、真实备份、凭据或业务数据。
 
 2026-08-21 TASK70合同切片事件：版本化policy/verifier及机器审计消费路径完成，`HANDLERS_IMPLEMENTED_DORMANT`、隔离动态、host activation、真实UAT回退和人工UAT分别失败关闭；当前审计4项阻断（P0=3、P1=1），任何`PARTIAL_ONLY`证据都不能移除。断网只读Node容器内两份生成器与17/17测试通过，缺失artifact及`assert-ready`按预期拒绝；容器/镜像/Volume/四服务摘要前后一致且零任务残留。TASK70保持`DOING`，下一切片为`DV70-PG-SWITCH-01`。
+
+2026-08-21 TASK70 PG切换事件：`DV70-PG-SWITCH-01`最终在clean source`c793cdd07d2d9b5fedd63055558aed3ac90723cf`上以单一断网、只读rootfs、全tmpfs PostgreSQL 17.10容器通过5个场景和9项断言，artifact`867f3a7c…2f56`由独立Node/Git复算通过，audit`a9d2e031…ddd1d`仍保持4 blockers。首次执行发现psql advisory-lock输出含精确单换行并在零残留下失败关闭；后续跨语言门又拦截Python `2.0`/Node `2`摘要差异，均经专项测试、独立提交和重跑解决。最终资源证据为37样本/180秒、最低available 1,900,601,344 bytes、Swap增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624 bytes、Load1最高0.23、restart/OOM增量0，cleanup receipt`68ee1d20…a700`且零任务残留。TASK70保持`DOING`，下一切片为`DV70-PG-RESTORE-02`；未访问UAT/真实数据/受保护卷。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -233,7 +235,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 | UAT晋升与回滚隔离动态验证 | DOING | Codex主智能体（唯一写入、串行重任务）、三条只读审计智能体、项目负责人（保留真实环境授权） | 2026-08-21 | TASK82、TASK84均已完成 | `DOING / DYNAMIC EVIDENCE CONTRACT VERIFIED / DV70-PG-SWITCH-01 NEXT / PRODUCTION NO-GO`。九阶段/十三检查合同、资源/对象/清理收据、四类阻断拆分及17/17专项验证通过；下一切片只运行不会跌破根盘10GiB硬线的单容器PostgreSQL原子切换case。不授权UAT/生产。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70.md)。 |
+| SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 | UAT晋升与回滚隔离动态验证 | DOING | Codex主智能体（唯一写入、串行重任务）、三条只读审计智能体、项目负责人（保留真实环境授权） | 2026-08-21 | TASK82、TASK84均已完成 | `DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-RESTORE-02 NEXT / PRODUCTION NO-GO`。最终artifact`867f3a7c…2f56`验证单容器PG17原子切换机制，Python24/24、Node20/20、release29/29及inventory262/238/24通过；audit仍有4 blockers。下一切片只在隔离合成边界验证dump/Migration/ACL，不授权UAT/生产。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70.md)。 |
 
 ## 已完成任务
 

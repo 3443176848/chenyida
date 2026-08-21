@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "b75b16f08d93958a3853bc4c8b35f8de0b012e675721dbb23628195174dfccd7",
+  "artifact_sha256": "a9d2e03132e387dd19cde9f312f9dc05c5202e231742183c5884fe2df75ddd1d",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -199,7 +199,7 @@
   "deployment_class": "UAT",
   "execution_blockers": [
     {
-      "finding": "尚无通过版本化合同和清理门的隔离动态回退证据；仓库单元测试不能替代真实引擎动态证明。",
+      "finding": "已验证的隔离合成case仅为PARTIAL_ONLY，不能代表九阶段、十三检查与全部故障窗口完成。",
       "id": "ISOLATED_ROLLBACK_DYNAMIC_VALIDATION_NOT_VERIFIED",
       "severity": "P0"
     },
@@ -779,9 +779,11 @@
       "ROLLBACK_UAT_ROLLBACK_RUNTIME_V2",
       "RECOVER_UAT_ROLLBACK_RUNTIME_V2_ACTIVATION"
     ],
-    "isolated_dynamic_artifact_sha256": null,
-    "isolated_dynamic_validation": "NOT_EXECUTED_NO_VERIFIED_RECEIPT",
-    "isolated_dynamic_verified_case_ids": [],
+    "isolated_dynamic_artifact_sha256": "867f3a7c2ee0b1c3ff6dc70bd167d55e76aa55ccf5969a0b6ad2923420272f56",
+    "isolated_dynamic_validation": "VERIFIED_PARTIAL_ONLY",
+    "isolated_dynamic_verified_case_ids": [
+      "DV70-PG-SWITCH-01"
+    ],
     "migration_authorization": "SUPERVISOR_ONE_TIME_EXECUTION_DATABASE_FENCED",
     "missing_required_promotion_operations": [],
     "postdeploy_transaction_binding": "SUPERVISOR_CHECKPOINT_10_11_CONTENT_ADDRESSED_AND_RECOVERABLE",
