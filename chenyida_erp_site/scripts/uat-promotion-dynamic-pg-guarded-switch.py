@@ -37,7 +37,7 @@ EXECUTOR_PATH = SITE_ROOT / "scripts/uat-promotion-rollback-fixed-executor.py"
 FIXTURE_PATH = SITE_ROOT / "tests/test_uat_promotion_rollback_fixed_executor.py"
 MIGRATION_ROOT = SITE_ROOT / "drizzle-postgres"
 DOCKER = "/usr/bin/docker"
-POLICY_EXPECTED_SHA256 = "90188fadc024e62912c5c6cfc85e97f254757ee274aba1e8bb55bd2c6e951d12"
+POLICY_EXPECTED_SHA256 = "87cadfcfa6c30e167426b6aeed12c7b4b1ce07f50f6dad2b577a3ac792e6bd50"
 CASE_ID = "DV70-PG-GUARDED-SWITCH-02"
 FAULT_BARRIER = "DV70_V3_FIRST_RENAME_REACHED"
 FIXED_EXECUTION_RECEIPT_CONTRACT = \
@@ -46,7 +46,9 @@ FIXED_EXECUTION_ENVIRONMENT = {
     "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
     "LC_ALL": "C", "LANG": "C", "TZ": "UTC", "HOME": "/nonexistent",
 }
+SQL_EVIDENCE_MAX_BYTES = 1024 * 1024
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
+HEX_IDENTIFIER = re.compile(r"^(?:[0-9a-f]{2}){1,4096}$")
 OID = re.compile(r"^[1-9][0-9]{3,9}$")
 CONTAINER_ID = re.compile(r"^[0-9a-f]{64}$")
 
@@ -150,14 +152,134 @@ def sql_normalization_roots(
     }
 
 
-def normalize_sql(raw: bytes, roots: dict[str, Any]) -> bytes:
-    code = "TASK70_V3_SQL_NORMALIZATION_INVALID"
+def content_report_hex_literals(
+        roots: dict[str, Any], code: str,
+) -> tuple[set[str], set[str]]:
+    try:
+        rows = roots["fixture"].get("content_report_rows")
+    except (AttributeError, KeyError, TypeError) as error:
+        raise DynamicGuardedSwitchError(code) from error
+    if rows is None:
+        return set(), set()
+    if not isinstance(rows, list):
+        reject(code)
+    literals: set[str] = set()
+    paths: set[str] = set()
+    seen: set[tuple[str, str]] = set()
+    large_objects = 0
+    for row_index, fields in enumerate(rows):
+        if not isinstance(fields, list) or any(
+                not isinstance(field, str) for field in fields
+        ):
+            reject(code)
+        kind = fields[0] if fields else ""
+        identity = fields[1] if len(fields) > 1 else ""
+        if kind == "RELATION" and len(fields) == 4:
+            valid = HEX_IDENTIFIER.fullmatch(identity) is not None \
+                and re.fullmatch(r"[0-9]+", fields[2]) is not None \
+                and SHA256.fullmatch(fields[3]) is not None
+            values = [identity]
+            value_indexes = [1]
+        elif kind == "SEQUENCE" and len(fields) == 4:
+            valid = HEX_IDENTIFIER.fullmatch(identity) is not None \
+                and re.fullmatch(r"-?[0-9]+", fields[2]) is not None \
+                and fields[3] in {"true", "false", "t", "f"}
+            values = [identity]
+            value_indexes = [1]
+        elif kind == "EXTENSION" and len(fields) == 4:
+            valid = all(HEX_IDENTIFIER.fullmatch(field) is not None
+                        for field in fields[1:])
+            values = fields[1:]
+            value_indexes = [1, 2, 3]
+        elif kind == "LARGE_OBJECTS" and len(fields) == 4:
+            large_objects += 1
+            valid = large_objects == 1 \
+                and re.fullmatch(r"[0-9]+", fields[1]) is not None \
+                and re.fullmatch(r"[0-9]+", fields[2]) is not None \
+                and SHA256.fullmatch(fields[3]) is not None
+            values = []
+            value_indexes = []
+        else:
+            valid = False
+            values = []
+            value_indexes = []
+        row_identity = (kind, identity)
+        if not valid or row_identity in seen:
+            reject(code)
+        seen.add(row_identity)
+        literals.update(values)
+        paths.update(
+            f"roots.fixture.content_report_rows[{row_index}][{field_index}]"
+            for field_index in value_indexes
+        )
+    if large_objects != 1:
+        reject(code)
+    return literals, paths
+
+
+def replace_special_sql_slots(
+        text: str, roots: dict[str, Any], sql_kind: str, code: str,
+) -> str:
+    if sql_kind == "GENERIC":
+        return text
+    if sql_kind not in {"RECONCILIATION", "PRODUCTION"}:
+        reject(code)
+    try:
+        base = roots["base"]
+        system_identifier = base["postgres"]["system_identifier"]
+        databases = base["databases"]
+        candidate_oid = databases["candidate_oid"]
+        restored_oid = roots["fixture"]["restored_oid"]
+    except (KeyError, TypeError) as error:
+        raise DynamicGuardedSwitchError(code) from error
+    values = (system_identifier, candidate_oid, restored_oid)
+    if any(not isinstance(value, str) or not value for value in values):
+        reject(code)
+
+    def replace_one(pattern: str, label: str) -> None:
+        nonlocal text
+        matched = list(re.finditer(pattern, text))
+        if len(matched) != 1:
+            reject(code)
+        start, end = matched[0].span("value")
+        text = text[:start] + f"{{{{DV70:{label}}}}}" + text[end:]
+
+    replace_one(
+        rf"pg_control_system\(\)\)\s*<>\s*'"
+        rf"(?P<value>{re.escape(system_identifier)})'",
+        "SYSTEM_IDENTIFIER",
+    )
+    replace_one(
+        rf"d\.datname='{re.escape(databases['staging_name'])}' AND "
+        rf"d\.oid::text='(?P<value>{re.escape(restored_oid)})'",
+        "RESTORED_OID",
+    )
+    if sql_kind == "PRODUCTION":
+        replace_one(
+            rf"d\.datname='{re.escape(databases['active_name'])}' AND "
+            rf"d\.oid::text='(?P<value>{re.escape(candidate_oid)})'",
+            "CANDIDATE_OID",
+        )
+        replace_one(
+            rf'"target":\{{"database_oid":"'
+            rf'(?P<value>{re.escape(restored_oid)})","marker_sha256":',
+            "RESTORED_OID",
+        )
+    return text
+
+
+def normalize_sql(
+        raw: bytes, roots: dict[str, Any],
+        code: str = "TASK70_V3_SQL_NORMALIZATION_INVALID",
+        sql_kind: str = "GENERIC",
+) -> bytes:
     try:
         text = raw.decode("utf-8", "strict")
     except (AttributeError, UnicodeError) as error:
         raise DynamicGuardedSwitchError(code) from error
     if not text.endswith("\n") or "\x00" in text or "{{DV70:" in text:
         reject(code)
+    content_hex, content_hex_paths = content_report_hex_literals(roots, code)
     labels: dict[str, set[str]] = {}
 
     def collect(value: Any, path: str) -> None:
@@ -167,39 +289,73 @@ def normalize_sql(raw: bytes, roots: dict[str, Any]) -> bytes:
         elif isinstance(value, list):
             for index, child in enumerate(value):
                 collect(child, f"{path}[{index}]")
-        elif isinstance(value, str) and SHA256.fullmatch(value):
+        elif isinstance(value, str) and SHA256.fullmatch(value) \
+                and path not in content_hex_paths:
             labels.setdefault(value, set()).add(path)
 
     collect(roots, "roots")
-    special = {
-        roots["base"]["postgres"]["system_identifier"]: "SYSTEM_IDENTIFIER",
-        roots["base"]["databases"]["candidate_oid"]: "CANDIDATE_OID",
-        roots["fixture"]["restored_oid"]: "RESTORED_OID",
+    protected_values = sorted(item for item in content_hex if len(item) >= 64)
+    protected_by_value = {
+        value: f"{{{{DV70:CONTENT_HEX_LITERAL:{index}}}}}"
+        for index, value in enumerate(protected_values)
     }
+    text = re.sub(
+        r"(?P<quote>['\"])(?P<value>[0-9a-f]{64,})(?P=quote)",
+        lambda matched: matched.group("quote") + protected_by_value.get(
+            matched.group("value"), matched.group("value"),
+        ) + matched.group("quote"),
+        text,
+    )
+    text = replace_special_sql_slots(text, roots, sql_kind, code)
     replacements: dict[str, str] = {}
     for value, paths in labels.items():
         if value == EXECUTOR.ZERO_SHA256:
             label = "ZERO_SHA256"
         elif value == digest_bytes(b""):
             label = "EMPTY_SHA256"
+        elif len(paths) > 1:
+            label = (
+                f"PATH_SET_{len(paths)}_SHA256_"
+                f"{digest_value(sorted(paths)).upper()}"
+            )
         else:
-            label = "|".join(sorted(paths))
+            label = next(iter(paths))
         replacements[value] = f"{{{{DV70:{label}}}}}"
-    for value, label in special.items():
-        if not isinstance(value, str) or not value:
+    text = re.sub(
+        r"(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])",
+        lambda matched: replacements.get(matched.group(0), matched.group(0)),
+        text,
+    )
+    text = re.sub(
+        r"\{\{DV70:CONTENT_HEX_LITERAL:([0-9]+)\}\}",
+        lambda matched: protected_values[int(matched.group(1))]
+        if int(matched.group(1)) < len(protected_values) else reject(code),
+        text,
+    )
+    for matched in re.finditer(r"[0-9a-f]{64,}", text):
+        value = matched.group(0)
+        quoted = matched.start() > 0 and matched.end() < len(text) \
+            and text[matched.start() - 1] in {"'", '"'} \
+            and text[matched.end()] == text[matched.start() - 1]
+        if not quoted or value not in content_hex:
             reject(code)
-        replacements[value] = f"{{{{DV70:{label}}}}}"
-    for value in sorted(replacements, key=lambda item: (-len(item), item)):
-        text = text.replace(value, replacements[value])
-    if re.search(r"[0-9a-f]{64}", text) \
-            or any(value in text for value in special):
-        reject(code)
     return text.encode("utf-8")
 
 
-def compressed_sql_evidence(raw: bytes, roots: dict[str, Any]) -> dict[str, Any]:
-    normalized = normalize_sql(raw, roots)
+def compressed_sql_evidence(
+        raw: bytes, roots: dict[str, Any],
+        code: str = "TASK70_V3_SQL_NORMALIZATION_INVALID",
+        sql_kind: str = "GENERIC",
+) -> dict[str, Any]:
+    if not isinstance(raw, bytes) \
+            or not 1 <= len(raw) <= SQL_EVIDENCE_MAX_BYTES:
+        reject(code)
+    normalized = normalize_sql(raw, roots, code, sql_kind)
+    if not 1 <= len(normalized) <= SQL_EVIDENCE_MAX_BYTES:
+        reject(code)
     compressed = gzip.compress(raw, compresslevel=9, mtime=0)
+    if not 1 <= len(compressed) <= SQL_EVIDENCE_MAX_BYTES:
+        reject(code)
     body = {
         "encoding": "GZIP_BASE64_MTIME_ZERO",
         "uncompressed_bytes": len(raw),
@@ -210,6 +366,18 @@ def compressed_sql_evidence(raw: bytes, roots: dict[str, Any]) -> dict[str, Any]
         "gzip_base64": base64.b64encode(compressed).decode("ascii"),
     }
     return {**body, "sql_evidence_sha256": digest_value(body)}
+
+
+def validate_primary_sql_normalization(
+        policy: dict[str, Any], reconciliation: dict[str, Any],
+        production: dict[str, Any],
+) -> None:
+    if reconciliation.get("normalized_sha256") \
+            != policy["sql_evidence"]["reconciliation_normalized_sha256"]:
+        reject("TASK70_V3_RECONCILIATION_SQL_NORMALIZATION_INVALID")
+    if production.get("normalized_sha256") \
+            != policy["sql_evidence"]["production_normalized_sha256"]:
+        reject("TASK70_V3_PRODUCTION_SQL_NORMALIZATION_INVALID")
 
 
 def secure_json(path: Path, code: str) -> dict[str, Any]:
@@ -2609,13 +2777,17 @@ def run_business_case(
         )
         reconciliation_sql_evidence = compressed_sql_evidence(
             reconciliation_sql, sql_roots,
+            "TASK70_V3_RECONCILIATION_SQL_NORMALIZATION_INVALID",
+            "RECONCILIATION",
         )
-        production_sql_evidence = compressed_sql_evidence(guarded_sql, sql_roots)
-        if reconciliation_sql_evidence["normalized_sha256"] \
-                != policy["sql_evidence"]["reconciliation_normalized_sha256"] \
-                or production_sql_evidence["normalized_sha256"] \
-                != policy["sql_evidence"]["production_normalized_sha256"]:
-            reject("TASK70_V3_SQL_NORMALIZATION_INVALID")
+        production_sql_evidence = compressed_sql_evidence(
+            guarded_sql, sql_roots,
+            "TASK70_V3_PRODUCTION_SQL_NORMALIZATION_INVALID",
+            "PRODUCTION",
+        )
+        validate_primary_sql_normalization(
+            policy, reconciliation_sql_evidence, production_sql_evidence,
+        )
 
         before, before_classification = observe(
             real, base, restored_oid, "v3-success-before",
@@ -2797,6 +2969,8 @@ def run_business_case(
             security_restore["opcode"]
         security_restore_sql_evidence = compressed_sql_evidence(
             security_restore_sql, security_restore_sql_roots,
+            "TASK70_V3_SECURITY_RESTORE_SQL_BINDING_INVALID",
+            "RECONCILIATION",
         )
         if digest_bytes(security_restore_sql) \
                 != security_restore["opcode"]["sql_sha256"] \
@@ -2888,7 +3062,10 @@ def run_business_case(
             "production_sql_sha256": guarded_opcode["sql_sha256"],
             "fault_sql_sha256": digest_bytes(fault_sql),
             "fault_boundary_offset_bytes": fault_boundary,
-            "fault_sql_evidence": compressed_sql_evidence(fault_sql, sql_roots),
+            "fault_sql_evidence": compressed_sql_evidence(
+                fault_sql, sql_roots, "TASK70_V3_FAULT_SQL_BINDING_INVALID",
+                "PRODUCTION",
+            ),
             "fault_command_receipt": fault_receipt,
             "fault_command_receipt_sha256": fault_receipt["command_receipt_sha256"],
             "before_layout": "OLD", "after_layout": "OLD",

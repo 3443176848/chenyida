@@ -4,9 +4,9 @@
 
 ## 1. 审计结论
 
-- artifact SHA-256：`6aa3f2bf7f593f0cb0ea4f472f518bac1335a17e23efb1c94cb267c72147a4a3`
-- source manifest SHA-256：`758044cf645ecdc6bf8b8593d835f19c2e713a7e71a9b6d9d76e5a8ead45fbf2`（45文件）
-- release inventory SHA-256：`bc5045f7f8ec45a9ab50fd08d7aae7381f97f33f08f7f3faafca70de9339bb4f`（263项）
+- artifact SHA-256：`072cf6a2b0a7c0ab5dbffd96c21f56e84053b34a71a5bdb3a6360c6c94048cbe`
+- source manifest SHA-256：`78990c03069724a6a6d952bdff5bf87b28a44fbbf45786fbc59ae1c5be2cd80e`（45文件）
+- release inventory SHA-256：`91caeaca1ba20bd3e5e147f625a6b6c2405e474d4788037efc55e7f08eea4419`（263项）
 - 执行判定：`UAT_PROMOTION_EXECUTOR_NOT_READY`；检查点缺口=0，全部阻塞=4，P0=3，P1=1，may_start=`false`。
 - 仓库检查点控制链与dormant回退handler已闭合，但隔离动态证明、受信host激活、真实UAT回退演练和人工UAT证据尚未闭合；不得执行UAT Migration、Compose部署、业务写、快照回灌或回滚。
 
@@ -74,8 +74,8 @@
 | `chenyida_erp_site/operations/uat-promotion-dynamic-validation-policy-v2.json` | `fe9932e26535fbd9b25c41259143c73b82c20ad5157b3a65d47e86b1200cc6b8` |
 | `chenyida_erp_site/operations/uat-promotion-transaction-policy-v1.json` | `c1fe967ab455af92ee385925dab53fcfa59ad6db97ca266d4971fbd632eb8075` |
 | `chenyida_erp_site/package.json` | `19bf5556ff3f25f3e330eb2da281e1a02756a99c4263d1ab2d8c14df5f05f88b` |
-| `chenyida_erp_site/release/release-test-inventory-v1.json` | `bc5045f7f8ec45a9ab50fd08d7aae7381f97f33f08f7f3faafca70de9339bb4f` |
-| `chenyida_erp_site/release/test-runtime-policy-v1.json` | `8d86bac32d104d4934faaa9b1fc8c7396bac2bb71da2abff3e58136936b00cd2` |
+| `chenyida_erp_site/release/release-test-inventory-v1.json` | `91caeaca1ba20bd3e5e147f625a6b6c2405e474d4788037efc55e7f08eea4419` |
+| `chenyida_erp_site/release/test-runtime-policy-v1.json` | `16e4428bec578bcfafb40d80067286bd9a6fb8548760605f0910cec196786711` |
 | `chenyida_erp_site/scripts/backup-recovery-readiness-v4.mjs` | `a0bf58d1f0afa7b5d5b98caf239f034bad910cfa2023fdc8b62b22630e45adda` |
 | `chenyida_erp_site/scripts/backup-selfhost.sh` | `adb7047631660c20a01c56d6c0393c08e67db5502a3eeeb64f2eaf392daf902a` |
 | `chenyida_erp_site/scripts/install-release-supervisor.py` | `9494592df62154cee0e2cd29a4efe4d3ba06675d40bb6a0f521e2c9ce50f6b2b` |
@@ -86,7 +86,7 @@
 | `chenyida_erp_site/scripts/release-candidate-snapshot.py` | `296f61efb552a5fdd327e7b60b567a4dc2a569f9ec1c93bd57ef4dfe0f4fe98d` |
 | `chenyida_erp_site/scripts/release-gate-runner.mjs` | `172c99a33bac72f78b58453e11cca1632e2ad4f461b42f40ff264e11dc92077d` |
 | `chenyida_erp_site/scripts/release-lifecycle-contract.mjs` | `3b6945a9b7374abf3f892492bf3811b7b105e435ca4ab43020d53bba0d0e8f1e` |
-| `chenyida_erp_site/scripts/release-manifest-contract.mjs` | `a89852bfa271bae3abdce21fed5db3c315a5209e8d59b4f43eef9778e1351a40` |
+| `chenyida_erp_site/scripts/release-manifest-contract.mjs` | `f93718a2a907063a140ff8ecf94c53b54000b019828a34d4426d354683de381b` |
 | `chenyida_erp_site/scripts/release-migration-authorization.ts` | `ee700cb7e1ce438f06114c54d8d4d17be9c630003307df7140932d86bce54f4e` |
 | `chenyida_erp_site/scripts/release-supervisor-launcher.py` | `96dd8b3b5ee2e976e8161dc9146c3d8185fe467c15bf63910a282436c75e9831` |
 | `chenyida_erp_site/scripts/restore-selfhost.sh` | `c648db054afdcec661ffc293eec71f3087315412aa222078aabea3a4de102b22` |

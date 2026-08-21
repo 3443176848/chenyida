@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`。历史`DV70-PG-SWITCH-01`保持`VERIFIED_PARTIAL_ONLY`；D-161 owner ACL修复`d7ce5f6`已private同步，clean-source测试又暴露并关闭历史V2 artifact与当前源码混验缺口。D-162三文件修复状态为`HISTORICAL SOURCE BINDING CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING`。真实备份恢复、A1—A8、外部锚点、host activation、UAT/生产、受保护Volume正文和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`。历史`DV70-PG-SWITCH-01`保持`VERIFIED_PARTIAL_ONLY`；D-161 owner ACL修复`d7ce5f6`与D-162历史Git blob修复`63c301f`均已private同步。随后clean run`dv70-nc3x52ls`安全暴露SQL归一化误把content long-hex当摘要且production policy绑定小夹具；D-163修复状态为`SQL NORMALIZATION CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING`。真实备份恢复、A1—A8、外部锚点、host activation、UAT/生产、受保护Volume正文和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-16调度事件：`SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82 DOING → DONE`。D-157固定逐副作用耐久回执、派生数据库/卷身份、commit-before-receipt只读恢复、精确前代镜像与live postverify；source`c2f071c`→manifest-only`aa77732`形成156文件canonical bundle`3674e011…35fb`。轻量组合201/201、manifest后installer21/21、inventory262/238/24及三路只读复核通过。未运行真实PG/Volume/Compose/恢复/回退，catalog与TASK70继续失败关闭。
 
@@ -33,7 +33,9 @@
 
 2026-08-21 TASK70 owner ACL修复事件：输出上限修复`cb731df`经敏感门普通快进到private main后，run`dv70-aazofvib`通过60秒前检和隔离PG17.10启动，在rename前由security state守卫失败关闭；诊断run`dv70-mz485olk`固定首差异为database ACL item count实际4/期望5。两条独立只读复核确认fixed executor在REVOKE owner ACL后只恢复4个service group，遗漏canonical合同要求的显式owner ACL。D-161在service grants前恢复database/schema/all tables/all sequences、394 routines和6 standalone types共404条owner grants；executor继续禁止tablespace mutation，fresh synthetic cluster只为`pg_default`/`pg_global`物化owner ACL。Python16+129、Node13、release29及inventory263/239/24通过，当前修复后的受影响合同108项和动态artifact仍待clean source提交/private fast-forward后串行重跑；所有失败run零任务残留，未访问UAT/真实数据/受保护卷。
 
-2026-08-21 TASK70历史证据source binding事件：owner ACL提交`d7ce5f6`经1,791文件committed-tree敏感门普通快进到private main；随后当前inventory组合实际110项的clean-source首次结果为106/110，四个失败均因当前audit用c793历史V2 artifact配当前inventory/runtime/fixed-executor bodies，连带生成JSON/Markdown过期。D-162保持五个V2文件逐字节冻结，只让当前audit对精确repository artifact SHA按ancestor commit的14个Git blobs复核，当前manifest/能力检查仍用当前源码；Git调用固定无shell/replace/lazy fetch/prompt及2MiB/5秒/fatal UTF-8门。重新生成audit仍为4 blockers、`may_start=false`，semantic/raw/Markdown/source-manifest摘要为`6aa3f2bf…a4a3`/`de3a5b49…57d6`/`53418ec4…2bbb`/`758044cf…fbf2`。专项20/20、完整110/110、V3 13/13、release29/29、inventory263/239/24、audit verify及预期assert-ready阻断通过，两条独立复核P0=0/P1=0；三文件修复待独立提交/private fast-forward后动态重跑。
+2026-08-21 TASK70历史证据source binding事件：owner ACL提交`d7ce5f6`经1,791文件committed-tree敏感门普通快进到private main；随后当前inventory组合实际110项的clean-source首次结果为106/110，四个失败均因当前audit用c793历史V2 artifact配当前inventory/runtime/fixed-executor bodies，连带生成JSON/Markdown过期。D-162保持五个V2文件逐字节冻结，只让当前audit对精确repository artifact SHA按ancestor commit的14个Git blobs复核，当前manifest/能力检查仍用当前源码；Git调用固定无shell/replace/lazy fetch/prompt及2MiB/5秒/fatal UTF-8门。重新生成audit仍为4 blockers、`may_start=false`，semantic/raw/Markdown/source-manifest摘要为`6aa3f2bf…a4a3`/`de3a5b49…57d6`/`53418ec4…2bbb`/`758044cf…fbf2`。专项20/20、完整110/110、V3 13/13、release29/29、inventory263/239/24、audit verify及预期assert-ready阻断通过，两条独立复核P0=0/P1=0；修复提交`63c301f`随后完成敏感门与private普通快进。
+
+2026-08-21 TASK70 SQL归一化修复事件：D-162提交`63c301f`经敏感门普通快进到private main后，clean run`dv70-nc3x52ls`通过60秒资源门与隔离PG17启动，但由`TASK70_V3_SQL_NORMALIZATION_INVALID`在发布artifact前失败关闭并清理为零。三次有界诊断证明139个“遗留摘要”实际是长关系/序列hex身份，旧production `058a924…c0a`只绑定2行小夹具，重复空行摘要又把234条完整路径展开到约2.9MiB。D-163按448行content report类型保护SQL单双引号身份，仅在精确system/candidate/restored OID槽位替换动态值，以`PATH_SET_<count>_SHA256_<digest>`有界绑定重复路径，并对raw/normalized/gzip执行1MiB上界；reconciliation保持`067255c7…339`，完整production更新为`b4e0c24f…a140`。policy raw/canonical为`6c66291a…7486`/`87cadfcf…bd50`，inventory/runtime为`91caeaca…4419`/`16e4428b…6711`；promotion audit由固定生成器重放为semantic/raw/Markdown/source-manifest `072cf6a2…8cbe`/`688179d8…aa7`/`40f807be…dd5a`/`78990c03…d80e`且仍有4 blockers。提交前完整受影响组合110/110、Python18/18、fixed executor129/129、Node14/14、audit/rollback34/34、release29/29（扩展组合76/76）和inventory263/239/24通过；五个V2文件不变，修复待独立提交/private fast-forward后动态重跑。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -241,7 +243,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 | UAT晋升与回滚隔离动态验证 | DOING | Codex主智能体（唯一写入、串行重任务）、两条只读终审智能体、项目负责人（保留真实环境授权） | 2026-08-21 | TASK82、TASK84均已完成 | `DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 OWNER ACL COMMIT PRIVATE-SYNCED / HISTORICAL SOURCE BINDING CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING / PRODUCTION NO-GO`。D-161 owner ACL提交已private同步；D-162关闭历史V2 artifact与当前source混验，audit20、完整110、V3 13、release29及inventory263全绿且终审无P0/P1。三文件修复待clean commit后执行动态artifact，dump/Volume、host和真实UAT继续阻断。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70.md)。 |
+| SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 | UAT晋升与回滚隔离动态验证 | DOING | Codex主智能体（唯一写入、串行重任务）、两条只读终审智能体、项目负责人（保留真实环境授权） | 2026-08-21 | TASK82、TASK84均已完成 | `DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 SQL NORMALIZATION CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING / PRODUCTION NO-GO`。D-162提交`63c301f`已private同步；clean run`dv70-nc3x52ls`安全暴露归一化缺陷。D-163 typed/bounded修复已通过受影响组合110、Python18、fixed129、Node14、release29及inventory263，待clean commit/private同步后执行动态artifact；dump/Volume、host和真实UAT继续阻断。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70.md)。 |
 
 ## 已完成任务
 

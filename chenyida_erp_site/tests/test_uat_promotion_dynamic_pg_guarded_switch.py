@@ -200,6 +200,115 @@ class DynamicPostgresGuardedSwitchV3Test(unittest.TestCase):
             "DOES_NOT_PROVE_TRANSPORT_LEVEL_POSTGRESQL_COMMIT_RESPONSE_LOSS",
             policy["required_non_claims"],
         )
+        self.assertEqual(
+            policy["sql_evidence"]["reconciliation_normalized_sha256"],
+            "067255c7e6b319dbea1660bebca1b3259bb6e61363f5818ec88f226fc99ce339",
+        )
+        self.assertEqual(
+            policy["sql_evidence"]["production_normalized_sha256"],
+            "b4e0c24f4e7852980fd090c073912957782571723ef502e8c21763c67f96a140",
+        )
+
+    def test_sql_normalization_distinguishes_bound_content_hex_from_unknown_digest(self):
+        bound = hashlib.sha256(b"task70-bound-content").hexdigest()
+        large_objects = hashlib.sha256(b"0:0:0:0:0:0").hexdigest()
+        long_identity = "61" * 20 + "016384" + "61" * 17
+        exact_sha_length_identity = "62" * 32
+        long_extension = "65" * 40
+        roots = {
+            "base": {
+                "postgres": {"system_identifier": "7612345678901234567"},
+                "databases": {
+                    "active_name": "chenyida_erp",
+                    "staging_name": "chenyida_erp_rb_deadbeefdeadbeef",
+                    "candidate_oid": "16384",
+                },
+                "bound_sha256": bound,
+            },
+            "fixture": {
+                "restored_oid": "16385",
+                "content_report_rows": [
+                    ["RELATION", long_identity, "16384", bound],
+                    ["SEQUENCE", exact_sha_length_identity, "16385", "false"],
+                    ["EXTENSION", long_extension, "31", "7075626c6963"],
+                    ["LARGE_OBJECTS", "0", "0", large_objects],
+                ],
+            },
+        }
+        raw = (
+            "SELECT (SELECT system_identifier::text FROM "
+            "pg_catalog.pg_control_system()) <> '7612345678901234567';\n"
+            "SELECT d.datname='chenyida_erp_rb_deadbeefdeadbeef' "
+            "AND d.oid::text='16385';\n"
+            "SELECT d.datname='chenyida_erp' AND d.oid::text='16384';\n"
+            "SELECT $json${\"target\":{\"database_oid\":\"16385\","
+            f"\"marker_sha256\":\"{bound}\"}}}}$json$;\n"
+            f"SELECT '{long_identity}','{exact_sha_length_identity}';\n"
+            f"SELECT '[[\"{long_extension}\",\"31\",\"7075626c6963\"]]'::jsonb;\n"
+            "SELECT '16384','16385';\n"
+        ).encode()
+        normalized = PRODUCER.normalize_sql(
+            raw, roots, sql_kind="PRODUCTION",
+        )
+        text = normalized.decode()
+        self.assertIn(f"'{long_identity}'", text)
+        self.assertIn(f"'{exact_sha_length_identity}'", text)
+        self.assertIn(f'\"{long_extension}\"', text)
+        self.assertNotIn(bound, text)
+        self.assertIn("{{DV70:PATH_SET_2_SHA256_", text)
+        self.assertIn("{{DV70:SYSTEM_IDENTIFIER}}", text)
+        self.assertIn("{{DV70:CANDIDATE_OID}}", text)
+        self.assertIn("{{DV70:RESTORED_OID}}", text)
+        self.assertIn("SELECT '16384','16385';", text)
+        self.assertEqual(
+            hashlib.sha256(normalized).hexdigest(),
+            "9d3eea6bfc39a1d4ec16849bb2ae3f68c9585ddcf4681bca95ae905175c8713b",
+        )
+        for invalid in (
+                f"SELECT '{'63' * 32}';\n".encode(),
+                f"SELECT '{'64' * 40}';\n".encode(),
+                f"-- {exact_sha_length_identity}\nSELECT true;\n".encode(),
+        ):
+            with self.subTest(invalid=invalid[:24]), self.assertRaisesRegex(
+                    PRODUCER.DynamicGuardedSwitchError,
+                    "TASK70_V3_SQL_NORMALIZATION_INVALID",
+            ):
+                PRODUCER.normalize_sql(invalid, roots)
+        expanded = ((bound + "\n") * 14_000).encode()
+        self.assertLess(len(expanded), PRODUCER.SQL_EVIDENCE_MAX_BYTES)
+        with self.assertRaisesRegex(
+                PRODUCER.DynamicGuardedSwitchError,
+                "TASK70_V3_SQL_NORMALIZATION_INVALID",
+        ):
+            PRODUCER.compressed_sql_evidence(expanded, roots)
+
+    def test_primary_sql_normalization_reports_the_exact_failing_phase(self):
+        policy = PRODUCER.load_policy()
+        reconciliation = {
+            "normalized_sha256":
+                policy["sql_evidence"]["reconciliation_normalized_sha256"],
+        }
+        production = {
+            "normalized_sha256":
+                policy["sql_evidence"]["production_normalized_sha256"],
+        }
+        PRODUCER.validate_primary_sql_normalization(
+            policy, reconciliation, production,
+        )
+        with self.assertRaisesRegex(
+                PRODUCER.DynamicGuardedSwitchError,
+                "TASK70_V3_RECONCILIATION_SQL_NORMALIZATION_INVALID",
+        ):
+            PRODUCER.validate_primary_sql_normalization(
+                policy, {"normalized_sha256": "0" * 64}, production,
+            )
+        with self.assertRaisesRegex(
+                PRODUCER.DynamicGuardedSwitchError,
+                "TASK70_V3_PRODUCTION_SQL_NORMALIZATION_INVALID",
+        ):
+            PRODUCER.validate_primary_sql_normalization(
+                policy, reconciliation, {"normalized_sha256": "0" * 64},
+            )
 
     def test_fixed_executor_receipts_bind_exact_outputs_order_and_failure_reason(self):
         _policy, _records, _ledger, inputs = self.inputs()

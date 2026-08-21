@@ -19,7 +19,7 @@ const POLICY_PATH = resolve(
 const ARTIFACT_PATH = resolve(
   SITE_ROOT, "operations/uat-promotion-dynamic-evidence-v3.json",
 );
-const EXPECTED_POLICY_SHA256 = "90188fadc024e62912c5c6cfc85e97f254757ee274aba1e8bb55bd2c6e951d12";
+const EXPECTED_POLICY_SHA256 = "87cadfcfa6c30e167426b6aeed12c7b4b1ce07f50f6dad2b577a3ac792e6bd50";
 const SHA256 = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const LABEL = /^[A-Z][A-Z0-9_]{1,79}$/;
@@ -167,7 +167,106 @@ function exactKeys(value, expected, code) {
 }
 
 
-function normalizeSql(raw, roots) {
+function contentReportHexLiterals(roots, code) {
+  const rows = roots?.fixture?.content_report_rows;
+  if (rows === undefined) return { literals: new Set(), paths: new Set() };
+  if (!Array.isArray(rows)) reject(code);
+  const hexIdentifier = /^(?:[0-9a-f]{2}){1,4096}$/;
+  const literals = new Set();
+  const paths = new Set();
+  const seen = new Set();
+  let largeObjects = 0;
+  rows.forEach((fields, rowIndex) => {
+    if (!Array.isArray(fields) || fields.some((field) => typeof field !== "string")) {
+      reject(code);
+    }
+    const [kind, identity] = fields;
+    let valid = false;
+    let values = [];
+    let valueIndexes = [];
+    if (kind === "RELATION" && fields.length === 4) {
+      valid = hexIdentifier.test(identity) && /^[0-9]+$/.test(fields[2])
+        && SHA256.test(fields[3]);
+      values = [identity];
+      valueIndexes = [1];
+    } else if (kind === "SEQUENCE" && fields.length === 4) {
+      valid = hexIdentifier.test(identity) && /^-?[0-9]+$/.test(fields[2])
+        && ["true", "false", "t", "f"].includes(fields[3]);
+      values = [identity];
+      valueIndexes = [1];
+    } else if (kind === "EXTENSION" && fields.length === 4) {
+      valid = fields.slice(1).every((field) => hexIdentifier.test(field));
+      values = fields.slice(1);
+      valueIndexes = [1, 2, 3];
+    } else if (kind === "LARGE_OBJECTS" && fields.length === 4) {
+      largeObjects += 1;
+      valid = largeObjects === 1 && /^[0-9]+$/.test(fields[1])
+        && /^[0-9]+$/.test(fields[2]) && SHA256.test(fields[3]);
+    }
+    const rowIdentity = `${kind}:${identity}`;
+    if (!valid || seen.has(rowIdentity)) reject(code);
+    seen.add(rowIdentity);
+    values.forEach((value) => literals.add(value));
+    valueIndexes.forEach((fieldIndex) => paths.add(
+      `roots.fixture.content_report_rows[${rowIndex}][${fieldIndex}]`,
+    ));
+  });
+  if (largeObjects !== 1) reject(code);
+  return { literals, paths };
+}
+
+
+function regexLiteral(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+
+function replaceSpecialSqlSlots(sql, roots, sqlKind, code) {
+  if (sqlKind === "GENERIC") return sql;
+  if (!["RECONCILIATION", "PRODUCTION"].includes(sqlKind)) reject(code);
+  const systemIdentifier = roots?.base?.postgres?.system_identifier;
+  const databases = roots?.base?.databases;
+  const candidateOid = databases?.candidate_oid;
+  const restoredOid = roots?.fixture?.restored_oid;
+  if (![systemIdentifier, candidateOid, restoredOid].every(
+    (value) => typeof value === "string" && value.length > 0,
+  )) reject(code);
+
+  const replaceOne = (pattern, label) => {
+    let count = 0;
+    const changed = sql.replace(pattern, (_matched, prefix, _value, suffix) => {
+      count += 1;
+      return `${prefix}{{DV70:${label}}}${suffix}`;
+    });
+    if (count !== 1) reject(code);
+    sql = changed;
+  };
+  replaceOne(new RegExp(
+    `(pg_control_system\\(\\)\\)\\s*<>\\s*')(${regexLiteral(systemIdentifier)})(')`,
+    "g",
+  ), "SYSTEM_IDENTIFIER");
+  replaceOne(new RegExp(
+    `(d\\.datname='${regexLiteral(databases.staging_name)}' AND `
+      + `d\\.oid::text=')(${regexLiteral(restoredOid)})(')`,
+    "g",
+  ), "RESTORED_OID");
+  if (sqlKind === "PRODUCTION") {
+    replaceOne(new RegExp(
+      `(d\\.datname='${regexLiteral(databases.active_name)}' AND `
+        + `d\\.oid::text=')(${regexLiteral(candidateOid)})(')`,
+      "g",
+    ), "CANDIDATE_OID");
+    replaceOne(new RegExp(
+      `("target":\\{"database_oid":")(${regexLiteral(restoredOid)})`
+        + `(","marker_sha256":)`,
+      "g",
+    ), "RESTORED_OID");
+  }
+  return sql;
+}
+
+
+export function normalizeSql(raw, roots, sqlKind = "GENERIC") {
   const code = "TASK70_V3_SQL_EVIDENCE_INVALID";
   let sql;
   try {
@@ -176,46 +275,69 @@ function normalizeSql(raw, roots) {
     reject(code);
   }
   if (!sql.endsWith("\n") || sql.includes("\0") || sql.includes("{{DV70:")) reject(code);
+  const { literals: contentHex, paths: contentHexPaths } =
+    contentReportHexLiterals(roots, code);
   const labels = new Map();
   const collect = (value, path) => {
     if (Array.isArray(value)) {
       value.forEach((child, index) => collect(child, `${path}[${index}]`));
     } else if (value && typeof value === "object") {
       Object.keys(value).sort().forEach((key) => collect(value[key], `${path}.${key}`));
-    } else if (typeof value === "string" && SHA256.test(value)) {
+    } else if (typeof value === "string" && SHA256.test(value)
+        && !contentHexPaths.has(path)) {
       if (!labels.has(value)) labels.set(value, new Set());
       labels.get(value).add(path);
     }
   };
   collect(roots, "roots");
+  const protectedValues = [...contentHex].filter((value) => value.length >= 64)
+    .sort(compareUtf8);
+  const protectedByValue = new Map(protectedValues.map(
+    (value, index) => [value, `{{DV70:CONTENT_HEX_LITERAL:${index}}}`],
+  ));
+  sql = sql.replace(/(['"])([0-9a-f]{64,})\1/g, (matched, quote, value) => (
+    protectedByValue.has(value)
+      ? `${quote}${protectedByValue.get(value)}${quote}` : matched
+  ));
+  sql = replaceSpecialSqlSlots(sql, roots, sqlKind, code);
   const replacements = new Map();
   for (const [value, paths] of labels) {
     const label = value === ZERO_SHA256 ? "ZERO_SHA256"
-      : value === EMPTY_SHA256 ? "EMPTY_SHA256" : [...paths].sort().join("|");
+      : value === EMPTY_SHA256 ? "EMPTY_SHA256"
+        : paths.size > 1
+          ? `PATH_SET_${paths.size}_SHA256_${digestValue(
+            [...paths].sort(compareUtf8),
+          ).toUpperCase()}`
+          : [...paths][0];
     replacements.set(value, `{{DV70:${label}}}`);
   }
-  const special = new Map([
-    [roots.base.postgres.system_identifier, "SYSTEM_IDENTIFIER"],
-    [roots.base.databases.candidate_oid, "CANDIDATE_OID"],
-    [roots.fixture.restored_oid, "RESTORED_OID"],
-  ]);
-  for (const [value, label] of special) {
-    if (typeof value !== "string" || value.length === 0) reject(code);
-    replacements.set(value, `{{DV70:${label}}}`);
-  }
-  for (const value of [...replacements.keys()].sort(
-    (left, right) => right.length - left.length || compareUtf8(left, right),
-  )) {
-    sql = sql.split(value).join(replacements.get(value));
-  }
-  if (/[0-9a-f]{64}/.test(sql) || [...special.keys()].some((value) => sql.includes(value))) {
-    reject(code);
+  sql = sql.replace(
+    /(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])/g,
+    (value) => replacements.get(value) ?? value,
+  );
+  sql = sql.replace(
+    /\{\{DV70:CONTENT_HEX_LITERAL:([0-9]+)\}\}/g,
+    (_matched, rawIndex) => {
+      const index = Number(rawIndex);
+      if (!Number.isSafeInteger(index) || index >= protectedValues.length) reject(code);
+      return protectedValues[index];
+    },
+  );
+  for (const matched of sql.matchAll(/[0-9a-f]{64,}/g)) {
+    const value = matched[0];
+    const start = matched.index;
+    const quoted = start > 0 && start + value.length < sql.length
+      && ["'", '"'].includes(sql[start - 1])
+      && sql[start + value.length] === sql[start - 1];
+    if (!quoted || !contentHex.has(value)) reject(code);
   }
   return Buffer.from(sql, "utf8");
 }
 
 
-export function verifyCompressedSqlEvidence(value, roots, expectedNormalized, maximumBytes) {
+export function verifyCompressedSqlEvidence(
+  value, roots, expectedNormalized, maximumBytes, sqlKind = "GENERIC",
+) {
   const code = "TASK70_V3_SQL_EVIDENCE_INVALID";
   exactKeys(value, [
     "encoding", "uncompressed_bytes", "uncompressed_sha256", "normalized_sha256",
@@ -251,8 +373,9 @@ export function verifyCompressedSqlEvidence(value, roots, expectedNormalized, ma
   } catch {
     reject(code);
   }
-  const normalized = normalizeSql(raw, roots);
+  const normalized = normalizeSql(raw, roots, sqlKind);
   if (raw.length !== value.uncompressed_bytes
+      || normalized.length < 1 || normalized.length > maximumBytes
       || digestBytes(raw) !== value.uncompressed_sha256
       || digestBytes(normalized) !== value.normalized_sha256
       || value.normalized_sha256 !== expectedNormalized) reject(code);
@@ -2641,11 +2764,13 @@ function verifyCase(selectedCase, policy, { runtime, before, after, cleanup, sou
     selectedCase.opcodes.reconciliation_sql_evidence, sqlNormalizationRoots,
     policy.sql_evidence.reconciliation_normalized_sha256,
     policy.sql_evidence.maximum_uncompressed_bytes,
+    "RECONCILIATION",
   );
   const productionSql = verifyCompressedSqlEvidence(
     selectedCase.opcodes.production_sql_evidence, sqlNormalizationRoots,
     policy.sql_evidence.production_normalized_sha256,
     policy.sql_evidence.maximum_uncompressed_bytes,
+    "PRODUCTION",
   );
   exactKeys(reconciliation, commonOpcodeKeys, code);
   exactKeys(production, commonOpcodeKeys, code);
@@ -3023,6 +3148,7 @@ function verifyCase(selectedCase, policy, { runtime, before, after, cleanup, sou
     by.SECURITY_DRIFT_REJECTED.security_restore_sql_evidence,
     securityRestoreRoots, policy.sql_evidence.reconciliation_normalized_sha256,
     policy.sql_evidence.maximum_uncompressed_bytes,
+    "RECONCILIATION",
   );
   const securityRestoreExecution = validateFixedExecutionReceipt(
     securityRestore.execution_receipt,
@@ -3188,8 +3314,9 @@ function verifyCase(selectedCase, policy, { runtime, before, after, cleanup, sou
   ], code);
   const faultSql = verifyCompressedSqlEvidence(
     by.FIRST_RENAME_FAULT_ROLLBACK.fault_sql_evidence, sqlNormalizationRoots,
-    digestBytes(normalizeSql(expectedFaultSql, sqlNormalizationRoots)),
+    digestBytes(normalizeSql(expectedFaultSql, sqlNormalizationRoots, "PRODUCTION")),
     policy.sql_evidence.maximum_uncompressed_bytes,
+    "PRODUCTION",
   );
   exactKeys(by.FIRST_RENAME_FAULT_ROLLBACK.fault_command_receipt, [
     "opcode", "execution_receipt", "barrier", "command_receipt_sha256",

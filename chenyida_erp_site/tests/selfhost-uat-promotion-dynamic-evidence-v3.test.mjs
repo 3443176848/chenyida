@@ -14,6 +14,7 @@ import {
   digestValue,
   expectedPsqlArguments,
   loadAndValidatePolicy,
+  normalizeSql,
   parseStrictJson,
   readTrustedArtifactFile,
   resetLayoutSql,
@@ -38,6 +39,14 @@ test("V3 policy is closed, partial-only and explicitly preserves trust-boundary 
   assert.equal(policy.migration_fixture.expected_count, 46);
   assert.equal(policy.case_catalog[0].required_scenarios.length, 10);
   assert.equal(policy.case_catalog[0].required_assertions.length, 15);
+  assert.equal(
+    policy.sql_evidence.reconciliation_normalized_sha256,
+    "067255c7e6b319dbea1660bebca1b3259bb6e61363f5818ec88f226fc99ce339",
+  );
+  assert.equal(
+    policy.sql_evidence.production_normalized_sha256,
+    "b4e0c24f4e7852980fd090c073912957782571723ef502e8c21763c67f96a140",
+  );
   assert.ok(policy.required_non_claims.includes(
     "DOES_NOT_PROVE_CONCURRENT_NONCOOPERATING_ROOT_OR_POSTGRESQL_SUPERUSER_EXCLUSION",
   ));
@@ -353,7 +362,11 @@ test("V3 SQL evidence accepts one canonical mtime-zero gzip member only", () => 
   const roots = {
     base: {
       postgres: { system_identifier: "7612345678901234567" },
-      databases: { candidate_oid: "16384" },
+      databases: {
+        active_name: "chenyida_erp",
+        staging_name: "chenyida_erp_rb_deadbeefdeadbeef",
+        candidate_oid: "16384",
+      },
     },
     fixture: { restored_oid: "16385" },
   };
@@ -402,6 +415,100 @@ test("V3 SQL evidence accepts one canonical mtime-zero gzip member only", () => 
         && error.code === "TASK70_V3_SQL_EVIDENCE_INVALID",
     );
   }
+});
+
+
+test("V3 SQL normalization distinguishes bound content hex from unknown digest", () => {
+  const bound = createHash("sha256").update("task70-bound-content").digest("hex");
+  const largeObjects = createHash("sha256").update("0:0:0:0:0:0").digest("hex");
+  const longIdentity = "61".repeat(20) + "016384" + "61".repeat(17);
+  const exactShaLengthIdentity = "62".repeat(32);
+  const longExtension = "65".repeat(40);
+  const roots = {
+    base: {
+      postgres: { system_identifier: "7612345678901234567" },
+      databases: {
+        active_name: "chenyida_erp",
+        staging_name: "chenyida_erp_rb_deadbeefdeadbeef",
+        candidate_oid: "16384",
+      },
+      bound_sha256: bound,
+    },
+    fixture: {
+      restored_oid: "16385",
+      content_report_rows: [
+        ["RELATION", longIdentity, "16384", bound],
+        ["SEQUENCE", exactShaLengthIdentity, "16385", "false"],
+        ["EXTENSION", longExtension, "31", "7075626c6963"],
+        ["LARGE_OBJECTS", "0", "0", largeObjects],
+      ],
+    },
+  };
+  const raw = Buffer.from(
+    "SELECT (SELECT system_identifier::text FROM "
+      + "pg_catalog.pg_control_system()) <> '7612345678901234567';\n"
+      + "SELECT d.datname='chenyida_erp_rb_deadbeefdeadbeef' "
+      + "AND d.oid::text='16385';\n"
+      + "SELECT d.datname='chenyida_erp' AND d.oid::text='16384';\n"
+      + "SELECT $json${\"target\":{\"database_oid\":\"16385\","
+      + "\"marker_sha256\":\"" + bound + "\"}}$json$;\n"
+      + `SELECT '${longIdentity}','${exactShaLengthIdentity}';\n`
+      + `SELECT '[[\"${longExtension}\",\"31\",\"7075626c6963\"]]'::jsonb;\n`
+      + "SELECT '16384','16385';\n",
+    "utf8",
+  );
+  const normalizedSha256 =
+    "9d3eea6bfc39a1d4ec16849bb2ae3f68c9585ddcf4681bca95ae905175c8713b";
+  assert.equal(
+    createHash("sha256").update(normalizeSql(raw, roots, "PRODUCTION")).digest("hex"),
+    normalizedSha256,
+  );
+
+  const evidenceFor = (sql, expectedNormalized) => {
+    const compressed = gzipSync(sql, { level: 9, mtime: 0 });
+    const body = {
+      encoding: "GZIP_BASE64_MTIME_ZERO",
+      uncompressed_bytes: sql.length,
+      uncompressed_sha256: createHash("sha256").update(sql).digest("hex"),
+      normalized_sha256: expectedNormalized,
+      gzip_bytes: compressed.length,
+      gzip_sha256: createHash("sha256").update(compressed).digest("hex"),
+      gzip_base64: compressed.toString("base64"),
+    };
+    return { ...body, sql_evidence_sha256: digestValue(body) };
+  };
+
+  assert.deepEqual(
+    verifyCompressedSqlEvidence(
+      evidenceFor(raw, normalizedSha256), roots, normalizedSha256, 4096,
+      "PRODUCTION",
+    ),
+    raw,
+  );
+  for (const invalid of [
+    Buffer.from(`SELECT '${"63".repeat(32)}';\n`),
+    Buffer.from(`SELECT '${"64".repeat(40)}';\n`),
+    Buffer.from(`-- ${exactShaLengthIdentity}\nSELECT true;\n`),
+  ]) {
+    const claimed = createHash("sha256").update(invalid).digest("hex");
+    assert.throws(
+      () => verifyCompressedSqlEvidence(
+        evidenceFor(invalid, claimed), roots, claimed, 4096,
+      ),
+      (error) => error instanceof DynamicEvidenceV3Error
+        && error.code === "TASK70_V3_SQL_EVIDENCE_INVALID",
+    );
+  }
+  const expanded = Buffer.from(`${bound}\n`.repeat(14_000));
+  assert.ok(expanded.length < 1_048_576);
+  const claimed = createHash("sha256").update(expanded).digest("hex");
+  assert.throws(
+    () => verifyCompressedSqlEvidence(
+      evidenceFor(expanded, claimed), roots, claimed, 1_048_576,
+    ),
+    (error) => error instanceof DynamicEvidenceV3Error
+      && error.code === "TASK70_V3_SQL_EVIDENCE_INVALID",
+  );
 });
 
 

@@ -3438,6 +3438,42 @@
 - 拒绝把当前audit manifest整体回退到c793，或仅按artifact自报path读取当前文件；两者都会混淆历史证据真实性与当前能力状态。
 - 拒绝自由Git argv、shell、replace refs、网络lazy fetch、无大小/超时边界读取，或在历史blob读取失败后fallback并继续标记动态证据有效。
 
+## D-163 TASK70 SQL证据按content类型与精确动态槽位归一，重复路径使用有界摘要
+
+- 日期：2026-08-21
+- 状态：`ACCEPTED / SQL NORMALIZATION CORRECTIVE SOURCE VERIFIED / CLEAN DYNAMIC RETRY PENDING / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据clean run`dv70-nc3x52ls`、三次隔离诊断、完整448行报告双实现重放和独立跨语言安全复核
+- 确认边界：只修改TASK70 V3合成证据producer/verifier、policy、测试和发布摘要链；不修改五个冻结V2文件，不授权或执行UAT/生产、真实数据、受保护Volume、真实备份、host、Migration部署或服务变更
+
+### Context
+
+- D-162提交`63c301f`完成敏感门并普通快进到private main后，`dv70-nc3x52ls`通过60秒资源门与隔离PG17启动，但在发布artifact前由`TASK70_V3_SQL_NORMALIZATION_INVALID`失败关闭，且任务容器、tmp根、进程和artifact均为0。
+- 旧算法对任意连续64位小写hex做全局摘要替换和残留拒绝。完整content report中的relation/sequence identity本身是可超过64位的UTF-8 hex；其中139个片段被误识别为未知摘要。全局替换system/OID还可能误改row count、sequence last value或identity正文。
+- 一个摘要可能出现在大量roots路径中。旧算法把全部路径以`|`拼成标签并在每个SQL出现点重复展开；完整234 relation、211 sequence、2 extension和1 large-object行使production normalized约为raw的4.48倍、约2.9MiB，超过policy 1MiB且没有独立normalized上界。
+- 旧production golden `058a924…c0a`来自只有app_users与large-object的2行单元夹具；实际完整生产SQL在旧算法下得到不同的`f71ba275…`诊断摘要，不能把小夹具值作为当前完整报告的权威golden。
+
+### Decision
+
+1. Python与Node先按既有content report合同严格解析每一行。RELATION/SEQUENCE identity及EXTENSION三字段只在属于该已验证报告、且在SQL中由匹配的单引号或双引号包围时作为content hex保护；未绑定的64位或更长hex继续失败关闭。
+2. system identifier、restored staging OID、candidate active OID及security JSON target OID只允许在四个精确、各出现一次的SQL语法槽位替换。RECONCILIATION与PRODUCTION采用显式类型；缺失、重复或上下文漂移均按对应阶段错误码拒绝，不再全局替换相同数字。
+3. roots中的普通SHA-256只匹配不嵌入更长hex的精确64位token。相同值绑定多个路径时改为`PATH_SET_<count>_SHA256_<SHA256(canonical sorted paths)>`；零摘要和空摘要保留固定短标签，单路径保留精确路径。这样仍绑定完整路径集合而不随路径数线性膨胀。
+4. producer在归一化前先拒绝raw超过1MiB，并在之后分别限制normalized及gzip为1MiB；Node verifier同时限制metadata/base64、单一mtime-zero gzip member、gunzip输出和normalized。不得以增大上限掩盖算法膨胀。
+5. 完整448行报告的reconciliation normalized SHA-256保持`067255c7e6b319dbea1660bebca1b3259bb6e61363f5818ec88f226fc99ce339`，production更新为`b4e0c24f4e7852980fd090c073912957782571723ef502e8c21763c67f96a140`。该golden只有在clean/private一致源码上的成功动态artifact再由独立Node verifier和整件篡改harness通过后才形成最终接受证据。
+
+### Consequences
+
+- V3 policy raw/canonical SHA-256为`6c66291a698f9aa7ef75d8e80e7e0616023adf3aa55351770c40587cea467486`/`87cadfcfa6c30e167426b6aeed12c7b4b1ce07f50f6dad2b577a3ac792e6bd50`；release inventory/runtime policy为`91caeaca1ba20bd3e5e147f625a6b6c2405e474d4788037efc55e7f08eea4419`/`16e4428bec578bcfafb40d80067286bd9a6fb8548760605f0910cec196786711`。
+- inventory变化由固定audit生成器机械重放；promotion audit semantic/raw/Markdown/source-manifest SHA-256为`072cf6a2b0a7c0ab5dbffd96c21f56e84053b34a71a5bdb3a6360c6c94048cbe`/`688179d83fa677e176180652bcfd58f8395e5d0449dc7296c190d7c9cfc15aa7`/`40f807be1cf0dfa1b29b2fb7d91fa1abccd260d0573cd789c58677b7d305dd5a`/`78990c03069724a6a6d952bdff5bf87b28a44fbbf45786fbc59ae1c5be2cd80e`，结论仍为4 blockers、`may_start=false`。
+- Python/Node共享测试向量覆盖含candidate OID子串的长relation identity、精确64位sequence identity、JSON双引号中的长extension identity、动态system/candidate/restored槽位、无关数值保持、未知hex拒绝及raw小于1MiB但normalized超过1MiB的膨胀拒绝；共享normalized SHA-256为`9d3eea6b…713b`。
+- 提交前完整受影响组合110/110、Python V3 18/18、fixed executor129/129、Node V3 14/14、promotion audit/rollback34/34、release gate/manifest29/29、扩展release组合76/76、inventory263/239/24及policy verify通过；audit组合首跑33/34准确拦截旧生成物，重放后原断言全绿。独立只读复核未发现可复现P0/P1，五个V2文件继续逐字节不变。
+- 系统仍为`PRODUCTION NO-GO`。本决策不证明成功V3动态case、dump/Volume、fresh-process恢复、传输层COMMIT响应丢失、host activation、真实UAT、员工试运行或正式切换。
+
+### Rejected alternatives
+
+- 拒绝把所有64位及更长hex一律删除、截断或当成摘要，也拒绝全局替换OID/系统标识；这些做法会抹去业务数量和content identity并产生伪稳定证据。
+- 拒绝继续使用2行小夹具golden、只提高1MiB上限、拼接全部重复路径或在normalized超界时跳过验证。
+- 拒绝手工修改artifact、在dirty或未private同步源码上运行，或修改/重生成五个冻结V2文件来适配V3缺陷。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
