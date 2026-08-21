@@ -1298,7 +1298,8 @@ function validatePreconditionCommandOutput(command) {
     "ERROR:  rollback switch precondition mismatch\n",
     "ERROR: rollback switch precondition mismatch\n",
   ]);
-  if (command.stdout.raw.length !== 0 || !expected.has(command.stderr.text)) {
+  if (!command.stdout.raw.equals(Buffer.from("\n", "utf8"))
+    || !expected.has(command.stderr.text)) {
     reject("TASK70_DYNAMIC_PRECONDITION_COMMAND_OUTPUT_INVALID");
   }
 }

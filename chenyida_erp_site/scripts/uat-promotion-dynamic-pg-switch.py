@@ -1509,7 +1509,7 @@ def execute_production_switch(
         if response_delivered:
             ack = executor.parse_pg_mutation_ack(result.stdout, "PG_RB_ATOMIC_SWITCH_V1")
     elif expected == "precondition":
-        if result.returncode != 3 or result.stdout != b"" \
+        if result.returncode != 3 or result.stdout != b"\n" \
                 or result.stderr not in PRECONDITION_ERROR_OUTPUTS:
             reject("TASK70_DYNAMIC_PRODUCTION_SWITCH_DID_NOT_FAIL_CLOSED")
         failure_code = "ROLLBACK_SWITCH_PRECONDITION_MISMATCH"

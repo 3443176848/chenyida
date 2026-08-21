@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "b6eb511eb2d46b7d8a1a4b8f747e59de3ac300bc72ec70cdd764a0e4b31ae72a",
+  "artifact_sha256": "65c496b1216559447a6c8ae3104e6ce2c78c2072fc499d44580ac49fe1558011",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -244,7 +244,7 @@
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 238,
-      "sha256": "98807995be436b77ffd7626940cc7d828b2fc3a4f2f46fb32ded960d24a73269",
+      "sha256": "5ee991b094569471324cf8554aa35415722cc827ca3084f1517edf5fe4fce3e1",
       "total_tests": 262
     },
     "source_manifest": {
@@ -341,7 +341,7 @@
             "selfhost-uat-promotion-rollback-audit.test.mjs"
           ],
           "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-          "sha256": "98807995be436b77ffd7626940cc7d828b2fc3a4f2f46fb32ded960d24a73269"
+          "sha256": "5ee991b094569471324cf8554aa35415722cc827ca3084f1517edf5fe4fce3e1"
         },
         {
           "markers": [
@@ -349,7 +349,7 @@
             "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394"
           ],
           "path": "chenyida_erp_site/release/test-runtime-policy-v1.json",
-          "sha256": "923823ed8860ac9d4a2a38ce9f852e531f0698d9fdb507524cea42bc666e30e7"
+          "sha256": "30ceff07b77e0b4309d036ef331c3c5ef8867a1a13ec44c232f6cb77ef350b51"
         },
         {
           "markers": [
@@ -444,7 +444,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "2d5f8984017097c55f9f441ed0ff9f620f97c4928254520662d0d3230129facc"
+          "sha256": "b4f5b2859d534ac6d7d165f0e061089908904a85d77a1951d8920a794df68a92"
         },
         {
           "markers": [
@@ -532,7 +532,7 @@
             "TASK70_DYNAMIC_CLEANUP_FAILED"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-dynamic-evidence.mjs",
-          "sha256": "3a2b8ecd7305603bbcf88349e5d4380ee96c1a11574ad667b415e3c92610335f"
+          "sha256": "888e8da9c401eedfc46d18982fa065aa0c394dd617798377d4a91854421c6308"
         },
         {
           "markers": [
@@ -543,7 +543,7 @@
             "ZERO_TASK_RESIDUE"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-dynamic-pg-switch.py",
-          "sha256": "9f06921a87a8740d5636826b4413f0a4763d1b778030b39f728bc7e349a7ed30"
+          "sha256": "011fed58671839a76ba8a63dfc029280caaf6311294a05edf7a570a4ef1c93b3"
         },
         {
           "markers": [
@@ -714,7 +714,7 @@
             "dynamic evidence tampering fails closed"
           ],
           "path": "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-audit.test.mjs",
-          "sha256": "a02b0dafc699eeaff2963786e032542bf7e882081f687c2954dd565f0c94801a"
+          "sha256": "80711e8c31ae4888a82dcb222956249843479286a6f20c9fb46b87c18d6624e9"
         },
         {
           "markers": [
@@ -734,7 +734,7 @@
             "test_task_container_projection_recomputes_exact_security_limits"
           ],
           "path": "chenyida_erp_site/tests/test_uat_promotion_dynamic_pg_switch.py",
-          "sha256": "3198b4bf85a79580f867475aeb1187744c4cd79b02e9173cf27bd841761ac936"
+          "sha256": "c166dbf54d89c41ec71d23aed01a8b9c367f64156c10e642c3642322bf7115bb"
         },
         {
           "markers": [
@@ -746,7 +746,7 @@
           "sha256": "c0ae0891094b76edc974a72628b0d9d2e6eef894de24a4c00e6ec83074a832ca"
         }
       ],
-      "sha256": "5ead9703df557214d33ab836957a80320f641fb8fd46462d09712af2ed711c06"
+      "sha256": "9b5b2219795bca679a60fa19a9d011536d4e5446fcda0f2e42d691efed21ea95"
     }
   },
   "observations": {

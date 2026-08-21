@@ -613,6 +613,7 @@ function dynamicArtifact(fixture) {
   const repeatAfter = pair(newRows(), "NEW_SEALED", "NEW_TOPOLOGY");
   const failureCommand = () => fixtureCommand({
     stdin_sha256: productionSpec.sql_sha256, exit_code: 3,
+    stdout_text: "\n",
     stderr_text: "ERROR:  rollback switch precondition mismatch\n",
     failure_code: "ROLLBACK_SWITCH_PRECONDITION_MISMATCH",
   });
@@ -1084,6 +1085,8 @@ test("dynamic command output, production bindings and Git blobs are independentl
     ));
   };
   commandFailure(1, "stderr", "", "TASK70_DYNAMIC_PRECONDITION_COMMAND_OUTPUT_INVALID");
+  commandFailure(1, "stdout", "", "TASK70_DYNAMIC_PRECONDITION_COMMAND_OUTPUT_INVALID");
+  commandFailure(1, "stdout", "\n\n", "TASK70_DYNAMIC_PRECONDITION_COMMAND_OUTPUT_INVALID");
   commandFailure(
     2, "stderr", "ERROR:  unrelated synthetic failure\n",
     "TASK70_DYNAMIC_PRECONDITION_COMMAND_OUTPUT_INVALID",

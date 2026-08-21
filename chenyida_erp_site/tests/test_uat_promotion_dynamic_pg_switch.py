@@ -244,6 +244,31 @@ class DynamicPgSwitchPureContractTest(unittest.TestCase):
                                     "TASK70_DYNAMIC_FAULT_ANCHOR_INVALID"):
             RUNNER.derive_fault_stream(sql.replace(first, first + first), base)
 
+    def test_precondition_failure_requires_exact_psql_advisory_lock_newline(self):
+        sql = b"SELECT 1;\n"
+        accepted = subprocess.CompletedProcess(
+            [], 3, b"\n", b"ERROR:  rollback switch precondition mismatch\n",
+        )
+        with mock.patch.object(RUNNER, "execute_psql", return_value=accepted):
+            receipt, acknowledgement = RUNNER.execute_production_switch(
+                object(), container_id="a" * 64, sql=sql, expected="precondition",
+            )
+        self.assertIsNone(acknowledgement)
+        self.assertEqual(receipt["stdout_base64"], "Cg==")
+        self.assertEqual(receipt["failure_code"], "ROLLBACK_SWITCH_PRECONDITION_MISMATCH")
+
+        rejected = subprocess.CompletedProcess(
+            [], 3, b"", b"ERROR:  rollback switch precondition mismatch\n",
+        )
+        with mock.patch.object(RUNNER, "execute_psql", return_value=rejected):
+            with self.assertRaisesRegex(
+                RUNNER.DynamicPgSwitchError,
+                "TASK70_DYNAMIC_PRODUCTION_SWITCH_DID_NOT_FAIL_CLOSED",
+            ):
+                RUNNER.execute_production_switch(
+                    object(), container_id="a" * 64, sql=sql, expected="precondition",
+                )
+
     def test_create_arguments_are_pull_free_mount_free_and_resource_bounded(self):
         arguments = RUNNER.expected_create_arguments(POLICY, "dv70-A1b2C3d4",
                                                       "cyd-dv70-pg-switch-dv70-A1b2C3d4")
