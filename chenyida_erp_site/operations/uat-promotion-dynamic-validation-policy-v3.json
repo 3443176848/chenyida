@@ -27,7 +27,7 @@
   "sql_evidence": {
     "compression": "GZIP_BASE64_MTIME_ZERO",
     "maximum_uncompressed_bytes": 1048576,
-    "reconciliation_normalized_sha256": "912716d7a454d4581c1bda36c19547cc60af205661870dfd4d231126f63fef24",
+    "reconciliation_normalized_sha256": "067255c7e6b319dbea1660bebca1b3259bb6e61363f5818ec88f226fc99ce339",
     "production_normalized_sha256": "058a924953232d2c96eb6b94346efe17d563401da2fe63b541e14c3e88f52c0a"
   },
   "required_stage_order": [

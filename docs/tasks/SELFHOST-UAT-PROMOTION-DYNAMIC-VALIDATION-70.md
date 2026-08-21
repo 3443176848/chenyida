@@ -1,6 +1,6 @@
 # SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 UAT晋升与回滚隔离动态验证
 
-> 状态：`DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 SOURCE READY / DYNAMIC RUN PENDING / ISOLATED SYNTHETIC ONLY / PRODUCTION NO-GO`
+> 状态：`DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 OWNER ACL CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING / ISOLATED SYNTHETIC ONLY / PRODUCTION NO-GO`
 > 日期：2026-08-21（Asia/Shanghai）
 > 责任：Codex主智能体串行调度；项目负责人保留任何UAT/生产、真实数据、host和凭据动作的专项授权
 
@@ -58,7 +58,7 @@ TASK70于2026-08-21正式启动为唯一`DOING`。首个提交先完成版本化
 
 只读映射证明“dump/卷恢复”与“生产固定executor在完整Migration/权限状态上的切换与一次性恢复”是两个不同信任边界。为先关闭可由现有固定生产opcode精确复用、且不需要读取任何备份正文的最高风险缺口，D-160将原计划`DV70-PG-RESTORE-02`拆分：当前先执行`DV70-PG-GUARDED-SWITCH-02`；dump和文件Volume恢复继续明确未证明，不能从本case推断。
 
-当前源码已完成、动态运行尚未执行：
+初始源码已完成；两次隔离动态运行均安全失败关闭，当前owner ACL修复切片已通过定向源码验证，仍待clean source提交后重跑：
 
 1. policy v3固定唯一case、46个不可变Migration、9个受管角色、4项membership、完整content report、runtime privilege来源、`PG_RB_GUARDED_SWITCH_V3`生产SQL及V2 policy/artifact逐字节冻结；证据仍只能是`PARTIAL_ONLY`。
 2. 生产fixed executor仅在本隔离runner注入完成态observer；默认路径不计算额外stdin摘要、不回调。observer在子进程EOF、退出码和无遗留daemon均确定后，为9次精确生产调用记录argv、固定环境、stdin、timeout/output上界、原始stdout/stderr、退出码、side-effect状态和自摘要；任何回调异常在副作用后转为typed UNKNOWN。
@@ -66,9 +66,11 @@ TASK70于2026-08-21正式启动为唯一`DOING`。首个提交先完成版本化
 4. Python与Node独立重建固定executor SQL/argv/env/序列/限制和原始输出；setup/reset/drift SQL也各自绑定精确执行receipt。SQL证据只接受单一mtime=0 canonical gzip member，artifact读取要求稳定root-owned `0400`单硬链接，整件篡改harness会级联重算合法上层摘要再验证语义拒绝。
 5. 资源门把monotonic elapsed与wall clock逐样本绑定，漂移不得超过1.5秒；容器创建必须晚于至少60秒前检，总窗口至少180秒。仍只允许一个本机既有固定摘要PG17容器、断网、只读rootfs、全有界tmpfs、无bind/Volume/build/pull。
 6. artifact发布使用本次创建inode和精确路径验证；若hardlink后unlink、目录fsync或metadata失败，只删除与该inode匹配的本任务路径并同步目录，保证安全重试且不误删外来文件。
-7. 源码验收已通过：Python V3 16/16、fixed executor 129/129、Node V3 13/13、受影响合同108/108、release 29/29、inventory 263/239/24及两份Node语法门；两条只读终审均无P0/P1。首次108项组合因全量drop capabilities不能覆盖夹具中的`0440`文件并chown reader GID而产生35个同源EACCES，使用离线临时容器仅补`DAC_OVERRIDE`/`CHOWN`后108/108通过，未修改断言。
-8. 历史V2五个文件的SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91`。当前V3 policy raw SHA-256为`9245a099…dc22`，canonical policy摘要由双语测试固定；release inventory/runtime policy分别为`c4775f60…6485`/`8f6fb710…85d2`。
+7. 初始源码验收已通过：Python V3 16/16、fixed executor 129/129、Node V3 13/13、受影响合同108/108、release 29/29、inventory 263/239/24及两份Node语法门；两条只读终审均无P0/P1。首次108项组合因全量drop capabilities不能覆盖夹具中的`0440`文件并chown reader GID而产生35个同源EACCES，使用离线临时容器仅补`DAC_OVERRIDE`/`CHOWN`后108/108通过，未修改断言。当前owner ACL修复后的Python V3 16/16、fixed executor 129/129、Node V3 13/13、release 29/29及inventory 263/239/24已通过；受影响合同108项必须在clean source上重新串行确认。
+8. 历史V2五个文件的SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91`。owner ACL修复后V3 policy raw/canonical SHA-256分别为`e62b16cc…5e4d`/`90188fad…d12`，reconciliation normalized SHA-256为`067255c7…339`；release inventory/runtime policy分别为`bc5045f7…bb4f`/`8d86bac3…cd2`。
 9. 源码提交`d1d8ae8`经1,791文件敏感信息检查后普通快进到`recovery-private/main`。首次动态run`dv70-3tbcp9x1`通过60秒前检并启动隔离PG17.10，但在baseline content capture执行前由`TASK70_V3_PSQL_INPUT_INVALID`失败关闭：producer包装器只允许32MiB输出，而fixed executor内容报告合同固定为64MiB。任务容器/tmp/artifact均为0、`oom_kill`保持0；修复改为直接复用`POSTGRES_CONTENT_REPORT_MAX_BYTES`并测试精确64MiB接受、+1拒绝，必须形成新提交和private fast-forward后重跑。
+10. 输出上限修复提交`cb731df`经敏感信息检查后普通快进到`recovery-private/main`。第二次动态run`dv70-aazofvib`通过60秒前检、启动隔离PG17.10并完成baseline物化，但在守卫切换前由`ROLLBACK_FIXED_EXECUTOR_POSTGRES_SECURITY_STATE_INVALID`失败关闭；只读诊断run`dv70-mz485olk`把首个差异固定为`$.object_acl_storage[0].acl_item_count actual=4 expected=5`。两次run均无artifact、任务容器、tmp根或进程残留，未访问UAT/生产或受保护Volume。
+11. 根因为fixed executor先撤销owner/`CURRENT_USER`/`pg_database_owner`显式ACL，随后只恢复4个service group，遗漏canonical Node reconciler和状态合同要求的owner ACL。修复在REVOKE后、service grants前恢复database/schema/all tables/all sequences、394个routine和6个standalone type的owner权限，共404条`GRANT ALL PRIVILEGES`；继续禁止executor对cluster-global tablespace执行GRANT/REVOKE。fresh synthetic cluster单独为`pg_default`/`pg_global`物化owner ACL，并由Python/Node相同setup bytes`2538`及SHA-256`919ec372…626`绑定。两条独立只读复核一致确认该边界；当前仍没有V3动态artifact。
 
 ## 9. 当前动态执行验收标准
 

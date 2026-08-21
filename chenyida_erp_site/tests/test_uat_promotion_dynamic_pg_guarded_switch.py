@@ -398,11 +398,27 @@ class DynamicPostgresGuardedSwitchV3Test(unittest.TestCase):
         self.assertEqual(sql.count("CREATE ROLE "), 9)
         self.assertEqual(sql.count("WITH ADMIN FALSE, INHERIT TRUE, SET FALSE;"), 4)
         self.assertEqual(sql.count("CREATE DATABASE "), 2)
+        self.assertEqual(sql.count("GRANT ALL PRIVILEGES ON TABLESPACE "), 2)
+        self.assertIn(
+            "GRANT ALL PRIVILEGES ON TABLESPACE pg_default TO CURRENT_USER;", sql,
+        )
+        self.assertIn(
+            "GRANT ALL PRIVILEGES ON TABLESPACE pg_global TO CURRENT_USER;", sql,
+        )
+        self.assertLess(sql.index("GRANT ALL PRIVILEGES ON TABLESPACE"),
+                        sql.index("CREATE DATABASE "))
         self.assertIn("CONNECTION LIMIT 64", sql)
         self.assertIn("ALLOW_CONNECTIONS false", sql)
         self.assertNotIn("chenyida-erp-parallel", sql)
         self.assertNotIn("DROP DATABASE", sql)
         self.assertNotIn("DROP ROLE", sql)
+        invalid = copy.deepcopy(privilege)
+        invalid["tablespaces"]["built_in"] = ["pg_default"]
+        with self.assertRaisesRegex(
+            PRODUCER.DynamicGuardedSwitchError,
+            "TASK70_V3_TABLESPACE_FIXTURE_INVALID",
+        ):
+            PRODUCER.setup_cluster_sql(policy, invalid)
 
     def test_v3_container_identity_is_distinct_and_cleanup_projection_is_exact(self):
         policy = PRODUCER.load_policy()

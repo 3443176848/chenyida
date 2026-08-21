@@ -37,7 +37,7 @@ EXECUTOR_PATH = SITE_ROOT / "scripts/uat-promotion-rollback-fixed-executor.py"
 FIXTURE_PATH = SITE_ROOT / "tests/test_uat_promotion_rollback_fixed_executor.py"
 MIGRATION_ROOT = SITE_ROOT / "drizzle-postgres"
 DOCKER = "/usr/bin/docker"
-POLICY_EXPECTED_SHA256 = "7eb2705a71a21ef7384a404392759a2bcafe798442df5f42db865d02ce525b12"
+POLICY_EXPECTED_SHA256 = "90188fadc024e62912c5c6cfc85e97f254757ee274aba1e8bb55bd2c6e951d12"
 CASE_ID = "DV70-PG-GUARDED-SWITCH-02"
 FAULT_BARRIER = "DV70_V3_FIRST_RENAME_REACHED"
 FIXED_EXECUTION_RECEIPT_CONTRACT = \
@@ -1356,12 +1356,20 @@ def managed_role_sql(policy_document: dict[str, Any]) -> str:
 def setup_cluster_sql(policy: dict[str, Any], privilege_policy: dict[str, Any]) -> bytes:
     active = "chenyida_erp"
     staging = "chenyida_erp_rb_deadbeefdeadbeef"
+    tablespaces = privilege_policy.get("tablespaces")
+    if tablespaces != {
+            "built_in": ["pg_default", "pg_global"], "custom": [],
+            "owner": "PLATFORM_OWNER", "privileges": [],
+    }:
+        reject("TASK70_V3_TABLESPACE_FIXTURE_INVALID")
     marker = policy["required_target_guard"]["management_database_comment"]
     candidate_marker = policy["required_target_guard"]["executor_fixture_candidate_marker"]
     staging_marker = (
         "chenyida-erp-uat-rollback/v1:rollback-runner-deadbeef:RESTORED_STAGING"
     )
     sql = f"""{managed_role_sql(privilege_policy)}
+GRANT ALL PRIVILEGES ON TABLESPACE pg_default TO CURRENT_USER;
+GRANT ALL PRIVILEGES ON TABLESPACE pg_global TO CURRENT_USER;
 COMMENT ON DATABASE postgres IS {quote_literal(marker)};
 CREATE DATABASE {quote_identifier(active)} WITH OWNER chenyida_erp_owner
   TEMPLATE template0 ENCODING 'UTF8' LOCALE_PROVIDER libc LC_COLLATE 'C'

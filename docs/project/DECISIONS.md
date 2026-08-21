@@ -3372,6 +3372,38 @@
 - 拒绝将same-process runtime重建描述成进程崩溃恢复，将调用方丢弃返回值描述成PostgreSQL传输层COMMIT ACK丢失，或以这些合成证据解除host/真实UAT/人工UAT阻断。
 - 拒绝用rename覆盖artifact、宽泛glob/rmtree清理失败发布，或为追求可重跑而删除身份不明的路径。
 
+## D-161 fixed executor撤销ACL后必须显式恢复owner，tablespace只在fresh synthetic fixture物化
+
+- 日期：2026-08-21
+- 状态：`ACCEPTED / OWNER ACL CORRECTIVE SOURCE VERIFIED / CLEAN DYNAMIC RETRY PENDING / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据第二次TASK70隔离PG17失败回执、只读首差异诊断、两条独立Python/Node与PostgreSQL ACL审计及定向回归
+- 确认边界：只修改仓库fixed executor和全新合成cluster fixture；不授权连接或修改UAT/生产、受保护Volume、真实备份、业务数据、host配置或运行服务
+
+### Context
+
+- `dv70-aazofvib`已完成60秒前检、PG17.10启动和baseline物化，但在rename前由security state守卫失败关闭；`dv70-mz485olk`只读诊断将首差异固定为database ACL item count实际4、期望5。
+- fixed executor先对owner、`CURRENT_USER`、`pg_database_owner`及service endpoints执行REVOKE，再只恢复4个service group。对象owner仍有PostgreSQL隐式权限，但`aclexplode`状态中缺少合同要求的显式owner aclitem，因此不能与canonical Node reconciler生成的期望状态相等。
+- tablespace是cluster-global对象，不能由针对单一staging database的生产reconciler修改；但全新合成cluster必须建立与版本化runtime policy一致的可观测初始ACL，否则测试夹具会把自身差异误报为生产executor缺陷。
+
+### Decision
+
+1. fixed executor在全部REVOKE后、任何service grant前显式恢复owner权限：database、schema、all tables、all sequences、394个routine及6个standalone type，共404条`GRANT ALL PRIVILEGES`。routine按声明owner映射到migration owner或`CURRENT_USER`，standalone type映射到`CURRENT_USER`。
+2. 不向生产reconciliation SQL加入任何tablespace GRANT/REVOKE；既有forbidden token测试继续锁定该边界。custom tablespace仍不由该opcode创建、删除或授权。
+3. 仅TASK70 fresh synthetic PG setup对`pg_default`和`pg_global`执行`GRANT ALL PRIVILEGES ... TO CURRENT_USER`，并先逐字段验证policy恰为两项built-in、零custom、`PLATFORM_OWNER`、零service privilege；Python和Node必须生成完全相同的setup bytes及摘要。
+4. security parser、期望ACL计数和漂移断言保持不变，不把4改成5以外的弱化值，也不忽略owner。动态producer只有在修复形成clean提交、敏感门通过并普通快进到private main后才可重跑。
+
+### Consequences
+
+- reconciliation normalized SHA-256更新为`067255c7e6b319dbea1660bebca1b3259bb6e61363f5818ec88f226fc99ce339`；V3 policy raw/canonical为`e62b16ccd7b4d0228f07c31a35a3f49085cfa7c0888f029812b24d12e81a5e4d`/`90188fadc024e62912c5c6cfc85e97f254757ee274aba1e8bb55bd2c6e951d12`。setup为2,538 bytes、SHA-256`919ec37296b6d65b3ddb33ba4ba3c8f4cf8f9b6d5883a762a7af56e9c4cfd626`。
+- 定向Python V3 16/16、fixed executor 129/129、Node V3 13/13、release 29/29及inventory263/239/24通过；当前修复后的受影响合同108项与隔离动态artifact仍须在clean source上串行验证。
+- 两次失败run及一次诊断run均无artifact、任务容器、tmp根或进程残留；系统仍为`PRODUCTION NO-GO`，本决策不关闭dump/Volume、fresh-process、host activation、真实UAT、人工验收或正式切换阻断。
+
+### Rejected alternatives
+
+- 拒绝修改security parser、忽略owner aclitem或把期望count降为4来适配错误输出；也拒绝把PostgreSQL owner隐式权限误当作显式ACL状态已经相等。
+- 拒绝在生产staging reconciliation中修改cluster-global tablespace，或把合成fixture的tablespace物化外推为UAT/生产权限变更。
+- 拒绝在dirty source上直接重跑、手改artifact、跳过受影响合同108项，或因rename尚未发生而忽略此次安全守卫失败。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

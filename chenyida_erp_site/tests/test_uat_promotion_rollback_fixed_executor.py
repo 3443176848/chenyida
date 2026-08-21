@@ -3396,11 +3396,64 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
         )
         self.assertIn('ALTER TABLE "public"."app_users" OWNER TO "chenyida_erp_owner";', text)
         self.assertIn("GRANT SELECT ON TABLE", text)
+        self.assertEqual(text.count("GRANT ALL PRIVILEGES"), 404)
+        self.assertEqual(text.count("GRANT ALL PRIVILEGES ON ROUTINE"), 394)
+        self.assertEqual(text.count("GRANT ALL PRIVILEGES ON TYPE"), 6)
+        self.assertIn(
+            'GRANT ALL PRIVILEGES ON DATABASE '
+            '"chenyida_erp_rb_deadbeefdeadbeef" TO "chenyida_erp_owner";',
+            text,
+        )
+        self.assertIn(
+            'GRANT ALL PRIVILEGES ON SCHEMA "public" TO "pg_database_owner";',
+            text,
+        )
+        self.assertIn(
+            'GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA "public" '
+            'TO "chenyida_erp_owner";',
+            text,
+        )
+        self.assertIn(
+            'GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA "public" '
+            'TO "chenyida_erp_owner";',
+            text,
+        )
+        self.assertIn(
+            'GRANT ALL PRIVILEGES ON ROUTINE '
+            'public."cyd_ai_governance_suggestion_assert_complete"(bigint) '
+            'TO "chenyida_erp_owner";',
+            text,
+        )
+        self.assertIn(
+            'GRANT ALL PRIVILEGES ON ROUTINE public."armor"(bytea) '
+            'TO CURRENT_USER;',
+            text,
+        )
+        self.assertIn(
+            'GRANT ALL PRIVILEGES ON TYPE "public"."gbtreekey16" '
+            'TO CURRENT_USER;',
+            text,
+        )
+        revoke_database = text.index(
+            'REVOKE ALL PRIVILEGES ON DATABASE '
+            '"chenyida_erp_rb_deadbeefdeadbeef"',
+        )
+        owner_database = text.index(
+            'GRANT ALL PRIVILEGES ON DATABASE '
+            '"chenyida_erp_rb_deadbeefdeadbeef"',
+        )
+        service_database = text.index(
+            'GRANT CONNECT ON DATABASE "chenyida_erp_rb_deadbeefdeadbeef"',
+        )
+        self.assertLess(revoke_database, owner_database)
+        self.assertLess(owner_database, service_database)
         self.assertEqual(text.count("ALTER DEFAULT PRIVILEGES"), 2)
         self.assertIn("SET default_transaction_read_only TO 'on'", text)
         for forbidden in (
             "CREATE ROLE", "ALTER ROLE", "DROP ROLE", "PASSWORD", "VALID UNTIL",
             "ALTER TABLESPACE", "CREATE TABLESPACE", "DROP TABLESPACE",
+            "GRANT ALL PRIVILEGES ON TABLESPACE",
+            "REVOKE ALL PRIVILEGES ON TABLESPACE",
         ):
             self.assertNotIn(forbidden, text.upper())
         spec = EXECUTOR.derive_pg_reconcile_opcode_spec(base, inputs, bindings)
@@ -3632,6 +3685,44 @@ class PostgresPostverifyParserTest(unittest.TestCase):
         state = EXECUTOR.derive_expected_runtime_privilege_state(
             inputs, base, {"database_oid": "16385"},
         )
+        storage = {
+            (item["kind"], item["identity"]): item
+            for item in state["object_acl_storage"]
+        }
+        self.assertEqual(storage[("DATABASE", "chenyida_erp")], {
+            "kind": "DATABASE", "identity": "chenyida_erp",
+            "owner": "chenyida_erp_owner", "acl_state": "EXPLICIT",
+            "acl_item_count": 5,
+            "owner_privileges": [
+                {"privilege_type": "CONNECT", "is_grantable": False},
+                {"privilege_type": "CREATE", "is_grantable": False},
+                {"privilege_type": "TEMPORARY", "is_grantable": False},
+            ],
+        })
+        self.assertEqual(storage[("ROUTINE", "public.armor(bytea)")], {
+            "kind": "ROUTINE", "identity": "public.armor(bytea)",
+            "owner": "PLATFORM_OWNER", "acl_state": "EXPLICIT",
+            "acl_item_count": 1,
+            "owner_privileges": [
+                {"privilege_type": "EXECUTE", "is_grantable": False},
+            ],
+        })
+        self.assertEqual(storage[("TYPE", "public.gbtreekey16")], {
+            "kind": "TYPE", "identity": "public.gbtreekey16",
+            "owner": "PLATFORM_OWNER", "acl_state": "EXPLICIT",
+            "acl_item_count": 1,
+            "owner_privileges": [
+                {"privilege_type": "USAGE", "is_grantable": False},
+            ],
+        })
+        self.assertEqual(storage[("TABLESPACE", "pg_default")], {
+            "kind": "TABLESPACE", "identity": "pg_default",
+            "owner": "PLATFORM_OWNER", "acl_state": "EXPLICIT",
+            "acl_item_count": 1,
+            "owner_privileges": [
+                {"privilege_type": "CREATE", "is_grantable": False},
+            ],
+        })
         raw = (json.dumps(state, ensure_ascii=False, separators=(", ", ": ")) + "\n").encode()
         parsed = EXECUTOR.parse_runtime_privilege_state(
             raw, inputs=inputs, base=base, restored_oid="16385",

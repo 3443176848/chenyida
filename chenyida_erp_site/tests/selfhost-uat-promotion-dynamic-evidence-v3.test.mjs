@@ -309,10 +309,21 @@ test("V3 setup and reset SQL reconstruction matches the Python producer golden b
     "../operations/postgresql-runtime-privilege-policy-v2.json", import.meta.url,
   ), "utf8"));
   const setup = setupClusterSql(policy, privilegePolicy);
-  assert.equal(setup.length, 2413);
+  assert.equal(setup.length, 2538);
   assert.equal(
     createHash("sha256").update(setup).digest("hex"),
-    "e7a75828818e3716afd0cfe86311aebaf1680aed1d50960084e5028f423a1cdc",
+    "919ec37296b6d65b3ddb33ba4ba3c8f4cf8f9b6d5883a762a7af56e9c4cfd626",
+  );
+  assert.match(
+    setup.toString("utf8"),
+    /GRANT ALL PRIVILEGES ON TABLESPACE pg_default TO CURRENT_USER;\nGRANT ALL PRIVILEGES ON TABLESPACE pg_global TO CURRENT_USER;/,
+  );
+  const invalidPrivilegePolicy = structuredClone(privilegePolicy);
+  invalidPrivilegePolicy.tablespaces.built_in = ["pg_default"];
+  assert.throws(
+    () => setupClusterSql(policy, invalidPrivilegePolicy),
+    (error) => error instanceof DynamicEvidenceV3Error
+      && error.code === "TASK70_V3_SQL_RECEIPT_INVALID",
   );
 
   const reset = resetLayoutSql({

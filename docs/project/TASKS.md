@@ -11,7 +11,7 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`。历史`DV70-PG-SWITCH-01`保持`VERIFIED_PARTIAL_ONLY`；D-160已将下一风险切片拆为`DV70-PG-GUARDED-SWITCH-02 SOURCE READY / DYNAMIC RUN PENDING`，先验证完整46项Migration、角色/ACL/内容守卫、固定executor精确回执与一次性恢复，不把它冒充dump/Volume恢复。真实备份恢复、A1—A8、外部锚点、host activation、UAT/生产、受保护Volume正文和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前唯一`DOING`为`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`。历史`DV70-PG-SWITCH-01`保持`VERIFIED_PARTIAL_ONLY`；`DV70-PG-GUARDED-SWITCH-02`第二次隔离运行已在守卫切换前发现显式owner ACL遗漏并零残留失败关闭，D-161修复切片通过定向验证，状态为`OWNER ACL CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING`。真实备份恢复、A1—A8、外部锚点、host activation、UAT/生产、受保护Volume正文和数据均未授权，系统保持`PRODUCTION NO-GO`。
 
 2026-08-16调度事件：`SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82 DOING → DONE`。D-157固定逐副作用耐久回执、派生数据库/卷身份、commit-before-receipt只读恢复、精确前代镜像与live postverify；source`c2f071c`→manifest-only`aa77732`形成156文件canonical bundle`3674e011…35fb`。轻量组合201/201、manifest后installer21/21、inventory262/238/24及三路只读复核通过。未运行真实PG/Volume/Compose/恢复/回退，catalog与TASK70继续失败关闭。
 
@@ -30,6 +30,8 @@
 2026-08-21 TASK70 PG切换事件：`DV70-PG-SWITCH-01`最终在clean source`c793cdd07d2d9b5fedd63055558aed3ac90723cf`上以单一断网、只读rootfs、全tmpfs PostgreSQL 17.10容器通过5个场景和9项断言，artifact`867f3a7c…2f56`由独立Node/Git复算通过，audit`a9d2e031…ddd1d`仍保持4 blockers。首次执行发现psql advisory-lock输出含精确单换行并在零残留下失败关闭；后续跨语言门又拦截Python `2.0`/Node `2`摘要差异，均经专项测试、独立提交和重跑解决。最终资源证据为37样本/180秒、最低available 1,900,601,344 bytes、Swap增长0、根盘最低11,386,380,288 bytes、峰值磁盘增量4,890,624 bytes、Load1最高0.23、restart/OOM增量0，cleanup receipt`68ee1d20…a700`且零任务残留。证据提交`526fd4a`在1,785文件官方凭据扫描后由private main `3e30dc3`普通快进接收，本条治理提交按同一授权继续普通快进；未force或推送公开origin。TASK70保持`DOING`；当时暂记后续为`DV70-PG-RESTORE-02`，随后由D-160拆分为guarded-switch与仍未证明的dump/Volume边界；未访问UAT/真实数据/受保护卷。
 
 2026-08-21 TASK70 V3源码事件：D-160基于固定executor真实边界将原计划`DV70-PG-RESTORE-02`拆分，先完成`DV70-PG-GUARDED-SWITCH-02`源码，dump/Volume恢复继续未证明。V3固定46项Migration、9角色/4 membership、内容/Migration/security守卫、ordinary-role拒绝、首rename回滚、一次恢复与unknown/no-replay；9条生产psql调用均绑定完成态argv/env/stdin/限制/原始输出回执，且明确不声称fresh-process恢复或传输层COMMIT响应丢失。artifact发布失败按本次inode安全清理。Python16/16+129/129、Node13/13、受影响合同108/108、release29/29、inventory263/239/24及两条独立终审无P0/P1；V2五个冻结SHA不变。source`d1d8ae8`完成1,791文件敏感门及private fast-forward；首次run`dv70-3tbcp9x1`在60秒前检和PG启动后因producer 32MiB输出上限小于executor内容报告64MiB合同而执行前拒绝，零残留。精确常量绑定及64MiB/+1测试已通过，待新提交/private fast-forward后重跑；未访问UAT/真实数据/受保护卷。
+
+2026-08-21 TASK70 owner ACL修复事件：输出上限修复`cb731df`经敏感门普通快进到private main后，run`dv70-aazofvib`通过60秒前检和隔离PG17.10启动，在rename前由security state守卫失败关闭；诊断run`dv70-mz485olk`固定首差异为database ACL item count实际4/期望5。两条独立只读复核确认fixed executor在REVOKE owner ACL后只恢复4个service group，遗漏canonical合同要求的显式owner ACL。D-161在service grants前恢复database/schema/all tables/all sequences、394 routines和6 standalone types共404条owner grants；executor继续禁止tablespace mutation，fresh synthetic cluster只为`pg_default`/`pg_global`物化owner ACL。Python16+129、Node13、release29及inventory263/239/24通过，当前修复后的受影响合同108项和动态artifact仍待clean source提交/private fast-forward后串行重跑；所有失败run零任务残留，未访问UAT/真实数据/受保护卷。
 
 2026-08-12调度事件：项目负责人在零`DOING`起点明确要求启动持续交付目标并组织数据迁移、应用测试、运维安全三条只读审计线。状态按`SELFHOST-PRODUCTION-READINESS-40 TODO → DOING`切换唯一 active slot；主智能体为唯一写者。用户既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交，所有生产动作和外部真实数据传输继续需要专项明确授权。
 
@@ -237,7 +239,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 | UAT晋升与回滚隔离动态验证 | DOING | Codex主智能体（唯一写入、串行重任务）、两条只读终审智能体、项目负责人（保留真实环境授权） | 2026-08-21 | TASK82、TASK84均已完成 | `DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 SOURCE READY / DYNAMIC RUN PENDING / PRODUCTION NO-GO`。V3源码覆盖完整Migration/权限/内容守卫、精确生产回执及一次性恢复；Python16+129、Node13、合同108、release29全部通过且终审无P0/P1。clean source动态artifact仍待执行，dump/Volume、host和真实UAT继续阻断。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70.md)。 |
+| SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 | UAT晋升与回滚隔离动态验证 | DOING | Codex主智能体（唯一写入、串行重任务）、两条只读终审智能体、项目负责人（保留真实环境授权） | 2026-08-21 | TASK82、TASK84均已完成 | `DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 OWNER ACL CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING / PRODUCTION NO-GO`。第二次动态run发现并失败关闭显式owner ACL遗漏；D-161恢复404条owner grants且保持tablespace集群边界，定向Python16+129、Node13、release29、inventory263通过。当前修复后的合同108和动态artifact仍待clean source串行执行，dump/Volume、host和真实UAT继续阻断。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70.md)。 |
 
 ## 已完成任务
 

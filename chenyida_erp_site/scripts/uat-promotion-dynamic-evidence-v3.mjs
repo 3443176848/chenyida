@@ -19,7 +19,7 @@ const POLICY_PATH = resolve(
 const ARTIFACT_PATH = resolve(
   SITE_ROOT, "operations/uat-promotion-dynamic-evidence-v3.json",
 );
-const EXPECTED_POLICY_SHA256 = "7eb2705a71a21ef7384a404392759a2bcafe798442df5f42db865d02ce525b12";
+const EXPECTED_POLICY_SHA256 = "90188fadc024e62912c5c6cfc85e97f254757ee274aba1e8bb55bd2c6e951d12";
 const SHA256 = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const LABEL = /^[A-Z][A-Z0-9_]{1,79}$/;
@@ -865,6 +865,10 @@ function quoteLiteral(value, code) {
 
 
 export function setupClusterSql(policy, privilegePolicy, code = "TASK70_V3_SQL_RECEIPT_INVALID") {
+  if (!same(privilegePolicy.tablespaces, {
+    built_in: ["pg_default", "pg_global"], custom: [],
+    owner: "PLATFORM_OWNER", privileges: [],
+  })) reject(code);
   const roleLines = privilegePolicy.roles.map((role) => {
     const attributes = [
       role.intended_login ? "LOGIN" : "NOLOGIN",
@@ -894,6 +898,8 @@ export function setupClusterSql(policy, privilegePolicy, code = "TASK70_V3_SQL_R
   const staging = quoteIdentifier("chenyida_erp_rb_deadbeefdeadbeef", code);
   return Buffer.from(
     `${[...roleLines, ...membershipLines].join("\n")}\n`
+    + "GRANT ALL PRIVILEGES ON TABLESPACE pg_default TO CURRENT_USER;\n"
+    + "GRANT ALL PRIVILEGES ON TABLESPACE pg_global TO CURRENT_USER;\n"
     + `COMMENT ON DATABASE postgres IS ${quoteLiteral(marker, code)};\n`
     + `CREATE DATABASE ${active} WITH OWNER chenyida_erp_owner\n`
     + "  TEMPLATE template0 ENCODING 'UTF8' LOCALE_PROVIDER libc LC_COLLATE 'C'\n"

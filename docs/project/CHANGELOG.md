@@ -4,6 +4,16 @@
 
 ## 2026-08-21
 
+### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: restore TASK70 owner ACL materialization`
+
+- 失败关闭：输出上限修复`cb731df`完成敏感门并普通快进到private main后，隔离run`dv70-aazofvib`通过60秒前检、PG17.10启动和baseline物化，在任何rename前由`ROLLBACK_FIXED_EXECUTOR_POSTGRES_SECURITY_STATE_INVALID`拒绝；只读诊断run`dv70-mz485olk`把首差异固定为`$.object_acl_storage[0].acl_item_count actual=4 expected=5`。没有生成V3 artifact，任务容器、tmp根和进程均为0。
+- 根因：fixed executor按合同先撤销owner、`CURRENT_USER`和`pg_database_owner`显式ACL，却只重新授予4个service group；canonical Node reconciler和状态投影均要求owner ACL存在。两条独立只读审计分别从PostgreSQL ACL语义和跨语言合同确认该结论，未修改parser或降低security断言。
+- 修复：在service grants前恢复database、schema、all tables、all sequences、394个routine和6个standalone type的owner权限，共404条`GRANT ALL PRIVILEGES`。executor继续明确禁止tablespace GRANT/REVOKE；仅fresh synthetic cluster为内建`pg_default`/`pg_global`物化owner ACL，Python/Node setup固定为2,538 bytes、SHA-256`919ec372…626`。
+- 合同/追溯：reconciliation normalized SHA-256更新为`067255c7…339`，V3 policy raw/canonical为`e62b16cc…5e4d`/`90188fad…d12`；release inventory/runtime policy为`bc5045f7…bb4f`/`8d86bac3…cd2`。历史V2五文件哈希保持不变。
+- 验证：当前修复已通过Python V3 16/16、fixed executor 129/129、Node V3 13/13、release 29/29及inventory263/239/24。初始V3 source的受影响合同108/108不冒充当前结果；本提交通过diff/敏感门并普通快进后，必须在clean source离线容器重新串行运行108项，再执行动态case。
+- 资源/清理：提交前available约2.0GiB、Swap133MiB/1GiB、根盘11GiB、Load1约0.90；Docker service和四容器cgroup `oom_kill=0`，四服务running、Web/PostgreSQL healthy、restart0/OOM false。未重复TASK84，未删除镜像/容器/Volume，未访问UAT/生产数据库、真实备份、凭据、业务数据或四个受保护Volume。
+- 数据库/API/运行面：无Schema/Migration文件、普通业务API、镜像、Compose或运行面变化；只修正仓库fixed executor ACL重建及隔离fixture。当前无有效V3动态artifact，TASK70保持`DOING / CLEAN COMMIT AND DYNAMIC RETRY PENDING`，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: align TASK70 content report output limit`
 
 - 失败关闭：source`d1d8ae8`通过1,791文件敏感信息检查并普通快进到private main后，run`dv70-3tbcp9x1`完成60秒前检和隔离PG17.10启动，但baseline content capture在执行前返回`TASK70_V3_PSQL_INPUT_INVALID`；没有生成artifact或进入既有/UAT数据库。

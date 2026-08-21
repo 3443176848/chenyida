@@ -2,23 +2,23 @@
 
 最后更新时间：2026-08-21（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；V3源码闭合，动态运行待执行）
+## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；owner ACL修复已定向验证，clean source动态重跑待执行）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 SOURCE READY / DYNAMIC RUN PENDING / PRODUCTION NO-GO | 当前唯一DOING；V3必须先提交为clean source并私有普通快进，再运行隔离PG17动态artifact |
-| 只读终审 | PASS / TWO INDEPENDENT LINES / NO P0 OR P1 | 两条终审分别复核跨语言证据、fixed executor observer/receipt、原始失败输出、资源时钟与整件篡改链；P0=0、P1=0，发布失败残留P2已用inode绑定清理和回归测试闭合 |
+| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 OWNER ACL CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING / PRODUCTION NO-GO | 当前唯一DOING；修复必须先提交为clean source并私有普通快进，再重跑受影响合同和隔离PG17动态artifact |
+| 只读终审 | PASS / TWO INDEPENDENT LINES / OWNER ACL ROOT CAUSE CONFIRMED | 两条终审独立复核Python fixed executor与Node canonical reconciler，均确认REVOKE后遗漏显式owner ACL是唯一已知首差异；修复恢复owner ACL并保持tablespace集群全局边界，未发现新的P0/P1 |
 | 状态边界 | PASS / FAIL CLOSED | V3只扩大隔离合成的数据库机制覆盖；dump/Volume、完整handler request/result commit边界、fresh-process恢复、host activation、真实UAT回退与人工UAT均继续阻断 |
-| V3合同/verifier | PASS / SOURCE READY | 固定46项Migration、9角色/4 membership、内容/Migration/security守卫、10场景/15断言、9条精确生产执行回执、strict JSON/gzip/artifact及monotonic-wall clock双语验证 |
+| V3合同/verifier | PASS / CORRECTIVE SOURCE READY | 固定46项Migration、9角色/4 membership、内容/Migration/security守卫、10场景/15断言、9条精确生产执行回执、strict JSON/gzip/artifact及monotonic-wall clock双语验证；owner ACL修复后reconciliation normalized SHA-256为`067255c7…339` |
 | 历史V2冻结 | PASS / BYTE IDENTICAL | producer/verifier/audit-test/policy/artifact五个SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91` |
-| 自动验证 | PASS / SOURCE SCOPED | Python V3 16/16、fixed executor 129/129、Node V3 13/13、受影响合同108/108、release 29/29、inventory263/239/24、Node syntax和diff门通过；初次35项EACCES已证明为容器夹具能力不足并以仅补`DAC_OVERRIDE`/`CHOWN`复现全绿 |
+| 自动验证 | PASS TARGETED / CLEAN-SOURCE AFFECTED SUITE PENDING | owner ACL修复后Python V3 16/16、fixed executor 129/129、Node V3 13/13、release 29/29及inventory263/239/24通过；初始V3 source的受影响合同108/108为历史证据，当前修复必须在clean source离线容器中重新串行确认，不能提前沿用 |
 | 已验证动态case | PASS PARTIAL / `DV70-PG-SWITCH-01` | 历史不可变artifact`867f3a7c…2f56`继续证明5场景/9断言；不被V3源码准备重写或扩大解释 |
-| 当前动态case | RETRY PENDING / `DV70-PG-GUARDED-SWITCH-02` | 首次run`dv70-3tbcp9x1`通过60秒前检和PG17.10启动后，在内容报告执行前因producer 32MiB上限与executor 64MiB合同不一致而失败关闭；精确修复及64MiB/+1测试已通过，待新提交/private fast-forward后重跑 |
-| 当前资源边界 | PASS / PRE-SOURCE-TEST SNAPSHOTS | available约2.0—2.1GiB、Swap126MiB/1GiB、根盘11GiB、Load低；四服务稳定约3天、restart/OOM无变化。正式动态运行仍必须生成新鲜60/180秒机器证据 |
+| 当前动态case | RETRY PENDING / `DV70-PG-GUARDED-SWITCH-02` | run`dv70-3tbcp9x1`发现32/64MiB上限差异；修复提交`cb731df`后run`dv70-aazofvib`在切换前发现security state不一致，诊断run`dv70-mz485olk`固定首差异为数据库ACL count实际4/期望5。三次均失败关闭且零任务残留；当前owner ACL修复待clean source重跑 |
+| 当前资源边界 | PASS / PRE-COMMIT SNAPSHOT | available约2.0GiB、Swap133MiB/1GiB、根盘11GiB、Load1约0.90；Docker service及四容器cgroup `oom_kill=0`，四服务running、Web/PostgreSQL healthy、restart0/OOM false。正式动态运行仍必须生成新鲜60/180秒机器证据 |
 | 对象/清理 | PASS / NO CURRENT TASK RESIDUE | 当前所有临时Node容器均已按任务名消失，未创建网络或Volume；发现的`/tmp/cyd-uat-promotion-*`均为8月15—16既有残留，不属于本轮且未删除 |
-| Git恢复锚点 | PENDING / AUTHORIZED PRIVATE FAST-FORWARD | 项目负责人已授权敏感信息检查通过后将main非强制推送到`recovery-private/main`；当前V3源码尚未提交/推送，不提前声称远端已同步 |
+| Git恢复锚点 | PASS THROUGH `cb731df` / CORRECTIVE COMMIT PENDING | `recovery-private/main`已只读核验为`cb731df46b2e`并与当前HEAD一致；项目负责人已授权敏感信息检查通过后继续非强制快进。owner ACL修复尚未提交/推送，不提前声称远端已同步 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不访问现有UAT数据库、受保护Volume、真实备份/凭据/业务数据，不执行host activation、Migration、部署或真实回退 |
-| 系统是否可用 | NO | V3源码和合成测试不能代替动态artifact，更不能代替dump/Volume恢复、源码匹配镜像、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
+| 系统是否可用 | NO | 当前仍无有效V3动态artifact；源码与运行镜像仍为alpha.47/alpha.42差距，更未完成dump/Volume恢复、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
 
 ## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（完成；BuildKit限定清理与清理后门通过）
 

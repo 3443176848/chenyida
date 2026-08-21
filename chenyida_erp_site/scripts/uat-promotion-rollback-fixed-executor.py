@@ -7142,6 +7142,26 @@ def render_pg_reconciliation_sql(
         statements.append(
             f"REVOKE ALL PRIVILEGES ON TYPE {_pg_qualified(identity)} FROM {endpoint_sql};"
         )
+    statements.extend([
+        f"GRANT ALL PRIVILEGES ON DATABASE {staging} TO {_pg_identifier(owner)};",
+        f"GRANT ALL PRIVILEGES ON SCHEMA {_pg_identifier(schema)}"
+        f" TO {_pg_identifier(schema_owner)};",
+        f"GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA {_pg_identifier(schema)}"
+        f" TO {_pg_identifier(owner)};",
+        f"GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {_pg_identifier(schema)}"
+        f" TO {_pg_identifier(owner)};",
+    ])
+    for item in sorted(routines, key=lambda value: value["identity"]):
+        owner_sql = _pg_identifier(owner) \
+            if item["owner"] == "MIGRATION_OWNER" else "CURRENT_USER"
+        statements.append(
+            f"GRANT ALL PRIVILEGES ON ROUTINE {_pg_routine(item['identity'])}"
+            f" TO {owner_sql};"
+        )
+    for identity in sorted(type_identities):
+        statements.append(
+            f"GRANT ALL PRIVILEGES ON TYPE {_pg_qualified(identity)} TO CURRENT_USER;"
+        )
     allowed_table_privileges = {"SELECT", "INSERT", "UPDATE", "DELETE"}
     allowed_sequence_privileges = {"SELECT", "UPDATE", "USAGE"}
     for service in ("ADMIN", "BACKUP", "WEB", "WORKER"):
