@@ -3189,9 +3189,9 @@
 ## D-158 资源停止线不得以低PSI或扩大Swap绕过，先释放Codex运行时并只清理BuildKit cache
 
 - 日期：2026-08-16
-- 状态：`ACCEPTED / READ-ONLY ATTRIBUTION COMPLETE / EXTERNAL REMEDIATION REQUIRED / NO HOST MUTATION / PRODUCTION NO-GO`
+- 状态：`ACCEPTED / BUILDKIT-ONLY REMEDIATION COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED / PRODUCTION NO-GO`
 - 提案与实施：Codex持续交付负责人，依据TASK83进程/cgroup只读归因、两段60秒稳定窗口、Docker容量摘要和低资源保护规则
-- 确认边界：只确认压力来源与恢复顺序；不授权kill/restart、Swap/内核/systemd/Docker daemon修改、prune、镜像/容器/卷删除或任何UAT/生产/数据动作
+- 确认边界：2026-08-16只确认压力来源与恢复顺序；项目负责人于2026-08-21另行专项授权仅执行一次精确BuildKit命令，仍不授权kill/restart、Swap/内核/systemd/Docker daemon修改、其他prune、镜像/容器/卷删除或任何UAT/生产/数据动作
 
 ### Context
 
@@ -3210,9 +3210,15 @@
 
 ### Consequences
 
-- TASK83转DONE，TASK84登记为`BLOCKED / OWNER-SIDE CODEX RUNTIME RESTART + BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED`，当前零DOING；这正是所有安全仓库调查完成后留下的最小外部阻断。
+- TASK83转DONE后，TASK84曾登记为`BLOCKED / OWNER-SIDE CODEX RUNTIME RESTART + BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED`；该历史阻断已由2026-08-21专项授权、唯一一次清理、对象复核和清理后门解除。
 - 两段稳定窗口和进程/cgroup/Docker容量证据进入治理文档；未创建临时资源，未修改host、服务、Swap、Docker对象、数据库或Volume。
 - 系统继续`PRODUCTION NO-GO`。即使TASK84解除资源门，也只允许进入TASK70隔离动态验证，不自动获得A1—A8、真实数据、UAT/生产或切换授权。
+
+### Implementation progress
+
+- 2026-08-21原样执行唯一一次`docker builder prune --force --filter until=24h`，退出0、回收475MB；Build Cache由192项/10.79GB变为174项/10.31GB，active保持0。
+- 容器/镜像/Volume数量6/75/277及三组集合SHA-256前后一致；四ERP服务ID、镜像、restart0/OOM false、Web/PostgreSQL health和四个受保护Volume均不变。
+- 清理后约60秒窗口最低available约1.82GiB、Swap最高3.14%且增长约1.16MiB、根盘最低约10.39GiB、Load1最高1.51、PSI/OOM增量0。TASK84转DONE，TASK70仅获得隔离合成动态验证准入；根盘上界和每任务资源门继续强制。
 
 ### Rejected alternatives
 

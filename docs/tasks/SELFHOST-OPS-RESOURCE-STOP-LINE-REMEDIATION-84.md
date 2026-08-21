@@ -1,47 +1,46 @@
 # SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84 受控资源停止线恢复
 
-> 状态：`BLOCKED / CODEX RESTART AND READ-ONLY RESOURCE GATE VERIFIED / BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED / PRODUCTION NO-GO`
-> 日期：2026-08-20（Asia/Shanghai）
-> 依赖：`SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83`
-> 责任：项目负责人授予精确BuildKit清理授权；Codex获权后执行受限清理、清理后门禁、验证、文档和独立提交
+> 状态：`DONE / BUILDKIT-ONLY CLEANUP COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED / PRODUCTION NO-GO`
+> 日期：2026-08-21（Asia/Shanghai）
+> 依赖：`SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83`、D-158、项目负责人专项授权
+> 责任：项目负责人授予精确一次性BuildKit清理授权；Codex串行执行、核对对象、验证资源并收口
 
-## 1. 阻断事实
+## 1. 结果
 
-TASK83在2026-08-16的两段60秒窗口证明memory PSI、OOM和服务状态稳定，但Swap仍约82.7%，根盘仅约11GiB。长期Codex session cgroup约317MiB Swap/2.01GiB memory，BuildKit有至少约7.87GB private可回收缓存；当时既不能安全自行重启当前Codex进程，也没有删除BuildKit cache的专项授权。
+项目负责人于2026-08-21明确授权仅执行一次`docker builder prune --force --filter until=24h`，并再次排除镜像、容器和Volume删除。Codex在清理前确认default BuildKit运行、active cache为0、没有任务构建/测试/Migration重任务，随后以原样命令执行唯一一次；退出码为0，Docker报告删除18项、回收`475MB`。
 
-2026-08-20只读复核证明宿主已在2026-08-18 20:11:57外部重启，当前Codex PID `2688`于20:12:25启动，已不是TASK83采样的旧进程；外部重启的原因和授权来源不可从现场事实推断，也不作追溯性授权。新的清理前60秒窗口数值门全部通过：MemAvailable最低`1,995,564 KiB`，Swap始终`10,204/1,049,596 KiB`且增长0，根盘最低`11,403,153,408 B`（约10.62GiB），Load1最高0.72，memory PSI与`oom_kill`增量均为0；四服务restart0/OOM false，Web/PostgreSQL healthy，Worker/Caddy running，四个受保护卷身份及挂载完整。
+Build Cache由192项/10.79GB/6.149GB reclaimable变为174项/10.31GB/5.674GB reclaimable，active始终为0。过滤条件只匹配该475MB；本任务未扩大范围、未第二次执行、未调用system/image/volume prune，也未删除镜像、容器或Volume。
 
-当前唯一立即解除条件仍是精确BuildKit-only删除授权及获权后的串行执行。Build Cache为192项/10.79GB，其中6.149GB reclaimable、active 0；根盘只比`>10 GiB`硬线多约0.62GiB。清理前数值自然恢复不能替代D-158要求的受控清理、对象复核和清理后新鲜60秒门，TASK70不得启动。
+## 2. 清理前事实与保护边界
 
-## 2. 解除条件
+- 根仓库起点为`main@9fc999cde40a03071cc295a99e357b78f4ea92a5`、tree`0fbbb79ea78e778971f71e68ab9a60befa95598b`；源码alpha.47/46项Migration/head 0046。运行Web仍是alpha.42镜像；本任务未访问运行数据库或业务数据确认Migration。
+- 清理前可用内存`1,998,110,720 B`，Swap使用`32,624,640/1,074,786,304 B`，根盘可用`11,097,247,744 B`，Load为`0.71/0.52/0.35`，memory PSI与`oom_kill`为0。
+- Docker对象基线为容器6、镜像75、Volume 277；集合SHA-256依次为`9b56a70b80016101d64053c4f51efa8b7069388e2b07efad36fb87487e2f2c27`、`7c35e42bb04d345e3b14708ed10c61389f791d67ddbbfe06b9a821550ca3dd5e`、`c6c0b39166b91e634d8330207e1c4f875a9593003903d8f363999fc1dca053e8`。
+- PostgreSQL/Web/Worker/Caddy四容器均running、restart0、OOM false，Web/PostgreSQL healthy；四个受保护Volume名称、driver、scope和创建时间完整。
 
-1. `已满足（只读事实）`：现场宿主和Codex均已在TASK83之后重新启动；本次只读复核未发起或授权该外部重启，也未主动重启ERP、Docker daemon、PostgreSQL、Web、Worker或Caddy。
-2. 项目负责人明确授权：仅删除最后访问超过24小时、标记为reclaimable的BuildKit cache，拟执行命令为`docker builder prune --force --filter until=24h`。
-3. 明确不授权`docker system prune`、image prune、volume prune、镜像/容器/卷删除、Swap/内核/systemd/网络修改、宿主重启或任何UAT/生产/数据动作。
+## 3. 清理后验证
 
-## 3. 获权后的串行步骤
+2026-08-21 18:45:10—18:46:11完成7点、约60秒新鲜窗口：
 
-- 已完成重连后的强制文档读取和只读基线：根仓库`main`起点HEAD为`6c3055bdc4b7ee728fb26cfa8bbe05ba7d9f6f25`、tree为`29116f4bcf9e75e394ac7b1b3090ea8881155eca`；源码为alpha.47/0046，运行Web仍为alpha.42/source `569aa954…d33a24`，未访问运行数据库确认其Migration head。
-- 只有Codex重启后资源仍安全且授权文本精确匹配时，先记录`docker system df`摘要，再执行一次BuildKit-only prune；任何目标歧义立即停止。
-- 记录删除结果和可恢复性（cache可重建，不删除镜像/容器/卷），复核Docker对象集合、根盘、OOM和服务状态。
-- 完成清理后的新鲜60秒资源窗口。只有available≥768MiB、Swap≤80%、Swap增长≤256MiB、根盘>10GiB、Load/OOM/restart/health均通过，才允许TASK70从BLOCKED转DOING；否则停止并形成新的最小授权请求。2026-08-20清理前窗口只证明当前可安全等待授权，不替代该步骤。
+- MemAvailable最低`1,955,749,888 B`（约1.82GiB），高于768MiB硬线。
+- Swap最高`33,832,960/1,074,786,304 B`（3.14%），窗口增长`1,212,416 B`（约1.16MiB），分别低于80%和256MiB硬线。
+- 根盘最低可用`11,153,551,360 B`（约10.39GiB），高于10GiB硬线；余量仍小，TASK70每个重任务前必须重新核验最坏磁盘占用。
+- Load1最高1.51，memory PSI始终0，`oom_kill`增量0。
+- 清理后容器/镜像/Volume仍为6/75/277，三组集合SHA-256与清理前逐字一致；四服务ID、镜像ID、运行状态、restart/OOM和health均不变，四个受保护Volume metadata不变。
+- 本任务未创建临时文件、容器、网络、Volume、数据库或测试数据，无任务资源需要清理。
 
-## 4. 验收标准与当前结果
+## 4. 验收结果
 
-| 验收项 | 当前结果 | 证据/剩余动作 |
+| 验收项 | 结果 | 证据 |
 | --- | --- | --- |
-| Codex旧进程已释放 | PASS / EXTERNAL FACT | 宿主与Codex均在TASK83之后启动；原因和授权来源不推断 |
-| 精确删除授权存在 | BLOCKED | 仍需项目负责人专项授权唯一命令；“继续”不扩大到删除授权 |
-| BuildKit-only清理完成 | NOT RUN | 不得在授权前执行；镜像、容器和Volume始终排除 |
-| Docker对象保护 | PASS / PRE-CLEANUP | 四服务身份/状态和四个受保护卷完整；清理后必须重新核对 |
-| 60秒资源门 | PASS / PRE-CLEANUP ONLY | 当前数值门通过；清理后必须再完成一次新鲜窗口 |
-| 治理与轻量验证 | PASS / CHECKPOINT | 177个本地链接、DOING=0、状态一致性、发布清单精确字节单元测试1/1、增量敏感信息及diff门通过 |
-| TASK70可启动 | NO | 仅在本表所有清理与清理后证据通过、TASK84收口后转换状态 |
-| 生产可用 | NO | 动态回退、host激活、真实异机恢复/迁移、人工UAT与正式切换仍缺证据 |
+| 精确删除授权 | PASS | 项目负责人授权唯一原样命令并明确禁止镜像、容器和卷删除 |
+| BuildKit-only清理 | PASS | 原样命令仅执行一次，退出0，回收475MB |
+| Docker对象保护 | PASS | 6/75/277及三组集合摘要前后一致；四服务和四保护卷不变 |
+| 60秒资源门 | PASS | available、Swap比例/增长、根盘、Load/PSI/OOM/restart/health全部通过 |
+| 数据与运行面保护 | PASS | 未访问数据库/Volume/备份正文，未build、Migration、部署、重启或业务写 |
+| TASK70前置 | PASS / READY | 资源停止线和TASK82执行器依赖已解除；TASK70可在独立任务转换后从隔离合成切片开始 |
+| 生产可用 | NO | 动态回退、host激活、源码匹配镜像、真实异机恢复/迁移、人工UAT、试运行和切换仍缺证据 |
 
-## 5. 禁止事项
+## 5. 后续边界
 
-- 不由当前Codex进程自行kill/restart；不猜测客户端守护会自动拉起。
-- 不重启或替换ERP/Docker服务，不触碰数据库、业务数据、备份、日志正文、env、凭据或四个受保护Volume。
-- 不清理镜像、容器、Volume、日志、`/root/.codex`、用户文件或任何未逐项授权对象。
-- 不因PSI为0或Swap增长低而放宽Swap≤80%的硬门。
+TASK84完成只解除资源停止线，不授予UAT/生产、真实数据、凭据、host安装、账号、网络、systemd、备份恢复、部署或切换权限。下一正式任务是`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`，只允许新建可丢弃TEST目标、隔离PostgreSQL、合成数据和临时文件域；根盘余量约0.39GiB，任何动态切片必须先证明其磁盘上界并重新执行资源门。

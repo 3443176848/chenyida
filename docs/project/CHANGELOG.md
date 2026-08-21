@@ -2,6 +2,19 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-21
+
+### SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84 - `ops: complete bounded BuildKit cache cleanup`
+
+- 调度/授权：从clean `main@9fc999cde40a03071cc295a99e357b78f4ea92a5`、tree`0fbbb79ea78e778971f71e68ab9a60befa95598b`恢复TASK84。项目负责人专项授权仅执行一次`docker builder prune --force --filter until=24h`并禁止镜像、容器和Volume删除；数据迁移、应用测试、运维安全三条智能体线只读审计，主智能体唯一写入和执行Docker mutation。
+- 执行：清理前default BuildKit running、active0且无任务build/test/Migration重任务；原样命令唯一执行、退出0、删除18项并回收475MB。Build Cache由192项/10.79GB/6.149GB reclaimable变为174项/10.31GB/5.674GB reclaimable；未第二次执行或扩大到system/image/volume prune。
+- 对象保护：容器/镜像/Volume前后均为6/75/277，集合SHA-256分别保持`9b56a70b…f2c27`、`7c35e42b…dd5e`、`c6c0b391…53e8`；PostgreSQL/Web/Worker/Caddy四容器ID、镜像ID、running、restart0/OOM false、Web/PostgreSQL health及四个受保护卷metadata不变。
+- 清理后门：18:45:10—18:46:11七点窗口最低MemAvailable`1,955,749,888 B`、最高Swap`33,832,960/1,074,786,304 B`（3.14%）、增长`1,212,416 B`、最低根盘`11,153,551,360 B`（约10.39GiB）、Load1最高1.51，memory PSI始终0且`oom_kill`增量0；全部D-158硬门通过。
+- Git/版本/运行面：源码保持alpha.47/46项Migration/head 0046，运行Web仍为alpha.42；没有访问运行数据库或业务数据，没有build、Migration、部署、备份恢复、服务重启、UAT/生产或业务写。项目负责人保护的状态报告保持不读、不改、不提交。
+- 验证：任务治理Markdown本地链接、状态一致性、发布bundle literal allowlist/精确blob字节单元测试、高置信敏感信息和`git diff --check`通过；没有以重型全量测试替代本任务对象/资源证据。
+- 资源/清理：本任务未创建临时文件、容器、网络、Volume、数据库或测试数据，无任务资源残留。根盘最低只比10GiB硬线高约0.39GiB，TASK70每个切片必须先证明磁盘上界并重做资源门。
+- 治理：TASK84转`DONE`，TASK70从`BLOCKED`转`TODO / READY FOR FORMAL START`；该转换只允许隔离合成动态验证，不授权真实target/凭据、host activation、UAT/生产、真实数据、员工签字或切换，系统继续`PRODUCTION NO-GO`。
+
 ## 2026-08-20
 
 ### SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84 - `docs: record TASK84 resource gate revalidation`

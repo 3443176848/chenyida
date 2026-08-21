@@ -1,21 +1,20 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-20（Asia/Shanghai）
+最后更新时间：2026-08-21（Asia/Shanghai）
 
-## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（阻塞；外部重启已发生，等待精确BuildKit授权）
+## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（完成；BuildKit限定清理与清理后门通过）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | BLOCKED / CODEX RESTART AND READ-ONLY RESOURCE GATE VERIFIED / BUILDKIT-ONLY CLEANUP AUTHORIZATION REQUIRED / PRODUCTION NO-GO | 当前零DOING；现场宿主/Codex已在TASK83后外部重启，原因和授权来源不推断，BuildKit删除仍需专项授权 |
-| 已满足前提 | PASS / READ-ONLY FACT | 宿主于2026-08-18 20:11:57外部重启，当前Codex于20:12:25启动；本轮未发起任何重启 |
-| 解除条件 | EXTERNAL / MINIMAL | 项目负责人授权仅执行一次`docker builder prune --force --filter until=24h`；不授权ERP/Docker服务、镜像/容器/卷或Swap变化 |
-| 保护范围 | EXACT | 禁止system/image/volume prune、镜像/容器/卷删除、`/root/.codex`/日志清理、host重启及任何UAT/生产/数据动作 |
-| 清理前60秒门 | PASS / DOES NOT RELEASE TASK | MemAvailable最低约1.90GiB、Swap约0.97%且增长0、根盘约10.62GiB、Load1最高0.72、PSI/OOM增量0；四服务restart0/OOM false，四卷完整 |
-| BuildKit | BLOCKED / AUTHORIZATION REQUIRED | 192项/10.79GB，6.149GB reclaimable、active 0；未执行prune，镜像和Volume不属于目标 |
-| 获权后验证 | FAIL CLOSED | BuildKit-only清理后复核对象并完成新鲜60秒窗口；仅当available≥768MiB、Swap≤80%、根盘>10GiB及OOM/restart/health通过，TASK70才转DOING |
-| 本轮适用验证 | PASS / LIGHTWEIGHT ONLY | 177个本地Markdown链接、状态一致性、发布清单精确字节单元测试1/1、增量敏感信息及diff门通过；没有运行重任务 |
-| 收口资源/临时项 | PASS / NO TASK RESIDUE | available约1.94GiB、Swap约9.97MiB、根盘约10.88GiB、Load1 0.17、`oom_kill=0`；四服务和四卷保持，本任务未创建临时资源 |
-| 系统是否可用 | NO | 资源门、动态回退、host激活、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
+| 当前状态 | DONE / BUILDKIT-ONLY CLEANUP COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED / PRODUCTION NO-GO | TASK84已释放；当前零DOING，TASK70为TODO并可正式启动隔离合成切片 |
+| 专项授权 | PASS / EXACT ONCE | 项目负责人仅授权一次`docker builder prune --force --filter until=24h`并禁止镜像、容器和卷删除；命令原样唯一执行 |
+| BuildKit结果 | PASS / BOUNDED | 退出0、回收475MB；Build Cache由192项/10.79GB/6.149GB reclaimable变为174项/10.31GB/5.674GB reclaimable，active 0 |
+| Docker对象保护 | PASS / IDENTICAL | 容器/镜像/Volume均保持6/75/277，三组集合SHA-256前后一致；四服务ID、restart0/OOM false、Web/PostgreSQL health和四保护卷不变 |
+| 清理后60秒门 | PASS | available最低约1.82GiB；Swap最高3.14%、增长约1.16MiB；根盘最低约10.39GiB；Load1最高1.51、PSI/OOM增量0 |
+| 保护范围 | PASS / EXACT | 未执行system/image/volume prune，未删除镜像/容器/卷，未读取数据库/Volume/备份正文，未重启服务或修改Swap/host |
+| 收口资源/临时项 | PASS / NO TASK RESIDUE | 本任务未创建临时文件、容器、网络、Volume、数据库或测试数据；根盘余量仅约0.39GiB，TASK70每个切片必须重做门禁并证明磁盘上界 |
+| 下一正式任务 | READY / NOT STARTED | TASK70先建立九阶段/十三检查动态矩阵、资源上界与清理收据，再运行最小隔离PostgreSQL故障注入切片 |
+| 系统是否可用 | NO | 动态回退、host激活、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
 
 ## SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83（完成；只读归因与恢复入口已固定）
 
