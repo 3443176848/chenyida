@@ -910,7 +910,8 @@ test("dynamic Git loader resolves real commits, ancestry, blobs and ignores repl
 });
 
 test("audit observes the complete repository control plane and recoverable fail-closed runtime boundary", () => {
-  const { artifact, errors } = buildUatPromotionRollbackAudit(inputs());
+  const fixture = inputs();
+  const { artifact, errors } = buildUatPromotionRollbackAudit(fixture);
   assert.deepEqual(errors, []);
   assert.equal(artifact.observations.supervisor_operation_count, 36);
   assert.equal(artifact.observations.required_promotion_operation_count, 16);
@@ -927,7 +928,8 @@ test("audit observes the complete repository control plane and recoverable fail-
   assert.equal(artifact.observations.repository_handler_capability,
     "HANDLERS_IMPLEMENTED_DORMANT");
   assert.equal(artifact.observations.isolated_dynamic_validation,
-    "NOT_EXECUTED_NO_VERIFIED_RECEIPT");
+    fixture.dynamicEvidence === null
+      ? "NOT_EXECUTED_NO_VERIFIED_RECEIPT" : "VERIFIED_PARTIAL_ONLY");
   assert.equal(artifact.observations.host_runtime_activation,
     "NOT_ACTIVATED_NO_TRUSTED_HOST_RECEIPT");
   assert.equal(artifact.observations.actual_uat_rollback_rehearsal,

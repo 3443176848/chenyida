@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "65c496b1216559447a6c8ae3104e6ce2c78c2072fc499d44580ac49fe1558011",
+  "artifact_sha256": "abd0989b4414393433464f0095de3415e24f3c62a7a2c9320328a0ae23790ef6",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -244,7 +244,7 @@
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 238,
-      "sha256": "5ee991b094569471324cf8554aa35415722cc827ca3084f1517edf5fe4fce3e1",
+      "sha256": "e8bf40d118bf0d84aeb922c47f4f349dada422ead3673483fd2bb1b2e4f08f98",
       "total_tests": 262
     },
     "source_manifest": {
@@ -341,7 +341,7 @@
             "selfhost-uat-promotion-rollback-audit.test.mjs"
           ],
           "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-          "sha256": "5ee991b094569471324cf8554aa35415722cc827ca3084f1517edf5fe4fce3e1"
+          "sha256": "e8bf40d118bf0d84aeb922c47f4f349dada422ead3673483fd2bb1b2e4f08f98"
         },
         {
           "markers": [
@@ -349,7 +349,7 @@
             "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394"
           ],
           "path": "chenyida_erp_site/release/test-runtime-policy-v1.json",
-          "sha256": "30ceff07b77e0b4309d036ef331c3c5ef8867a1a13ec44c232f6cb77ef350b51"
+          "sha256": "818c4a92c2f5e23b389cb6963c080b77b839b5bbb482c8135ec03ac7c7a01303"
         },
         {
           "markers": [
@@ -444,7 +444,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "b4f5b2859d534ac6d7d165f0e061089908904a85d77a1951d8920a794df68a92"
+          "sha256": "9ff70b8a7249496951017e405b9122e3434293c81b6be157026b5ae498f68e9c"
         },
         {
           "markers": [
@@ -714,7 +714,7 @@
             "dynamic evidence tampering fails closed"
           ],
           "path": "chenyida_erp_site/tests/selfhost-uat-promotion-rollback-audit.test.mjs",
-          "sha256": "80711e8c31ae4888a82dcb222956249843479286a6f20c9fb46b87c18d6624e9"
+          "sha256": "fd9a5df231adf873df597e1f7253347c19ae0079cdb33e168bec1134320b9dc7"
         },
         {
           "markers": [
@@ -746,7 +746,7 @@
           "sha256": "c0ae0891094b76edc974a72628b0d9d2e6eef894de24a4c00e6ec83074a832ca"
         }
       ],
-      "sha256": "9b5b2219795bca679a60fa19a9d011536d4e5446fcda0f2e42d691efed21ea95"
+      "sha256": "fe205a08ff4dc49f511fae71830ffd7bdf8eef53f6ed1ad6a044b3016dd55769"
     }
   },
   "observations": {
