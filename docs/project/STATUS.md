@@ -2,11 +2,11 @@
 
 最后更新时间：2026-08-21（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；D-165 psql失败关闭源码已验证，PG17刷新与动态重跑受资源门阻断）
+## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；D-165源码已提交并私有锚定，PG17刷新与动态重跑受资源门阻断）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 D-165 PSQL FAIL-CLOSED CORRECTIVE SOURCE VERIFIED / PG17 REFRESH AND DYNAMIC RETRY RESOURCE-BLOCKED / PRODUCTION NO-GO | 当前唯一DOING；D-164提交`28128de`已clean/private同步。D-165先完成独立提交和私有普通快进，根盘恢复到至少10GiB后才允许启动真实PG17 refresh/test和正式动态artifact |
+| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 D-165 SOURCE COMMITTED AND PRIVATE-ANCHORED / PG17 REFRESH AND DYNAMIC RETRY RESOURCE-BLOCKED / PRODUCTION NO-GO | 当前唯一DOING；D-165提交`e192f1d`已通过committed-tree敏感门并与private main精确一致。根盘恢复到至少10GiB后才允许启动真实PG17 refresh/test和正式动态artifact |
 | 只读终审 | PASS / THREE INDEPENDENT AUDITS | PostgreSQL语义审计确认psql 17的`\quit`不接受状态，Node/Python审计确认精确执行回执，摘要链审计确认五个V2文件和历史Supervisor V1 bundle不变；D-132源码哈希仅因生产安全修复更新，不改写历史证据 |
 | 状态边界 | PASS / FAIL CLOSED | V3只扩大隔离合成的数据库机制覆盖；dump/Volume、完整handler request/result commit边界、fresh-process恢复、host activation、真实UAT回退与人工UAT均继续阻断 |
 | V3合同/verifier | PASS / D-165 CORRECTIVE SOURCE READY | 全部production-reachable带参quit改为server-side exception；失败回执只接受rc=3、stdout单换行、精确ERROR stderr。security drift同时绑定失败前后状态字节及相等摘要；reconciliation/production normalized为`067255c7…339`/`56700c1f…abb`，raw/normalized/gzip仍受1MiB上界 |
@@ -14,9 +14,9 @@
 | 自动验证 | PASS / SCOPED NON-PG | Node受影响68/68及catalog/release35/35，Python V3 19/19、fixed130/130、Supervisor46/46、audit20/20，inventory263/239/24、policy/audit直接门、shell语法和全仓带参quit静态门通过；`assert-ready`按预期拒绝。真实PG17 integration和官方catalog refresh/test因硬资源门未运行，明确不计为PASS |
 | 已验证动态case | PASS PARTIAL / `DV70-PG-SWITCH-01` | 历史不可变artifact`867f3a7c…2f56`继续证明5场景/9断言；不被V3源码准备重写或扩大解释 |
 | 当前动态case | RESOURCE-BLOCKED RETRY / `DV70-PG-GUARDED-SWITCH-02` | D-164提交`28128de`同步后，正式`dv70-g2g36ygu`由exact receipt门拒绝且零残留；诊断`dv70-1bzn9rfk`固定旧实现rc=0和`extra argument "3" ignored`。D-165修复已通过非PG回归，但尚无成功V3 artifact；空间门恢复后必须从clean/private一致源码重跑 |
-| 当前资源边界 | BLOCKED / ROOT BELOW 10 GIB | 本轮门禁available约1.9GiB、Swap166MiB/1GiB、Load1 0.31，四服务restart0/OOM false且宿主`oom_kill=0`；根盘精确可用10,717,696,000 bytes，低于10GiB下限10,737,418,240 bytes 19,722,240 bytes。禁止启动新的PG/Docker重任务 |
+| 当前资源边界 | BLOCKED / ROOT BELOW 10 GIB | 提交后门禁available约1.9GiB、Swap166MiB/1GiB、Load1 0.97，四服务restart0/OOM false且宿主`oom_kill=0`；根盘精确可用10,724,749,312 bytes，低于10GiB下限10,737,418,240 bytes 12,668,928 bytes。禁止启动新的PG/Docker重任务 |
 | 对象/清理 | PASS / NO CURRENT TASK RESIDUE | 当前无`/tmp/cyd-dv70-*`、`/tmp/cyd-task70-*`或runtime privilege任务残留；8月15—16既有`/tmp/cyd-uat-promotion-*`未删除。未重复TASK84、未删除镜像、容器或Volume |
-| Git恢复锚点 | PASS THROUGH `28128de` / D-165 COMMIT PENDING | D-164提交`28128de0ca03453234f760f5b5b3fa8b0562319c`经1,791文件committed-tree敏感门普通快进且与`recovery-private/main`精确一致；D-165必须完成最终diff/敏感门后按既有授权非强制快进 |
+| Git恢复锚点 | PASS THROUGH `e192f1d` / PRIVATE READBACK EXACT | D-165提交`e192f1d7bb63bfafcd39d77a3d543d604364c9c6`经1,791文件committed-tree敏感门，由`recovery-private/main`从`28128de`普通快进接收；远端逐字节回读与local HEAD一致，未force或推送公开origin |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不访问现有UAT数据库、受保护Volume、真实备份/凭据/业务数据，不执行host activation、Migration、部署或真实回退 |
 | 系统是否可用 | NO | 当前仍无有效V3动态artifact；audit保持4 blockers、`may_start=false`，源码与运行镜像仍为alpha.47/alpha.42差距，更未完成PG17闭环、dump/Volume恢复、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
 

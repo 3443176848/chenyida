@@ -3531,7 +3531,7 @@
 4. PostgreSQL 17 integration脚本必须真实覆盖state/catalog缺失`expected_database`、非法marker target、reconciler/operator强制advisory-lock失败，并在每个失败后重捕获状态与结构性catalog进行字节核对。静态门同时扫描`.cjs/.js/.mjs/.mts/.py/.sh/.sql/.ts`并禁止带参quit回归。
 5. V3 policy、compiled catalog、runtime/operator/cluster policy、release inventory/runtime/manifest及promotion audit必须由固定生成器按新源码重放；audit仍保持4 blockers、P0=3、P1=1、`may_start=false`。五个V2冻结文件和历史`release-supervisor-bundle-v1.json`不得更新。
 6. D-132 dashboard中的cluster catalog源码SHA断言属于当前安全回归锁，不是允许坏语义永久冻结的历史artifact。D-165仅更新该断言以绑定修复后源码；D-132原提交、tree、当时运行结果和历史报告不改写，且文档明确这是生产安全修正例外。
-7. D-165先在非PG适用回归、diff及敏感门后形成独立提交并普通快进到`recovery-private/main`。只有根盘恢复到至少10GiB且内存、Swap、Load、OOM/restart/health门同时通过，才串行执行真实PG17 refresh/test和clean/private一致源码上的60/180秒正式producer。
+7. D-165先在非PG适用回归、diff及敏感门后形成独立提交并普通快进到`recovery-private/main`；该前置已由提交`e192f1d7bb63bfafcd39d77a3d543d604364c9c6`及精确远端回读满足。只有根盘恢复到至少10GiB且内存、Swap、Load、OOM/restart/health门同时通过，才串行执行真实PG17 refresh/test和clean/private一致源码上的60/180秒正式producer。
 
 ### Consequences
 

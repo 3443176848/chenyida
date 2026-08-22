@@ -4,6 +4,13 @@
 
 ## 2026-08-21
 
+### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `docs: record TASK70 psql guard correction`
+
+- Git恢复锚点：D-165源码提交`e192f1d7bb63bfafcd39d77a3d543d604364c9c6`在clean HEAD再次通过官方1,791文件committed-tree敏感信息检查；`recovery-private/main`经祖先关系确认后从`28128de`普通快进，远端回读精确等于local HEAD。未force、未推送公开origin或改写历史。
+- 验证结论：server-side exception、精确rc/stdout/stderr、security state零副作用、八类源码带参quit静态禁令及派生摘要链均由前一源码提交闭合；冻结V2五文件和历史Supervisor V1 bundle字节不变。治理收口只更新MASTER/TASKS/CHANGELOG/STATUS/DECISIONS和当前任务事实，不修改业务代码、Migration、API、镜像、Compose或运行面。
+- 资源失败关闭：提交后available约1.9GiB、Swap166MiB/1GiB、Load1 0.97、宿主`oom_kill=0`，四服务restart0/OOM false且Web/PostgreSQL healthy；根盘精确可用10,724,749,312 bytes，仍比10GiB硬线少12,668,928 bytes。未启动PG17 catalog refresh/test或正式V3 producer，未重复TASK84，未删除镜像、容器或Volume。
+- 下一步：只有根盘重新达到至少10GiB且新鲜资源门全部通过，才从clean/private一致的`e192f1d`串行运行PG17负测、catalog refresh/test和`DV70-PG-GUARDED-SWITCH-02`正式证据。当前仍无V3 artifact，audit保持4 blockers与`may_start=false`，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: fail closed on TASK70 psql guard errors`
 
 - clean source前提：D-164提交`28128de0ca03453234f760f5b5b3fa8b0562319c`经1,791文件committed-tree敏感门普通快进到`recovery-private/main`，local/private精确一致。其后正式run`dv70-g2g36ygu`由`TASK70_V3_GUARDED_FAILURE_EXECUTION_INVALID`拒绝，没有发布artifact且任务资源零残留。
@@ -13,7 +20,7 @@
 - 追溯：V3 reconciliation/production normalized SHA-256为`067255c7…339`/`56700c1f…abb`，policy raw/canonical为`e8c642ec…cdcd`/`30b81e06…0e9`。compiled catalog raw/semantic/artifact为`915ee9bf…7a41`/`e0070514…e8c`/`a386c384…aa53`；runtime/operator/cluster policy raw为`2aba8ed9…a7c`/`4767a070…9fa`/`3537a90a…016`，release inventory/runtime为`97e599da…51e6`/`1b0637e2…efc8`。audit semantic/raw/Markdown/source-manifest为`ab52a095…123`/`c180f6f7…8ef`/`5b1175d1…5f45`/`605cdacc…bdf8`，仍为4 blockers、`may_start=false`。
 - 验证：受影响Node六文件68/68、catalog/release gate/manifest35/35，Python V3 19/19、fixed executor130/130、Supervisor受影响套件46/46、audit20/20，inventory263/239/24、policy/audit直接门、shell语法及静态quit门通过；`assert-ready`继续按预期以exit 1和`UAT_PROMOTION_EXECUTOR_NOT_READY`拒绝。五个V2冻结文件与历史`release-supervisor-bundle-v1.json`不变。D-132 dashboard中的cluster catalog源码哈希只按D-165安全修复更新，历史D-132提交/证据不改写。
 - 资源/未验证范围：收口前available约1.9GiB、Swap166MiB/1GiB、Load低、宿主`oom_kill=0`，四个常驻服务restart0/OOM false且Web/PostgreSQL healthy；但根盘精确可用10,717,696,000 bytes，低于10GiB硬线。按规则未启动官方PG17-backed catalog refresh/test或正式V3 producer；仓库编译产物虽由固定生成器更新，仍不得冒充真实PG17闭环，也不得重复已消耗的TASK84命令。
-- 数据库/API/运行面：无Schema/Migration、普通业务API、镜像、Compose、UAT或生产运行面变化；未访问真实数据库、业务数据、备份正文、凭据或受保护Volume。D-165先形成独立提交并在敏感门后普通快进到private；空间门恢复后继续PG17验证和正式动态重跑。TASK70保持唯一`DOING`，系统继续`PRODUCTION NO-GO`。
+- 数据库/API/运行面：无Schema/Migration、普通业务API、镜像、Compose、UAT或生产运行面变化；未访问真实数据库、业务数据、备份正文、凭据或受保护Volume。D-165随后以`e192f1d`形成独立提交并在敏感门后普通快进到private；空间门恢复后继续PG17验证和正式动态重跑。TASK70保持唯一`DOING`，系统继续`PRODUCTION NO-GO`。
 
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: correct TASK70 guarded SQL coalesce syntax`
 
