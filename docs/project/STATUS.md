@@ -16,7 +16,7 @@
 | 当前动态case | RESOURCE-BLOCKED RETRY / `DV70-PG-GUARDED-SWITCH-02` | D-164提交`28128de`同步后，正式`dv70-g2g36ygu`由exact receipt门拒绝且零残留；诊断`dv70-1bzn9rfk`固定旧实现rc=0和`extra argument "3" ignored`。D-165修复已通过非PG回归，但尚无成功V3 artifact；空间门恢复后必须从clean/private一致源码重跑 |
 | 当前资源边界 | BLOCKED / ROOT BELOW 10 GIB | 提交后门禁available约1.9GiB、Swap166MiB/1GiB、Load1 0.97，四服务restart0/OOM false且宿主`oom_kill=0`；根盘精确可用10,724,749,312 bytes，低于10GiB下限10,737,418,240 bytes 12,668,928 bytes。禁止启动新的PG/Docker重任务 |
 | 对象/清理 | PASS / NO CURRENT TASK RESIDUE | 当前无`/tmp/cyd-dv70-*`、`/tmp/cyd-task70-*`或runtime privilege任务残留；8月15—16既有`/tmp/cyd-uat-promotion-*`未删除。未重复TASK84、未删除镜像、容器或Volume |
-| Git恢复锚点 | PASS THROUGH `e192f1d` / PRIVATE READBACK EXACT | D-165提交`e192f1d7bb63bfafcd39d77a3d543d604364c9c6`经1,791文件committed-tree敏感门，由`recovery-private/main`从`28128de`普通快进接收；远端逐字节回读与local HEAD一致，未force或推送公开origin |
+| Git恢复锚点 | PASS / SOURCE ANCHOR `e192f1d` PRIVATE / GOVERNANCE FAST-FORWARD VERIFIED | D-165源码提交`e192f1d7bb63bfafcd39d77a3d543d604364c9c6`经1,791文件committed-tree敏感门并由private main从`28128de`普通快进接收；后续治理提交只在该锚点之上普通快进。精确分支tip以本轮`git rev-parse`和`git ls-remote`回读为准，不在自身文档中循环嵌入 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不访问现有UAT数据库、受保护Volume、真实备份/凭据/业务数据，不执行host activation、Migration、部署或真实回退 |
 | 系统是否可用 | NO | 当前仍无有效V3动态artifact；audit保持4 blockers、`may_start=false`，源码与运行镜像仍为alpha.47/alpha.42差距，更未完成PG17闭环、dump/Volume恢复、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
 

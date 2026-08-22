@@ -4,6 +4,11 @@
 
 ## 2026-08-21
 
+### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `docs: clarify TASK70 private source anchor`
+
+- 自指边界：治理提交不能在自身正文稳定嵌入自身commit。MASTER/STATUS只固定已验证的D-165源码锚点`e192f1d`和“后续只允许普通快进”事实；当前分支tip由`git rev-parse HEAD`与`git ls-remote`在提交后回读，不用下一笔文档提交追写上一笔治理哈希。
+- 范围/验证：仅更正MASTER、STATUS及本条CHANGELOG的Git追溯措辞；不修改源码、Migration、API、测试、镜像、Compose或运行面。继续使用前一治理提交的1,791文件敏感门、静态测试和diff门，系统状态与资源阻断不变。
+
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `docs: record TASK70 psql guard correction`
 
 - Git恢复锚点：D-165源码提交`e192f1d7bb63bfafcd39d77a3d543d604364c9c6`在clean HEAD再次通过官方1,791文件committed-tree敏感信息检查；`recovery-private/main`经祖先关系确认后从`28128de`普通快进，远端回读精确等于local HEAD。未force、未推送公开origin或改写历史。
