@@ -1,20 +1,35 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-21（Asia/Shanghai）
+最后更新时间：2026-08-23（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；D-165源码已提交并私有锚定，PG17刷新与动态重跑受资源门阻断）
+## SELFHOST-SMALL-TEAM-SCOPE-RESET-85（完成；小团队范围重置）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 D-165 SOURCE COMMITTED AND PRIVATE-ANCHORED / PG17 REFRESH AND DYNAMIC RETRY RESOURCE-BLOCKED / PRODUCTION NO-GO | 当前唯一DOING；D-165提交`e192f1d`已通过committed-tree敏感门并与private main精确一致。根盘恢复到至少10GiB后才允许启动真实PG17 refresh/test和正式动态artifact |
+| 当前状态 | DONE / SMALL-TEAM RESET RECORDED / TASK70 FROZEN / DOCS ONLY / PRODUCTION NO-GO | D-166已接受；当前零DOING，下一步等待实际岗位与业务流程基线确认 |
+| 目标架构 | PASS / MONOLITH-FIRST | Caddy + 一个Node Web/API + PostgreSQL + 本地文件；只有确需异步任务时保留一个Worker |
+| 保留底线 | PASS / UNCHANGED | 稳定ID、关系约束、事务、幂等、并发、服务端权限、审计、Migration、备份和过账冲销规则不放宽 |
+| 冻结范围 | PASS | TASK70、TASK59—TASK82扩展、R2—R5及AI路线均不自动继续；历史实现保留，不批量删除 |
+| 代码/数据库/API | UNCHANGED | 只修改治理Markdown；无业务代码、Schema/Migration、API、依赖、镜像或Compose变化 |
+| 自动验证 | PASS / SCOPED | Node发布合同76/76、Python fixed-executor合同130/130、Python三项基线通过；lint退出0，为0 error/50个既有warning；`git diff --check`通过 |
+| 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | 未连接自托管UAT/生产数据库、读取Volume/正式备份正文或执行build、Migration、部署、重启、业务写。Python基线只检查既有本地开发SQLite；首次默认生成的本任务时间戳备份已精确删除并以`--no-backup`重跑通过 |
+| 资源/清理 | PASS / NO TASK RESIDUE | 前后available均约2.4GiB，Swap 145→147MiB/1GiB，根盘均约11GiB，Load由`0.49/0.50/0.36`降至`0.16/0.35/0.35`；四服务restart0/OOM false、宿主`oom_kill=0`。本任务测试容器与精确时间戳备份均已清零；Compose状态命令因本机缺必填release deployment ID无法渲染，已用只读Docker状态/inspect核验且未改配置 |
+| 下一步 | OWNER BUSINESS BASELINE REQUIRED | 确认实际岗位、8—10条真实流程、必须单据/报表、首期数据范围和`KEEP / PARK / REMOVE_LATER`清单 |
+| 系统是否可用 | NO | 该治理重置不代表真实数据迁移、员工UAT、备份恢复或生产切换完成 |
+
+## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（已冻结；负责人要求按小团队重新定范围）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE / NO AUTOMATIC RESUME / HISTORICAL PARTIAL EVIDENCE PRESERVED / PRODUCTION NO-GO | D-166已停止原自动续跑路线；D-165提交`e192f1d`及历史部分证据保留，但资源恢复不再授权PG17 refresh/test或正式动态artifact |
 | 只读终审 | PASS / THREE INDEPENDENT AUDITS | PostgreSQL语义审计确认psql 17的`\quit`不接受状态，Node/Python审计确认精确执行回执，摘要链审计确认五个V2文件和历史Supervisor V1 bundle不变；D-132源码哈希仅因生产安全修复更新，不改写历史证据 |
 | 状态边界 | PASS / FAIL CLOSED | V3只扩大隔离合成的数据库机制覆盖；dump/Volume、完整handler request/result commit边界、fresh-process恢复、host activation、真实UAT回退与人工UAT均继续阻断 |
 | V3合同/verifier | PASS / D-165 CORRECTIVE SOURCE READY | 全部production-reachable带参quit改为server-side exception；失败回执只接受rc=3、stdout单换行、精确ERROR stderr。security drift同时绑定失败前后状态字节及相等摘要；reconciliation/production normalized为`067255c7…339`/`56700c1f…abb`，raw/normalized/gzip仍受1MiB上界 |
 | 历史V2冻结 | PASS / BYTE IDENTICAL | producer/verifier/audit-test/policy/artifact五个SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91` |
 | 自动验证 | PASS / SCOPED NON-PG | Node受影响68/68及catalog/release35/35，Python V3 19/19、fixed130/130、Supervisor46/46、audit20/20，inventory263/239/24、policy/audit直接门、shell语法和全仓带参quit静态门通过；`assert-ready`按预期拒绝。真实PG17 integration和官方catalog refresh/test因硬资源门未运行，明确不计为PASS |
 | 已验证动态case | PASS PARTIAL / `DV70-PG-SWITCH-01` | 历史不可变artifact`867f3a7c…2f56`继续证明5场景/9断言；不被V3源码准备重写或扩大解释 |
-| 当前动态case | RESOURCE-BLOCKED RETRY / `DV70-PG-GUARDED-SWITCH-02` | D-164提交`28128de`同步后，正式`dv70-g2g36ygu`由exact receipt门拒绝且零残留；诊断`dv70-1bzn9rfk`固定旧实现rc=0和`extra argument "3" ignored`。D-165修复已通过非PG回归，但尚无成功V3 artifact；空间门恢复后必须从clean/private一致源码重跑 |
-| 当前资源边界 | BLOCKED / ROOT BELOW 10 GIB | 提交后门禁available约1.9GiB、Swap166MiB/1GiB、Load1 0.97，四服务restart0/OOM false且宿主`oom_kill=0`；根盘精确可用10,724,749,312 bytes，低于10GiB下限10,737,418,240 bytes 12,668,928 bytes。禁止启动新的PG/Docker重任务 |
+| 当前动态case | PARKED / `DV70-PG-GUARDED-SWITCH-02` | D-165修复已通过非PG回归，但尚无成功V3 artifact；只有小团队业务基线完成且项目负责人重新明确确认必要性后，才可另行决定是否恢复 |
+| 当前资源边界 | INFORMATIONAL / NOT AN UNBLOCK CONDITION | 2026-08-21历史资源阻断事实保留；2026-08-23起资源恢复本身不再解除TASK70冻结 |
 | 对象/清理 | PASS / NO CURRENT TASK RESIDUE | 当前无`/tmp/cyd-dv70-*`、`/tmp/cyd-task70-*`或runtime privilege任务残留；8月15—16既有`/tmp/cyd-uat-promotion-*`未删除。未重复TASK84、未删除镜像、容器或Volume |
 | Git恢复锚点 | PASS / SOURCE ANCHOR `e192f1d` PRIVATE / GOVERNANCE FAST-FORWARD VERIFIED | D-165源码提交`e192f1d7bb63bfafcd39d77a3d543d604364c9c6`经1,791文件committed-tree敏感门并由private main从`28128de`普通快进接收；后续治理提交只在该锚点之上普通快进。精确分支tip以本轮`git rev-parse`和`git ls-remote`回读为准，不在自身文档中循环嵌入 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不访问现有UAT数据库、受保护Volume、真实备份/凭据/业务数据，不执行host activation、Migration、部署或真实回退 |
@@ -24,14 +39,14 @@
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / BUILDKIT-ONLY CLEANUP COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED / PRODUCTION NO-GO | TASK84已释放；TASK70现为唯一DOING并先实施动态证据合同 |
+| 当前状态 | DONE / BUILDKIT-ONLY CLEANUP COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED / PRODUCTION NO-GO | TASK84历史结果保持；TASK70后续已由D-166冻结，当前零DOING |
 | 专项授权 | PASS / EXACT ONCE | 项目负责人仅授权一次`docker builder prune --force --filter until=24h`并禁止镜像、容器和卷删除；命令原样唯一执行 |
 | BuildKit结果 | PASS / BOUNDED | 退出0、回收475MB；Build Cache由192项/10.79GB/6.149GB reclaimable变为174项/10.31GB/5.674GB reclaimable，active 0 |
 | Docker对象保护 | PASS / IDENTICAL | 容器/镜像/Volume均保持6/75/277，三组集合SHA-256前后一致；四服务ID、restart0/OOM false、Web/PostgreSQL health和四保护卷不变 |
 | 清理后60秒门 | PASS | available最低约1.82GiB；Swap最高3.14%、增长约1.16MiB；根盘最低约10.39GiB；Load1最高1.51、PSI/OOM增量0 |
 | 保护范围 | PASS / EXACT | 未执行system/image/volume prune，未删除镜像/容器/卷，未读取数据库/Volume/备份正文，未重启服务或修改Swap/host |
 | 收口资源/临时项 | PASS / NO TASK RESIDUE | 本任务未创建临时文件、容器、网络、Volume、数据库或测试数据；根盘余量仅约0.39GiB，TASK70每个切片必须重做门禁并证明磁盘上界 |
-| 下一正式任务 | STARTED / TASK70 DOING | TASK70先建立九阶段/十三检查动态矩阵、资源上界与清理收据，再运行最小隔离PostgreSQL故障注入切片 |
+| 下一正式任务 | HISTORICAL / SUPERSEDED BY D-166 | TASK84当时已解除资源停止线；2026-08-23后不再自动进入TASK70，下一步改为小团队业务基线确认 |
 | 系统是否可用 | NO | 动态回退、host激活、源码匹配镜像、正式门、真实异机恢复/迁移、业务批准、跨岗签字、员工试运行和正式切换仍未完成 |
 
 ## SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83（完成；只读归因与恢复入口已固定）

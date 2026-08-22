@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`。历史`DV70-PG-SWITCH-01`保持`VERIFIED_PARTIAL_ONLY`；D-164 `COALESCE`修复提交`28128de`已经committed-tree敏感门和private普通快进。其后正式run`dv70-g2g36ygu`与诊断`dv70-1bzn9rfk`证明psql 17.10忽略`\quit 3`参数并以rc=0退出；D-165 psql失败关闭修复提交`e192f1d7bb63bfafcd39d77a3d543d604364c9c6`已再次通过1,791文件committed-tree敏感门并由private main从`28128de`普通快进接收。当前状态为`SOURCE COMMITTED AND PRIVATE-ANCHORED / PG17 REFRESH AND DYNAMIC RETRY RESOURCE-BLOCKED`；根盘仍低于10GiB，真实PG17负测、catalog refresh/test和正式producer尚未运行。真实备份恢复、A1—A8、外部锚点、host activation、UAT/生产、受保护Volume正文和数据均未授权，系统保持`PRODUCTION NO-GO`。
+当前零`DOING`。项目负责人确认系统少于20人使用并确认按小团队版重置后，`SELFHOST-SMALL-TEAM-SCOPE-RESET-85`已按D-166完成；`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`由`DOING`转为`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE / NO AUTOMATIC RESUME`。历史部分证据和D-165源码锚点保留，资源恢复不再触发自动续跑。下一步等待项目负责人确认实际岗位、8—10条真实流程、必须单据/报表和首期数据范围，不自动创建代码任务。
+
+2026-08-23范围重置事件：项目负责人先指出系统实际使用人数少于20人并质疑当前复杂度，随后明确确认“按小团队版重置”。调度按`TASK70 DOING → BLOCKED`、`SELFHOST-SMALL-TEAM-SCOPE-RESET-85 TODO → DOING → DONE`收口并回到零`DOING`。D-166固定单体优先、业务闭环优先、保留数据安全底线并冻结TASK59—TASK82扩展、R2—R5和AI路线；未修改代码、Migration、数据库、镜像、Compose或运行服务。
 
 2026-08-16调度事件：`SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82 DOING → DONE`。D-157固定逐副作用耐久回执、派生数据库/卷身份、commit-before-receipt只读恢复、精确前代镜像与live postverify；source`c2f071c`→manifest-only`aa77732`形成156文件canonical bundle`3674e011…35fb`。轻量组合201/201、manifest后installer21/21、inventory262/238/24及三路只读复核通过。未运行真实PG/Volume/Compose/恢复/回退，catalog与TASK70继续失败关闭。
 
@@ -247,12 +249,20 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 | UAT晋升与回滚隔离动态验证 | DOING | Codex主智能体（唯一写入、串行重任务）、只读跨语言审计智能体、项目负责人（保留真实环境授权） | 2026-08-21 | TASK82、TASK84均已完成；每次动态切片仍受新鲜资源门约束 | `DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 D-165 SOURCE COMMITTED AND PRIVATE-ANCHORED / PG17 REFRESH AND DYNAMIC RETRY RESOURCE-BLOCKED / PRODUCTION NO-GO`。D-164提交`28128de`后的clean run与诊断证明psql 17不支持带状态quit；D-165已用server-side exception关闭全部生产可达分支并通过非PG回归，提交`e192f1d`完成敏感门与private普通快进。根盘低于10GiB，真实PG17 refresh/test及正式artifact尚未运行。dump/Volume、fresh-process、host和真实UAT继续阻断。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70.md)。 |
+
+当前无执行中任务。
+
+## 已冻结任务
+
+| 任务编号 | 任务名称 | 状态 | 冻结时间 | 解除条件 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 | UAT晋升与回滚隔离动态验证 | BLOCKED | 2026-08-23 | 小团队业务基线完成后，项目负责人重新书面确认该高级控制面仍属必要范围 | `BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE / NO AUTOMATIC RESUME / HISTORICAL PARTIAL EVIDENCE PRESERVED / PRODUCTION NO-GO`。历史`DV70-PG-SWITCH-01 VERIFIED PARTIAL`和D-165源码`e192f1d`保留；未完成的PG17动态case、dump/Volume、host activation和真实UAT不改写为完成。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70.md)及[D-166](DECISIONS.md#d-166-少于20人erp采用单体优先业务闭环优先并冻结平台级治理扩展)。 |
 
 ## 已完成任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-SMALL-TEAM-SCOPE-RESET-85 | 小团队版范围重置 | DONE | 项目负责人（确认规模与方向）、Codex（文档重置、边界核验、非生产验证与独立提交） | 2026-08-23 | 2026-08-23 | D-166、项目负责人明确确认 | `DONE / SMALL-TEAM RESET RECORDED / TASK70 FROZEN / DOCS ONLY / PRODUCTION NO-GO`。固定Caddy+Node单体+PostgreSQL+本地文件、必要时单Worker；保留数据安全底线，冻结平台级控制面、R2—R5和AI路线。Node合同76/76、Python合同130/130、三项Python基线和lint 0 error通过；无业务代码、Migration、自托管数据库、镜像、Compose或运行服务变化。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-SCOPE-RESET-85.md)及[D-166](DECISIONS.md#d-166-少于20人erp采用单体优先业务闭环优先并冻结平台级治理扩展)。 |
 | SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84 | 受控资源停止线恢复 | DONE | 项目负责人（精确一次性BuildKit授权）、Codex（串行清理/对象复核/门禁/验证） | 2026-08-21 | 2026-08-21 | SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83、D-158、专项授权 | `DONE / BUILDKIT-ONLY CLEANUP COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED / PRODUCTION NO-GO`。唯一原样命令退出0、回收475MB；6容器/75镜像/277卷和三组摘要不变，四服务/四保护卷保持；60秒门最低available约1.82GiB、Swap最高3.14%/增长约1.16MiB、根盘最低约10.39GiB、OOM/restart无增量。未访问数据或执行UAT/生产动作。见[任务文档](../tasks/SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84.md)。 |
 | SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83 | 低资源服务器停止线只读归因 | DONE | Codex主智能体（只读采样、归因、文档与独立提交） | 2026-08-16 | 2026-08-16 | SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82、低资源保护规则、D-158 | `DONE / READ-ONLY RESOURCE ATTRIBUTION COMPLETE / EXTERNAL REMEDIATION REQUIRED / PRODUCTION NO-GO`。两段60秒窗口无PSI/OOM，Swap仍约82.7%；Codex session约317MiB Swap/2.01GiB memory，Docker daemon约102MiB，四ERP容器约291MiB。根盘约11GiB，BuildKit private cache至少约7.87GB可回收；未重启/清理/修改host。见[任务文档](../tasks/SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83.md)及[D-158](DECISIONS.md#d-158-资源停止线不得以低psi或扩大swap绕过先释放codex运行时并只清理buildkit-cache)。 |
 | SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82 | UAT回退能力处理器与物化边界 | DONE | Codex主智能体（唯一写入、轻量测试串行、证据集成） | 2026-08-16 | 2026-08-16 | SELFHOST-UAT-PROMOTION-ROLLBACK-FIXED-EXECUTOR-81、D-156—D-157 | `DONE / REPOSITORY UAT ROLLBACK HANDLERS VERIFIED / CATALOG AND HOST ACTIVATION BLOCKED / DYNAMIC VALIDATION DEFERRED / PRODUCTION NO-GO`。固定FD/schema/argv的writer、PG、四域卷、runtime、前代Web/Worker与postverify handler，逐副作用耐久receipt及保全恢复闭合；source`c2f071c`→Supervisor`aa77732`形成156文件bundle`3674e011…35fb`。轻量组合201/201、manifest后installer21/21、inventory262/238/24和三路复核通过。未运行真实PG/Volume/Compose/回退，catalog继续BLOCKED。见[任务文档](../tasks/SELFHOST-UAT-PROMOTION-ROLLBACK-CAPABILITY-HANDLERS-82.md)及[D-157](DECISIONS.md#d-157-uat回退能力采用逐副作用耐久回执与派生身份仓库handler不得解除动态能力阻断)。 |

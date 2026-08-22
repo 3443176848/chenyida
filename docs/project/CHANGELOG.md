@@ -2,6 +2,18 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-23
+
+### SELFHOST-SMALL-TEAM-SCOPE-RESET-85 - `docs: reset ERP scope for small team`
+
+- 决策：项目负责人确认系统少于20人使用并确认按小团队版重置；D-166固定Caddy+Node单体+PostgreSQL+本地文件、必要时单Worker，业务闭环和真实员工UAT优先于平台级合成治理。
+- 调度：TASK70由`DOING`转为`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE / NO AUTOMATIC RESUME`；TASK59—TASK82扩展、R2—R5和AI路线冻结。历史源码、证据、Migration和任务记录保留，不伪装完成、不立即删除。
+- 保留边界：稳定内部ID、关系约束、事务、幂等、并发、服务端权限、审计、版本化Migration、可恢复备份和已过账事实冲销规则继续是强制底线。
+- 代码/数据库/API：仅更新MASTER、TASKS、PROJECT_CONTEXT、DECISIONS、CHANGELOG、STATUS及TASK70/TASK85文档；无业务代码、Schema/Migration、API、依赖、镜像或Compose变化。
+- 验证：Node发布合同在断网只读单容器内通过76/76，配套Python fixed-executor合同130/130；`server.py --self-test`、项目虚拟环境`smoke_test.py`和`go_live_check.py --no-backup`通过。lint退出0，为0 error/50个既有warning；`git diff --check`通过。历史D1 smoke不适用于当前自托管方向，未恢复退役Wrangler依赖。
+- 运行面：未连接自托管UAT/生产数据库、读取受保护Volume/正式备份正文或执行build、Migration、部署、重启、业务写。首次go-live默认生成的本任务时间戳本地备份经精确核对后删除，并以`--no-backup`重跑通过；UAT继续alpha.42/0040，源码继续alpha.47/0046，系统保持`PRODUCTION NO-GO`。
+- 资源/清理：前后available均约2.4GiB，Swap 145→147MiB/1GiB，根盘均约11GiB，Load由`0.49/0.50/0.36`降至`0.16/0.35/0.35`；四服务restart0/OOM false、宿主`oom_kill=0`。本任务测试容器和精确时间戳备份均已清零；Compose状态命令因本机缺必填release deployment ID未渲染，已用只读Docker状态/inspect核验且未修改配置。
+
 ## 2026-08-21
 
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `docs: clarify TASK70 private source anchor`

@@ -3548,6 +3548,44 @@
 - 拒绝因历史D-132哈希锁而冻结已证实的fail-open语义；同样拒绝重写D-132历史证据、修改五个V2冻结文件或历史Supervisor V1 bundle来适配当前源码。
 - 拒绝在根盘低于10GiB时启动PG17、Docker或正式producer，也拒绝重复已消耗的TASK84命令。资源恢复必须来自自然释放或新的精确专项授权。
 
+## D-166 少于20人ERP采用单体优先、业务闭环优先并冻结平台级治理扩展
+
+- 日期：2026-08-23
+- 状态：`ACCEPTED / SMALL-TEAM RESET / GOVERNANCE ONLY / PRODUCTION NO-GO`
+- 提案人：项目负责人提出系统少于20人使用并质疑当前复杂度；Codex完成只读量化复核
+- 确认人：项目负责人明确确认“按小团队版重置”
+
+### Context
+
+- 排除生成目录后，自托管核心应用、数据库、Worker和PostgreSQL Migration约7.3万行；运维脚本和工具约13.5万行，其中UAT晋升/回滚相关约11.3万行。发布控制逻辑已大于ERP核心实现。
+- 当前Schema有233张PostgreSQL表、46项Migration和238份任务文档；源码为alpha.47/0046，运行UAT仍为alpha.42/0040，系统保持`PRODUCTION NO-GO`。继续补合成控制面没有优先解决真实员工使用、真实数据迁移和业务验收。
+- 少于20名用户不降低物料、BOM、库存、生产、出货或财务数据正确性要求，但显著降低了自建多层发布平台、多智能体Runtime、Capability Broker和十五检查点晋升事务的收益。
+
+### Decision
+
+1. 未来生产方向继续是自托管，但默认部署边界固定为Caddy、一个Node Web/API单体、PostgreSQL和本地文件存储；只有确需异步导入或后台处理时才保留一个Worker，不新增微服务群、消息平台或集群控制面。
+2. 必须保留稳定内部ID、关系约束、事务、幂等、并发控制、服务端权限、审计、版本化Migration、可恢复备份和已过账事实的调整/冲销规则。这些属于业务安全底线，不以用户数为由放宽。
+3. 发布流程目标收敛为“可恢复备份 → 版本化Migration → 替换Web/必要Worker → 健康检查 → 回退上一已知可用版本”。TASK59—TASK82已实现的内容寻址Supervisor、监控/授权/回退控制面保留为历史，不继续扩展或激活。
+4. `SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`立即从`DOING`转为`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE`。历史部分证据和D-165安全修复保留；磁盘恢复不再触发自动续跑。只有新的项目负责人明确决定才能恢复。
+5. D-113/D-114的R2—R5、多智能体Runtime、Control Store、强制lease/fencing及Capability Broker继续`NOT AUTHORIZED`，并从当前路线移除。研发默认保持单一写者和按需只读复核，不建设新的Agent平台。
+6. 外部AI、AI采购、AI报价、AI生产辅助及未启动的产品AI任务继续冻结。后续只有在核心业务闭环稳定、真实数据迁移和员工UAT完成后，才能重新评估。
+7. 下一阶段先由项目负责人确认实际岗位、8—10条真实端到端流程、必须单据/报表和首期数据范围，再形成现有代码的`KEEP / PARK / REMOVE_LATER`清单。该基线确认前不新增表、Migration、角色、模块或基础设施。
+8. 本决定不授权立即删除现有代码、Migration、测试或历史文档。任何删除必须另立任务，先证明无运行时依赖、建立恢复点并通过适用回归。
+
+### Consequences
+
+- `SELFHOST-SMALL-TEAM-SCOPE-RESET-85`只更新治理文档并暂停TASK70；不修改业务代码、Schema/Migration、API、镜像、Compose、数据库或运行服务。
+- 当前UAT继续保持alpha.42/0040，源码继续保持alpha.47/0046；该差距必须在小团队业务基线中决定是复用、摘取还是放弃，不能直接部署或回退猜测。
+- 实际异机备份、恢复验证、认证授权和数据完整性仍是上线底线；冻结的是超出小团队收益的平台级实现，不是灾备或安全责任。
+- 系统保持`PRODUCTION NO-GO`，直到真实数据范围、员工UAT、备份恢复和明确切换授权完成。
+
+### Rejected alternatives
+
+- 拒绝继续按原TASK70路线消耗资源，只为扩大合成证据覆盖而不验证真实业务。
+- 拒绝因用户少而取消权限、事务、审计、备份、Migration或数据约束。
+- 拒绝立即大规模删除233张表、46项Migration或历史脚本；未经依赖盘点的清理会制造新的恢复和数据风险。
+- 拒绝同时维护Python/SQLite、历史Sites/D1和Node/PostgreSQL三套新增业务逻辑；旧运行面只作迁移和行为参照。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

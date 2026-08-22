@@ -1,8 +1,19 @@
 # SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 UAT晋升与回滚隔离动态验证
 
-> 状态：`DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 D-165 SOURCE COMMITTED AND PRIVATE-ANCHORED / PG17 REFRESH AND DYNAMIC RETRY RESOURCE-BLOCKED / ISOLATED SYNTHETIC ONLY / PRODUCTION NO-GO`
-> 日期：2026-08-21（Asia/Shanghai）
+> 状态：`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE / NO AUTOMATIC RESUME / HISTORICAL PARTIAL EVIDENCE PRESERVED / PRODUCTION NO-GO`
+> 日期：2026-08-23（Asia/Shanghai，范围状态更新；历史执行事实仍为2026-08-21）
 > 责任：Codex主智能体串行调度；项目负责人保留任何UAT/生产、真实数据、host和凭据动作的专项授权
+
+## 0. 2026-08-23 小团队范围重置
+
+项目负责人确认系统实际使用人数少于20人，并确认按小团队版重置。D-166据此把业务闭环、真实数据迁移和员工UAT置于平台级发布证明之前；本任务从`DOING`转为`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE`。
+
+- 既有`DV70-PG-SWITCH-01 VERIFIED PARTIAL`、D-165源码锚点和全部历史失败记录原样保留，不改写为完成或无效。
+- 根盘恢复、测试环境可用或旧计划中的自动续跑条件不再单独解除阻断；不得自动执行PG17刷新、动态producer、catalog更新、host activation或真实UAT回退。
+- 只有项目负责人在小团队业务基线完成后书面确认该高级控制面仍为必要范围，TASK70才可重新立项或恢复。
+- 本次状态变化不修改代码、Migration、数据库、镜像、Compose或运行服务，系统继续`PRODUCTION NO-GO`。
+
+以下第1—9节保留2026-08-21原执行目标、证据和验收合同，仅作为历史记录；其“当前”“下一切片”或自动重跑措辞均由本节和D-166取代，不构成现行调度指令。
 
 ## 1. 目标
 
