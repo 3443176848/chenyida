@@ -3210,6 +3210,7 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
         sql = EXECUTOR.render_pg_guarded_switch_sql(base, inputs, bindings).decode()
         self.assertNotIn("pg_catalog.digest", sql)
         self.assertIn("pg_catalog.sha256", sql)
+        self.assertNotIn("pg_catalog.coalesce(", sql)
         self.assertIn("0:0:0:0:0:0", sql)
         reset = sql.index("SET default_transaction_read_only=off;")
         security = sql.index("\\set ON_ERROR_STOP on")

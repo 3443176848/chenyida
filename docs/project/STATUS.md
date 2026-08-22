@@ -2,23 +2,23 @@
 
 最后更新时间：2026-08-21（Asia/Shanghai）
 
-## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；typed/bounded SQL归一化修复已验证，clean commit动态重跑待执行）
+## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（执行中；guarded SQL `COALESCE`语法修复已验证，clean commit动态重跑待执行）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 SQL NORMALIZATION CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING / PRODUCTION NO-GO | 当前唯一DOING；D-163修复必须先提交为clean source并私有普通快进，再执行隔离PG17动态artifact |
-| 只读终审 | PASS / INDEPENDENT CROSS-LANGUAGE REVIEW / NO P0 OR P1 | 独立智能体复核typed slot、单双引号content hex、1MiB上下界及policy→inventory→runtime hash链，未发现可复现P0/P1；五个冻结V2文件不变 |
+| 当前状态 | DOING / DV70-PG-SWITCH-01 VERIFIED PARTIAL / DV70-PG-GUARDED-SWITCH-02 GUARDED SQL COALESCE CORRECTIVE SOURCE VERIFIED / CLEAN COMMIT AND DYNAMIC RETRY PENDING / PRODUCTION NO-GO | 当前唯一DOING；D-163已clean/private同步，D-164六处精确语法修复必须先提交为clean source并私有普通快进，再执行隔离PG17动态artifact |
+| 只读终审 | PASS / HISTORIC GATE RECONSTRUCTED | 独立智能体从TASK70文档、package脚本和声明数恢复精确历史110项集合为rollback audit20 + rollback contract14 + transaction journal71 + migration execution5；该门已在`4dbe266` clean source通过110/110。五个冻结V2文件不变 |
 | 状态边界 | PASS / FAIL CLOSED | V3只扩大隔离合成的数据库机制覆盖；dump/Volume、完整handler request/result commit边界、fresh-process恢复、host activation、真实UAT回退与人工UAT均继续阻断 |
-| V3合同/verifier | PASS / CORRECTIVE SOURCE READY | 固定46项Migration、9角色/4 membership、内容/Migration/security守卫、10场景/15断言、9条精确生产执行回执、strict JSON/gzip/artifact及monotonic-wall clock双语验证；typed normalization固定reconciliation/production为`067255c7…339`/`b4e0c24f…a140`，raw/normalized/gzip均受1MiB上界 |
+| V3合同/verifier | PASS / CORRECTIVE SOURCE READY | 固定46项Migration、9角色/4 membership、内容/Migration/security守卫、10场景/15断言、9条精确生产执行回执、strict JSON/gzip/artifact及monotonic-wall clock双语验证；D-163 typed normalization保持reconciliation `067255c7…339`，D-164把完整production更新为`fd129b85…e39e24`，raw/normalized/gzip仍受1MiB上界 |
 | 历史V2冻结 | PASS / BYTE IDENTICAL | producer/verifier/audit-test/policy/artifact五个SHA-256保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91` |
-| 自动验证 | PASS / PRE-COMMIT AFFECTED SUITE 110/110 | 当前修复通过完整受影响组合110/110、Python V3 18/18、fixed executor129/129、Node V3 14/14、promotion audit/rollback34/34、release gate/manifest29/29、扩展release组合76/76、inventory263/239/24及policy verify；audit生成物漂移首跑33/34，固定生成器重放后原断言全绿。提交后仍须在clean/private一致源码上复跑同一110项与动态case |
+| 自动验证 | PASS / PRE-COMMIT NODE 195/195 + PYTHON 147/147 | D-164通过12个去重Node文件的完整并集195/195（0 skip/todo/fail）、Python V3+fixed executor147/147、inventory263/239/24、V3 policy PASS、audit verify PASS/BLOCKED及`assert-ready`预期exit 1/错误码拒绝；audit固定生成器已重放。首次包装器误期望exit 3后已按源码合同纠正并重跑。提交后仍须在clean/private一致源码上复跑精确历史110项与动态case |
 | 已验证动态case | PASS PARTIAL / `DV70-PG-SWITCH-01` | 历史不可变artifact`867f3a7c…2f56`继续证明5场景/9断言；不被V3源码准备重写或扩大解释 |
-| 当前动态case | RETRY PENDING / `DV70-PG-GUARDED-SWITCH-02` | D-162提交`63c301f`已private同步；clean run`dv70-nc3x52ls`通过60秒门和隔离PG17后因旧归一化失败关闭且零残留。三次诊断将根因固定为long-hex身份、旧小夹具golden及重复路径展开；D-163修复待clean commit/private fast-forward后重跑 |
-| 当前资源边界 | PASS / PRE-COMMIT SNAPSHOT | available约2.0—2.1GiB、Swap133MiB/1GiB、根盘11GiB、Load低；四服务running、Web/PostgreSQL healthy、restart0/OOM false。正式动态运行仍必须生成新鲜60/180秒机器证据 |
+| 当前动态case | RETRY PENDING / `DV70-PG-GUARDED-SWITCH-02` | D-163提交`4dbe266`已private同步。首个`dv70-9cvw_3r_`于PG创建前主动中止；正式`dv70-6kvqa_9c`通过60秒门并启动隔离PG17.10，在第二条生产调用后失败关闭。`dv70-mqr7yjwr`证明首条调用rc=0/observer PASS；`dv70-q51u17a0`把第二条rc=3 stderr固定为PostgreSQL不存在`pg_catalog.coalesce(numeric, integer)`。D-164只修正六处语法，待clean commit/private fast-forward后重跑 |
+| 当前资源边界 | PASS / PRE-COMMIT SNAPSHOT | available约2.1GiB、Swap133MiB/1GiB、根盘约11GiB、Load1约0.29；四服务资源稳定、restart0/OOM false，宿主`oom_kill=0`。正式动态运行仍必须生成新鲜60/180秒机器证据 |
 | 对象/清理 | PASS / NO CURRENT TASK RESIDUE | 当前所有临时Node容器均已按任务名消失，未创建网络或Volume；发现的`/tmp/cyd-uat-promotion-*`均为8月15—16既有残留，不属于本轮且未删除 |
-| Git恢复锚点 | PASS THROUGH `63c301f` / SQL NORMALIZATION COMMIT PENDING | D-162提交`63c301ff2530`经committed-tree敏感门普通快进且与`recovery-private/main`精确一致；D-163修复尚未提交/推送，必须重复diff/敏感门后按既有授权非强制快进 |
+| Git恢复锚点 | PASS THROUGH `4dbe266` / COALESCE CORRECTIVE COMMIT PENDING | D-163提交`4dbe266c271eb90ca4e02fcb632ef26b24986cd4`经候选和committed-tree敏感门普通快进且与`recovery-private/main`精确一致；D-164修复尚未提交/推送，必须重复diff/敏感门后按既有授权非强制快进 |
 | 授权/运行面 | UNCHANGED / NOT AUTHORIZED | 不访问现有UAT数据库、受保护Volume、真实备份/凭据/业务数据，不执行host activation、Migration、部署或真实回退 |
-| 系统是否可用 | NO | 当前仍无有效V3动态artifact；源码与运行镜像仍为alpha.47/alpha.42差距，更未完成dump/Volume恢复、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
+| 系统是否可用 | NO | 当前仍无有效V3动态artifact；audit保持4 blockers、`may_start=false`，源码与运行镜像仍为alpha.47/alpha.42差距，更未完成dump/Volume恢复、真实恢复/迁移、人工UAT、员工试运行和正式切换 |
 
 ## SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84（完成；BuildKit限定清理与清理后门通过）
 

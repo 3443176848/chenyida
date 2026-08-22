@@ -19,7 +19,7 @@ const POLICY_PATH = resolve(
 const ARTIFACT_PATH = resolve(
   SITE_ROOT, "operations/uat-promotion-dynamic-evidence-v3.json",
 );
-const EXPECTED_POLICY_SHA256 = "87cadfcfa6c30e167426b6aeed12c7b4b1ce07f50f6dad2b577a3ac792e6bd50";
+const EXPECTED_POLICY_SHA256 = "192b1cab9ee7edd52786d6a14c906dfbec817ee189e64a714f6e8bf4b9ec773f";
 const SHA256 = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const LABEL = /^[A-Z][A-Z0-9_]{1,79}$/;

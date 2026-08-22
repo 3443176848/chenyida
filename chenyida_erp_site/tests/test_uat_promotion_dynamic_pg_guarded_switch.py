@@ -206,7 +206,7 @@ class DynamicPostgresGuardedSwitchV3Test(unittest.TestCase):
         )
         self.assertEqual(
             policy["sql_evidence"]["production_normalized_sha256"],
-            "b4e0c24f4e7852980fd090c073912957782571723ef502e8c21763c67f96a140",
+            "fd129b85c4f23937d62e2f6838e113a609d9cf5d305b3424480f096391e39e24",
         )
 
     def test_sql_normalization_distinguishes_bound_content_hex_from_unknown_digest(self):

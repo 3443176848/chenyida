@@ -7399,10 +7399,10 @@ def _render_postgres_guarded_content_check(report_raw: bytes) -> str:
         FROM %I.%I AS source_row
       ), aggregate_hash AS (
         SELECT count(*)::text AS row_count,
-          pg_catalog.coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,1,16))::bit(64)::bigint)::numeric),0)::text AS h1,
-          pg_catalog.coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,17,16))::bit(64)::bigint)::numeric),0)::text AS h2,
-          pg_catalog.coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,33,16))::bit(64)::bigint)::numeric),0)::text AS h3,
-          pg_catalog.coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,49,16))::bit(64)::bigint)::numeric),0)::text AS h4
+          coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,1,16))::bit(64)::bigint)::numeric),0)::text AS h1,
+          coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,17,16))::bit(64)::bigint)::numeric),0)::text AS h2,
+          coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,33,16))::bit(64)::bigint)::numeric),0)::text AS h3,
+          coalesce(pg_catalog.sum((('x'||pg_catalog.substr(value,49,16))::bit(64)::bigint)::numeric),0)::text AS h4
         FROM row_hashes
       )
       SELECT row_count,pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
@@ -7472,7 +7472,7 @@ BEGIN
         AND namespace.nspname!~'^pg_') <> {len(sequences)} THEN
     RAISE EXCEPTION 'guarded switch sequence inventory mismatch';
   END IF;{sequence_loop}
-  IF pg_catalog.coalesce((
+  IF coalesce((
       SELECT pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
         pg_catalog.encode(pg_catalog.convert_to(extension.extname,'UTF8'),'hex'),
         pg_catalog.encode(pg_catalog.convert_to(extension.extversion,'UTF8'),'hex'),
@@ -7597,7 +7597,7 @@ SET LOCAL lock_timeout='5s';
 SET LOCAL statement_timeout='60s';
 DO $cyd_guard_migration$
 BEGIN
-  IF pg_catalog.coalesce((SELECT pg_catalog.jsonb_agg(
+  IF coalesce((SELECT pg_catalog.jsonb_agg(
       pg_catalog.jsonb_build_object('checksum',checksum,'version',version)
       ORDER BY version COLLATE "C") FROM public.schema_migrations),'[]'::jsonb)
       <> {_pg_guarded_literal(migration_json)}::jsonb THEN

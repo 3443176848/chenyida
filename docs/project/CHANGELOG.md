@@ -4,15 +4,26 @@
 
 ## 2026-08-21
 
+### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: correct TASK70 guarded SQL coalesce syntax`
+
+- clean source前提：D-163提交`4dbe266c271eb90ca4e02fcb632ef26b24986cd4`先后通过候选与committed-tree各1,791文件敏感信息检查，并由`recovery-private/main`从`63c301f`非强制普通快进接收；local/private精确一致，公开`origin`未推送。精确历史组合在该clean source通过110/110。
+- 失败关闭：首个producer`dv70-9cvw_3r_`因确认精确测试门而在PG创建前主动中止，零临时资源；正式run`dv70-6kvqa_9c`通过60秒前检并启动唯一断网、只读rootfs、全tmpfs PostgreSQL 17.10容器，在第二条生产fixed executor调用后以`SIDE_EFFECT_OUTCOME_UNKNOWN`拒绝且没有发布artifact。
+- 根因证据：有界诊断`dv70-mqr7yjwr`证明第一条reconciliation调用rc=0、stderr空、observer PASS；`dv70-q51u17a0`证明第二条guarded switch调用rc=3，stderr为`function pg_catalog.coalesce(numeric, integer) does not exist`。PostgreSQL把`COALESCE`作为内建语法构造，不能以`pg_catalog.coalesce`调用；D-163修复使真实SQL首次到达该执行点，从而暴露既有缺陷。
+- 修复：只把fixed executor中六处`pg_catalog.coalesce(...)`改为`coalesce(...)`，覆盖四个聚合分片、extension inventory和Migration inventory；不做类型强转，不修改内容、Migration、ACL、事务、rename、UNKNOWN/no-replay或副作用守卫。测试增加禁止该非法token的精确断言。
+- 合同/追溯：完整production normalized SHA-256更新为`fd129b85c4f23937d62e2f6838e113a609d9cf5d305b3424480f096391e39e24`，reconciliation保持`067255c7…339`；V3 policy raw/canonical为`56b57120…c34a`/`192b1cab…773f`，release inventory/runtime policy为`a378c049…f993`/`9dfc7f9f…1c40`，release manifest source为`68350570…c00c`。固定生成器重放promotion audit为semantic/raw/Markdown/source-manifest `9ee02ef4…f22b`/`f0a8a64c…630d`/`ab4d4197…d1f7`/`ed3974f7…ce80`，仍为4 blockers与`may_start=false`。
+- 验证：12个去重Node文件的完整并集195/195且0 skip/todo/fail，Python V3+fixed executor147/147，inventory263/239/24、V3 policy verify PASS、audit verify PASS/BLOCKED，`assert-ready`以精确exit 1和`UAT_PROMOTION_EXECUTOR_NOT_READY`按预期拒绝。首次组合门包装器误把预期退出码写成3而自身退出1；核对源码合同后以精确exit 1重跑通过，产品输出始终正确。一个过宽的总`coalesce(`计数测试准确暴露文件内另有35个合法非限定用法后，被收紧为直接禁止`pg_catalog.coalesce(`；产品断言没有降低。提交后还须从clean/private一致源码复跑精确110项和动态producer，成功artifact必须再经Node verifier与整件篡改harness。
+- 资源/清理：所有正式/诊断run均只使用单一隔离PG17容器且串行；任务容器、网络、Volume、tmp根、进程和V3 artifact均为0。提交前available约2.1GiB、Swap133MiB/1GiB、根盘约11GiB、Load低、宿主`oom_kill=0`，四个常驻服务restart/OOM保持0。未重复TASK84，未删除镜像、容器或Volume。
+- 数据库/API/运行面：无Schema/Migration文件、普通业务API、镜像、Compose或运行面变化；未访问UAT/生产数据库、受保护Volume、真实备份、凭据或业务数据。TASK70保持`DOING / CLEAN COMMIT AND DYNAMIC RETRY PENDING`，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: bound TASK70 SQL normalization`
 
 - 失败关闭：D-162提交`63c301f`完成committed-tree敏感门并普通快进到private main后，clean run`dv70-nc3x52ls`通过60秒资源门与隔离PG17启动，在artifact发布前以`TASK70_V3_SQL_NORMALIZATION_INVALID`拒绝且任务容器、tmp根和artifact均为0。未连接UAT/生产或受保护Volume。
 - 根因：旧归一化用无边界64位hex搜索，误把完整448行报告中的长关系/序列identity切成摘要；相同摘要的全部JSON路径直接拼接又使production normalized扩张到约2.9MiB。旧production golden `058a924…c0a`来自2行小夹具，不是实际234 relation、211 sequence、2 extension及1 large-object行的生产SQL。
 - 修复：先严格解析content-report行类型，保护SQL单双引号中的合法关系、序列和扩展hex；未知64位及更长hex继续失败关闭。system identifier、candidate/restored OID只在四个精确SQL槽位替换，数量、sequence值和无关JSON数字不做全局替换；重复摘要路径改用`PATH_SET_<count>_SHA256_<digest>`有界标签，producer/verifier同时限制raw、normalized和gzip/gunzip为1MiB。
 - 合同/追溯：完整448行双语归一化固定reconciliation/production SHA-256为`067255c7…339`/`b4e0c24f…a140`；V3 policy raw/canonical为`6c66291a…7486`/`87cadfcf…bd50`，release inventory/runtime policy为`91caeaca…4419`/`16e4428b…6711`。inventory变更由固定生成器重放当前promotion audit，semantic/raw/Markdown/source-manifest为`072cf6a2…8cbe`/`688179d8…aa7`/`40f807be…dd5a`/`78990c03…d80e`，仍为4 blockers与`may_start=false`。V2五文件SHA-256继续保持`888e8da9…6308`、`a62db066…2c3`、`43de9dc9…5b01`、`fe9932e2…c6b8`、`8e7b9c65…f91`。
-- 验证：完整受影响组合110/110、Python V3 18/18、fixed executor129/129、Node V3 14/14、promotion audit/rollback34/34、release gate/manifest29/29、扩展release组合76/76、inventory263/239/24和V3 policy verify通过；audit组合首跑33/34按预期发现旧生成物摘要，固定生成器重放后原断言34/34。跨语言独立只读复核未发现可复现P0/P1。clean提交后的同一110项、成功动态artifact、Node verifier及整件篡改harness必须在本提交完成敏感门/private普通快进后串行执行，不提前声称通过。
+- 验证：完整受影响组合110/110、Python V3 18/18、fixed executor129/129、Node V3 14/14、promotion audit/rollback34/34、release gate/manifest29/29、扩展release组合76/76、inventory263/239/24和V3 policy verify通过；audit组合首跑33/34按预期发现旧生成物摘要，固定生成器重放后原断言34/34。跨语言独立只读复核未发现可复现P0/P1。该修复随后以`4dbe266`完成候选及committed-tree敏感门、private普通快进和clean-source精确110/110；正式动态run到达下一执行点后由D-164记录的PostgreSQL语法错误继续失败关闭，未生成artifact。
 - 资源/清理：提交前available约2.0—2.1GiB、Swap133MiB/1GiB、根盘11GiB、Load低；四服务running且Web/PostgreSQL healthy，所有`cyd-task70-*`测试容器均已消失。未重复TASK84、未删除镜像/容器/Volume，未运行build、现有Compose、Migration、部署或业务写。
-- 数据库/API/运行面：无Schema/Migration、普通业务API、镜像、Compose或运行面变化；只修正隔离证据producer/verifier、policy和发布摘要链。TASK70保持`DOING / CLEAN COMMIT AND DYNAMIC RETRY PENDING`，系统继续`PRODUCTION NO-GO`。
+- 数据库/API/运行面：无Schema/Migration、普通业务API、镜像、Compose或运行面变化；只修正隔离证据producer/verifier、policy和发布摘要链。D-163源码已提交/private同步，但TASK70仍保持`DOING`且系统继续`PRODUCTION NO-GO`。
 
 ### SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70 - `fix: verify frozen TASK70 evidence from bound Git blobs`
 

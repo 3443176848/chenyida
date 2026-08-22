@@ -2305,7 +2305,7 @@
     },
     {
       "path": "tests/selfhost-uat-promotion-dynamic-evidence-v3.test.mjs",
-      "sha256": "02e5a8b9b48218fa35b95d6bcbeca37c9edf617c43d47e6a3f97ab2fd9f20f9c",
+      "sha256": "8146b0d1045d706a48bd0a54a8f11fe04ec55b39f3c9c87bc1beedeaeceb1211",
       "category": "PURE_NODE",
       "applicability": "REQUIRED",
       "harness": "NODE_SOURCE",

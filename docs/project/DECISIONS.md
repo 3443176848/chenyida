@@ -3474,6 +3474,41 @@
 - 拒绝继续使用2行小夹具golden、只提高1MiB上限、拼接全部重复路径或在normalized超界时跳过验证。
 - 拒绝手工修改artifact、在dirty或未private同步源码上运行，或修改/重生成五个冻结V2文件来适配V3缺陷。
 
+## D-164 TASK70 guarded-switch SQL使用PostgreSQL内建`COALESCE`语法，不允许schema qualification
+
+- 日期：2026-08-21
+- 状态：`ACCEPTED / GUARDED SQL COALESCE CORRECTIVE SOURCE VERIFIED / CLEAN DYNAMIC RETRY PENDING / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据D-163 clean-source正式失败回执、两次有界隔离诊断、完整448行SQL golden重放和Node/Python串行回归
+- 确认边界：只修正仓库fixed executor生成的六处PostgreSQL语法及其V3摘要链；不修改Migration、数据库结构、内容/权限/事务守卫，不授权或执行UAT/生产、真实数据、受保护Volume、真实备份、host、部署或服务变更
+
+### Context
+
+- D-163提交`4dbe266c271eb90ca4e02fcb632ef26b24986cd4`先后通过候选及committed-tree各1,791文件敏感门，并从private main `63c301f`普通快进到`recovery-private/main`；local/private精确一致。精确历史组合在clean source通过110/110。
+- 首个producer`dv70-9cvw_3r_`只因核对精确测试门而在创建PostgreSQL前主动中止；正式run`dv70-6kvqa_9c`通过60秒资源门并创建唯一隔离PG17.10容器，但第二条生产调用返回`SIDE_EFFECT_OUTCOME_UNKNOWN`，没有artifact且清理为零。UNKNOWN边界正确阻止runner推断副作用结果或重放。
+- 有界诊断`dv70-mqr7yjwr`证明第一条fixed reconciliation调用rc=0、stderr为0、observer PASS；`dv70-q51u17a0`固定第二条guarded switch调用rc=3，stderr为`function pg_catalog.coalesce(numeric, integer) does not exist`。PostgreSQL解析`COALESCE`为内建条件表达式而非可通过schema限定调用的普通函数。
+- fixed executor中恰有六处非法`pg_catalog.coalesce(...)`：四个content聚合分片、extension inventory及Migration inventory。D-163此前因归一化失败而没有执行到该SQL；修复D-163后该缺陷才由真实隔离执行暴露。
+
+### Decision
+
+1. 只把上述六处改为未限定的`coalesce(...)`。不得通过把numeric强转integer、忽略stderr、放宽observer或接受UNKNOWN来掩盖语法错误。
+2. 既有内容、Migration、ACL/default privilege、ordinary-role、事务rename、一次恢复及UNKNOWN/no-replay断言保持不变；测试必须精确拒绝fixed executor源码中再次出现`pg_catalog.coalesce(`。
+3. 完整448行production SQL必须重新生成并绑定normalized SHA-256 `fd129b85c4f23937d62e2f6838e113a609d9cf5d305b3424480f096391e39e24`；reconciliation golden保持`067255c7e6b319dbea1660bebca1b3259bb6e61363f5818ec88f226fc99ce339`。
+4. policy→V3 producer/verifier→release inventory/runtime policy→release manifest→promotion audit摘要链必须机械更新并由固定生成器重放；audit仍须失败关闭为4 blockers、P0=3、P1=1、`may_start=false`。
+5. 修复只有在独立提交、候选与committed-tree敏感门、`recovery-private/main`普通fast-forward及clean-source精确110项通过后才能再次运行动态producer。最终接受仍要求成功artifact、Node verifier和整件篡改harness共同通过。
+
+### Consequences
+
+- V3 policy raw/canonical SHA-256为`56b571203b42fdc2f4c474c6ebd0878abf8d5461edaf9aa412af95de4c65c34a`/`192b1cab9ee7edd52786d6a14c906dfbec817ee189e64a714f6e8bf4b9ec773f`；release inventory/runtime policy为`a378c049d1a5874fc2ec179e642ebdb2ef7b70f906e7634d95945c2bcf0cf993`/`9dfc7f9fc068e8967a3ac394c847e4cb22207aacfbe551ab9588b6533ca21c40`，release manifest source为`6835057009870d5d6616f613d018c95aae422ac4830cad8a4e852b56efedc00c`。
+- 固定生成器重放后的promotion audit semantic/raw/Markdown/source-manifest SHA-256为`9ee02ef4823ebd638a79fac1a951ed89d04d503ce8d5b407b42cfe6b6207f22b`/`f0a8a64cfe50db5a1b98c305ce16f0419a96eafbc76923576b3380c0c174630d`/`ab4d4197271bc75d1d4eda8830e716ce7d3f400086a199f826f2b04ad63dd1f7`/`ed3974f7fb22d7f76df114e60d86b3fa09a96c721eaca12069098fd9b3aace80`；结论继续为4 blockers、`may_start=false`。
+- 提交前12个去重Node文件完整并集195/195且0 skip/todo/fail，Python V3+fixed executor147/147，inventory263/239/24、V3 policy verify、audit verify和预期`assert-ready`失败关闭通过。首次组合门包装器误期望exit 3而自失败；源码合同固定exit 1，随后以exit 1加精确错误码重跑通过，产品输出未改变。一个以全文件`coalesce(`总数为6的过宽测试会把35个既有合法未限定用法计入；该测试被纠正为精确禁止非法token，没有降低产品断言。
+- 所有正式及诊断run均没有V3 artifact、任务容器、网络、Volume、tmp根或进程残留；五个冻结V2文件逐字节不变。系统仍为`PRODUCTION NO-GO`，本决策不证明dump/Volume、fresh-process恢复、host activation、真实UAT、人工验收、员工试运行或正式切换。
+
+### Rejected alternatives
+
+- 拒绝把`numeric`强制转换为`integer`、创建同名wrapper、忽略PostgreSQL stderr或仅调整预期return code；错误在schema-qualified语法本身，且这些替代会改变精度或掩盖执行失败。
+- 拒绝把`SIDE_EFFECT_OUTCOME_UNKNOWN`当作已失败可安全重放或已成功可继续；observer和no-replay边界必须保持。
+- 拒绝手工编辑动态artifact、跳过clean/private source binding、修改冻结V2文件，或借合成PG诊断访问UAT/生产数据库及受保护数据。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

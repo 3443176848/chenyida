@@ -28,7 +28,7 @@
     "compression": "GZIP_BASE64_MTIME_ZERO",
     "maximum_uncompressed_bytes": 1048576,
     "reconciliation_normalized_sha256": "067255c7e6b319dbea1660bebca1b3259bb6e61363f5818ec88f226fc99ce339",
-    "production_normalized_sha256": "b4e0c24f4e7852980fd090c073912957782571723ef502e8c21763c67f96a140"
+    "production_normalized_sha256": "fd129b85c4f23937d62e2f6838e113a609d9cf5d305b3424480f096391e39e24"
   },
   "required_stage_order": [
     "PRECONDITION_RECHECK",
