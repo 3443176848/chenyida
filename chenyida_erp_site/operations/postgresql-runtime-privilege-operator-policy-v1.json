@@ -134,11 +134,11 @@
     },
     {
       "path": "operations/postgresql-runtime-privilege-compiled-catalog-v1.json",
-      "sha256": "8eedab4e2d6f074b08396cb629d47c5f3400fd2f97e00c9a00469165276e14e8"
+      "sha256": "915ee9bf1a10199abbae9139600bd4d8e83429c2dc5011c7953374c515ad7a41"
     },
     {
       "path": "operations/postgresql-runtime-privilege-policy-v2.json",
-      "sha256": "9f73459e104ccb596ee54221a6314bd1d6017b86f42ecb4c1eab8fcb4e52d45f"
+      "sha256": "2aba8ed96202117761ba88212fb84e3d475afbf19e5447fabe2f658bbe9d8a7c"
     },
     {
       "path": "operations/runtime-secret-file-policy-v1.json",
@@ -146,7 +146,7 @@
     },
     {
       "path": "scripts/postgresql-runtime-privilege-catalog.sql",
-      "sha256": "ca59a9322b15f305eac540fc7ec3fc7cfb6134ab36aa5fb02197b9d203f61b32"
+      "sha256": "e97c6e4657a95cd808b811a70df588f3f5487e8c376f95fcee726ff773b64695"
     },
     {
       "path": "scripts/postgresql-runtime-privilege-interlock.sh",
@@ -158,11 +158,11 @@
     },
     {
       "path": "scripts/postgresql-runtime-privilege-operator.mjs",
-      "sha256": "c93e5388f842ff71eae689296116592bb1b41c60020d2f298531d06f1dff3674"
+      "sha256": "13a896aee3c0c36d6c120eb2d9c46b2e514fc9c15f8e7a2becad06e3b84d0dc5"
     },
     {
       "path": "scripts/postgresql-runtime-privilege-reconciler.mjs",
-      "sha256": "2ae2050324ab685ef143ac7cdf4719708651beef1c5eb84affd69f72cd14f948"
+      "sha256": "22ddda1cf7f77899cbb58f2e6e5ac75f81ea7629d8a4abbf05b07021efc0a6b9"
     },
     {
       "path": "scripts/postgresql-runtime-privilege-runner.mjs",
@@ -170,9 +170,9 @@
     },
     {
       "path": "scripts/postgresql-runtime-privilege-state.sql",
-      "sha256": "b42f6bb969bfd931579e0a12e800399d3e4c0404981ab695b01bdac84232ac41"
+      "sha256": "4fd1e6a749d24025918152a51591601bb1ec6f1d767acda98d03656846bf334b"
     }
   ],
-  "runtime_privilege_policy_sha256": "b99cd7389dbb5a9f24b56400a61d0a05f3de2ca0ec84101560beab22cb07226c",
-  "policy_sha256": "b606404e616e202ce31e56592b193c66ede8a3cd2ea619a63f8c419551411e7f"
+  "runtime_privilege_policy_sha256": "1e147e55b5285fc548ba8bc473e044e9f4e6a4b80be6b3520ec257fcbc1c29f7",
+  "policy_sha256": "fe2b007b3ab3c18bf23f59fa5c65d5128de29d45b0cfce1544314cfb21dd4b06"
 }

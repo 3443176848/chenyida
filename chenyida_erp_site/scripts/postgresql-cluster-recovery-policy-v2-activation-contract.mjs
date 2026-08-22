@@ -13,8 +13,8 @@ export const CLUSTER_POLICY_ACTIVATION_EVIDENCE_CONTRACT = "chenyida-erp-postgre
 export const CLUSTER_POLICY_ACTIVATION_STATE_ROOT = "/var/lib/chenyida-erp/postgresql-cluster-recovery-policy-v2";
 export const CLUSTER_POLICY_ACTIVATION_CURRENT_FILE = `${CLUSTER_POLICY_ACTIVATION_STATE_ROOT}/current.json`;
 export const CLUSTER_POLICY_TARGET_FILE = "/etc/chenyida-erp/recovery/postgresql-cluster-recovery-policy.json";
-export const CLUSTER_POLICY_V2_TEMPLATE_FILE_SHA256 = "1a092993b1dda00bd8a2aac0899cb4e1eee83e9b336022bdb72f3e4d23e317aa";
-export const CLUSTER_POLICY_V2_TEMPLATE_POLICY_SHA256 = "c30951ad74a827c06e8256cfc124f61bd5672bca9daa7abda21c0896523378b8";
+export const CLUSTER_POLICY_V2_TEMPLATE_FILE_SHA256 = "3537a90acc094f166bd4fab6cad11e5d27f98d041432fa92f3288eee5d703016";
+export const CLUSTER_POLICY_V2_TEMPLATE_POLICY_SHA256 = "a3e82feb55530cae3a6f1768f4534b2ebd9a67300a965c07c593c4e2d9a5cee9";
 
 const SHA256 = /^[0-9a-f]{64}$/u;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/u;

@@ -14,23 +14,35 @@ SET statement_timeout = '60s';
 
 \if :{?expected_database}
 \else
-  \echo 'expected_database is required'
-  \quit 3
+DO $cyd_cluster_catalog_failure$
+BEGIN
+  RAISE EXCEPTION 'expected_database is required';
+END
+$cyd_cluster_catalog_failure$;
 \endif
 \if :{?migration_owner}
 \else
-  \echo 'migration_owner is required'
-  \quit 3
+DO $cyd_cluster_catalog_failure$
+BEGIN
+  RAISE EXCEPTION 'migration_owner is required';
+END
+$cyd_cluster_catalog_failure$;
 \endif
 \if :{?runtime_login}
 \else
-  \echo 'runtime_login is required'
-  \quit 3
+DO $cyd_cluster_catalog_failure$
+BEGIN
+  RAISE EXCEPTION 'runtime_login is required';
+END
+$cyd_cluster_catalog_failure$;
 \endif
 \if :{?privilege_group}
 \else
-  \echo 'privilege_group is required'
-  \quit 3
+DO $cyd_cluster_catalog_failure$
+BEGIN
+  RAISE EXCEPTION 'privilege_group is required';
+END
+$cyd_cluster_catalog_failure$;
 \endif
 CREATE TEMP TABLE cyd_policy_roles(name text PRIMARY KEY, purpose text NOT NULL) ON COMMIT PRESERVE ROWS;
 CREATE TEMP TABLE cyd_extension_members(classid oid NOT NULL,objid oid NOT NULL,objsubid integer NOT NULL,extname text NOT NULL) ON COMMIT PRESERVE ROWS;

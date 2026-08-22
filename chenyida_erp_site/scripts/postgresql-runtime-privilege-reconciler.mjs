@@ -751,7 +751,7 @@ async function isolatedSources() {
   return { policy, access, catalog };
 }
 
-function renderIsolatedPsql(plan) {
+export function renderIsolatedPsql(plan) {
   if (plan.no_op || plan.statements.length < 2) reject("RUNTIME_PRIVILEGE_ISOLATED_PLAN_EMPTY");
   const [lock, ...statements] = plan.statements;
   return [
@@ -764,9 +764,12 @@ function renderIsolatedPsql(plan) {
     ...statements.map((statement) => `${statement};`),
     "COMMIT;",
     "\\else",
-    "  \\echo 'RUNTIME_PRIVILEGE_MIGRATION_LOCK_UNAVAILABLE'",
     "  ROLLBACK;",
-    "  \\quit 3",
+    "DO $cyd_runtime_reconcile_failure$",
+    "BEGIN",
+    "  RAISE EXCEPTION 'RUNTIME_PRIVILEGE_MIGRATION_LOCK_UNAVAILABLE';",
+    "END",
+    "$cyd_runtime_reconcile_failure$;",
     "\\endif",
     "",
   ].join("\n");

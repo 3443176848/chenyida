@@ -555,11 +555,11 @@
     "path": "operations/postgresql-runtime-privilege-policy-v2.json",
     "contract": "chenyida-erp-postgresql-runtime-privilege-policy/v2",
     "policy_id": "chenyida-erp-postgresql-runtime-privilege-v2",
-    "policy_sha256": "b99cd7389dbb5a9f24b56400a61d0a05f3de2ca0ec84101560beab22cb07226c",
-    "file_sha256": "9f73459e104ccb596ee54221a6314bd1d6017b86f42ecb4c1eab8fcb4e52d45f",
+    "policy_sha256": "1e147e55b5285fc548ba8bc473e044e9f4e6a4b80be6b3520ec257fcbc1c29f7",
+    "file_sha256": "2aba8ed96202117761ba88212fb84e3d475afbf19e5447fabe2f658bbe9d8a7c",
     "access_sha256": "bcd714c9af16a634279eb38f01b665d3f927d16af41e64c1a065eea1ee17dd17",
     "compiled_catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
-    "compiled_catalog_artifact_sha256": "9e331334c1636b2ee46180df3aca6850c7831470782f7f03856a6efef962480b",
+    "compiled_catalog_artifact_sha256": "a386c38457e6e3e36f6409b90b08e6a0bac284c3fc97e139cceff5e9f125aa53",
     "migration_head": "0046_runtime_lock_privilege_boundary.sql",
     "migration_count": 46,
     "migration_source_set_sha256": "c3392d8d8e8a0e63acead47c7a4b48b305c7eba456fa7511851494312d255a8f",
@@ -577,8 +577,8 @@
     "tablespaces_sha256": "1a0db725c894f23de99fb5c7ccb907fcd0452e20da494aee092753b0b16ae738",
     "operator_policy_path": "operations/postgresql-runtime-privilege-operator-policy-v1.json",
     "operator_policy_contract": "chenyida-erp-postgresql-runtime-privilege-operator-policy/v1",
-    "operator_policy_sha256": "b606404e616e202ce31e56592b193c66ede8a3cd2ea619a63f8c419551411e7f",
-    "operator_policy_file_sha256": "6f9a9d409bd7be2a5937a5555413660cda33e3fb5090bc7dbe329b91b3a2717d"
+    "operator_policy_sha256": "fe2b007b3ab3c18bf23f59fa5c65d5128de29d45b0cfce1544314cfb21dd4b06",
+    "operator_policy_file_sha256": "4767a070ed8695fc770052619c3e78c5474686378ef5d1a538c58db9f78eb9fa"
   },
   "actual_recovery_controls": {
     "required_recovery_control_intent_contract": "chenyida-erp-postgresql-recovery-control-intent/v2",

@@ -321,6 +321,12 @@ test("five distinct canonical passwords are rendered once into one transaction b
     assert.equal((rendered.match(/^COMMIT;$/gmu) || []).length, 1);
     assert.ok(rendered.indexOf("SET LOCAL log_statement='none';") < rendered.indexOf('\\password "chenyida_erp_admin"'));
     assert.ok(rendered.indexOf("SET LOCAL log_min_error_statement='panic';") < rendered.indexOf('\\password "chenyida_erp_admin"'));
+    const rollback = rendered.indexOf("  ROLLBACK;");
+    const lockFailure = rendered.indexOf(
+      "RAISE EXCEPTION 'RUNTIME_PRIVILEGE_OPERATOR_MIGRATION_LOCK_UNAVAILABLE';",
+    );
+    assert.ok(rollback >= 0 && lockFailure > rollback);
+    assert.doesNotMatch(rendered, /\\(?:quit|q)[ \t]+\S/u);
     assert.equal((rendered.match(/^\\password "/gmu) || []).length, 5);
     for (const role of roles) {
       assert.equal((rendered.match(new RegExp(`^\\\\password "${role}"$`, "gmu")) || []).length, 1);

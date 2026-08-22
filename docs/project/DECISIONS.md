@@ -3509,6 +3509,45 @@
 - 拒绝把`SIDE_EFFECT_OUTCOME_UNKNOWN`当作已失败可安全重放或已成功可继续；observer和no-replay边界必须保持。
 - 拒绝手工编辑动态artifact、跳过clean/private source binding、修改冻结V2文件，或借合成PG诊断访问UAT/生产数据库及受保护数据。
 
+## D-165 TASK70不得以带状态的psql `\quit`模拟失败，必须由服务端异常和`ON_ERROR_STOP`形成精确失败关闭回执
+
+- 日期：2026-08-21
+- 状态：`ACCEPTED / PSQL FAIL-CLOSED CORRECTIVE SOURCE VERIFIED / PG17 REFRESH AND DYNAMIC RETRY RESOURCE-BLOCKED / PRODUCTION NO-GO`
+- 提案与实施：Codex持续交付负责人，依据D-164 clean-source正式失败回执、PostgreSQL 17.10有界诊断及PostgreSQL语义、Node回执、Python/摘要链三条独立只读审计
+- 确认边界：只修正生产可达psql失败语义、精确动态回执、零副作用负测及其派生摘要链；不修改Migration、业务Schema/API，不授权UAT/生产、真实数据、受保护Volume、真实备份、host、部署或服务变更
+
+### Context
+
+- D-164提交`28128de0ca03453234f760f5b5b3fa8b0562319c`完成1,791文件committed-tree敏感信息检查并由private main普通快进接收。clean正式run`dv70-g2g36ygu`在发布artifact前由`TASK70_V3_GUARDED_FAILURE_EXECUTION_INVALID`拒绝且零任务残留。
+- 有界诊断`dv70-1bzn9rfk`证明旧security-drift分支实际rc=0、stdout含guard marker、stderr为`\quit: extra argument "3" ignored`。PostgreSQL 17.10的psql `\quit`/`\q`不接受退出状态，带参写法只警告并忽略参数；因此`\quit 3`不能实现调用方依赖的rc=3失败关闭合同。
+- 全仓审计发现同类写法还存在于cluster catalog、runtime privilege catalog/state、operator、reconciler、fixed executor及集成测试fixture。只修V3 producer会让生产可达operator/恢复路径继续把守卫失败误报为成功。
+- 根盘在本修复收口门禁中精确可用10,717,696,000 bytes，低于10GiB硬线10,737,418,240 bytes；故真实PG17 integration、官方catalog refresh/test和正式producer必须停止，静态或fixture结果不得冒充动态通过。
+
+### Decision
+
+1. 生产可达SQL不得再使用任何带参数的psql `\quit`或`\q`。所有守卫失败改为server-side `DO ... RAISE EXCEPTION`，并继续依赖既有`ON_ERROR_STOP`产生rc=3；显式事务内必须先`ROLLBACK`再抛错，避免异常事务吞掉预期消息或留下副作用。
+2. V3 guarded-failure执行回执只接受rc=3、stdout逐字节等于单个换行、stderr逐字节等于`ERROR:  guarded switch runtime privilege mismatch`加单换行。旧rc=0 warning、stdout marker、CRLF、宽松substring或伪造rc=3均必须拒绝。
+3. `SECURITY_DRIFT_REJECTED`必须在失败调用前后各捕获一次非空、最多32MiB的canonical security state，要求逐字节相等，并在artifact中记录两个非零且相等的SHA-256。调用失败而安全状态变化时不得发布证据。
+4. PostgreSQL 17 integration脚本必须真实覆盖state/catalog缺失`expected_database`、非法marker target、reconciler/operator强制advisory-lock失败，并在每个失败后重捕获状态与结构性catalog进行字节核对。静态门同时扫描`.cjs/.js/.mjs/.mts/.py/.sh/.sql/.ts`并禁止带参quit回归。
+5. V3 policy、compiled catalog、runtime/operator/cluster policy、release inventory/runtime/manifest及promotion audit必须由固定生成器按新源码重放；audit仍保持4 blockers、P0=3、P1=1、`may_start=false`。五个V2冻结文件和历史`release-supervisor-bundle-v1.json`不得更新。
+6. D-132 dashboard中的cluster catalog源码SHA断言属于当前安全回归锁，不是允许坏语义永久冻结的历史artifact。D-165仅更新该断言以绑定修复后源码；D-132原提交、tree、当时运行结果和历史报告不改写，且文档明确这是生产安全修正例外。
+7. D-165先在非PG适用回归、diff及敏感门后形成独立提交并普通快进到`recovery-private/main`。只有根盘恢复到至少10GiB且内存、Swap、Load、OOM/restart/health门同时通过，才串行执行真实PG17 refresh/test和clean/private一致源码上的60/180秒正式producer。
+
+### Consequences
+
+- V3 reconciliation/production normalized SHA-256为`067255c7e6b319dbea1660bebca1b3259bb6e61363f5818ec88f226fc99ce339`/`56700c1f2cbbae092a7fc2635e53da836ef37a30e48549173f91e0c5bf616abb`；policy raw/canonical为`e8c642ec5f6d419a8b0a8104d7c784f7022e2a802e2c6751177d9504579cedcd`/`30b81e0683d9dde3ef175d68d9c29013b28630d81e132fe86cba2040f0eb90e9`。
+- compiled catalog raw/semantic/artifact为`915ee9bf1a10199abbae9139600bd4d8e83429c2dc5011c7953374c515ad7a41`/`e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c`/`a386c38457e6e3e36f6409b90b08e6a0bac284c3fc97e139cceff5e9f125aa53`；runtime/operator/cluster policy raw为`2aba8ed96202117761ba88212fb84e3d475afbf19e5447fabe2f658bbe9d8a7c`/`4767a070ed8695fc770052619c3e78c5474686378ef5d1a538c58db9f78eb9fa`/`3537a90acc094f166bd4fab6cad11e5d27f98d041432fa92f3288eee5d703016`。
+- release inventory为263/239/24，raw SHA-256 `97e599dab466ed256821b0980075660c7aac9e7a053c4c92c1ede4c8436451e6`；test runtime policy及release manifest contract source raw为`1b0637e2092d63e491be72c64f1ce49f4368eef257a8fbe0867a5d17b9d0efc8`/`eafe78d1c1b1d1d7846fad70f838665a44d540cc3cd5f5ed7da49b6f1744fae5`。
+- promotion audit semantic/raw/Markdown/source-manifest为`ab52a0958c854179fbecfb4afca58a5ecfc454d3a07b3dd1dfa410a43078b123`/`c180f6f71018b349a42fb8593f40b9afb63603e8d217afabc328f28290a5b8ef`/`5b1175d1f1e1e0b5e89505edd033b366c7fbd95c8e2d9235ac0fc16cd52b5f45`/`605cdacc99935ae80449252a516ebbe4a0fdba0e55639429c629f528f827bdf8`；`assert-ready`继续以exit 1和`UAT_PROMOTION_EXECUTOR_NOT_READY`拒绝。
+- 非PG适用回归已通过Node68/68+35/35、Python19/19+130/130+46/46、audit20/20、inventory263/239/24及policy/audit直接门；真实PG17范围明确保持`NOT RUN / RESOURCE-BLOCKED`。系统仍为`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝保留`\quit 3`并在调用方把rc=0 warning解释成失败，也拒绝用stdout marker、shell wrapper或手工`exit 3`伪造psql服务端执行结果；这些做法无法证明SQL守卫实际失败且无副作用。
+- 拒绝只修V3 verifier而留下operator/reconciler/cluster catalog同类路径，或放宽精确stderr/stdout合同来接受旧行为。
+- 拒绝因历史D-132哈希锁而冻结已证实的fail-open语义；同样拒绝重写D-132历史证据、修改五个V2冻结文件或历史Supervisor V1 bundle来适配当前源码。
+- 拒绝在根盘低于10GiB时启动PG17、Docker或正式producer，也拒绝重复已消耗的TASK84命令。资源恢复必须来自自然释放或新的精确专项授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

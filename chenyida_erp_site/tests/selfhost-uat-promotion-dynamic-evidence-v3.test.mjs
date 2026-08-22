@@ -20,6 +20,7 @@ import {
   resetLayoutSql,
   setupClusterSql,
   verifyCompressedSqlEvidence,
+  validateGuardedFailureExecution,
   validateFixedExecutionReceipt,
   validatePsqlCommandReceipt,
   validatePolicy,
@@ -45,7 +46,7 @@ test("V3 policy is closed, partial-only and explicitly preserves trust-boundary 
   );
   assert.equal(
     policy.sql_evidence.production_normalized_sha256,
-    "fd129b85c4f23937d62e2f6838e113a609d9cf5d305b3424480f096391e39e24",
+    "56700c1f2cbbae092a7fc2635e53da836ef37a30e48549173f91e0c5bf616abb",
   );
   assert.ok(policy.required_non_claims.includes(
     "DOES_NOT_PROVE_CONCURRENT_NONCOOPERATING_ROOT_OR_POSTGRESQL_SUPERUSER_EXCLUSION",
@@ -224,6 +225,105 @@ test("V3 SQL receipt independently binds target role variables argv stdin and li
     assert.throws(() => validatePsqlCommandReceipt(altered, spec),
       (error) => error instanceof DynamicEvidenceV3Error
         && error.code === "TASK70_V3_SQL_RECEIPT_INVALID");
+  }
+});
+
+
+test("V3 runtime privilege guard requires the exact PostgreSQL failure receipt", () => {
+  const sql = Buffer.from("SELECT true;\n", "ascii");
+  const base = {
+    databases: {
+      staging_name: "chenyida_erp_rb_deadbeef",
+      staging_marker: "chenyida-erp-deployment/v2:UAT:chenyida-erp-rb-deadbeef",
+    },
+    postgres: {
+      container_id: "a".repeat(64),
+      system_identifier: "7612345678901234567",
+    },
+    security: { database_owner: "chenyida_erp_owner" },
+  };
+  const opcode = {
+    phase: "guardedswitch",
+    database: base.databases.staging_name,
+    opcode: "PG_RB_GUARDED_SWITCH_V3",
+    sql_sha256: createHash("sha256").update(sql).digest("hex"),
+  };
+  const argumentsValue = [
+    "exec", "--interactive", "--user", "999:999", "--env",
+    "PGAPPNAME=cyd_rb_deadbeef_guardedswitch",
+    "--env", "PGOPTIONS=-c default_transaction_read_only=off",
+    "--", base.postgres.container_id,
+    "psql", "--no-psqlrc", "--quiet", "--no-align", "--tuples-only",
+    "--field-separator=\t", "--host=/var/run/postgresql", "--port=5432",
+    "--username=postgres", "--no-password", `--dbname=${base.databases.staging_name}`,
+    "--set=capture_security_state=1",
+    `--set=expected_database=${base.databases.staging_name}`,
+    `--set=expected_marker=${base.databases.staging_marker}`,
+    `--set=expected_system_identifier=${base.postgres.system_identifier}`,
+    "--set=migration_owner=chenyida_erp_owner",
+    "--set=sealed_staging_mode=1",
+    "--set=ON_ERROR_STOP=on", "--set=VERBOSITY=terse",
+  ];
+  const environment = {
+    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    LC_ALL: "C", LANG: "C", TZ: "UTC", HOME: "/nonexistent",
+  };
+  const receipt = (returnCode, stdout, stderr) => {
+    const body = {
+      schema_version: 1,
+      contract: "chenyida-erp-task70-v3-fixed-executor-psql-execution-receipt/v1",
+      sequence: 6,
+      phase: "guardedswitch",
+      arguments: argumentsValue,
+      arguments_sha256: digestValue(argumentsValue),
+      environment,
+      environment_sha256: digestValue(environment),
+      stdin_present: true,
+      stdin_bytes: sql.length,
+      stdin_sha256: opcode.sql_sha256,
+      timeout_milliseconds: 300_000,
+      maximum_output_bytes: 4 * 1024 * 1024,
+      side_effects_started: true,
+      return_code: returnCode,
+      stdout_base64: stdout.toString("base64"),
+      stdout_bytes: stdout.length,
+      stdout_sha256: createHash("sha256").update(stdout).digest("hex"),
+      stderr_base64: stderr.toString("base64"),
+      stderr_bytes: stderr.length,
+      stderr_sha256: createHash("sha256").update(stderr).digest("hex"),
+      daemon_state: "COMPLETED_NO_UNTRACKED_PROCESS",
+    };
+    return { ...body, execution_receipt_sha256: digestValue(body) };
+  };
+  const spec = { base, opcode, sql, sequence: 6 };
+  validateGuardedFailureExecution(
+    receipt(
+      3, Buffer.from("\n", "ascii"),
+      Buffer.from("ERROR:  guarded switch runtime privilege mismatch\n", "ascii"),
+    ),
+    spec, "RUNTIME_PRIVILEGE_MISMATCH",
+  );
+  for (const invalid of [
+    receipt(
+      0, Buffer.from("\nguarded switch runtime privilege mismatch\n", "ascii"),
+      Buffer.from('\\quit: extra argument "3" ignored\n', "ascii"),
+    ),
+    receipt(
+      3, Buffer.from("\nguarded switch runtime privilege mismatch\n", "ascii"),
+      Buffer.alloc(0),
+    ),
+    receipt(
+      3, Buffer.from("\n", "ascii"),
+      Buffer.from("ERROR:  guarded switch runtime privilege mismatch\r\n", "ascii"),
+    ),
+  ]) {
+    assert.throws(
+      () => validateGuardedFailureExecution(
+        invalid, spec, "RUNTIME_PRIVILEGE_MISMATCH",
+      ),
+      (error) => error instanceof DynamicEvidenceV3Error
+        && error.code === "TASK70_V3_GUARDED_FAILURE_EXECUTION_INVALID",
+    );
   }
 });
 

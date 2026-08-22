@@ -1,5 +1,5 @@
 {
-  "artifact_sha256": "9ee02ef4823ebd638a79fac1a951ed89d04d503ce8d5b407b42cfe6b6207f22b",
+  "artifact_sha256": "ab52a0958c854179fbecfb4afca58a5ecfc454d3a07b3dd1dfa410a43078b123",
   "audit_validation": {
     "errors": [],
     "result": "PASS"
@@ -244,7 +244,7 @@
       "not_applicable_tests": 24,
       "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
       "required_tests": 239,
-      "sha256": "a378c049d1a5874fc2ec179e642ebdb2ef7b70f906e7634d95945c2bcf0cf993",
+      "sha256": "97e599dab466ed256821b0980075660c7aac9e7a053c4c92c1ede4c8436451e6",
       "total_tests": 263
     },
     "source_manifest": {
@@ -341,7 +341,7 @@
             "selfhost-uat-promotion-rollback-audit.test.mjs"
           ],
           "path": "chenyida_erp_site/release/release-test-inventory-v1.json",
-          "sha256": "a378c049d1a5874fc2ec179e642ebdb2ef7b70f906e7634d95945c2bcf0cf993"
+          "sha256": "97e599dab466ed256821b0980075660c7aac9e7a053c4c92c1ede4c8436451e6"
         },
         {
           "markers": [
@@ -349,7 +349,7 @@
             "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394"
           ],
           "path": "chenyida_erp_site/release/test-runtime-policy-v1.json",
-          "sha256": "9dfc7f9fc068e8967a3ac394c847e4cb22207aacfbe551ab9588b6533ca21c40"
+          "sha256": "1b0637e2092d63e491be72c64f1ce49f4368eef257a8fbe0867a5d17b9d0efc8"
         },
         {
           "markers": [
@@ -378,7 +378,7 @@
             "SUPERVISOR_INSTALL_UAT_ROLLBACK_RUNTIME_RECOVERY_REQUIRED"
           ],
           "path": "chenyida_erp_site/scripts/install-release-supervisor.py",
-          "sha256": "9494592df62154cee0e2cd29a4efe4d3ba06675d40bb6a0f521e2c9ce50f6b2b"
+          "sha256": "cffae36e4ecfa2fbb0babe2880c52d805ae8b2f1fbbfb17686ae6e5eb719887d"
         },
         {
           "markers": [
@@ -444,7 +444,7 @@
             "RELEASE_NOT_ELIGIBLE"
           ],
           "path": "chenyida_erp_site/scripts/release-manifest-contract.mjs",
-          "sha256": "6835057009870d5d6616f613d018c95aae422ac4830cad8a4e852b56efedc00c"
+          "sha256": "eafe78d1c1b1d1d7846fad70f838665a44d540cc3cd5f5ed7da49b6f1744fae5"
         },
         {
           "markers": [
@@ -483,7 +483,7 @@
             "VERIFY_AND_PUBLISH_POST_DEPLOY_IDENTITY"
           ],
           "path": "chenyida_erp_site/scripts/release-supervisor-launcher.py",
-          "sha256": "96dd8b3b5ee2e976e8161dc9146c3d8185fe467c15bf63910a282436c75e9831"
+          "sha256": "24ac34d6c7f222c70cb723e1bb0591d387baaf872b3570be5afdec2f023684b0"
         },
         {
           "markers": [
@@ -626,7 +626,7 @@
             "runtime_plan_sha256"
           ],
           "path": "chenyida_erp_site/scripts/uat-promotion-rollback-fixed-executor.py",
-          "sha256": "0275a69421e30a34df4c3df97607e4efba46a38b199bdf4d4d72b42698c25c36"
+          "sha256": "3be6383f35ab93c73bbe31279aa1e260f1665207c0b1b80e39a5bb30a4646fcb"
         },
         {
           "markers": [
@@ -743,10 +743,10 @@
             "test_live_state_parser_classifies_old_new_and_partial_layouts"
           ],
           "path": "chenyida_erp_site/tests/test_uat_promotion_rollback_fixed_executor.py",
-          "sha256": "17640771603dd56a0e19aad993a287b370d154b48c3c1a1253664ece537f834d"
+          "sha256": "9ea08b10a1b06904162b6bd4782294767f74a558e084aac671bc62a6016ed77b"
         }
       ],
-      "sha256": "ed3974f7fb22d7f76df114e60d86b3fa09a96c721eaca12069098fd9b3aace80"
+      "sha256": "605cdacc99935ae80449252a516ebbe4a0fdba0e55639429c629f528f827bdf8"
     }
   },
   "observations": {

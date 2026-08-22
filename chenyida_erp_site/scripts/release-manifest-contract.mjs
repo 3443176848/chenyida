@@ -53,8 +53,8 @@ export const RELEASE_GATE_PLAN_REPOSITORY_PATH = "chenyida_erp_site/release/rele
 export const RELEASE_VULNERABILITY_POLICY_ID = "chenyida-erp-zero-known-vulnerabilities-v1";
 export const RELEASE_VULNERABILITY_POLICY_SHA256 = "042cd1bb1185923a8f186319d90194911beba78f761938f42937c5fd0e463ab9";
 export const RELEASE_TEST_RUNTIME_POLICY_CONTRACT = "chenyida-erp-release-test-runtime-policy/v1";
-export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "9dfc7f9fc068e8967a3ac394c847e4cb22207aacfbe551ab9588b6533ca21c40";
-export const RELEASE_TEST_INVENTORY_SHA256 = "a378c049d1a5874fc2ec179e642ebdb2ef7b70f906e7634d95945c2bcf0cf993";
+export const RELEASE_TEST_RUNTIME_POLICY_SHA256 = "1b0637e2092d63e491be72c64f1ce49f4368eef257a8fbe0867a5d17b9d0efc8";
+export const RELEASE_TEST_INVENTORY_SHA256 = "97e599dab466ed256821b0980075660c7aac9e7a053c4c92c1ede4c8436451e6";
 export const RELEASE_GATE_REQUIRED_STEP_IDS = [
   "release-contracts",
   "supervisor-python-contracts",
@@ -298,8 +298,8 @@ export function validateOfficialTestRuntimePolicy(value, raw = null) {
   if (value.postgres_image.reference !== "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394" || value.postgres_image.repo_digest !== "sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394" || value.postgres_image.config_digest !== "sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394") reject("TEST_RUNTIME_POSTGRES_IMAGE_INVALID");
   exactKeys(value.postgres_runtime_catalog, ["path", "file_sha256", "artifact_sha256", "image_reference"], "TEST_RUNTIME_POSTGRES_CATALOG_FIELDS_INVALID");
   if (value.postgres_runtime_catalog.path !== "operations/postgresql-runtime-privilege-compiled-catalog-v1.json"
-    || value.postgres_runtime_catalog.file_sha256 !== "8eedab4e2d6f074b08396cb629d47c5f3400fd2f97e00c9a00469165276e14e8"
-    || value.postgres_runtime_catalog.artifact_sha256 !== "9e331334c1636b2ee46180df3aca6850c7831470782f7f03856a6efef962480b"
+    || value.postgres_runtime_catalog.file_sha256 !== "915ee9bf1a10199abbae9139600bd4d8e83429c2dc5011c7953374c515ad7a41"
+    || value.postgres_runtime_catalog.artifact_sha256 !== "a386c38457e6e3e36f6409b90b08e6a0bac284c3fc97e139cceff5e9f125aa53"
     || value.postgres_runtime_catalog.image_reference !== value.postgres_image.reference) reject("TEST_RUNTIME_POSTGRES_CATALOG_INVALID");
   if (value.posix_image.reference !== "node@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37" || value.posix_image.repo_digest !== "sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37" || value.posix_image.config_digest !== "sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37") reject("TEST_RUNTIME_POSIX_IMAGE_INVALID");
   if (value.browser_image.reference !== "mcr.microsoft.com/playwright@sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961" || value.browser_image.repo_digest !== "sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961" || value.browser_image.config_digest !== "sha256:daa1690ea366d2d6b52ea085a59a221a6e954cd9d9c13c89bd7eccb0673e8961") reject("TEST_RUNTIME_BROWSER_IMAGE_INVALID");

@@ -14,23 +14,35 @@ SET statement_timeout = '60s';
 
 \if :{?expected_database}
 \else
-  \echo 'expected_database is required'
-  \quit 3
+DO $cyd_runtime_privilege_failure$
+BEGIN
+  RAISE EXCEPTION 'expected_database is required';
+END
+$cyd_runtime_privilege_failure$;
 \endif
 \if :{?migration_owner}
 \else
-  \echo 'migration_owner is required'
-  \quit 3
+DO $cyd_runtime_privilege_failure$
+BEGIN
+  RAISE EXCEPTION 'migration_owner is required';
+END
+$cyd_runtime_privilege_failure$;
 \endif
 \if :{?expected_marker}
 \else
-  \echo 'expected_marker is required'
-  \quit 3
+DO $cyd_runtime_privilege_failure$
+BEGIN
+  RAISE EXCEPTION 'expected_marker is required';
+END
+$cyd_runtime_privilege_failure$;
 \endif
 \if :{?expected_system_identifier}
 \else
-  \echo 'expected_system_identifier is required'
-  \quit 3
+DO $cyd_runtime_privilege_failure$
+BEGIN
+  RAISE EXCEPTION 'expected_system_identifier is required';
+END
+$cyd_runtime_privilege_failure$;
 \endif
 
 \if :{?sealed_staging_mode}
@@ -78,8 +90,11 @@ SET statement_timeout = '60s';
   \gset
   \if :sealed_staging_target_valid
   \else
-    \echo 'RUNTIME_PRIVILEGE_STATE_SEALED_STAGING_TARGET_INVALID'
-    \quit 3
+DO $cyd_runtime_privilege_failure$
+BEGIN
+  RAISE EXCEPTION 'RUNTIME_PRIVILEGE_STATE_SEALED_STAGING_TARGET_INVALID';
+END
+$cyd_runtime_privilege_failure$;
   \endif
 \elif :{?controlled_runtime_mode}
   SELECT (
@@ -107,8 +122,11 @@ SET statement_timeout = '60s';
   \gset
   \if :controlled_target_valid
   \else
-    \echo 'RUNTIME_PRIVILEGE_STATE_CONTROLLED_TARGET_INVALID'
-    \quit 3
+DO $cyd_runtime_privilege_failure$
+BEGIN
+  RAISE EXCEPTION 'RUNTIME_PRIVILEGE_STATE_CONTROLLED_TARGET_INVALID';
+END
+$cyd_runtime_privilege_failure$;
   \endif
 \else
   SELECT (
@@ -136,8 +154,11 @@ SET statement_timeout = '60s';
   \gset
   \if :synthetic_target_valid
   \else
-    \echo 'RUNTIME_PRIVILEGE_STATE_SYNTHETIC_TARGET_INVALID'
-    \quit 3
+DO $cyd_runtime_privilege_failure$
+BEGIN
+  RAISE EXCEPTION 'RUNTIME_PRIVILEGE_STATE_SYNTHETIC_TARGET_INVALID';
+END
+$cyd_runtime_privilege_failure$;
   \endif
 \endif
 

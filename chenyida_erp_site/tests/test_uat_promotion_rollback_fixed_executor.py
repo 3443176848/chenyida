@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 import subprocess
 import tarfile
 import tempfile
@@ -2784,6 +2785,23 @@ class WriterContainmentRuntimeTest(unittest.TestCase):
 
 
 class PostgresRollbackBaseSpecTest(unittest.TestCase):
+    def test_psql_failure_paths_never_use_unsupported_quit_arguments(self):
+        unsupported = re.compile(r"\\+(?:quit|q)[ \t]+\S")
+        self.assertIsNotNone(unsupported.search(r"\quit 3"))
+        self.assertIsNotNone(unsupported.search(r"\q failure"))
+        self.assertIsNone(unsupported.search("\\quit\n"))
+        for path in sorted((SITE_ROOT / "scripts").glob("**/*")):
+            if not path.is_file() or path.suffix not in {
+                    ".cjs", ".js", ".mjs", ".mts", ".py", ".sh",
+                    ".sql", ".ts",
+            }:
+                continue
+            with self.subTest(path=path.relative_to(SITE_ROOT)):
+                self.assertIsNone(
+                    unsupported.search(path.read_text(encoding="utf-8")),
+                    f"psql \\quit does not accept status arguments: {path}",
+                )
+
     @staticmethod
     def inputs():
         document_paths = {
@@ -3211,9 +3229,20 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
         self.assertNotIn("pg_catalog.digest", sql)
         self.assertIn("pg_catalog.sha256", sql)
         self.assertNotIn("pg_catalog.coalesce(", sql)
+        self.assertNotRegex(sql, r"\\(?:quit|q)[ \t]+\S")
+        self.assertEqual(
+            sql.count(
+                "RAISE EXCEPTION 'guarded switch runtime privilege mismatch';",
+            ),
+            1,
+        )
         self.assertIn("0:0:0:0:0:0", sql)
         reset = sql.index("SET default_transaction_read_only=off;")
         security = sql.index("\\set ON_ERROR_STOP on")
+        security_failure = sql.index(
+            "RAISE EXCEPTION 'guarded switch runtime privilege mismatch';",
+        )
+        migration_guard = sql.index("guarded switch migration ledger mismatch")
         switch_connection = sql.index("\\connect postgres")
         management_begin = sql.index("BEGIN;", switch_connection)
         management_lock_timeout = sql.index(
@@ -3232,6 +3261,8 @@ class PostgresRollbackBaseSpecTest(unittest.TestCase):
             'ALTER DATABASE "chenyida_erp_rb_deadbeefdeadbeef" RENAME TO "chenyida_erp";',
         )
         self.assertLess(reset, security)
+        self.assertLess(security, security_failure)
+        self.assertLess(security_failure, migration_guard)
         self.assertLess(security, switch_connection)
         self.assertLess(management_begin, management_lock_timeout)
         self.assertLess(management_lock_timeout, management_statement_timeout)

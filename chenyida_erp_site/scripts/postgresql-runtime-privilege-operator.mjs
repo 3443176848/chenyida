@@ -716,7 +716,7 @@ export function buildRuntimePrivilegeOperatorTransactionInput(planInput, binding
     appendBuffer(parts, privateBinding.secrets.get(role));
     appendBuffer(parts, "\n");
   }
-  appendBuffer(parts, "COMMIT;\n\\else\n  ROLLBACK;\n  \\echo 'RUNTIME_PRIVILEGE_OPERATOR_MIGRATION_LOCK_UNAVAILABLE'\n  \\quit 3\n\\endif\n");
+  appendBuffer(parts, "COMMIT;\n\\else\n  ROLLBACK;\nDO $cyd_runtime_operator_failure$\nBEGIN\n  RAISE EXCEPTION 'RUNTIME_PRIVILEGE_OPERATOR_MIGRATION_LOCK_UNAVAILABLE';\nEND\n$cyd_runtime_operator_failure$;\n\\endif\n");
   const input = Buffer.concat(parts);
   for (const part of parts) {
     if (![...privateBinding.secrets.values()].includes(part)) part.fill(0);

@@ -16,6 +16,7 @@ import {
   createRuntimePrivilegeReconciliationPlan,
   decideRuntimePrivilegeInterruptedRecovery,
   runtimePrivilegeControlledBaselineNeedsOwnershipBootstrap,
+  renderIsolatedPsql,
   transitionRuntimePrivilegeIntent,
   validateRuntimePrivilegeState,
 } from "../scripts/postgresql-runtime-privilege-reconciler.mjs";
@@ -173,6 +174,13 @@ test("planner separates role bootstrap, emits migration lock and exact default s
   assert.ok(bootstrap.statements.some((statement) => statement === "ALTER DEFAULT PRIVILEGES FOR ROLE \"chenyida_erp_owner\" REVOKE ALL PRIVILEGES ON ROUTINES FROM PUBLIC, \"chenyida_erp_admin_priv\", \"chenyida_erp_backup_priv\", \"chenyida_erp_web_priv\", \"chenyida_erp_worker_priv\", \"chenyida_erp_admin\", \"chenyida_erp_backup\", \"chenyida_erp_web\", \"chenyida_erp_worker\""));
   assert.ok(bootstrap.statements.some((statement) => statement.includes("IN SCHEMA \"public\" REVOKE ALL PRIVILEGES ON TABLES")));
   assert.ok(bootstrap.statements.some((statement) => statement.includes("REVOKE ALL PRIVILEGES ON ROUTINE public.digest(bytea,text)")));
+  const rendered = renderIsolatedPsql(bootstrap);
+  const rollback = rendered.indexOf("  ROLLBACK;");
+  const lockFailure = rendered.indexOf(
+    "RAISE EXCEPTION 'RUNTIME_PRIVILEGE_MIGRATION_LOCK_UNAVAILABLE';",
+  );
+  assert.ok(rollback >= 0 && lockFailure > rollback);
+  assert.doesNotMatch(rendered, /\\(?:quit|q)[ \t]+\S/u);
 
   const reconcilerBaseline = { ...baseline, roles: bootstrap.desired.roles, memberships: bootstrap.desired.memberships };
   const reconciliation = createRuntimePrivilegeReconciliationPlan(reconcilerBaseline, sources);

@@ -103,7 +103,11 @@ SELECT current_user=session_user AND current_user='chenyida_erp_owner' AS migrat
 \gset
 \if :migration_identity_valid
 \else
-  \quit 3
+DO $cyd_test_migration_identity_failure$
+BEGIN
+  RAISE EXCEPTION 'migration identity invalid';
+END
+$cyd_test_migration_identity_failure$;
 \endif
 CREATE TABLE public.schema_migrations(version text PRIMARY KEY,checksum text NOT NULL,applied_at timestamptz NOT NULL DEFAULT now());
 SQL
@@ -121,7 +125,11 @@ SELECT current_user=session_user AND current_user='chenyida_erp_owner' AS migrat
 \gset
 \if :migration_identity_valid
 \else
-  \quit 3
+DO $cyd_test_migration_identity_failure$
+BEGIN
+  RAISE EXCEPTION 'migration identity invalid';
+END
+$cyd_test_migration_identity_failure$;
 \endif
 \i $migration
 INSERT INTO public.schema_migrations(version,checksum) VALUES (:'migration_name',:'migration_checksum');
@@ -363,6 +371,39 @@ capture_state() {
   chmod 0600 "$error_log"
 }
 
+expect_psql_guard_failure() {
+  label=$1
+  expected_error=$2
+  input=$3
+  shift 3
+  output="$TASK_ROOT/psql-guard-$label.output"
+  error="$TASK_ROOT/psql-guard-$label.error"
+  expected="$TASK_ROOT/psql-guard-$label.expected"
+  status=0
+  psql -X -q -A -t -v ON_ERROR_STOP=on -v VERBOSITY=terse "$@" \
+    <"$input" >"$output" 2>"$error" || status=$?
+  chmod 0600 "$output" "$error"
+  [ "$status" = 3 ] || return 1
+  [ -z "$(tr -d '[:space:]' <"$output")" ] || return 1
+  printf 'ERROR:  %s\n' "$expected_error" >"$expected"
+  chmod 0600 "$expected"
+  cmp -s "$expected" "$error"
+}
+
+force_plan_lock_failure() {
+  input=$1
+  output=$2
+  lock_statement="SELECT pg_catalog.pg_try_advisory_xact_lock(pg_catalog.hashtext('chenyida_erp_schema_migration')::bigint) AS migration_lock_acquired"
+  awk -v expected="$lock_statement" '
+    $0 == expected { matches++; print "SELECT false AS migration_lock_acquired"; next }
+    { print }
+    END { if (matches != 1) exit 1 }
+  ' "$input" >"$output"
+  chmod 0600 "$output"
+  [ "$(grep -Fxc 'SELECT false AS migration_lock_acquired' "$output")" = 1 ]
+  [ "$(grep -Fxc "$lock_statement" "$output")" = 0 ]
+}
+
 STAGE=RUNTIME_PRIVILEGE_BASELINE_CAPTURE
 PRIVILEGE_BASELINE="$TASK_ROOT/runtime-privilege-baseline.json"
 PRIVILEGE_BASELINE_ERROR="$TASK_ROOT/runtime-privilege-baseline.error"
@@ -370,6 +411,56 @@ capture_state "$PRIVILEGE_BASELINE" "$PRIVILEGE_BASELINE_ERROR" || {
   sed -n '1p' "$PRIVILEGE_BASELINE_ERROR" | sed 's/[^A-Za-z0-9_:. -]/_/g' >&2
   exit 1
 }
+
+STAGE=RUNTIME_PRIVILEGE_PSQL_GUARD_FAILURES
+expect_psql_guard_failure state_missing_database 'expected_database is required' \
+  "$SITE_ROOT/scripts/postgresql-runtime-privilege-state.sql" \
+  -v migration_owner="$OWNER" -v expected_marker="$MARKER" \
+  -v expected_system_identifier="$SYSTEM_IDENTIFIER"
+expect_psql_guard_failure catalog_missing_database 'expected_database is required' \
+  "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.sql" \
+  -v migration_owner="$OWNER" -v expected_marker="$MARKER" \
+  -v expected_system_identifier="$SYSTEM_IDENTIFIER"
+expect_psql_guard_failure state_invalid_target \
+  RUNTIME_PRIVILEGE_STATE_SYNTHETIC_TARGET_INVALID \
+  "$SITE_ROOT/scripts/postgresql-runtime-privilege-state.sql" \
+  -v expected_database="$DATABASE" -v migration_owner="$OWNER" \
+  -v expected_marker="$MARKER.invalid" \
+  -v expected_system_identifier="$SYSTEM_IDENTIFIER"
+expect_psql_guard_failure catalog_invalid_target \
+  RUNTIME_PRIVILEGE_CATALOG_SYNTHETIC_TARGET_INVALID \
+  "$SITE_ROOT/scripts/postgresql-runtime-privilege-catalog.sql" \
+  -v expected_database="$DATABASE" -v migration_owner="$OWNER" \
+  -v expected_marker="$MARKER.invalid" \
+  -v expected_system_identifier="$SYSTEM_IDENTIFIER"
+
+STAGE=RUNTIME_PRIVILEGE_PSQL_GUARD_NO_SIDE_EFFECTS
+PRIVILEGE_GUARD_STATE="$TASK_ROOT/runtime-privilege-guard-state.json"
+PRIVILEGE_GUARD_STATE_ERROR="$TASK_ROOT/runtime-privilege-guard-state.error"
+capture_state "$PRIVILEGE_GUARD_STATE" "$PRIVILEGE_GUARD_STATE_ERROR"
+cmp -s "$PRIVILEGE_BASELINE" "$PRIVILEGE_GUARD_STATE"
+PRIVILEGE_GUARD_STRUCTURE="$TASK_ROOT/runtime-privilege-guard-structure.tsv"
+capture "$PRIVILEGE_GUARD_STRUCTURE"
+cmp -s "$PRIVILEGE_STRUCTURE_BEFORE" "$PRIVILEGE_GUARD_STRUCTURE"
+
+STAGE=RUNTIME_PRIVILEGE_RECONCILER_LOCK_FAILURE_PLAN
+PRIVILEGE_RECONCILER_PLAN="$TASK_ROOT/runtime-privilege-reconciler-bootstrap.sql"
+PRIVILEGE_RECONCILER_LOCK_FAILURE_PLAN="$TASK_ROOT/runtime-privilege-reconciler-lock-failure.sql"
+NODE_ENV=test ERP_RUNTIME_PRIVILEGE_RECONCILER_POSTGRES_CONTAINER_MODE=YES \
+  node "$SITE_ROOT/scripts/postgresql-runtime-privilege-reconciler.mjs" \
+    render-isolated-bootstrap-psql "$PRIVILEGE_BASELINE" >"$PRIVILEGE_RECONCILER_PLAN"
+chmod 0600 "$PRIVILEGE_RECONCILER_PLAN"
+force_plan_lock_failure \
+  "$PRIVILEGE_RECONCILER_PLAN" "$PRIVILEGE_RECONCILER_LOCK_FAILURE_PLAN"
+STAGE=RUNTIME_PRIVILEGE_RECONCILER_LOCK_FAILURE
+expect_psql_guard_failure reconciler_lock \
+  RUNTIME_PRIVILEGE_MIGRATION_LOCK_UNAVAILABLE \
+  "$PRIVILEGE_RECONCILER_LOCK_FAILURE_PLAN"
+PRIVILEGE_RECONCILER_LOCK_STATE="$TASK_ROOT/runtime-privilege-reconciler-lock-state.json"
+PRIVILEGE_RECONCILER_LOCK_STATE_ERROR="$TASK_ROOT/runtime-privilege-reconciler-lock-state.error"
+capture_state "$PRIVILEGE_RECONCILER_LOCK_STATE" \
+  "$PRIVILEGE_RECONCILER_LOCK_STATE_ERROR"
+cmp -s "$PRIVILEGE_BASELINE" "$PRIVILEGE_RECONCILER_LOCK_STATE"
 
 if [ "${ERP_RUNTIME_PRIVILEGE_CATALOG_REPOSITORY_MODE:-test}" = system-adapter ]; then
   STAGE=RUNTIME_PRIVILEGE_SYSTEM_ADAPTER_AUTH_POLICY
@@ -433,6 +524,18 @@ if ! NODE_ENV=test ERP_RUNTIME_PRIVILEGE_CATALOG_POSTGRES_CONTAINER_MODE=YES \
 fi
 chmod 0600 "$PRIVILEGE_PLAN"
 chmod 0600 "$PRIVILEGE_PLAN_ERROR"
+
+STAGE=RUNTIME_PRIVILEGE_OPERATOR_LOCK_FAILURE_PLAN
+PRIVILEGE_OPERATOR_LOCK_FAILURE_PLAN="$TASK_ROOT/runtime-privilege-operator-lock-failure.sql"
+force_plan_lock_failure "$PRIVILEGE_PLAN" "$PRIVILEGE_OPERATOR_LOCK_FAILURE_PLAN"
+STAGE=RUNTIME_PRIVILEGE_OPERATOR_LOCK_FAILURE
+expect_psql_guard_failure operator_lock \
+  RUNTIME_PRIVILEGE_OPERATOR_MIGRATION_LOCK_UNAVAILABLE \
+  "$PRIVILEGE_OPERATOR_LOCK_FAILURE_PLAN"
+PRIVILEGE_OPERATOR_LOCK_STATE="$TASK_ROOT/runtime-privilege-operator-lock-state.json"
+PRIVILEGE_OPERATOR_LOCK_STATE_ERROR="$TASK_ROOT/runtime-privilege-operator-lock-state.error"
+capture_state "$PRIVILEGE_OPERATOR_LOCK_STATE" "$PRIVILEGE_OPERATOR_LOCK_STATE_ERROR"
+cmp -s "$PRIVILEGE_BASELINE" "$PRIVILEGE_OPERATOR_LOCK_STATE"
 
 enable_transaction_log_audit() {
   psql -X -d postgres -v ON_ERROR_STOP=1 -c "ALTER SYSTEM SET log_statement='all'" >/dev/null

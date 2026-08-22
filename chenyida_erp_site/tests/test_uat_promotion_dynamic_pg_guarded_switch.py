@@ -206,7 +206,7 @@ class DynamicPostgresGuardedSwitchV3Test(unittest.TestCase):
         )
         self.assertEqual(
             policy["sql_evidence"]["production_normalized_sha256"],
-            "fd129b85c4f23937d62e2f6838e113a609d9cf5d305b3424480f096391e39e24",
+            "56700c1f2cbbae092a7fc2635e53da836ef37a30e48549173f91e0c5bf616abb",
         )
 
     def test_sql_normalization_distinguishes_bound_content_hex_from_unknown_digest(self):
@@ -373,12 +373,35 @@ class DynamicPostgresGuardedSwitchV3Test(unittest.TestCase):
             reason="CONTENT_GUARD_RELATION_MISMATCH",
         )
         security = receipt(
-            6, 3, b"\nguarded switch runtime privilege mismatch\n", b"",
+            6, 3, b"\n", b"ERROR:  guarded switch runtime privilege mismatch\n",
         )
         PRODUCER.validate_guarded_failure_execution(
             security, base=base, opcode=opcode, sql=sql, sequence=6,
             reason="RUNTIME_PRIVILEGE_MISMATCH",
         )
+        for invalid_security in (
+                receipt(
+                    6, 0,
+                    b"\nguarded switch runtime privilege mismatch\n",
+                    b'\\quit: extra argument "3" ignored\n',
+                ),
+                receipt(
+                    6, 3,
+                    b"\nguarded switch runtime privilege mismatch\n", b"",
+                ),
+                receipt(
+                    6, 3, b"\n",
+                    b"ERROR:  guarded switch runtime privilege mismatch\r\n",
+                ),
+        ):
+            with self.assertRaisesRegex(
+                    PRODUCER.DynamicGuardedSwitchError,
+                    "TASK70_V3_GUARDED_FAILURE_EXECUTION_INVALID",
+            ):
+                PRODUCER.validate_guarded_failure_execution(
+                    invalid_security, base=base, opcode=opcode, sql=sql,
+                    sequence=6, reason="RUNTIME_PRIVILEGE_MISMATCH",
+                )
 
         for changed in (
                 {**copy.deepcopy(success), "sequence": 3},
@@ -415,6 +438,19 @@ class DynamicPostgresGuardedSwitchV3Test(unittest.TestCase):
                 forged_content, base=base, opcode=opcode, sql=sql, sequence=4,
                 reason="CONTENT_GUARD_RELATION_MISMATCH",
             )
+
+    def test_security_failure_requires_byte_exact_unchanged_state(self):
+        state = b'{"synthetic":"security-state"}\n'
+        self.assertEqual(
+            PRODUCER.security_failure_state_digest(state, state),
+            hashlib.sha256(state).hexdigest(),
+        )
+        for changed in (b"", state + b" ", bytearray(state)):
+            with self.assertRaisesRegex(
+                    PRODUCER.DynamicGuardedSwitchError,
+                    "TASK70_V3_SECURITY_FAILURE_SIDE_EFFECT_INVALID",
+            ):
+                PRODUCER.security_failure_state_digest(state, changed)
 
     def test_fixture_binds_all_real_migrations_and_current_policy_sources(self):
         policy, records, ledger, inputs = self.inputs()

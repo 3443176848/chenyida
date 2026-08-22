@@ -19,7 +19,7 @@ const POLICY_PATH = resolve(
 const ARTIFACT_PATH = resolve(
   SITE_ROOT, "operations/uat-promotion-dynamic-evidence-v3.json",
 );
-const EXPECTED_POLICY_SHA256 = "192b1cab9ee7edd52786d6a14c906dfbec817ee189e64a714f6e8bf4b9ec773f";
+const EXPECTED_POLICY_SHA256 = "30b81e0683d9dde3ef175d68d9c29013b28630d81e132fe86cba2040f0eb90e9";
 const SHA256 = /^[0-9a-f]{64}$/;
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/;
 const LABEL = /^[A-Z][A-Z0-9_]{1,79}$/;
@@ -939,7 +939,7 @@ export function validateFixedExecutionReceipt(
 }
 
 
-function validateGuardedFailureExecution(
+export function validateGuardedFailureExecution(
   receipt, spec, reason, code = "TASK70_V3_GUARDED_FAILURE_EXECUTION_INVALID",
 ) {
   const { stdout, stderr } = validateFixedExecutionReceipt(receipt, spec, code);
@@ -961,13 +961,11 @@ function validateGuardedFailureExecution(
     return receipt;
   }
   if (reason === "RUNTIME_PRIVILEGE_MISMATCH") {
-    if (receipt.return_code !== 3 || stderr.length !== 0 || stdout.length > 4096
-        || stdout.includes(0) || stdout.includes(13)) reject(code);
-    const text = new TextDecoder("ascii", { fatal: true }).decode(stdout);
-    const lines = text.split(/\n/).map((line) => line.trim()).filter(Boolean);
-    if (!text.endsWith("\n")
-        || !text.split("").every((value) => /[ \t\na-z]/.test(value))
-        || !same(lines, ["guarded switch runtime privilege mismatch"])) reject(code);
+    if (receipt.return_code !== 3
+        || !stdout.equals(Buffer.from("\n", "ascii"))
+        || !stderr.equals(Buffer.from(
+          "ERROR:  guarded switch runtime privilege mismatch\n", "ascii",
+        ))) reject(code);
     return receipt;
   }
   reject(code);
@@ -3049,6 +3047,7 @@ function verifyCase(selectedCase, policy, { runtime, before, after, cleanup, sou
     "scenario_id", "failure_code", "failure_reason", "execution_receipt",
     "after_layout", "drift_apply_receipt", "security_restore",
     "security_restore_sql_evidence",
+    "security_state_before_failure_sha256", "security_state_after_failure_sha256",
     "restored_security_state_sha256", "after_state_sha256", "scenario_sha256",
   ], code);
   for (const id of [
@@ -3076,6 +3075,10 @@ function verifyCase(selectedCase, policy, { runtime, before, after, cleanup, sou
     { base, opcode: production, sql: productionSql, sequence: 6 },
     "RUNTIME_PRIVILEGE_MISMATCH", code,
   );
+  nonzeroSha(by.SECURITY_DRIFT_REJECTED.security_state_before_failure_sha256, code);
+  nonzeroSha(by.SECURITY_DRIFT_REJECTED.security_state_after_failure_sha256, code);
+  if (by.SECURITY_DRIFT_REJECTED.security_state_before_failure_sha256
+      !== by.SECURITY_DRIFT_REJECTED.security_state_after_failure_sha256) reject(code);
   if (by.CONTENT_DRIFT_REJECTED.failure_reason
         !== "CONTENT_GUARD_RELATION_MISMATCH"
       || by.MIGRATION_LEDGER_DRIFT_REJECTED.failure_reason

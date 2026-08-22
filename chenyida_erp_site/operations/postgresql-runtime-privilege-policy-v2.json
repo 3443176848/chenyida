@@ -11,7 +11,7 @@
       "code": "POSTGRESQL17_COMPILED_CATALOG_REQUIRED",
       "evidence_contract": "chenyida-erp-postgresql-runtime-compiled-catalog/v1",
       "evidence_catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
-      "evidence_artifact_sha256": "9e331334c1636b2ee46180df3aca6850c7831470782f7f03856a6efef962480b"
+      "evidence_artifact_sha256": "a386c38457e6e3e36f6409b90b08e6a0bac284c3fc97e139cceff5e9f125aa53"
     }
   ],
   "source_binding": {
@@ -25,8 +25,8 @@
       "path": "operations/postgresql-runtime-privilege-compiled-catalog-v1.json",
       "contract": "chenyida-erp-postgresql-runtime-compiled-catalog/v1",
       "catalog_sha256": "e0070514bdaaa998f114583ed820047688ef8945aa5ea3cafdfb873e3df02e8c",
-      "artifact_sha256": "9e331334c1636b2ee46180df3aca6850c7831470782f7f03856a6efef962480b",
-      "file_sha256": "8eedab4e2d6f074b08396cb629d47c5f3400fd2f97e00c9a00469165276e14e8"
+      "artifact_sha256": "a386c38457e6e3e36f6409b90b08e6a0bac284c3fc97e139cceff5e9f125aa53",
+      "file_sha256": "915ee9bf1a10199abbae9139600bd4d8e83429c2dc5011c7953374c515ad7a41"
     },
     "migrations": {
       "count": 46,
@@ -52,11 +52,11 @@
       },
       {
         "path": "scripts/postgresql-runtime-privilege-reconciler.mjs",
-        "sha256": "2ae2050324ab685ef143ac7cdf4719708651beef1c5eb84affd69f72cd14f948"
+        "sha256": "22ddda1cf7f77899cbb58f2e6e5ac75f81ea7629d8a4abbf05b07021efc0a6b9"
       },
       {
         "path": "scripts/postgresql-runtime-privilege-state.sql",
-        "sha256": "b42f6bb969bfd931579e0a12e800399d3e4c0404981ab695b01bdac84232ac41"
+        "sha256": "4fd1e6a749d24025918152a51591601bb1ec6f1d767acda98d03656846bf334b"
       }
     ]
   },
@@ -520,5 +520,5 @@
     "owner": "PLATFORM_OWNER",
     "privileges": []
   },
-  "policy_sha256": "b99cd7389dbb5a9f24b56400a61d0a05f3de2ca0ec84101560beab22cb07226c"
+  "policy_sha256": "1e147e55b5285fc548ba8bc473e044e9f4e6a4b80be6b3520ec257fcbc1c29f7"
 }

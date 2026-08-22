@@ -207,7 +207,7 @@ test("D-132 v1 remains synthetic-only and every actual V4 entry point fails clos
 
   const frozen=new Map([
     ["operations/postgresql-cluster-recovery-policy-v1.json","7e24d900b3445ca6b4f406b7330919cc1269f34fdf6bef193eedacf0d2e5bd13"],
-    ["scripts/postgresql-cluster-catalog.sql","96fb565b50ea11ea7cd248fb1425fa8cea01204a4dde6d283a4d7bddb295eeed"],
+    ["scripts/postgresql-cluster-catalog.sql","bd6001a4d1bd858f49cfa1c4c90e2cd5a731b2fa3e0502fb04e25175e2931a94"],
     ["scripts/postgresql-cluster-catalog-contract.mjs","5cca1502f57a2d0320acb77147f090e3f043a4d55dd8142ea5d4d76d21fbcf73"],
     ["scripts/postgresql-cluster-recovery-contract.mjs","d11ba513f43d69d3bc4918dbd523d32973904bf98beec585de084cc2bdea3cfa"],
     ["scripts/postgresql-cluster-restore-contract.mjs","2e484812fa434db6a3dc7758b50eb1714b05d3c983f702ab7a43063b216e2342"],

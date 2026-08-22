@@ -37,7 +37,7 @@ EXECUTOR_PATH = SITE_ROOT / "scripts/uat-promotion-rollback-fixed-executor.py"
 FIXTURE_PATH = SITE_ROOT / "tests/test_uat_promotion_rollback_fixed_executor.py"
 MIGRATION_ROOT = SITE_ROOT / "drizzle-postgres"
 DOCKER = "/usr/bin/docker"
-POLICY_EXPECTED_SHA256 = "192b1cab9ee7edd52786d6a14c906dfbec817ee189e64a714f6e8bf4b9ec773f"
+POLICY_EXPECTED_SHA256 = "30b81e0683d9dde3ef175d68d9c29013b28630d81e132fe86cba2040f0eb90e9"
 CASE_ID = "DV70-PG-GUARDED-SWITCH-02"
 FAULT_BARRIER = "DV70_V3_FIRST_RENAME_REACHED"
 FIXED_EXECUTION_RECEIPT_CONTRACT = \
@@ -1979,20 +1979,23 @@ def validate_guarded_failure_execution(
             reject(code)
         return
     if reason == "RUNTIME_PRIVILEGE_MISMATCH":
-        try:
-            output_text = stdout.decode("ascii", "strict")
-        except UnicodeError as error:
-            raise DynamicGuardedSwitchError(code) from error
-        nonempty = [line.strip() for line in output_text.splitlines() if line.strip()]
-        if receipt["return_code"] != 3 or stderr != b"" \
-                or len(stdout) > 4096 or not output_text.endswith("\n") \
-                or "\x00" in output_text or "\r" in output_text \
-                or any(character not in " \t\r\nabcdefghijklmnopqrstuvwxyz" \
-                       for character in output_text) \
-                or nonempty != ["guarded switch runtime privilege mismatch"]:
+        if receipt["return_code"] != 3 \
+                or stdout != b"\n" \
+                or stderr != (
+                    b"ERROR:  guarded switch runtime privilege mismatch\n"
+                ):
             reject(code)
         return
     reject(code)
+
+
+def security_failure_state_digest(before: bytes, after: bytes) -> str:
+    code = "TASK70_V3_SECURITY_FAILURE_SIDE_EFFECT_INVALID"
+    if not isinstance(before, bytes) or not isinstance(after, bytes) \
+            or not 1 <= len(before) <= 32 * 1024 * 1024 \
+            or before != after:
+        reject(code)
+    return digest_bytes(before)
 
 
 def observe(
@@ -2939,11 +2942,20 @@ def run_business_case(
             b"REVOKE SELECT ON public.app_users FROM chenyida_erp_web_priv;\n",
             database=base["databases"]["staging_name"], write_override=True,
         )
+        security_before_failure = real.runner.postgres_preswitch_security(
+            base, inputs,
+        )
         security_failure, security_execution_receipt = execute_guarded_failure(
             real, base, inputs, guarded_opcode,
             {"SIDE_EFFECT_OUTCOME_UNKNOWN"},
             sql=guarded_sql, sequence=6,
             reason="RUNTIME_PRIVILEGE_MISMATCH",
+        )
+        security_after_failure = real.runner.postgres_preswitch_security(
+            base, inputs,
+        )
+        failed_security_state_sha256 = security_failure_state_digest(
+            security_before_failure, security_after_failure,
         )
         security_after, security_after_classification = observe(
             real, base, restored_oid, "v3-security-drift-after",
@@ -2993,6 +3005,10 @@ def run_business_case(
             "failure_reason": "RUNTIME_PRIVILEGE_MISMATCH",
             "execution_receipt": security_execution_receipt,
             "drift_apply_receipt": security_apply,
+            "security_state_before_failure_sha256":
+                failed_security_state_sha256,
+            "security_state_after_failure_sha256":
+                failed_security_state_sha256,
             "security_restore": {
                 **security_restore,
                 "execution_receipt": security_restore_execution_receipt,
