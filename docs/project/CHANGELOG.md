@@ -2,6 +2,18 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-24
+
+### SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90 - `docs: add synthetic small-team UAT starter pack`
+
+- 无样本起点：新增小团队V1试运行准备包、`CYD-UAT-SYN-001` 10件虚构控制板样本及员工执行/核对清单；不等待或擅自读取真实客户、供应商、联系人、价格、账号或附件。
+- 可复算旅程：固定27步岗位交接和8项负向检查，覆盖主数据、现代Mapping、项目/工程/计划、需求、商务门、RFQ/PO、收货/IQC/AP、工单/领料/报工/完工、FQC/出货/AR及收款反向记录。采购10×12=120 CNY，销售10×20=200 CNY，原料/成品/WIP期末均预期为0。
+- 业务边界：D-171保持`SO_REQUIRED / PRE_SALES_EXCEPTION`待项目负责人确认；常规订单推荐先有已接受SO，样品/打样/备货例外必须有负责人授权编号、金额上限和有效期。该选择未写入产品规则。
+- 人员与授权：一个岗位占位不等于一个固定席位，人数和兼岗按实际名单变化；L0—L5区分文档、只读环境核对、部署/Migration/账号、虚构UAT写入、真实样本和生产授权。本轮只获L0授权。
+- 数据库/API/运行面：只新增/更新Markdown；无产品代码、Schema、Migration、API、角色、页面、依赖或部署配置变化。未连接UAT/生产，未创建账号、读取数据/备份/Volume，未build/deploy/restart。
+- 验证/资源：13个相关Unit文件`61/61 PASS`；内部链接、27步/8负测/6级授权结构门、`git diff --check`、仅`docs/`变更门及凭据扫描1803文件通过。起点约2.4GiB available/171MiB Swap/根盘约11GiB/Load`0.63/0.24/0.13`，收口约2.4GiB/171MiB/`10,788,438,016`B/`0.09/0.17/0.12`；宿主OOM0、四服务restart0/OOM false且Web/PostgreSQL healthy，任务残留0。本任务未启动临时容器或数据库。
+- 结论：TASK90只完成“可以申请独立UAT试跑”的准备包，不代表已经试运行。TASK91等待项目负责人选择现有并行UAT或新建隔离UAT并授权L1只读核对。
+
 ## 2026-08-23
 
 ### SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89 - `test: add unified small-team golden journey`

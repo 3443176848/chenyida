@@ -1,7 +1,7 @@
 # SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90 真实样本与员工UAT准备
 
-> 状态：`TODO / OWNER INPUT AND AUTHORIZATION REQUIRED / PRODUCTION NO-GO`
-> 日期：2026-08-23（Asia/Shanghai）
+> 状态：`DONE / SYNTHETIC STARTER PACK READY / NO UAT EXECUTED / PRODUCTION NO-GO`
+> 日期：2026-08-24（Asia/Shanghai）
 > 依赖：TASK89、D-167、D-170、低资源服务器保护规则
 > 责任：项目负责人提供业务样本、实名参与者和环境授权；Codex在授权后形成最小计划与隔离演练证据
 
@@ -30,4 +30,22 @@
 
 ## 5. 当前停止线
 
-当前缺少项目负责人批准的样本、实名参与者、目标环境和外部写入授权，因此保持`TODO`。TASK89的合成PASS不能替代这些真实业务输入。
+当前缺少项目负责人批准的真实样本、实名参与者、目标环境和外部写入授权，因此只执行L0文档准备包；L1—L5的环境核对、部署、Migration、账号、UAT写入、真实数据和生产动作全部停止。TASK89的合成PASS不能替代这些真实业务输入。
+
+## 6. 执行记录
+
+- 2026-08-24 01:34 CST：项目负责人确认当前没有真实样本并要求先推进下一步。TASK90由`TODO → DOING`，范围收敛为零真实数据的试运行准备包：一套完整虚构样本、岗位UAT清单、数量金额核对表和后续授权边界。此授权不包含UAT/生产访问、部署、Migration、账号创建、真实数据读取或业务写。
+- 形成[小团队V1试运行准备包](../uat/small-team-v1/README.md)、[10件控制板虚构样本](../uat/small-team-v1/synthetic-sample.md)和[员工UAT执行与核对清单](../uat/small-team-v1/uat-checklist.md)。样本固定10件、采购120 CNY、销售200 CNY用于人工复算，但不把人数、日期或业务量写成产品限制。
+- 准备包覆盖实名独立账号占位、主数据、现代Supplier Mapping、项目/工程/计划、需求、销售商务门、RFQ/PO、收货/IQC/AP、工单/领料/报工/完工、FQC/出货/AR、收款冲销、稳定ID谱系、数量金额守恒、负向权限/幂等/CAS及P0停止线。
+- D-171记录唯一待确认业务门：常规订单推荐`SO_REQUIRED`；样品/打样/备货可选`PRE_SALES_EXCEPTION`，但必须有负责人授权编号、金额上限和有效期。在负责人确认前，准备包不把任一选项写入产品规则。
+
+## 7. 验证与资源
+
+- 三份Markdown共419行；内部链接、27步旅程、8项负向检查、6级授权、日期偏移、数量金额和最终守恒静态门通过。13个相关Unit文件共`61/61 PASS`，`git diff --check`通过，凭据扫描`1803`个仓库文件通过，最终变更范围只有`docs/`。
+- 本任务未启动临时容器、数据库、Migration、build、typecheck或Compose操作；未读取受保护状态报告、真实数据、账号、凭据、备份或Volume。
+- 资源起点约2.4 GiB available、171 MiB Swap、根盘约11 GiB、Load 0.63/0.24/0.13；收口约2.4 GiB available、171 MiB Swap、根盘10,788,438,016 bytes、Load 0.09/0.17/0.12、宿主`oom_kill=0`。四服务restart 0/OOM false，Web/PostgreSQL healthy；任务容器、数据库、网络、Volume和`/dev/shm`残留均为0。
+
+## 8. 收口与下一门
+
+- TASK90由`DOING → DONE`只表示“无样本试运行准备包已就绪”，不是已经UAT、试运行或可上线。
+- 下一任务登记为`SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91`。项目负责人必须先指定使用现有并行UAT还是新建隔离UAT，并明确授权L1只读核对；未授权前不访问目标环境。

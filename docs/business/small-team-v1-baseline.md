@@ -131,4 +131,4 @@ ERP 的首要任务不是拥有最多模块、页面或审批层，而是让全�
 4. 让九个业务职能按实际账号执行员工UAT；人数按实际情况调整，不修改代码中的席位限制，因为不存在该限制。
 5. 完成可恢复备份、恢复演练、简化部署/回退、上线授权和稳定观察后，才可从`PRODUCTION NO-GO`转出。
 
-TASK87/D-168完成修复前就绪核验后，TASK88/D-169已关闭Material Requirement date-only P0，十条闭环现为源码/隔离PostgreSQL `READY`。下一正式任务为`SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89`，只补现代接口同库连续证据；这仍不等于真实样本、员工UAT或生产准入完成。
+TASK87/D-168完成修复前就绪核验后，TASK88/D-169已关闭Material Requirement date-only P0，TASK89/D-170已通过现代接口同库合成旅程。TASK90/D-171又在没有真实样本时形成10件虚构控制板员工UAT准备包；当前下一任务是TASK91目标UAT环境只读就绪核对。以上均不等于环境升级、真实样本、员工UAT或生产准入完成。

@@ -1,12 +1,30 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-23（Asia/Shanghai）
+最后更新时间：2026-08-24（Asia/Shanghai）
+
+## SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90（完成；无样本试运行准备包）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / SYNTHETIC STARTER PACK READY / NO UAT EXECUTED / PRODUCTION NO-GO | D-171已接受；当前零DOING，TASK91等待目标环境和L1只读授权 |
+| 准备包 | PASS / 3 DOCUMENTS | README、10件虚构控制板样本、员工执行与核对清单；完全不含真实业务数据 |
+| 岗位旅程 | READY / 27 STEPS | 市场、工程、计划、采购、仓库、生产、品质、财务、管理及Mapping审核的逐步交接和证据槽位 |
+| 负向检查 | READY / 8 CASES | 403、退役Mapping 409、幂等重放、CAS、IQC/FQC前越界、重复冲销及商务门缺失 |
+| 数量金额 | MANUALLY RECONCILABLE | 采购/IQC/领料/完工/FQC/出货均10；PO/AP 120 CNY、SO/Shipment/AR 200 CNY、冲销后AR已结0 |
+| 人数 | VARIABLE / NOT CODED | 账号仅为职能占位；实际人数和兼岗按实名名单确定，不构成席位、Seed、Schema或验收限制 |
+| 商务启动门 | PENDING OWNER DECISION | 常规`SO_REQUIRED`与样品/备货`PRE_SALES_EXCEPTION`二选一；未写入产品规则 |
+| 授权边界 | PASS / L0 ONLY | L1环境只读、L2部署/Migration/账号、L3虚构UAT写、L4真实样本、L5生产均未授权 |
+| 代码/数据库/API | DOCS ONLY / UNCHANGED | 无产品代码、Schema、Migration、API、角色、页面、依赖或部署配置变化 |
+| 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT仍为alpha.42/0040；未访问目标环境、账号、数据、备份或受保护Volume |
+| 验证/资源 | PASS / `61/61` / NO TASK RESIDUE | 13个相关Unit文件61/61；内部链接、27步/8负测/6级授权、diff、仅docs范围、credentials1803通过。收口约2.4GiB available/171MiB Swap/`10,788,438,016`B/Load`0.09/0.17/0.12`，宿主OOM0、四服务restart0/OOM false，任务残留0 |
+| 下一步 | TASK91 / TARGET + L1 AUTHORIZATION REQUIRED | 选择现有并行UAT或新建隔离UAT，并明确只读版本/health/Migration/恢复点核对范围 |
+| 系统是否可用 | NO | 准备包不是环境升级、员工UAT、真实试运行或上线证据 |
 
 ## SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89（完成；现代同库合成整链通过）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / TEST-HARNESS CLOSED / MODERN GOLDEN JOURNEY PASS / PRODUCTION NO-GO | D-170已接受；当前零DOING，TASK90等待项目负责人输入和授权 |
+| 当前状态 | DONE / TEST-HARNESS CLOSED / MODERN GOLDEN JOURNEY PASS / PRODUCTION NO-GO | D-170历史结果保持；后续TASK90/D-171已完成无样本UAT准备包 |
 | 数据库基线 | PASS / FRESH 0046 | 精确隔离库、空业务表、46项Migration/head 0046；最大2连接，任何复用业务库或错误确认短语均失败关闭 |
 | 主数据与Mapping | PASS / MODERN GOVERNANCE | 物料审核、Product/Version/BOM与Mapping草稿→提交→异人审核连续完成；退役Mapping直写继续409 |
 | 跨域旅程 | PASS / `1/1` TWICE | 项目→工程→计划→需求→寻源/PO→到货/AP→生产/品质→订单/出货/AR→结算冲销在同一空库连续通过 |
@@ -17,7 +35,7 @@
 | 代码/数据库/API | TEST ONLY / NO PRODUCT OR STRUCTURAL CHANGE | 新增隔离测试并更新包脚本入口；历史脚本保留。无产品源码、Schema/Migration、正式API、角色、页面或依赖变化 |
 | 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT继续alpha.42/0040；未访问真实数据、账号、凭据、备份或受保护Volume，未build/deploy/restart |
 | 资源/清理 | PASS / NO TASK RESIDUE | 重任务前约2.4GiB/171MiB/`10,773,078,016`B/Load`0.07/0.11/0.09`；清理后约2.4GiB/171MiB/`10,755,850,240`B/`0.22/0.45/0.29`，最终静态门后约2.4GiB/171MiB/`10,811,756,544`B/`0.18/0.22/0.22`。宿主OOM0、四服务restart0/OOM false/healthy，临时PG、库、端口、网络、Volume和内存盘残留0 |
-| 下一步 | TASK90 / OWNER INPUT AND AUTHORIZATION REQUIRED | 提供并批准真实/脱敏样本、实名参与者、目标环境、核对口径和逐项授权；人数按实际名单变化，不写死 |
+| 下一步 | COMPLETED BY TASK90 | 无真实样本的准备包已完成；当前后续为TASK91目标UAT只读就绪核对 |
 | 系统是否可用 | NO | 合成整链通过仍不等于真实样本试迁移、员工UAT、恢复演练、版本收敛或上线授权完成 |
 
 ## SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88（完成；ST-04日期型P0关闭）
@@ -35,7 +53,7 @@
 | Schema/Migration/API | NO STRUCTURAL CHANGE | 未新增或修改Schema、Migration、表、角色、权限、页面、依赖；仅修Material Requirement内部date-only投影行为 |
 | 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT继续alpha.42/0040且未部署本修复；未访问真实数据、账号、凭据、备份或受保护Volume，未build/deploy/restart |
 | 资源/清理 | PASS / NO TASK RESIDUE | 起点约2.4GiB available/171MiB Swap/根盘`10,758,881,280`B；唯一1 CPU/512MiB tmpfs PG容器。清理后60秒SwapFree `873,784→873,784 KiB`；收口终检约2.4GiB/171MiB/`10,779,873,280`B/Load`0.65/0.30/0.20`，宿主OOM0、四服务restart0/OOM false，任务容器/库/端口/网络/Volume/内存盘残留0 |
-| 下一步 | COMPLETED BY TASK89 | 现代同库合成旅程已通过；当前后续为TASK90真实样本与员工UAT准备 |
+| 下一步 | COMPLETED BY TASK90 | 现代同库合成旅程及无样本UAT准备包均已完成；当前后续为TASK91目标环境只读核对 |
 | 系统是否可用 | NO | 仍缺真实样本/试迁移、九职能员工UAT、恢复演练和上线授权 |
 
 ## SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87（完成；九条就绪与ST-04日期型P0）
@@ -53,8 +71,8 @@
 | 代码/数据库/API | UNCHANGED | 本任务只新增/更新Markdown；无业务代码、Schema/Migration、API、依赖、账号、镜像、Compose或常驻服务变化 |
 | 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT继续alpha.42/0040；未连接UAT/生产数据库，未读取受保护Volume、真实备份、凭据或业务数据，未build/pull/deploy/restart |
 | 资源/清理 | PASS / STOP LINE RECORDED / NO TASK RESIDUE | 补验窗口起点available约2.3GiB、Swap160MiB、根盘`10,776,580,096`B、Load`0.02/0.13/0.17`；最终约2.4GiB、172MiB、`10,750,689,280`B、`0.13/0.13/0.14`。最终磁盘仅高于硬线约12.7MiB；宿主`oom_kill=0`，常驻Web/PG restart0/OOM false/healthy，临时容器、PG、库、端口和`/dev/shm/cyd-task87-*`全清零 |
-| 下一步 | COMPLETED BY TASK89 | 日期型P0已由TASK88/D-169关闭，现代同库旅程已由TASK89/D-170通过；当前后续为TASK90真实样本与员工UAT准备 |
-| 系统是否可用 | NO | P0已修复，但仍缺现代同库整链、真实样本/试迁移、九职能员工UAT、恢复演练和上线授权 |
+| 下一步 | COMPLETED BY TASK90 | 日期型P0、现代同库旅程和无样本UAT准备包已完成；当前后续为TASK91目标环境只读核对 |
+| 系统是否可用 | NO | P0已修复且合成整链通过，但仍缺目标环境升级、真实样本/试迁移、员工UAT、恢复演练和上线授权 |
 
 ## SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86（完成；小团队V1业务基线）
 
