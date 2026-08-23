@@ -4,6 +4,17 @@
 
 ## 2026-08-23
 
+### SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 - `docs: audit small-team golden journey readiness`
+
+- 结论：D-168按ST-01—ST-10收口为`9 READY / 1 FIX_REQUIRED / 0 PARKED`。ST-01、02、03、05、06、07、08、09、10可进入后续真实样本/UAT；ST-04必须先修P0，`READY`不等于已投产。
+- 唯一P0：Material Requirement同一隔离PG套件在UTC为`8/8`、Asia/Shanghai为`1/8`。PostgreSQL `date`由`pg`返回Date后经`toISOString().slice(0,10)`转换到前一日，导致即时生成后提交错误返回`MATERIAL_REQUIREMENT_RECALC_REQUIRED`；当前UAT Web为UTC只是在环境上掩盖问题。
+- 证据矩阵：任务报告逐条映射页面、`selfhost-api.ts` Dispatcher、Service、Migration/关系边界和动态测试。44个相关Unit/UI文件`194/194`、21组现代Service隔离PG/UTC `99/99`、主数据PG `6/6`、Supplier Mapping PG `10/10`通过；没有把独立库的局部套件描述成统一现代黄金旅程。
+- 全ERP smoke：在全新PG17/46项Migration上分别以alpha.42和源码修订`78d96c61…`对应的历史alpha.47本机镜像运行；两次均先完成Identity，再因脚本调用已退役的`POST /api/mappings`被`409 SUPPLIER_MAPPING_GOVERNANCE_REQUIRED`拒绝，restart未到达。治理门保持正确，脚本必须改用现代Mapping草稿→提交→异人审核；现代同库整链缺口另行处理。
+- 资源失败关闭：首次计划补跑Supplier Mapping PG 10项前，根盘只比10 GiB硬线高约3.5 MiB，立即停止并清理；空间自然恢复到`10,767,990,784`B且完整新鲜门再次通过后，才以另一隔离库完成`10/10`，未执行任何额外清理。补验窗口起点available约2.3GiB、Swap160MiB、根盘`10,776,580,096`B、Load`0.02/0.13/0.17`；最终约2.4GiB、172MiB、`10,750,689,280`B、`0.13/0.13/0.14`，仍只高于硬线约12.7MiB。
+- 对象/运行面：宿主`oom_kill=0`，常驻Web/PostgreSQL restart0、OOM false、healthy；临时Web自身无OOM，PG集群、库、监听、容器和内存盘目录已精确清零。未连接UAT/生产数据库、读取受保护Volume/真实备份/凭据/业务数据，未build、pull、现有Compose重启、部署、账号创建或员工UAT。
+- 代码/数据库/API：只新增TASK87报告、TASK88最小任务文档和D-168，并同步MASTER、TASKS、PROJECT_CONTEXT、CHANGELOG、STATUS；无业务代码、Schema/Migration、API、依赖、镜像或运行服务变化。
+- 下一步：`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88`只处理date-only规范化与UTC/Asia双时区回归，不新增页面、角色、表、Migration或基础设施；新鲜资源门通过前保持TODO。
+
 ### SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86 - `docs: define small-team ERP business baseline`
 
 - 决策：项目负责人确认九个业务职能暂按每职能2人、约18人估算，但人数不得写死；D-167明确该数字不进入Schema、Seed、权限、并发、许可证或验收条件，`admin`/`operations`只作治理职责。

@@ -131,4 +131,4 @@ ERP 的首要任务不是拥有最多模块、页面或审批层，而是让全�
 4. 让九个业务职能按实际账号执行员工UAT；人数按实际情况调整，不修改代码中的席位限制，因为不存在该限制。
 5. 完成可恢复备份、恢复演练、简化部署/回退、上线授权和稳定观察后，才可从`PRODUCTION NO-GO`转出。
 
-下一正式任务为`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87`：先证明现有代码能走到哪里，不预设必须新增功能。
+TASK87/D-168已完成上述就绪核验：九条闭环为`READY`，ST-04因Material Requirement date-only时区漂移为`FIX_REQUIRED`。下一正式任务为`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88`，只做该P0的最小修复；根盘新鲜资源门通过前保持`TODO`。

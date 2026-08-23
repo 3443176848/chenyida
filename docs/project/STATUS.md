@@ -2,6 +2,24 @@
 
 最后更新时间：2026-08-23（Asia/Shanghai）
 
+## SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87（完成；九条就绪与ST-04日期型P0）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / 9 READY + ST-04 FIX_REQUIRED / SOURCE-AND-ISOLATED-POSTGRES VERIFIED / PRODUCTION NO-GO | D-168已接受；当前零DOING，TASK88保持TODO并等待新鲜资源门 |
+| 十条闭环 | 9 READY / 1 FIX_REQUIRED / 0 PARKED | ST-01、02、03、05、06、07、08、09、10可进入后续真实样本/UAT；ST-04必须先修date-only时区漂移 |
+| 唯一产品P0 | MATERIAL REQUIREMENT DATE-ONLY TIMEZONE DRIFT | UTC下PG `8/8`，Asia/Shanghai仅`1/8`；`required_date`经`Date.toISOString()`后退到前一日并触发`MATERIAL_REQUIREMENT_RECALC_REQUIRED`。当前UAT容器UTC只是掩盖问题 |
+| 源码/静态合同 | PASS / `194/194` | 44个相关Unit/UI文件，覆盖页面、权限、验证、稳定错误码及Service合同；不把页面存在当作动态闭环 |
+| 现代模块隔离PG | PASS / `99/99` UTC | 21组Service、46项Migration；每组使用独立库，不能冒充同一数据库连续现代黄金旅程 |
+| 主数据与Mapping隔离PG | PASS / `6/6 + 10/10` UTC | 客户/供应商/Product/BOM、稳定ID、发布不可变，以及Mapping草稿/提交/异人审核、并发/CAS、冲突、原子回滚和RFQ覆盖通过 |
+| 全ERP smoke | PARTIAL / SCRIPT GAP | alpha.42与源码修订`78d96c61…`对应的历史alpha.47本机镜像均先通过Identity，再因旧`POST /api/mappings`被`409 SUPPLIER_MAPPING_GOVERNANCE_REQUIRED`拒绝；restart未到达。必须更新到现代Mapping和现代业务接口后再做同库整链 |
+| 资源停止/恢复 | PASS / STOP THEN FRESH RE-GATE | 首次补跑Mapping前磁盘余量约3.5 MiB时停止并清理；空间自然恢复到`10,767,990,784`B且完整资源门再次通过后，才以另一全新隔离库完成`10/10` |
+| 代码/数据库/API | UNCHANGED | 本任务只新增/更新Markdown；无业务代码、Schema/Migration、API、依赖、账号、镜像、Compose或常驻服务变化 |
+| 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT继续alpha.42/0040；未连接UAT/生产数据库，未读取受保护Volume、真实备份、凭据或业务数据，未build/pull/deploy/restart |
+| 资源/清理 | PASS / STOP LINE RECORDED / NO TASK RESIDUE | 补验窗口起点available约2.3GiB、Swap160MiB、根盘`10,776,580,096`B、Load`0.02/0.13/0.17`；最终约2.4GiB、172MiB、`10,750,689,280`B、`0.13/0.13/0.14`。最终磁盘仅高于硬线约12.7MiB；宿主`oom_kill=0`，常驻Web/PG restart0/OOM false/healthy，临时容器、PG、库、端口和`/dev/shm/cyd-task87-*`全清零 |
+| 下一步 | TASK88 / MINIMAL DATE-ONLY FIX | 只修两个已证实的date-only消费点并在UTC/Asia双时区PG均`8/8`；不新增表、Migration、角色、页面或基础设施 |
+| 系统是否可用 | NO | 仍缺P0修复、现代同库整链、真实样本/试迁移、九职能员工UAT、恢复演练和上线授权 |
+
 ## SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86（完成；小团队V1业务基线）
 
 | 验证项 | 结果 | 说明 |

@@ -3622,6 +3622,43 @@
 - 拒绝继续补齐所有设想页面和控制面后才做跨岗旅程，也拒绝把局部单元测试或页面存在解释为员工可用。
 - 拒绝一次性删除历史代码或Migration来追求表面简洁；先冻结、再证明无依赖、最后独立清理。
 
+## D-168 TASK87以九条READY和ST-04日期型P0收口，先做单一最小修复再进入真实样本
+
+- 日期：2026-08-23
+- 状态：`ACCEPTED / 9 READY + 1 FIX_REQUIRED / DATE-ONLY P0 / PRODUCTION NO-GO`
+- 提案与实施：Codex依据D-167业务基线、当前alpha.47/0046源码、194项Unit/UI合同和隔离PostgreSQL动态证据
+- 确认边界：只决定ST-01—ST-10源码就绪分类、唯一P0和后续任务顺序；不授权UAT/生产、真实数据、账号、备份、Migration、部署或运行服务变化
+
+### Context
+
+- 44个相关Unit/UI文件`194/194 PASS`；21组现代Service在全新隔离PostgreSQL 17.10、46项Migration下以UTC运行`99/99 PASS`，主数据套件另为`6/6 PASS`。
+- ST-04的Material Requirement套件在UTC为`8/8 PASS`，同一源码在Asia/Shanghai仅`1/8 PASS`。PostgreSQL `date`返回JavaScript `Date`后，`toISOString().slice(0,10)`把上海本地零点转换为前一UTC日，造成提交重算摘要不一致。
+- 当前UAT Web容器使用UTC，只是偶然掩盖问题。业务日期是日历日，不应依赖Node所在时区。
+- 现有全ERP smoke在alpha.42和源码修订`78d96c61…`对应的历史alpha.47本机镜像中都先通过Identity，再因调用已退役的`POST /api/mappings`而收到`409 SUPPLIER_MAPPING_GOVERNANCE_REQUIRED`。现代Supplier Mapping要求草稿→提交→异人审核，不能为迁就旧测试而恢复直写。
+- 首次准备补跑现代Supplier Mapping PG 10项前，根盘只比10 GiB硬线高约3.5 MiB，按低资源规则停止并清理；空间自然恢复且新鲜门再次通过后，以另一全新隔离库补跑`10/10 PASS`。现代模块尚未串成同一数据库连续旅程仍是验证工具缺口，不是已复现产品P0。
+
+### Decision
+
+1. ST-01、ST-02、ST-03、ST-05、ST-06、ST-07、ST-08、ST-09、ST-10标为`READY`，表示可在修复P0后进入真实样本/员工UAT；ST-04标为`FIX_REQUIRED`。十条闭环没有`PARKED`项。
+2. 唯一产品P0是Material Requirement date-only时区漂移。PostgreSQL `date`必须按日历日期规范化，不得经本地时间→UTC时间点转换来决定业务日。
+3. 下一任务固定为`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88`：只修复date-only规范化与两个已知消费点，并在UTC/Asia/Shanghai下运行同一PG回归；不新增页面、角色、表、Migration或基础设施，不顺带重构其他业务。
+4. 现有全ERP smoke必须在P0之后由独立任务更新到现代Supplier Mapping和Project→Planning→Requirement→Sourcing→Production/Quality/Sales/Finance接口，并在同一隔离库连续运行。局部套件不得冒充该统一旅程已通过。
+5. `READY`和合成隔离PASS都不等于当前UAT可用或生产准入。真实样本试迁移、九职能实名UAT、可恢复备份/恢复演练和上线授权仍是独立强制条件。
+
+### Consequences
+
+- TASK87以`9 READY / 1 FIX_REQUIRED / 0 PARKED`完成，TASK88成为唯一明确待启动任务；TASK70及AI/高级控制面保持冻结。
+- TASK88通过前不得进入真实Material Requirement UAT；通过后仍先补现代同库整链证据，再申请真实数据和员工动作授权。
+- 每职能2人、约18人继续只作容量参考，不进入修复实现、测试数量、权限、Schema或验收条件。
+- 系统保持`PRODUCTION NO-GO`，UAT alpha.42/0040及全部常驻服务不因本决定改变。
+
+### Rejected alternatives
+
+- 拒绝通过强制生产容器永远使用UTC来掩盖date-only错误；基础设施约定不能替代正确业务语义。
+- 拒绝恢复旧`/api/mappings`直写、放宽Supplier Mapping审核或修改全ERP smoke的预期状态来制造假PASS。
+- 拒绝把测试脚本过期或缺失统一旅程误报为已通过；也拒绝把验证工具缺口和日期型产品P0混进一个大任务。
+- 拒绝因九条`READY`就直接部署源码、迁移UAT、创建真实账号或开始员工操作。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

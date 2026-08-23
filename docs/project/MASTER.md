@@ -53,13 +53,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0046`，46/head`0046_runtime_lock_privilege_boundary.sql`，0046 SQL/Snapshot SHA-256分别为`ad68aaa4f20d16324fcdc7b234928ac363ecb73313921970d3b4840f4db6d66b`/`c8fe259a7838475bc41ffaf0e843ba9ca69a8ca0c5688d42275a81ea8b21f60d`；0001—0045未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0046只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `SMALL-TEAM V1 BUSINESS BASELINE APPROVED / HEADCOUNT VARIABLE / GOLDEN-JOURNEY NEXT / ZERO DOING / TASK70 FROZEN / PRODUCTION NO-GO`。D-166停止平台级治理扩展，D-167改按十大业务闭环验收；源码alpha.47/0046与UAT alpha.42/0040均保持不变 |
-| 当前任务 | 当前零`DOING`。`SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86`已完成九职能、每职能2人可变估算、十大闭环、首期单据/报表/数据和源码处置基线；`SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70`继续冻结 |
-| 下一任务 | `SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87`：只在隔离PostgreSQL核对现有源码对“主数据→市场/工程→计划→采购/生产→品质/仓库→财务”黄金旅程的真实覆盖，逐段标记`READY / FIX_REQUIRED / PARKED`。没有实际P0阻断前不新增模块、角色、表、Migration或基础设施 |
+| 当前阶段 | `SMALL-TEAM ST-04 DATE-ONLY P0 FIX QUEUED / ZERO DOING / RESOURCE STOP LINE / TASK70 FROZEN / PRODUCTION NO-GO`。TASK87按D-168形成`9 READY / 1 FIX_REQUIRED`；源码alpha.47/0046与UAT alpha.42/0040均保持不变 |
+| 当前任务 | 当前零`DOING`。`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87`已完成；根盘收口时仅比10 GiB硬线高约12.7 MiB，因此下一重任务尚未启动 |
+| 下一任务 | `SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88`：只修复Material Requirement的PostgreSQL date/JavaScript Date时区漂移，并要求UTC与Asia/Shanghai隔离PG回归均`8/8`；新鲜资源门通过前保持`TODO`，不新增页面、角色、表、Migration或基础设施 |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
+
+- `SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87`已按D-168完成源码/隔离PG就绪核验：44个相关Unit/UI文件`194/194`、21组现代Service PG/UTC `99/99`、主数据PG `6/6`、Supplier Mapping PG `10/10`通过；ST-01、02、03、05、06、07、08、09、10为`READY`，ST-04为`FIX_REQUIRED`。Material Requirement在UTC `8/8`、Asia/Shanghai `1/8`，唯一产品P0为date-only经`toISOString()`发生前一日漂移。现有全ERP smoke因调用已退役Mapping直写而被409治理门拒绝，现代同库整链缺口已如实登记；无业务代码、Migration、UAT或常驻服务变化，临时资源已清零
 
 - `SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86`已按D-167形成[小团队V1业务基线](../business/small-team-v1-baseline.md)：九个业务职能暂按每职能2人、约18人估算，但人数不进入Schema、Seed、权限、并发或验收条件；固定十大闭环、必需单据/报表、最小试迁移范围及`KEEP / PARK / REMOVE_LATER`。源码只读盘点确认11技术角色无席位限制、50个原生页面、37个一级模块目录、233张表和46项Migration；适用Node/Python合同、Python三项基线和lint通过，无代码、数据库、账号、UAT或运行面变化
 
@@ -413,11 +415,12 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 49. OFFLINE-IDENTITY-RECOVERY-11 已按 D-087 解除上述身份恢复风险：11 个目标账号单事务恢复、目标旧 Session 撤销、Canonical 双文件激活、1+10 身份页验证和最终零有效目标 Session 通过。该完成不构成 Planning 核验授权，不能自动进入 Package 接收/退回。
 50. FIX-12 已以新的明确 planning-only 授权完成主 UAT 历史回看，不能反向改写 FIX-08/TASK09/TASK10 的历史结论。退回原因的数据库 ASCII 标点与预期全角标点仅在 NFKC 后等价，登记为 LOW；数据库原文仍是权威历史值，未来不得以体验优化为由静默修复 Package 或 RETURN Event。
 51. D-088 已由 alpha.38/0037 在并行非生产 UAT 落地：工程修订回复采用追加式 Version 与 RETURN 事件专属 CAS Head，v2 固定引用源 v1、精确 RETURN、精确回复版本及 Product/BOM/Unit Resolution/物料快照；同 RETURN 只允许一个直接后继，摘要、事务、幂等、审计和数据库 guard 共同保护谱系。主 UAT 只读验收后仍为 v1 RETURNED、RETURN 1、Response 0、v2 0，未填写回复、未生成或提交 v2、未登录 planning；工程 v2 黑盒试用必须等待新的明确授权。
+52. TASK87证明`planning_material_requirement_plans.required_date`在Node本地时区为Asia/Shanghai时会被`Date.toISOString().slice(0,10)`投影到前一日，导致即时生成后提交错误返回`MATERIAL_REQUIREMENT_RECALC_REQUIRED`。当前UAT容器UTC只是在运行条件上掩盖P0，不构成修复；TASK88通过前ST-04不得进入真实样本/UAT。现有全ERP smoke仍调用退役Mapping直写且没有现代同库黄金旅程，不能用局部PG PASS冒充统一整链完成。
 
 ## 当前任务与下一任务
 
-- 当前零`DOING`。TASK85已按D-166完成小团队范围重置，TASK86又按D-167完成九职能可变人数、十大闭环、必需单据/报表、首期数据及`KEEP / PARK / REMOVE_LATER`基线；TASK70保持`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE`。
-- 下一任务为`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87`：只在隔离PostgreSQL证明现有alpha.47/0046黄金旅程覆盖，先复用现有页面/API/Service/测试并标记真实P0缺口，不预设新增功能或恢复高级控制面。
+- 当前零`DOING`。TASK87已按D-168完成`9 READY / 1 FIX_REQUIRED`核验；TASK70保持`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE`，AI和高级控制面继续冻结。
+- 下一任务为`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88`：只消除ST-04业务日期的本地时区依赖并做UTC/Asia双时区PG回归。根盘收口仅比硬线高约12.7 MiB，必须先通过新鲜资源门；不得借机扩展模块或恢复旧Mapping直写。
 - `SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已按D-132完成并释放active slot：冻结源码`b93d838`/tree`269165d4`与manifest-only直接子提交`2136aa3`/tree`c5b78dab`形成49文件bundle，manifest SHA-256`699cdd2a…7dd6`。cluster catalog/security/tablespace、秘密分离、加密传输、V4 readiness、Dashboard/monitor与崩溃安全executor均通过合成双PostgreSQL cluster及完整适用回归；没有真实恢复或部署。
 - `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已按D-131完成并释放active slot：源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle；签名密文来源、双向ACK、恢复强绑定、调度/保留和V3 readiness通过合成密文双集群恢复及适用回归。真实异机、密钥托管、timer/WORM、真实数据与RPO/RTO均未执行。
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。

@@ -11,7 +11,11 @@
 
 ## 当前任务
 
-当前零`DOING`。项目负责人确认九个业务职能先按每职能2人估算但人数不得写死后，`SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86`已按D-167完成；[小团队V1业务基线](../business/small-team-v1-baseline.md)固定十大闭环、必需单据/报表、首期试迁移范围及`KEEP / PARK / REMOVE_LATER`。下一任务为`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 TODO`，只证明现有源码的黄金旅程覆盖，不预设新增功能。
+当前零`DOING`。`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87`已以`9 READY / 1 FIX_REQUIRED`收口；唯一产品P0为Material Requirement date-only受Node本地时区影响。下一任务`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88`保持`TODO`，最终根盘仅高于硬线约12.7 MiB，须先通过新鲜资源门再启动。
+
+2026-08-23黄金旅程收口事件：`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 DOING → DONE`。相关Unit/UI `194/194`、现代模块隔离PG/UTC `99/99`、主数据PG `6/6`、Supplier Mapping PG `10/10`通过；Material Requirement在UTC `8/8`、Asia/Shanghai `1/8`，固定ST-04日期型P0。现有全ERP smoke在alpha.42及源码修订`78d96c61…`对应的历史alpha.47本机镜像均因旧`POST /api/mappings`被治理门返回409而无法进入restart，登记为脚本/统一旅程证据缺口。首次补跑Mapping前磁盘余量约3.5 MiB时停止，清理自然恢复并通过新鲜门后才补验；最终临时资源清零。未连接UAT/生产或修改业务代码、Migration和运行服务。
+
+2026-08-23黄金旅程调度事件：项目负责人要求持续进行任务，`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 TODO → DOING`成为唯一active task。允许只读源码盘点、非生产合同测试和单一隔离PostgreSQL；禁止build/deploy、现有Compose重启、真实数据/账号/UAT及高级控制面恢复。
 
 2026-08-23业务基线事件：项目负责人补充工程、计划和市场等职能，并确认全部业务职能暂按2人估算但不得成为硬条件，要求以第一性原理推进完成。调度按`SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86 TODO → DOING → DONE`收口并回到零`DOING`。源码只读盘点确认11技术角色无席位限制、50个原生页面、37个一级模块目录、233张表和46项Migration；未修改代码、数据库、账号、镜像、Compose或运行服务。
 
@@ -258,7 +262,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 | 小团队黄金旅程就绪核验 | TODO | Codex（隔离核验与缺口归类）、项目负责人（真实业务样本和后续UAT授权） | TASK86、D-167、低资源规则 | 在隔离PostgreSQL按ST-01—ST-10证明现有alpha.47/0046覆盖，逐段标记`READY / FIX_REQUIRED / PARKED`；先复用现有测试和页面/API，不连接UAT/生产，不预设新增模块、角色、表、Migration或基础设施。 |
+| SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 | 需求日期时区无关修复 | TODO | Codex（最小源码与回归）、项目负责人（后续真实样本/UAT授权） | TASK87、D-168、低资源规则 | 只修复PostgreSQL `date`经JavaScript Date/UTC投影导致的业务日漂移，并要求Material Requirement PG在UTC与Asia/Shanghai均`8/8`；不新增Schema/Migration、页面、角色或基础设施。根盘新鲜门通过前不得启动。见[任务文档](../tasks/SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88.md)。 |
 
 ## 已冻结任务
 
@@ -270,6 +274,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 | 小团队黄金旅程就绪核验 | DONE | Codex（源码映射、隔离核验、缺口归类和文档收口）、项目负责人（真实业务样本和后续UAT授权） | 2026-08-23 | 2026-08-23 | TASK86、D-167、低资源规则 | `DONE / 9 READY + ST-04 FIX_REQUIRED / PRODUCTION NO-GO`。Unit/UI `194/194`、现代模块PG/UTC `99/99`、主数据PG `6/6`、Supplier Mapping PG `10/10`；Material Requirement UTC `8/8`、Asia/Shanghai `1/8`，唯一P0是date-only时区漂移。现有全ERP smoke因旧Mapping直写被409治理门拒绝，restart未到达并登记现代同库整链缺口。无业务代码/Migration/UAT变化，临时资源清零。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87.md)及[D-168](DECISIONS.md#d-168-task87以九条ready和st-04日期型p0收口先做单一最小修复再进入真实样本)。 |
 | SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86 | 小团队V1业务基线 | DONE | 项目负责人（可变人数与第一性原则）、Codex（源码盘点、业务基线、治理同步和验证） | 2026-08-23 | 2026-08-23 | TASK85、D-166、D-167 | `DONE / BUSINESS BASELINE APPROVED / HEADCOUNT VARIABLE / DOCS ONLY / PRODUCTION NO-GO`。九职能暂按2人/约18人估算但不写入Schema、Seed、权限、并发或验收；固定十大闭环、单据/报表、最小试迁移和源码处置。Node合同38/38+76/76、Python合同130/130及三项基线、lint通过；无代码、Migration、数据库、账号或运行面变化。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86.md)、[业务基线](../business/small-team-v1-baseline.md)及[D-167](DECISIONS.md#d-167-小团队v1按可变岗位容量和十大业务闭环验收不把每岗两人写入系统)。 |
 | SELFHOST-SMALL-TEAM-SCOPE-RESET-85 | 小团队版范围重置 | DONE | 项目负责人（确认规模与方向）、Codex（文档重置、边界核验、非生产验证与独立提交） | 2026-08-23 | 2026-08-23 | D-166、项目负责人明确确认 | `DONE / SMALL-TEAM RESET RECORDED / TASK70 FROZEN / DOCS ONLY / PRODUCTION NO-GO`。固定Caddy+Node单体+PostgreSQL+本地文件、必要时单Worker；保留数据安全底线，冻结平台级控制面、R2—R5和AI路线。Node合同76/76、Python合同130/130、三项Python基线和lint 0 error通过；无业务代码、Migration、自托管数据库、镜像、Compose或运行服务变化。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-SCOPE-RESET-85.md)及[D-166](DECISIONS.md#d-166-少于20人erp采用单体优先业务闭环优先并冻结平台级治理扩展)。 |
 | SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84 | 受控资源停止线恢复 | DONE | 项目负责人（精确一次性BuildKit授权）、Codex（串行清理/对象复核/门禁/验证） | 2026-08-21 | 2026-08-21 | SELFHOST-OPS-RESOURCE-STOP-LINE-ATTRIBUTION-83、D-158、专项授权 | `DONE / BUILDKIT-ONLY CLEANUP COMPLETE / POST-CLEANUP RESOURCE GATE VERIFIED / PRODUCTION NO-GO`。唯一原样命令退出0、回收475MB；6容器/75镜像/277卷和三组摘要不变，四服务/四保护卷保持；60秒门最低available约1.82GiB、Swap最高3.14%/增长约1.16MiB、根盘最低约10.39GiB、OOM/restart无增量。未访问数据或执行UAT/生产动作。见[任务文档](../tasks/SELFHOST-OPS-RESOURCE-STOP-LINE-REMEDIATION-84.md)。 |
