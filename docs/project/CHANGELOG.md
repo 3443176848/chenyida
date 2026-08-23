@@ -4,6 +4,17 @@
 
 ## 2026-08-23
 
+### SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89 - `test: add unified small-team golden journey`
+
+- 统一旅程：新增`selfhost-small-team-unified-golden-journey-postgres.test.mjs`，强制全新0046隔离数据库、精确确认短语、空业务库和最多2连接；`test:small-team:golden-journey:postgres`与兼容入口`test:full-erp:compose`统一选择现代测试，历史全ERP脚本保留但不再作为正式入口。
+- 业务链：连续完成正式物料与产品/BOM、Supplier Mapping草稿→提交→异人审核、市场项目→工程→计划→净需求10、RFQ/报价/中选→PO/到货/AP、生产领料/报工/完工、品质放行、销售订单→出货/AR、结算及追加式冲销。原料稳定ID贯穿，采购/领料/完工/出货均为10，采购金额120、销售金额200。
+- 安全边界：旧Mapping直写继续409，无权仓库项目写入继续403；物料/工单幂等、当前版本CAS、异人审核与财务追加式反向记录均有断言。合成账号仅用于角色交接，不把每职能2人、总人数或席位写入测试约束。
+- 失败归类：首次运行沿用采购接收前PRQ版本，RFQ创建正确返回`409 VERSION_CONFLICT`；测试改为读取交接后当前版本2。这是测试工具CAS假设，无产品P0，也未放宽服务端规则。
+- 验证：两次从空库顺序应用0001—0046后，统一旅程均`1/1 PASS`；Material、Mapping、Project、Planning Handoff、Material Requirement、Sourcing、Fulfillment、Production Handoff/Operation/Final Output、Quality、Sales和Finance共13组相关Unit合同通过。包脚本中的精确Node命令已原样通过；宿主npm因容器根路径重解析无法启动，JSON解析、Node语法和最终lint/diff/凭据门另行收口。
+- 数据库/API/运行面：无产品代码、Schema、Migration、正式API、角色、页面、依赖、build或部署变化；UAT继续alpha.42/0040。未访问真实数据、账号、凭据、备份、受保护Volume或UAT/生产数据库，未重启常驻服务。
+- 资源/清理：重任务前约2.4GiB available/171MiB Swap/根盘`10,773,078,016`B/Load`0.07/0.11/0.09`；唯一临时PG限制1 CPU/512MiB并使用tmpfs。清理后约2.4GiB/171MiB/`10,755,850,240`B/Load`0.22/0.45/0.29`，最终静态门后为约2.4GiB/171MiB/`10,811,756,544`B/`0.18/0.22/0.22`；宿主OOM0、四服务restart0/OOM false/healthy，任务容器、数据库、端口、网络、Volume和内存盘残留0。
+- 结论：D-170把现代同库合成旅程固定为当前测试基线，TASK89关闭；这不等于真实员工可用或生产准入。TASK90只登记为等待项目负责人批准样本、实名参与者、目标环境和逐项授权的TODO。
+
 ### SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 - `fix: preserve material requirement calendar dates`
 
 - 修复：新增Material Requirement单一`normalizeDateOnly`边界。规范`YYYY-MM-DD`字符串继续严格验证真实日历；node-postgres返回的有效`Date`按Node进程本地日历分量生成业务日，不再经UTC时间点转换后决定PostgreSQL `date`。

@@ -3694,6 +3694,42 @@
 - 拒绝全局修改pg类型解析器或顺带重构其他业务模块；TASK88只修复已证实的Material Requirement边界。
 - 拒绝把UTC/Asia双时区局部PG通过描述为现代同库整链、员工UAT或可上线。
 
+## D-170 现代同库合成黄金旅程成为当前基线，历史全ERP smoke不再作为正式入口
+
+- 日期：2026-08-23
+- 状态：`ACCEPTED / TASK89 MODERN GOLDEN JOURNEY PASS / REAL UAT REQUIRED / PRODUCTION NO-GO`
+- 提案与实施：Codex依据D-167—D-169业务范围、当前alpha.47/0046服务和全新隔离PostgreSQL动态证据
+- 确认边界：只固定合成测试入口、跨域守恒证据和下一授权门；不授权真实数据、账号、UAT/生产、Migration、build、deploy或运行服务变化
+
+### Context
+
+- TASK87发现历史全ERP smoke仍调用退役`POST /api/mappings`，治理门正确返回409，因此旧脚本无法证明当前服务的连续整链。TASK88关闭唯一已知产品P0后，局部套件仍不能代替同一数据库旅程。
+- TASK89在一个全新0046隔离库中改用现代Supplier Mapping草稿→提交→异人审核及当前Project、Planning、Requirement、Sourcing、Fulfillment、Production、Quality、Sales和Finance服务。
+- 同一稳定原料ID贯穿Mapping、BOM、计划包、净需求、RFQ、PO和生产；采购、领料、完工和出货数量均为10，采购金额120、销售金额200。退役接口409、无权写403、幂等、CAS、异人审核和追加式付款冲销均有明确断言。
+- 首次运行在采购接收后继续提交PRQ旧版本1，服务正确返回`409 VERSION_CONFLICT`；读取当前版本2后，两次全新空库旅程均`1/1 PASS`。这是测试工具CAS假设，不是产品P0。
+- 合成测试每个相关角色只创建一个账号来表达职责交接；账号数量不是岗位编制、席位、最少/最多用户、并发或验收约束。
+
+### Decision
+
+1. `tests/selfhost-small-team-unified-golden-journey-postgres.test.mjs`成为现代小团队合成黄金旅程；`test:small-team:golden-journey:postgres`和兼容入口`test:full-erp:compose`均选择它。
+2. 历史`scripts/selfhost-full-erp-compose-smoke.mjs`保留为审计证据，但不再由正式包脚本选择。不得恢复退役Mapping直写或放宽现代审核来迁就历史脚本。
+3. 当前合成通过标准固定为同一全新0046数据库、稳定ID贯穿、关键数量金额守恒、授权拒绝、幂等/CAS、异人审核及合法追加式更正；独立模块PASS不得冒充整链。
+4. TASK89结果为`MODERN GOLDEN JOURNEY PASS`，只关闭测试工具缺口。它不证明UAT alpha.42/0040已升级、不证明真实数据可迁移、不证明员工能完成岗位操作，也不构成生产准入。
+5. 下一任务为`SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90`。启动真实写入前，项目负责人必须提供并批准样本、实际责任人/参与者、目标环境、数量金额口径、清理/回退方式和逐项授权；人数按真实名单变化。
+
+### Consequences
+
+- 十条闭环从“源码/局部隔离READY”提升为“现代同库合成旅程PASS”，但项目阶段仍为`PRODUCTION NO-GO`。
+- 后续缺口集中到真实样本试迁移、实名员工UAT、恢复演练、源码/UAT版本收敛及明确上线授权；没有新证据前不新增模块、角色、表或基础设施。
+- 产品源码、Schema、Migration、API、权限和运行面未因TASK89改变；UAT继续alpha.42/0040，TASK70及AI/高级控制面继续冻结。
+
+### Rejected alternatives
+
+- 拒绝把历史全ERP脚本的409改成预期成功，或恢复退役Mapping直写来制造表面PASS。
+- 拒绝用直接SQL造业务状态、降低数量金额/权限/CAS/冲销断言，或把多个独立数据库的局部测试拼成统一旅程结论。
+- 拒绝把每职能2人或合成账号数写成测试、权限、Seed、Schema或许可证限制。
+- 拒绝从合成PASS自动进入真实UAT、迁移、部署或生产；这些动作必须由新的明确输入和授权启动。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

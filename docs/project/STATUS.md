@@ -2,11 +2,29 @@
 
 最后更新时间：2026-08-23（Asia/Shanghai）
 
+## SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89（完成；现代同库合成整链通过）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / TEST-HARNESS CLOSED / MODERN GOLDEN JOURNEY PASS / PRODUCTION NO-GO | D-170已接受；当前零DOING，TASK90等待项目负责人输入和授权 |
+| 数据库基线 | PASS / FRESH 0046 | 精确隔离库、空业务表、46项Migration/head 0046；最大2连接，任何复用业务库或错误确认短语均失败关闭 |
+| 主数据与Mapping | PASS / MODERN GOVERNANCE | 物料审核、Product/Version/BOM与Mapping草稿→提交→异人审核连续完成；退役Mapping直写继续409 |
+| 跨域旅程 | PASS / `1/1` TWICE | 项目→工程→计划→需求→寻源/PO→到货/AP→生产/品质→订单/出货/AR→结算冲销在同一空库连续通过 |
+| 稳定ID与守恒 | PASS | 同一原料ID贯穿Mapping/BOM/计划/需求/RFQ/PO/生产；采购、领料、完工、出货均10，采购120、销售200 |
+| 权限/并发/更正 | PASS | 无权写403、退役接口409、物料/工单幂等、当前版本CAS、异人审核和追加式付款冲销均验证 |
+| 首次失败 | TEST-HARNESS CAS ASSUMPTION | 采购接收后PRQ已从v1变为v2，旧版本正确409；测试读取当前版本后两次空库通过，无产品P0 |
+| 相关Unit | PASS / 13 GROUPS | Material、Mapping、Project、Planning、Requirement、Sourcing、Fulfillment、Production三组、Quality、Sales、Finance串行通过 |
+| 代码/数据库/API | TEST ONLY / NO PRODUCT OR STRUCTURAL CHANGE | 新增隔离测试并更新包脚本入口；历史脚本保留。无产品源码、Schema/Migration、正式API、角色、页面或依赖变化 |
+| 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT继续alpha.42/0040；未访问真实数据、账号、凭据、备份或受保护Volume，未build/deploy/restart |
+| 资源/清理 | PASS / NO TASK RESIDUE | 重任务前约2.4GiB/171MiB/`10,773,078,016`B/Load`0.07/0.11/0.09`；清理后约2.4GiB/171MiB/`10,755,850,240`B/`0.22/0.45/0.29`，最终静态门后约2.4GiB/171MiB/`10,811,756,544`B/`0.18/0.22/0.22`。宿主OOM0、四服务restart0/OOM false/healthy，临时PG、库、端口、网络、Volume和内存盘残留0 |
+| 下一步 | TASK90 / OWNER INPUT AND AUTHORIZATION REQUIRED | 提供并批准真实/脱敏样本、实名参与者、目标环境、核对口径和逐项授权；人数按实际名单变化，不写死 |
+| 系统是否可用 | NO | 合成整链通过仍不等于真实样本试迁移、员工UAT、恢复演练、版本收敛或上线授权完成 |
+
 ## SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88（完成；ST-04日期型P0关闭）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / P0-01 FIXED IN SOURCE AND ISOLATED POSTGRES / 10 READY / PRODUCTION NO-GO | D-169已接受；当前零DOING，TASK89保持TODO并等待新鲜资源门 |
+| 当前状态 | DONE / P0-01 FIXED IN SOURCE AND ISOLATED POSTGRES / 10 READY / PRODUCTION NO-GO | D-169历史结果保持；后续TASK89/D-170已完成现代同库旅程 |
 | date-only合同 | PASS / CALENDAR DATE PRESERVED | 规范字符串严格验真；node-postgres `date`返回的有效Date读取本地年/月/日，不以UTC时间点决定业务日 |
 | 无效值 | PASS / FAIL CLOSED | invalid Date、`2026-02-30`、带时间字符串和非支持类型均保持`REQUIRED_DATE_INVALID / 422` |
 | 消费点 | PASS / SINGLE RULE | 请求/Package回退、提交重算及采购追溯截止日复用同一规范化；计算摘要、库存/在途、权限、事务、幂等、CAS、审计和失败关闭未放宽 |
@@ -17,8 +35,8 @@
 | Schema/Migration/API | NO STRUCTURAL CHANGE | 未新增或修改Schema、Migration、表、角色、权限、页面、依赖；仅修Material Requirement内部date-only投影行为 |
 | 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT继续alpha.42/0040且未部署本修复；未访问真实数据、账号、凭据、备份或受保护Volume，未build/deploy/restart |
 | 资源/清理 | PASS / NO TASK RESIDUE | 起点约2.4GiB available/171MiB Swap/根盘`10,758,881,280`B；唯一1 CPU/512MiB tmpfs PG容器。清理后60秒SwapFree `873,784→873,784 KiB`；收口终检约2.4GiB/171MiB/`10,779,873,280`B/Load`0.65/0.30/0.20`，宿主OOM0、四服务restart0/OOM false，任务容器/库/端口/网络/Volume/内存盘残留0 |
-| 下一步 | TASK89 / MODERN SAME-DATABASE JOURNEY | 只更新退役全ERP smoke到现代Supplier Mapping和当前跨域API，在一个隔离库连续验证；不新增产品功能或连接UAT |
-| 系统是否可用 | NO | 仍缺现代同库整链、真实样本/试迁移、九职能员工UAT、恢复演练和上线授权 |
+| 下一步 | COMPLETED BY TASK89 | 现代同库合成旅程已通过；当前后续为TASK90真实样本与员工UAT准备 |
+| 系统是否可用 | NO | 仍缺真实样本/试迁移、九职能员工UAT、恢复演练和上线授权 |
 
 ## SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87（完成；九条就绪与ST-04日期型P0）
 
@@ -35,7 +53,7 @@
 | 代码/数据库/API | UNCHANGED | 本任务只新增/更新Markdown；无业务代码、Schema/Migration、API、依赖、账号、镜像、Compose或常驻服务变化 |
 | 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT继续alpha.42/0040；未连接UAT/生产数据库，未读取受保护Volume、真实备份、凭据或业务数据，未build/pull/deploy/restart |
 | 资源/清理 | PASS / STOP LINE RECORDED / NO TASK RESIDUE | 补验窗口起点available约2.3GiB、Swap160MiB、根盘`10,776,580,096`B、Load`0.02/0.13/0.17`；最终约2.4GiB、172MiB、`10,750,689,280`B、`0.13/0.13/0.14`。最终磁盘仅高于硬线约12.7MiB；宿主`oom_kill=0`，常驻Web/PG restart0/OOM false/healthy，临时容器、PG、库、端口和`/dev/shm/cyd-task87-*`全清零 |
-| 下一步 | COMPLETED BY TASK88 | 日期型P0已由TASK88/D-169关闭；当前后续为TASK89现代同库整链 |
+| 下一步 | COMPLETED BY TASK89 | 日期型P0已由TASK88/D-169关闭，现代同库旅程已由TASK89/D-170通过；当前后续为TASK90真实样本与员工UAT准备 |
 | 系统是否可用 | NO | P0已修复，但仍缺现代同库整链、真实样本/试迁移、九职能员工UAT、恢复演练和上线授权 |
 
 ## SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86（完成；小团队V1业务基线）

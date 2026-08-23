@@ -14,6 +14,8 @@
 
 2026-08-23日期修复增量：TASK88/D-169新增Material Requirement单一`normalizeDateOnly`边界，对规范字符串严格验真，并把node-postgres `date`的本地日历分量保留为业务日；提交重算与采购追溯不再用UTC时间点决定需求日。Unit在UTC/Asia各`4/4`、UI `6/6`，同一全新0046隔离PostgreSQL下PG在UTC/Asia各`8/8`，ST-04转`READY`，当前为`10 READY / 0 FIX_REQUIRED / 0 PARKED`。无Schema/Migration、页面、角色、依赖、UAT或运行服务变化；下一任务TASK89只补现代Supplier Mapping与跨域API的同库连续证据。
 
+2026-08-23现代同库旅程增量：TASK89/D-170新增一个全新0046隔离PostgreSQL中的现代连续旅程，替代包脚本对历史全ERP smoke的选择。稳定原料ID贯穿审核、Supplier Mapping、BOM、计划、需求、RFQ、PO与生产；采购、领料、完工、出货数量均为10，采购金额120、销售金额200，并验证403/409、幂等/CAS、异人审核和追加式付款冲销。两次空库统一旅程`1/1 PASS`，13组相关Unit合同通过；首次RFQ 409被归类为测试工具沿用旧PRQ版本的CAS假设，无产品P0。无Schema/Migration/UAT变化，临时资源清零。当前零`DOING`；TASK90等待真实样本、实名参与者、目标环境和逐项授权。
+
 ## 2026-08-13 投产准入基线
 
 `SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：TASK41/TASK54已完成四域V2与签名密文外层，TASK55按D-132补齐cluster security/tablespace恢复和readiness v4，但没有真实异机锚点、密钥/调度/WORM、当前数据恢复或真实RTO。TASK56已在alpha.47/0046闭合Web行锁、Backup control/capture、PG17 catalog、角色/ACL、session/secret/container/tablespace及D-134受控operator；TASK59—TASK65按D-135—D-141闭合detached候选、reservation、monitor交付/投影、V2 actual policy/激活和target-bound egress，TASK66—TASK82按D-142—D-157建立授权矩阵、跨岗UAT证据、15检查点控制平面、内容寻址root受信rollback gateway、fixed executor/activation v2及数据库/四文件域/前代运行面固定handler。机器审计仍以动态能力/host activation、隔离回退演练和人工UAT三项条件强制`UAT_PROMOTION_EXECUTOR_NOT_READY`。TASK57曾构建的Web/Worker本机候选和当前安全仓库变化前的镜像均为`STALE / NOT AUTHORIZABLE`，当前没有与最终源码匹配的可授权镜像。当前UAT仍使用共享superuser、环境变量秘密且为alpha.42/0040，host Supervisor/monitor、真实V2/egress policy激活、真实网络出口、A1/A3、正式镜像证据、19步PASS、rollback handler动态证明/host activation、隔离回退演练、真实异机恢复/迁移、业务批准的职责分离、跨岗位验收、员工试运行和正式切换均未完成。
@@ -26,7 +28,7 @@
 
 2026-08-21 TASK70启动增量：TASK70已从`TODO`转为当前唯一`DOING`。三条只读审计和主智能体代码复核确认现有审计把handler实现、隔离动态证明、host activation与真实UAT回退混为一个阻断；首个仓库切片先建立版本化、失败关闭的动态证据/verifier并拆分四类状态，之后才允许在新鲜资源门和磁盘上界内执行单容器PostgreSQL 17原子切换case。任何隔离结果都不得冒充host或真实UAT证据；现有UAT数据库、四卷、备份正文、凭据和业务数据保持禁止访问。
 
-项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK88已按D-169完成并回到零`DOING`；下一任务TASK89只允许现代接口同库隔离测试旅程，且必须先通过低资源门。不得自动恢复控制面、AI、build/deploy或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
+项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK89已按D-170完成并回到零`DOING`；下一任务TASK90在未获得样本、实名参与者、目标环境和专项授权前保持`TODO`。不得自动恢复控制面、AI、build/deploy或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。
 
@@ -153,6 +155,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 - 本机永久按 2 核、约 4 GiB 内存、1 GiB Swap 管理。2026-07-27 曾发生服务器重启或不可用，证据不足，根因记录为 `UNKNOWN`，不得无证据归因 OOM。
 - 所有 build、全量测试、Migration、备份恢复和 Compose 重启必须串行，固定 `COMPOSE_PARALLEL_LIMIT=1`；停止阈值、禁用清理命令和验证记录见 `docs/self-hosting/low-resource-server.md`。
 - TASK88启动门available约2.4GiB、Swap171MiB、根盘`10,758,881,280`B、Load低；唯一1 CPU/512MiB临时PostgreSQL 17容器的数据目录使用tmpfs，46项Migration与两次PG套件串行，启动后根盘仍为`10,768,338,944`B。清理后60秒SwapFree `873,784→873,784 KiB`；收口终检约2.4GiB/171MiB/`10,779,873,280`B/Load`0.65/0.30/0.20`，宿主OOM0、四服务restart0/OOM false且Web/PostgreSQL healthy。临时容器、库、端口、网络、Volume及`/dev/shm/cyd-task88-*`清零；未连接UAT/生产或受保护Volume。
+- TASK89重任务前约2.4GiB available、171MiB Swap、根盘`10,773,078,016`B、Load`0.07/0.11/0.09`；唯一1 CPU/512MiB、384MiB tmpfs的临时PostgreSQL 17容器串行应用46项Migration和运行旅程。清理后约2.4GiB/171MiB/`10,755,850,240`B/Load`0.22/0.45/0.29`，最终静态门后约2.4GiB/171MiB/`10,811,756,544`B/`0.18/0.22/0.22`，仍高于10GiB停止线；宿主OOM0、四服务restart0/OOM false且healthy，任务容器、库、端口、网络、Volume及`/dev/shm`残留0。
 - TASK75因Swap持续超过80%只运行仓库静态、受限Node与Python轻量验证，没有启动容器、PostgreSQL、build、typecheck或全量测试。收口available约1.9GiB、Swap881/1024MiB、根盘约13GiB、Load低；四服务restart0/OOM false且Web/PostgreSQL healthy，宿主`oom_kill`计数2但缺同窗口增量归因，故不声称新OOM为0。任务专属临时Node目录精确清零，没有容器、网络、Volume或数据库临时资源。
 - TASK54所有重任务串行，合成密文双集群恢复只使用一个临时PostgreSQL容器，六服务runtime probe实测`max_containers=1`。收口窗口available约1.8GiB、Swap`543→545MiB`、根盘16GiB、Load低于1；四服务restart0/OOM false，Web/PostgreSQL healthy。任务临时容器、数据库、网络和Volume清零；未读取或修改受保护卷、真实备份或UAT数据。
 - TASK56受控operator真实system adapter演练串行使用一个临时PostgreSQL 17容器，Node单测与PG演练不并行。最新定向演练后available约1.7GiB、Swap539MiB/1.0GiB、根盘15GiB、Load`1.33/0.73/0.72`、`oom_kill=0`；四服务restart0/OOM false，Web/PostgreSQL healthy，operator测试容器和临时source/credential/state目录清零。最终完整回归仍须继续记录收口资源。
@@ -312,6 +315,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 53. PM-002补充D-113执行设计：研发Agent系统与D-112产品五表严格分离；推荐4个常驻逻辑控制职责由1个轻量确定性进程承载、常驻LLM为0，实施/ERP领域/对抗/安全/QA/真黑盒及专项专家按任务动态创建。候选单写者，领域/安全/QA及适用DB门禁不可由多数覆盖；Reviewer和Black-box使用隔离Context，黑盒不读取源码或`.git`。D-114仅为待负责人确认的native-first/R1.5提案，不构成Runtime、UAT或产品任务授权。
 54. 项目负责人已接受D-114并授权`AGENT-R1-5`：范围只含版本化Task Packet v2、Message/Context Schema、无状态验证器、合成候选/故障注入/Minority Report和Codex原生临时门禁角色。黑盒只使用合成公开接口并在不挂载产品源码/`.git`的断网沙箱运行；R1.5不宣称R2级技术隔离，不访问D-112产品五表、UAT/生产或真实数据。
 55. TASK88采用D-169：Material Requirement的PostgreSQL `date`按node-postgres生成的本地日历分量规范化，规范字符串严格验真；请求/Package回退、提交重算和采购追溯使用同一规则。UTC/Asia隔离PG各8/8后ST-04转`READY`，但现代同库旅程、UAT、真实数据和生产准入仍未证明。
+56. TASK89采用D-170：现代同库合成旅程已在全新0046隔离库连续通过，历史全ERP smoke不再是包脚本正式入口；合成角色数量不构成编制约束。该结果只关闭测试工具缺口，真实样本、实名员工UAT、试迁移/恢复和生产授权继续独立失败关闭。
 
 ## 当前风险
 
@@ -359,7 +363,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-2026-08-23 D-166—D-169已取代原持续交付路线：TASK59—TASK82既有发布/监控/授权/回退控制面只保留历史，不继续扩展或激活；TASK70转`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE`，R2—R5和PHASE4 AI路线冻结。TASK86完成九职能可变人数和十大闭环基线；TASK87形成`9 READY / ST-04 FIX_REQUIRED`，TASK88已关闭日期型P0并提升为`10 READY`。当前零`DOING`，TASK89为资源门后的唯一TODO，只补现代接口同库黄金旅程。UAT alpha.42/0040及全部运行服务保持不变，系统继续`PRODUCTION NO-GO`。
+2026-08-23 D-166—D-170已取代原持续交付路线：TASK59—TASK82既有发布/监控/授权/回退控制面只保留历史，不继续扩展或激活；TASK70转`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE`，R2—R5和PHASE4 AI路线冻结。TASK86完成九职能可变人数和十大闭环基线，TASK87/88关闭唯一日期型P0，TASK89完成现代同库合成旅程。当前零`DOING`；TASK90为`TODO / OWNER INPUT AND AUTHORIZATION REQUIRED`，只面向获批真实样本、实名员工UAT及试迁移/回退准备。UAT alpha.42/0040及全部运行服务保持不变，系统继续`PRODUCTION NO-GO`。
 
 ## 恢复上下文检查清单
 

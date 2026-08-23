@@ -11,7 +11,11 @@
 
 ## 当前任务
 
-当前零`DOING`。`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88`已按D-169完成，ST-04转为`READY`并形成`10 READY / 0 FIX_REQUIRED / 0 PARKED`源码基线；下一任务`SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89`保持`TODO`，须先通过新鲜资源门，只补现代接口同库连续证据。
+当前零`DOING`。`SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89`已完成现代同库合成黄金旅程；下一任务`SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90`等待项目负责人提供并批准样本、实名参与者、目标环境及逐项授权，不自动访问UAT/生产。
+
+2026-08-23现代同库旅程收口事件：`SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89 DOING → DONE`。一个全新0046隔离数据库以现代Supplier Mapping和当前跨域API连续完成主数据、项目/计划、需求、采购、生产/品质、销售/财务及追加式付款冲销，稳定ID贯穿且采购/领料/完工/出货数量均为10、采购金额120、销售金额200；统一测试两次空库`1/1`、13组相关Unit合同通过。首次409是测试工具沿用PRQ旧版本的CAS假设，改为读取交接后当前版本后通过，无产品P0。临时PG与全部任务资源清零，UAT/生产未访问。TASK90只登记为`TODO / OWNER INPUT AND AUTHORIZATION REQUIRED`。
+
+2026-08-23现代同库旅程调度事件：项目负责人要求“下一步”，`SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89 TODO → DOING`。启动门为available memory约2.4 GiB、Swap 171 MiB、根盘可用10,771,357,696 bytes、Load 0.05/0.07/0.11、OOM/restart无异常及零任务残留；根盘仅高于10 GiB硬线约33.9 MiB，后续每项重任务前必须重新核验并串行执行。
 
 2026-08-23日期修复收口事件：`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 DOING → DONE`。单一date-only规范化已覆盖请求/回退、提交重算与采购追溯；Unit UTC/Asia各`4/4`、UI `6/6`、同一全新0046隔离PG下UTC/Asia各`8/8`。无Schema/Migration、页面、角色、依赖或运行面变化，临时PG容器和全部任务资源清零；UAT仍为alpha.42/0040且未部署本修复。
 
@@ -259,14 +263,13 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-
 当前无执行中任务。
 
 ## 待启动任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89 | 现代接口同库黄金旅程 | TODO | Codex（隔离测试旅程）、项目负责人（后续真实样本/UAT授权） | TASK88、D-168、D-169、低资源规则 | 在一个全新0046隔离数据库中改用现代Supplier Mapping和当前跨域API连续验证；不恢复退役直写、不新增Schema/Migration/角色/页面、不连接UAT/生产。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89.md)。 |
+| SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90 | 真实样本与员工UAT准备 | TODO | 项目负责人（样本、实名人员、环境和授权）、Codex（授权后准备清单与隔离证据） | TASK89、D-167、D-170、专项授权 | `TODO / OWNER INPUT AND AUTHORIZATION REQUIRED / PRODUCTION NO-GO`。先准备真实样本、实际责任人、核对口径和试迁移/回退授权包；每职能约2人只是排班估算，不写死。未获授权不得访问UAT/生产、真实数据、账号、备份或运行部署动作。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90.md)。 |
 
 ## 已冻结任务
 
@@ -278,6 +281,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89 | 现代接口同库黄金旅程 | DONE | Codex（隔离测试旅程）、项目负责人（后续真实样本/UAT授权） | 2026-08-23 22:40 CST | 2026-08-23 23:10 CST | TASK88、D-168、D-169、低资源规则 | `DONE / TEST-HARNESS CLOSED / MODERN GOLDEN JOURNEY PASS / PRODUCTION NO-GO`。全新0046隔离库连续完成现代Mapping及跨域旅程；稳定ID、数量10守恒、采购120/销售200、403/409、幂等/CAS、异人审核和追加式付款冲销均验证。统一旅程两次空库1/1及13组Unit合同通过；无产品P0、Schema/Migration/UAT变化，临时资源清零。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89.md)及[D-170](DECISIONS.md#d-170-现代同库合成黄金旅程成为当前基线历史全erp-smoke不再作为正式入口)。 |
 | SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 | 需求日期时区无关修复 | DONE | Codex（最小源码与回归）、项目负责人（后续真实样本/UAT授权） | 2026-08-23 22:11 CST | 2026-08-23 22:18 CST | TASK87、D-168、低资源规则 | `DONE / P0-01 FIXED / 10 READY / PRODUCTION NO-GO`。单一规范化保留PostgreSQL `date`日历分量并严格拒绝无效值，提交重算/采购追溯统一使用；Unit UTC/Asia各4/4、UI 6/6、0046隔离PG UTC/Asia各8/8。无Schema/Migration/UAT变化，临时资源清零。见[任务文档](../tasks/SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88.md)及[D-169](DECISIONS.md#d-169-postgresql-date按日历分量规范化utc时间点不得决定material-requirement业务日)。 |
 | SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 | 小团队黄金旅程就绪核验 | DONE | Codex（源码映射、隔离核验、缺口归类和文档收口）、项目负责人（真实业务样本和后续UAT授权） | 2026-08-23 | 2026-08-23 | TASK86、D-167、低资源规则 | `DONE / 9 READY + ST-04 FIX_REQUIRED / PRODUCTION NO-GO`。Unit/UI `194/194`、现代模块PG/UTC `99/99`、主数据PG `6/6`、Supplier Mapping PG `10/10`；Material Requirement UTC `8/8`、Asia/Shanghai `1/8`，唯一P0是date-only时区漂移。现有全ERP smoke因旧Mapping直写被409治理门拒绝，restart未到达并登记现代同库整链缺口。无业务代码/Migration/UAT变化，临时资源清零。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87.md)及[D-168](DECISIONS.md#d-168-task87以九条ready和st-04日期型p0收口先做单一最小修复再进入真实样本)。 |
 | SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86 | 小团队V1业务基线 | DONE | 项目负责人（可变人数与第一性原则）、Codex（源码盘点、业务基线、治理同步和验证） | 2026-08-23 | 2026-08-23 | TASK85、D-166、D-167 | `DONE / BUSINESS BASELINE APPROVED / HEADCOUNT VARIABLE / DOCS ONLY / PRODUCTION NO-GO`。九职能暂按2人/约18人估算但不写入Schema、Seed、权限、并发或验收；固定十大闭环、单据/报表、最小试迁移和源码处置。Node合同38/38+76/76、Python合同130/130及三项基线、lint通过；无代码、Migration、数据库、账号或运行面变化。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86.md)、[业务基线](../business/small-team-v1-baseline.md)及[D-167](DECISIONS.md#d-167-小团队v1按可变岗位容量和十大业务闭环验收不把每岗两人写入系统)。 |
