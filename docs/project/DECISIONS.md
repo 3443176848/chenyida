@@ -3659,6 +3659,41 @@
 - 拒绝把测试脚本过期或缺失统一旅程误报为已通过；也拒绝把验证工具缺口和日期型产品P0混进一个大任务。
 - 拒绝因九条`READY`就直接部署源码、迁移UAT、创建真实账号或开始员工操作。
 
+## D-169 PostgreSQL date按日历分量规范化，UTC时间点不得决定Material Requirement业务日
+
+- 日期：2026-08-23
+- 状态：`ACCEPTED / TASK88 P0 FIXED / 10 READY / PRODUCTION NO-GO`
+- 提案与实施：Codex依据D-168最小修复边界和UTC/Asia/Shanghai隔离回归
+- 确认边界：仅固定Material Requirement的date-only读取合同与后续验证顺序；不授权UAT/生产、真实数据、账号、Migration、build或部署
+
+### Context
+
+- node-postgres把PostgreSQL `date`解析为Node进程本地零点的JavaScript `Date`。在Asia/Shanghai调用`toISOString()`会先转换为UTC时间点，从而把`2026-10-01`错误投影为`2026-09-30`。
+- Material Requirement的提交重算摘要和采购追溯当前供应截止日都依赖同一需求日；任何一个消费点漂移都会造成错误重算拒绝或错误在途边界。
+- 该字段是无时区日历日，不是一个全球时间点。强制容器使用UTC只能隐藏错误，不能形成正确业务合同。
+
+### Decision
+
+1. Material Requirement建立单一`normalizeDateOnly`边界。规范`YYYY-MM-DD`字符串必须通过真实日历往返校验；无效Date、非法字符串、带时间值或其他类型明确返回既有`REQUIRED_DATE_INVALID / 422`。
+2. 对node-postgres返回的有效`Date`读取`getFullYear/getMonth/getDate`本地日历分量，再生成并复核规范字符串；不得使用`toISOString`、UTC getter或时间戳偏移决定PostgreSQL `date`的业务日。
+3. 请求日期、Package回退日期、提交重算和采购追溯截止日复用同一规则。计算摘要、库存/在途SQL、Allocation、事务、权限、幂等、CAS、审计和既有失败关闭语义保持不变。
+4. UTC与Asia/Shanghai必须运行同一Material Requirement隔离PG套件并各自`8/8 PASS`。局部通过只把ST-04提升为源码/隔离库`READY`，不构成统一旅程、UAT或生产准入。
+5. 下一任务为`SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89`：在一个隔离数据库中把现代Supplier Mapping和当前跨域API串成连续旅程；若复现新的产品P0，应独立登记，不把修复塞入测试脚本重写。
+
+### Consequences
+
+- TASK88完成后十条闭环源码就绪分类为`10 READY / 0 FIX_REQUIRED / 0 PARKED`；TASK87记录的Asia/Shanghai `1/8`仍保留为修复前证据，不改写历史。
+- 源码、测试和文档变化不包含Schema、Migration、角色、页面、依赖或运行配置；UAT继续alpha.42/0040，源码仍为alpha.47/0046且尚未部署。
+- 真实样本/试迁移、九职能实名UAT、可恢复备份/恢复演练和明确上线授权继续是强制后续条件，系统保持`PRODUCTION NO-GO`。
+- 每职能2人、约18人仍只作可变容量参考，不进入实现或验收硬条件。
+
+### Rejected alternatives
+
+- 拒绝强制所有Node进程永久使用UTC来掩盖date-only错误。
+- 拒绝对PostgreSQL `date`使用UTC getter、固定8小时偏移或任意字符串截断；这些做法会把运行环境假设写进业务日期。
+- 拒绝全局修改pg类型解析器或顺带重构其他业务模块；TASK88只修复已证实的Material Requirement边界。
+- 拒绝把UTC/Asia双时区局部PG通过描述为现代同库整链、员工UAT或可上线。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

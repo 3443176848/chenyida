@@ -4,6 +4,16 @@
 
 ## 2026-08-23
 
+### SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 - `fix: preserve material requirement calendar dates`
+
+- 修复：新增Material Requirement单一`normalizeDateOnly`边界。规范`YYYY-MM-DD`字符串继续严格验证真实日历；node-postgres返回的有效`Date`按Node进程本地日历分量生成业务日，不再经UTC时间点转换后决定PostgreSQL `date`。
+- 消费点：`requiredDate`复用同一规则，提交锁内重算和采购追溯当前供应截止日两个已知消费点统一调用；计算摘要内容、库存/在途SQL、Allocation、权限、事务、幂等、CAS、审计和既有失败关闭错误均未放宽。
+- 验证：Unit在`TZ=UTC`和`TZ=Asia/Shanghai`各`4/4`，UI合同`6/6`；同一个全新PostgreSQL 17数据库顺序应用0001—0046并确认233张public表后，Material Requirement PG在UTC与Asia/Shanghai各`8/8 PASS`。即时生成→提交不再因业务日后退而错误返回重算拒绝，合法的权限/并发/来源变化/追溯失败关闭仍按测试预期触发。
+- 运行时说明：宿主没有Node；首次宿主命令和只读容器根Node的默认子进程隔离均在测试断言前因可执行路径缺失退出。最终使用Web容器根文件系统中的只读Node 22.23.2及当前进程test isolation执行本地源码，全部目标结果通过；未修改运行容器或建立Node临时容器。
+- 数据库/API/运行面：无Schema、Migration、表、角色、权限、页面、依赖或部署结构变化；UAT继续alpha.42/0040且未含本修复。未连接UAT/生产、真实数据、账号、凭据、备份或受保护Volume，未build、deploy或重启常驻服务。
+- 资源/清理：启动门约2.4GiB available/171MiB Swap/`10,758,881,280`B根盘/低Load；唯一临时PG容器限制1 CPU/512MiB且数据为tmpfs。清理后60秒SwapFree增长0；收口终检约2.4GiB/171MiB/`10,779,873,280`B/Load`0.65/0.30/0.20`，宿主`oom_kill=0`、四服务restart0/OOM false、Web/PostgreSQL healthy，任务容器、库、端口、网络、Volume和`/dev/shm`残留均为0。
+- 结论：D-169把ST-04提升为源码/隔离PG `READY`，当前十条闭环为`10 READY / 0 FIX_REQUIRED / 0 PARKED`，但系统仍为`PRODUCTION NO-GO`。下一任务`SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89`只更新现代Supplier Mapping和跨域API的同库连续旅程。
+
 ### SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 - `docs: audit small-team golden journey readiness`
 
 - 结论：D-168按ST-01—ST-10收口为`9 READY / 1 FIX_REQUIRED / 0 PARKED`。ST-01、02、03、05、06、07、08、09、10可进入后续真实样本/UAT；ST-04必须先修P0，`READY`不等于已投产。

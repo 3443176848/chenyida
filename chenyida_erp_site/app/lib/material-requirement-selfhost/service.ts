@@ -5,7 +5,7 @@ import { currentSupplyFormula, currentSupplyModel, loadCurrentSupplyBreakdowns, 
 import { MaterialRequirementError } from "./errors.ts";
 import { MaterialRequirementRepository } from "./repository.ts";
 import type { RequirementMutationMeta, RequirementMutationResult } from "./types.ts";
-import { assertOnlyKeys, boundedText, expectedVersion, requiredDate } from "./validation.ts";
+import { assertOnlyKeys, boundedText, expectedVersion, normalizeDateOnly, requiredDate } from "./validation.ts";
 
 type PackageRow = Record<string, unknown> & { id: string; project_id: string; status: string; version: number; package_digest: string; target_delivery_date: unknown; latest_package_id: string };
 type PlanRow = Record<string, unknown> & { id: string; project_id: string; planning_package_id: string; status: string; version: number; required_date: unknown; source_package_version: number; source_package_digest: string; calculation_digest: string };
@@ -145,7 +145,7 @@ export class MaterialRequirementService {
       if (String(plan.project_id) !== String(planRef.rows[0].project_id) || plan.status !== "DRAFT" || Number(plan.version) !== expected) throw new MaterialRequirementError("MATERIAL_REQUIREMENT_VERSION_CONFLICT", "物料需求计划状态或版本已变化", 409);
       const source = await this.latestAcceptedPackage(client, Number(plan.planning_package_id), true);
       if (Number(source.version) !== Number(plan.source_package_version) || source.package_digest !== plan.source_package_digest) throw new MaterialRequirementError("MATERIAL_REQUIREMENT_RECALC_REQUIRED", "计划交接包来源已变化，请重新生成物料需求计划", 409);
-      const demandDate = plan.required_date instanceof Date ? plan.required_date.toISOString().slice(0, 10) : String(plan.required_date).slice(0, 10); const calculation = await calculateMaterialRequirements(client, Number(plan.planning_package_id), demandDate, true);
+      const demandDate = normalizeDateOnly(plan.required_date); const calculation = await calculateMaterialRequirements(client, Number(plan.planning_package_id), demandDate, true);
       if (calculation.digest !== plan.calculation_digest) throw new MaterialRequirementError("MATERIAL_REQUIREMENT_RECALC_REQUIRED", "库存、有效分配或需求日前在途已变化，请重新生成物料需求计划", 409);
       const stored = await client.query("select id,line_no,material_id,unit_id,source_digest from planning_material_requirement_lines where plan_id=$1 order by line_no", [planId]);
       if (stored.rowCount !== calculation.lines.length || stored.rows.some((row, index) => Number(row.material_id) !== calculation.lines[index].materialId || Number(row.unit_id) !== calculation.lines[index].unitId || row.source_digest !== calculation.lines[index].sourceDigest)) throw new MaterialRequirementError("MATERIAL_REQUIREMENT_RECALC_REQUIRED", "物料需求预览与当前来源不一致，请重新生成", 409);
@@ -270,7 +270,7 @@ export class MaterialRequirementService {
         from planning_material_requirement_events
         where plan_id=$1 and purchase_request_id=$2 and event_type in ('PURCHASE_ACCEPTED','PURCHASE_RETURNED')
         order by id`, [Number(header.plan_id), requestId]);
-      const requiredDateValue = header.required_date instanceof Date ? header.required_date.toISOString().slice(0, 10) : String(header.required_date).slice(0, 10);
+      const requiredDateValue = normalizeDateOnly(header.required_date);
       const currentByLineId = await loadCurrentSupplyBreakdowns(client, lineResult.rows.map((line) => ({
         lineId: Number(line.id), materialId: Number(line.material_id), unitId: Number(line.unit_id),
         snapshotStockAvailable: String(line.stock_available), snapshotStockAllocated: String(line.stock_allocated),

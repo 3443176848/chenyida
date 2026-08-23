@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { permissionsForRole } from "../app/lib/identity-selfhost/permissions.ts";
 import { canReadPurchaseRequest, purchaseRequestReadScope } from "../app/lib/material-requirement-selfhost/service.ts";
-import { canonicalDigest, requiredDate } from "../app/lib/material-requirement-selfhost/validation.ts";
+import { canonicalDigest, normalizeDateOnly, requiredDate } from "../app/lib/material-requirement-selfhost/validation.ts";
 
 test("planning and purchase capabilities are separated while managers retain the full loop", () => {
   const planning = permissionsForRole("planning"), purchase = permissionsForRole("purchase");
@@ -32,7 +32,13 @@ test("purchase request read scope is object bounded without global audit access"
 });
 
 test("dates and source digests are deterministic", () => {
-  assert.equal(requiredDate("2026-12-31"), "2026-12-31"); assert.equal(requiredDate(undefined, "2026-12-30"), "2026-12-30"); assert.throws(() => requiredDate("2026-02-30"), /有效/);
+  const postgresDate = new Date(2026, 9, 1);
+  assert.equal(normalizeDateOnly(postgresDate), "2026-10-01");
+  assert.equal(normalizeDateOnly("2026-10-01"), normalizeDateOnly(postgresDate));
+  assert.equal(requiredDate("2026-12-31"), "2026-12-31"); assert.equal(requiredDate(undefined, "2026-12-30"), "2026-12-30");
+  assert.throws(() => normalizeDateOnly(new Date(Number.NaN)), { code: "REQUIRED_DATE_INVALID", status: 422 });
+  assert.throws(() => normalizeDateOnly("2026-02-30"), { code: "REQUIRED_DATE_INVALID", status: 422 });
+  assert.throws(() => normalizeDateOnly("2026-10-01T00:00:00Z"), { code: "REQUIRED_DATE_INVALID", status: 422 });
   assert.equal(canonicalDigest({ b: "2.000000", a: 1 }), canonicalDigest({ a: 1, b: "2.000000" })); assert.match(canonicalDigest({ quantity: "9007199254740993.000001" }), /^[0-9a-f]{64}$/);
 });
 
@@ -45,6 +51,7 @@ test("calculation and submission are PostgreSQL numeric, locked and scope-bounde
   assert.match(calculation, /sum\(bl\.calculated_gross_quantity\)/); assert.match(calculation, /on_hand_qty-b\.reserved_qty-b\.frozen_qty/); assert.match(calculation, /order_qty-pol\.received_qty/); assert.match(calculation, /numeric\(24,6\)/);
   assert.match(calculation, /planning_material_allocations/); assert.match(calculation, /pg_advisory_xact_lock/); assert.match(calculation, /lock table purchase_orders, purchase_order_lines in share mode/);
   assert.match(repository, /client\.query\("begin"\)/); assert.match(service, /MATERIAL_REQUIREMENT_RECALC_REQUIRED/); assert.match(service, /net_purchase_requirement>0/); assert.match(service, /PLANNING_PURCHASE_REQUEST/);
+  assert.match(service, /normalizeDateOnly\(plan\.required_date\)/); assert.match(service, /normalizeDateOnly\(header\.required_date\)/);
   assert.doesNotMatch(service, /insert into purchase_orders|insert into supplier|request_for_quotation|supplier_quote/i); assert.doesNotMatch(service, /update inventory_stock_balances/);
   const requestDetail = service.slice(service.indexOf("async requestDetail"), service.indexOf("async requestQueue"));
   assert.match(requestDetail, /begin transaction isolation level repeatable read read only/); assert.ok(requestDetail.indexOf("canReadPurchaseRequest") < requestDetail.indexOf("loadCurrentSupplyBreakdowns"));

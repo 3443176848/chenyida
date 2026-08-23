@@ -11,7 +11,11 @@
 
 ## 当前任务
 
-当前零`DOING`。`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87`已以`9 READY / 1 FIX_REQUIRED`收口；唯一产品P0为Material Requirement date-only受Node本地时区影响。下一任务`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88`保持`TODO`，最终根盘仅高于硬线约12.7 MiB，须先通过新鲜资源门再启动。
+当前零`DOING`。`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88`已按D-169完成，ST-04转为`READY`并形成`10 READY / 0 FIX_REQUIRED / 0 PARKED`源码基线；下一任务`SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89`保持`TODO`，须先通过新鲜资源门，只补现代接口同库连续证据。
+
+2026-08-23日期修复收口事件：`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 DOING → DONE`。单一date-only规范化已覆盖请求/回退、提交重算与采购追溯；Unit UTC/Asia各`4/4`、UI `6/6`、同一全新0046隔离PG下UTC/Asia各`8/8`。无Schema/Migration、页面、角色、依赖或运行面变化，临时PG容器和全部任务资源清零；UAT仍为alpha.42/0040且未部署本修复。
+
+2026-08-23日期修复调度事件：项目负责人要求“下一步”，`SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 TODO → DOING`成为唯一active task。允许Material Requirement date-only规范化、两个已知消费点及Unit/UI/隔离PG双时区回归；禁止Schema/Migration、角色、页面、运行服务、真实账号/数据和高级控制面变化。
 
 2026-08-23黄金旅程收口事件：`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 DOING → DONE`。相关Unit/UI `194/194`、现代模块隔离PG/UTC `99/99`、主数据PG `6/6`、Supplier Mapping PG `10/10`通过；Material Requirement在UTC `8/8`、Asia/Shanghai `1/8`，固定ST-04日期型P0。现有全ERP smoke在alpha.42及源码修订`78d96c61…`对应的历史alpha.47本机镜像均因旧`POST /api/mappings`被治理门返回409而无法进入restart，登记为脚本/统一旅程证据缺口。首次补跑Mapping前磁盘余量约3.5 MiB时停止，清理自然恢复并通过新鲜门后才补验；最终临时资源清零。未连接UAT/生产或修改业务代码、Migration和运行服务。
 
@@ -262,7 +266,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- |
-| SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 | 需求日期时区无关修复 | TODO | Codex（最小源码与回归）、项目负责人（后续真实样本/UAT授权） | TASK87、D-168、低资源规则 | 只修复PostgreSQL `date`经JavaScript Date/UTC投影导致的业务日漂移，并要求Material Requirement PG在UTC与Asia/Shanghai均`8/8`；不新增Schema/Migration、页面、角色或基础设施。根盘新鲜门通过前不得启动。见[任务文档](../tasks/SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88.md)。 |
+| SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89 | 现代接口同库黄金旅程 | TODO | Codex（隔离测试旅程）、项目负责人（后续真实样本/UAT授权） | TASK88、D-168、D-169、低资源规则 | 在一个全新0046隔离数据库中改用现代Supplier Mapping和当前跨域API连续验证；不恢复退役直写、不新增Schema/Migration/角色/页面、不连接UAT/生产。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89.md)。 |
 
 ## 已冻结任务
 
@@ -274,6 +278,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 | 需求日期时区无关修复 | DONE | Codex（最小源码与回归）、项目负责人（后续真实样本/UAT授权） | 2026-08-23 22:11 CST | 2026-08-23 22:18 CST | TASK87、D-168、低资源规则 | `DONE / P0-01 FIXED / 10 READY / PRODUCTION NO-GO`。单一规范化保留PostgreSQL `date`日历分量并严格拒绝无效值，提交重算/采购追溯统一使用；Unit UTC/Asia各4/4、UI 6/6、0046隔离PG UTC/Asia各8/8。无Schema/Migration/UAT变化，临时资源清零。见[任务文档](../tasks/SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88.md)及[D-169](DECISIONS.md#d-169-postgresql-date按日历分量规范化utc时间点不得决定material-requirement业务日)。 |
 | SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87 | 小团队黄金旅程就绪核验 | DONE | Codex（源码映射、隔离核验、缺口归类和文档收口）、项目负责人（真实业务样本和后续UAT授权） | 2026-08-23 | 2026-08-23 | TASK86、D-167、低资源规则 | `DONE / 9 READY + ST-04 FIX_REQUIRED / PRODUCTION NO-GO`。Unit/UI `194/194`、现代模块PG/UTC `99/99`、主数据PG `6/6`、Supplier Mapping PG `10/10`；Material Requirement UTC `8/8`、Asia/Shanghai `1/8`，唯一P0是date-only时区漂移。现有全ERP smoke因旧Mapping直写被409治理门拒绝，restart未到达并登记现代同库整链缺口。无业务代码/Migration/UAT变化，临时资源清零。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87.md)及[D-168](DECISIONS.md#d-168-task87以九条ready和st-04日期型p0收口先做单一最小修复再进入真实样本)。 |
 | SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86 | 小团队V1业务基线 | DONE | 项目负责人（可变人数与第一性原则）、Codex（源码盘点、业务基线、治理同步和验证） | 2026-08-23 | 2026-08-23 | TASK85、D-166、D-167 | `DONE / BUSINESS BASELINE APPROVED / HEADCOUNT VARIABLE / DOCS ONLY / PRODUCTION NO-GO`。九职能暂按2人/约18人估算但不写入Schema、Seed、权限、并发或验收；固定十大闭环、单据/报表、最小试迁移和源码处置。Node合同38/38+76/76、Python合同130/130及三项基线、lint通过；无代码、Migration、数据库、账号或运行面变化。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86.md)、[业务基线](../business/small-team-v1-baseline.md)及[D-167](DECISIONS.md#d-167-小团队v1按可变岗位容量和十大业务闭环验收不把每岗两人写入系统)。 |
 | SELFHOST-SMALL-TEAM-SCOPE-RESET-85 | 小团队版范围重置 | DONE | 项目负责人（确认规模与方向）、Codex（文档重置、边界核验、非生产验证与独立提交） | 2026-08-23 | 2026-08-23 | D-166、项目负责人明确确认 | `DONE / SMALL-TEAM RESET RECORDED / TASK70 FROZEN / DOCS ONLY / PRODUCTION NO-GO`。固定Caddy+Node单体+PostgreSQL+本地文件、必要时单Worker；保留数据安全底线，冻结平台级控制面、R2—R5和AI路线。Node合同76/76、Python合同130/130、三项Python基线和lint 0 error通过；无业务代码、Migration、自托管数据库、镜像、Compose或运行服务变化。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-SCOPE-RESET-85.md)及[D-166](DECISIONS.md#d-166-少于20人erp采用单体优先业务闭环优先并冻结平台级治理扩展)。 |

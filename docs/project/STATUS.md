@@ -2,11 +2,29 @@
 
 最后更新时间：2026-08-23（Asia/Shanghai）
 
+## SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88（完成；ST-04日期型P0关闭）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / P0-01 FIXED IN SOURCE AND ISOLATED POSTGRES / 10 READY / PRODUCTION NO-GO | D-169已接受；当前零DOING，TASK89保持TODO并等待新鲜资源门 |
+| date-only合同 | PASS / CALENDAR DATE PRESERVED | 规范字符串严格验真；node-postgres `date`返回的有效Date读取本地年/月/日，不以UTC时间点决定业务日 |
+| 无效值 | PASS / FAIL CLOSED | invalid Date、`2026-02-30`、带时间字符串和非支持类型均保持`REQUIRED_DATE_INVALID / 422` |
+| 消费点 | PASS / SINGLE RULE | 请求/Package回退、提交重算及采购追溯截止日复用同一规范化；计算摘要、库存/在途、权限、事务、幂等、CAS、审计和失败关闭未放宽 |
+| Unit | PASS / UTC `4/4` + ASIA `4/4` | 同一个PG date形状Date与规范字符串得到`2026-10-01`，两个消费点有静态合同 |
+| UI合同 | PASS / `6/6` | Planning与Purchase页面、追溯、确认/取消和390px合同保持 |
+| 隔离PG UTC | PASS / `8/8` | 全新PostgreSQL 17，顺序应用0001—0046并确认233张public表 |
+| 隔离PG Asia/Shanghai | PASS / `8/8` | 同一套件、同一隔离数据库；即时生成→提交不再出现日期漂移造成的错误重算拒绝 |
+| Schema/Migration/API | NO STRUCTURAL CHANGE | 未新增或修改Schema、Migration、表、角色、权限、页面、依赖；仅修Material Requirement内部date-only投影行为 |
+| 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT继续alpha.42/0040且未部署本修复；未访问真实数据、账号、凭据、备份或受保护Volume，未build/deploy/restart |
+| 资源/清理 | PASS / NO TASK RESIDUE | 起点约2.4GiB available/171MiB Swap/根盘`10,758,881,280`B；唯一1 CPU/512MiB tmpfs PG容器。清理后60秒SwapFree `873,784→873,784 KiB`；收口终检约2.4GiB/171MiB/`10,779,873,280`B/Load`0.65/0.30/0.20`，宿主OOM0、四服务restart0/OOM false，任务容器/库/端口/网络/Volume/内存盘残留0 |
+| 下一步 | TASK89 / MODERN SAME-DATABASE JOURNEY | 只更新退役全ERP smoke到现代Supplier Mapping和当前跨域API，在一个隔离库连续验证；不新增产品功能或连接UAT |
+| 系统是否可用 | NO | 仍缺现代同库整链、真实样本/试迁移、九职能员工UAT、恢复演练和上线授权 |
+
 ## SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87（完成；九条就绪与ST-04日期型P0）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / 9 READY + ST-04 FIX_REQUIRED / SOURCE-AND-ISOLATED-POSTGRES VERIFIED / PRODUCTION NO-GO | D-168已接受；当前零DOING，TASK88保持TODO并等待新鲜资源门 |
+| 当前状态 | DONE / HISTORICAL PRE-FIX EVIDENCE / 9 READY + ST-04 FIX_REQUIRED / PRODUCTION NO-GO | D-168修复前结论保留；后续TASK88/D-169已把ST-04提升为READY |
 | 十条闭环 | 9 READY / 1 FIX_REQUIRED / 0 PARKED | ST-01、02、03、05、06、07、08、09、10可进入后续真实样本/UAT；ST-04必须先修date-only时区漂移 |
 | 唯一产品P0 | MATERIAL REQUIREMENT DATE-ONLY TIMEZONE DRIFT | UTC下PG `8/8`，Asia/Shanghai仅`1/8`；`required_date`经`Date.toISOString()`后退到前一日并触发`MATERIAL_REQUIREMENT_RECALC_REQUIRED`。当前UAT容器UTC只是掩盖问题 |
 | 源码/静态合同 | PASS / `194/194` | 44个相关Unit/UI文件，覆盖页面、权限、验证、稳定错误码及Service合同；不把页面存在当作动态闭环 |
@@ -17,8 +35,8 @@
 | 代码/数据库/API | UNCHANGED | 本任务只新增/更新Markdown；无业务代码、Schema/Migration、API、依赖、账号、镜像、Compose或常驻服务变化 |
 | 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT继续alpha.42/0040；未连接UAT/生产数据库，未读取受保护Volume、真实备份、凭据或业务数据，未build/pull/deploy/restart |
 | 资源/清理 | PASS / STOP LINE RECORDED / NO TASK RESIDUE | 补验窗口起点available约2.3GiB、Swap160MiB、根盘`10,776,580,096`B、Load`0.02/0.13/0.17`；最终约2.4GiB、172MiB、`10,750,689,280`B、`0.13/0.13/0.14`。最终磁盘仅高于硬线约12.7MiB；宿主`oom_kill=0`，常驻Web/PG restart0/OOM false/healthy，临时容器、PG、库、端口和`/dev/shm/cyd-task87-*`全清零 |
-| 下一步 | TASK88 / MINIMAL DATE-ONLY FIX | 只修两个已证实的date-only消费点并在UTC/Asia双时区PG均`8/8`；不新增表、Migration、角色、页面或基础设施 |
-| 系统是否可用 | NO | 仍缺P0修复、现代同库整链、真实样本/试迁移、九职能员工UAT、恢复演练和上线授权 |
+| 下一步 | COMPLETED BY TASK88 | 日期型P0已由TASK88/D-169关闭；当前后续为TASK89现代同库整链 |
+| 系统是否可用 | NO | P0已修复，但仍缺现代同库整链、真实样本/试迁移、九职能员工UAT、恢复演练和上线授权 |
 
 ## SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86（完成；小团队V1业务基线）
 
