@@ -3765,6 +3765,44 @@
 - 拒绝直接把现有并行UAT升级到0046、创建账号或写入虚构数据；这些动作超出L0授权。
 - 拒绝用口头约定掩盖“销售订单前能否采购/投产”的产品控制缺口；必须由负责人明确业务门并在UAT验证是否服务端强制。
 
+## D-172 新隔离UAT从空库0046建立，L1通过但同机L2因控制根、镜像和磁盘失败关闭
+
+- 日期：2026-08-24
+- 状态：`ACCEPTED / L1 READ-ONLY COMPLETE / SAME-HOST L2 NO-GO / NEW UAT NOT CREATED / PRODUCTION NO-GO`
+- 发起与授权：项目负责人明确选择新建隔离UAT并授权L1只读核对
+- 核对与提案：Codex依据当前alpha.47/0046源码、Compose/运行身份合同和宿主Docker/resource metadata
+- 确认边界：只固定新环境数据边界、L1事实和下一授权门；不授权主机采购、配置改造、清理、build、Migration、deploy、账号、UAT写入或生产动作
+
+### Context
+
+- 当前源码有46项Migration/head 0046和233张public表snapshot；TASK89已证明同一全新0046隔离数据库的合成黄金旅程，但本轮没有运行数据库或访问现有UAT业务内容。
+- Compose项目名可以隔离网络、命名Volume和loopback端口；无副作用渲染以`chenyida-erp-uat-synthetic`通过。但secret、release candidate/identity、runtime privilege operator、全局lock及backup继续使用固定宿主root，仓库没有新UAT专用override。
+- 本机唯一alpha.47 Web/Worker镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`；其后运行代码、Dockerfile和发布合同已变化，当前HEAD没有匹配镜像。
+- 根盘起点/收口只高于10 GiB硬线约51.79/43.23 MiB。内存、Swap、Load、PSI、OOM及四服务状态正常，但磁盘余量不允许启动任何重任务或新运行资源。
+- 首轮只有完全虚构样本，失败时可以精确销毁该隔离环境并从空库重建；这不能冒充真实备份恢复或生产灾备。
+
+### Decision
+
+1. 新UAT必须从`EMPTY → 0046`建立，使用独立数据库、uploads、attachments、backup-status、网络、secret、运行角色、release identity和端口；不得复制、恢复或升级现有alpha.42/0040 UAT。
+2. 任何候选必须绑定批准后的精确当前Git提交、alpha.47、Migration allowlist和Web/Worker digest。旧`78d96c6` alpha.47镜像继续`STALE / NOT AUTHORIZABLE`。
+3. Compose项目名前缀不是完整隔离证明。只要固定宿主控制root仍可能共享，同机L2就保持NO-GO。
+4. 首轮回退模式固定为`DISPOSABLE_SYNTHETIC / RECREATE_FROM_EMPTY`；不发布或伪造`RECOVERY_READY`。真实样本前必须另立恢复策略。
+5. 第一性原则下推荐独立UAT主机/VM，让固定控制root和Docker资源天然独占；是否提供独立主机仍由项目负责人确认。若坚持当前主机，必须分别授权隔离配置改造和精确BuildKit-only清理，并重做资源门。
+6. TASK92只处理所选宿主路径和前置阻断。L2a空环境build/Migration/deploy、账号/HTTPS、L3虚构业务写、L4真实样本和L5生产继续逐层授权。
+
+### Consequences
+
+- TASK91以L1完成关闭，但“新UAT已建立”“可以试运行”和“可以上线”均为假；当前运行面没有变化。
+- 0041 AI表随不可变Migration存在但AI功能继续冻结；小团队人数、每职能约2人及10件样本不进入基础设施、Schema、权限或容量硬条件。
+- D-171商务启动门不阻止空环境准备，但在员工执行采购/投产步骤前仍必须确认。
+
+### Rejected alternatives
+
+- 拒绝直接升级或克隆现有UAT，也拒绝读取其业务数据来制造样本。
+- 拒绝因版本号同为alpha.47就复用旧镜像，或在磁盘只剩几十MiB硬线余量时尝试build。
+- 拒绝把Docker项目名、synthetic recreate或Dashboard占位解释为secret/control隔离、可恢复备份或生产准入。
+- 拒绝同时建设独立主机和同机多环境两套方案；TASK92只执行负责人选定的一条最小路径。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

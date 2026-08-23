@@ -2,11 +2,29 @@
 
 最后更新时间：2026-08-24（Asia/Shanghai）
 
+## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / L1 READ-ONLY COMPLETE / SAME-HOST L2 NO-GO / NEW UAT NOT CREATED / PRODUCTION NO-GO | D-172已记录；当前零DOING，TASK92等待宿主路径与授权 |
+| 新UAT数据边界 | PASS / EMPTY 0046 ONLY | 从`EMPTY → 0046`，不升级、复制或读取现有alpha.42/0040 UAT数据库/文件域 |
+| 源码/Migration | PASS / alpha.47 / 46 / 233 TABLES | 0041—0046摘要、journal顺序和0046 snapshot静态一致；本轮未运行数据库Migration |
+| Compose逻辑隔离 | PASS / PROJECT-SCOPED | 自定义项目名渲染退出0，基础4服务、2网络、5命名Volume和loopback端口可独立前缀 |
+| 宿主控制隔离 | FAIL / FIXED ROOTS | secret、release candidate/identity、operator状态、全局lock和backup root固定；仓库无独立UAT override，项目名不足以证明同机隔离 |
+| 精确镜像 | FAIL / STALE ONLY | 唯一alpha.47 Web/Worker镜像绑定`78d96c6`；当前HEAD无匹配镜像，禁止复用 |
+| 恢复方式 | PARTIAL / SYNTHETIC RECREATE ONLY | 首轮虚构环境可精确销毁并从空库重建；不声称Dashboard recovery ready、真实恢复或生产灾备 |
+| 当前主机资源 | FAIL FOR L2 | 收口MemAvailable约2.37GiB、Swap171.62MiB、Load`0.18/0.15/0.12`正常；根盘`10,782,752,768`B，仅高于10GiB硬线43.23MiB |
+| 运行面完整性 | PASS / UNCHANGED | 6容器/75镜像/277 Volume/174 Build Cache不变；四ERP服务restart0/OOM false，Web/PostgreSQL healthy，TASK91残留0 |
+| 授权/非动作 | PASS / L1 ONLY | 未连接数据库，未读业务/凭据/备份/Volume正文；未创建资源、清理、build、deploy、Migration、账号或业务写 |
+| 推荐路径 | SEPARATE UAT HOST / OWNER DECISION REQUIRED | 独立主机天然隔离固定root；同机备选需隔离配置与BuildKit-only清理分别授权 |
+| 下一步 | TASK92 / OWNER HOST PATH + AUTHORIZATION | 只解除宿主/资源/精确输入前置；不自动取得L2a、账号、HTTPS或L3写权限 |
+| 系统是否可试运行 | NO | 环境尚未创建，L1通过不能替代部署、Migration、账号和员工UAT |
+
 ## SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90（完成；无样本试运行准备包）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / SYNTHETIC STARTER PACK READY / NO UAT EXECUTED / PRODUCTION NO-GO | D-171已接受；当前零DOING，TASK91等待目标环境和L1只读授权 |
+| 当前状态 | DONE / SYNTHETIC STARTER PACK READY / NO UAT EXECUTED / PRODUCTION NO-GO | D-171历史结果保持；后续TASK91/D-172已完成L1，新UAT仍未创建 |
 | 准备包 | PASS / 3 DOCUMENTS | README、10件虚构控制板样本、员工执行与核对清单；完全不含真实业务数据 |
 | 岗位旅程 | READY / 27 STEPS | 市场、工程、计划、采购、仓库、生产、品质、财务、管理及Mapping审核的逐步交接和证据槽位 |
 | 负向检查 | READY / 8 CASES | 403、退役Mapping 409、幂等重放、CAS、IQC/FQC前越界、重复冲销及商务门缺失 |
@@ -17,7 +35,7 @@
 | 代码/数据库/API | DOCS ONLY / UNCHANGED | 无产品代码、Schema、Migration、API、角色、页面、依赖或部署配置变化 |
 | 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | UAT仍为alpha.42/0040；未访问目标环境、账号、数据、备份或受保护Volume |
 | 验证/资源 | PASS / `61/61` / NO TASK RESIDUE | 13个相关Unit文件61/61；内部链接、27步/8负测/6级授权、diff、仅docs范围、credentials1803通过。收口约2.4GiB available/171MiB Swap/`10,788,438,016`B/Load`0.09/0.17/0.12`，宿主OOM0、四服务restart0/OOM false，任务残留0 |
-| 下一步 | TASK91 / TARGET + L1 AUTHORIZATION REQUIRED | 选择现有并行UAT或新建隔离UAT，并明确只读版本/health/Migration/恢复点核对范围 |
+| 下一步 | COMPLETED BY TASK91 | 已选择新隔离UAT并完成L1；当前后续为TASK92宿主路径与前置授权 |
 | 系统是否可用 | NO | 准备包不是环境升级、员工UAT、真实试运行或上线证据 |
 
 ## SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89（完成；现代同库合成整链通过）

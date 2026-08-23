@@ -16,7 +16,9 @@
 
 2026-08-23现代同库旅程增量：TASK89/D-170新增一个全新0046隔离PostgreSQL中的现代连续旅程，替代包脚本对历史全ERP smoke的选择。稳定原料ID贯穿审核、Supplier Mapping、BOM、计划、需求、RFQ、PO与生产；采购、领料、完工、出货数量均为10，采购金额120、销售金额200，并验证403/409、幂等/CAS、异人审核和追加式付款冲销。两次空库统一旅程`1/1 PASS`，13组相关Unit合同通过；首次RFQ 409被归类为测试工具沿用旧PRQ版本的CAS假设，无产品P0。无Schema/Migration/UAT变化，临时资源清零。当前零`DOING`；TASK90等待真实样本、实名参与者、目标环境和逐项授权。
 
-2026-08-24无样本UAT准备增量：项目负责人确认当前没有样本并授权先完成L0文档准备。TASK90/D-171形成[小团队V1试运行准备包](../uat/small-team-v1/README.md)、10件虚构控制板样本和员工执行/核对清单：27步旅程、8项负向检查、采购/AP 120 CNY、销售/AR 200 CNY、IQC/FQC、稳定ID、数量金额守恒、P0停止线及L0—L5授权分层。人数、日期、数量和价格不构成产品约束；`SO_REQUIRED / PRE_SALES_EXCEPTION`商务门待项目负责人确认。未访问UAT/生产或执行账号、数据、Migration、部署和运行服务动作。当前零`DOING`，TASK91等待目标环境与L1只读授权。
+2026-08-24无样本UAT准备增量：项目负责人确认当前没有样本并授权先完成L0文档准备。TASK90/D-171形成[小团队V1试运行准备包](../uat/small-team-v1/README.md)、10件虚构控制板样本和员工执行/核对清单：27步旅程、8项负向检查、采购/AP 120 CNY、销售/AR 200 CNY、IQC/FQC、稳定ID、数量金额守恒、P0停止线及L0—L5授权分层。人数、日期、数量和价格不构成产品约束；`SO_REQUIRED / PRE_SALES_EXCEPTION`商务门待项目负责人确认。未访问UAT/生产或执行账号、数据、Migration、部署和运行服务动作。该任务收口时TASK91仍等待目标环境与L1只读授权，后续状态见下一段。
+
+2026-08-24新隔离UAT L1增量：项目负责人选择新建隔离UAT并授权L1只读核对。TASK91/D-172确认源码alpha.47、46项Migration/head 0046、233表snapshot和Compose/release overlay静态渲染可用；新UAT必须从`EMPTY → 0046`，不升级、复制或读取现有alpha.42/0040 UAT数据库。项目名可隔离网络、命名Volume和loopback端口，但secret、release candidate/identity、runtime privilege operator、全局lock及backup使用固定宿主root，仓库没有独立UAT override；唯一alpha.47镜像又绑定旧`78d96c6`。根盘收口只高于10GiB硬线43.23MiB，同机L2失败关闭。推荐独立UAT主机但仍待负责人选择；当前零`DOING`，TASK92等待独立主机或同机隔离路径授权。未创建或修改任何运行资源，也未访问数据库、业务、备份或Volume正文。
 
 ## 2026-08-13 投产准入基线
 
@@ -30,7 +32,7 @@
 
 2026-08-21 TASK70启动增量：TASK70已从`TODO`转为当前唯一`DOING`。三条只读审计和主智能体代码复核确认现有审计把handler实现、隔离动态证明、host activation与真实UAT回退混为一个阻断；首个仓库切片先建立版本化、失败关闭的动态证据/verifier并拆分四类状态，之后才允许在新鲜资源门和磁盘上界内执行单容器PostgreSQL 17原子切换case。任何隔离结果都不得冒充host或真实UAT证据；现有UAT数据库、四卷、备份正文、凭据和业务数据保持禁止访问。
 
-项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK90已按D-171完成L0准备包并回到零`DOING`；下一任务TASK91在未指定目标环境和L1只读范围前保持`TODO`。不得自动恢复控制面、AI、build/deploy或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
+项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK91已按D-172完成新隔离UAT L1核对并回到零`DOING`；TASK92在项目负责人选择独立主机或同机隔离路径并给出对应授权前保持`TODO`。不得自动恢复控制面、AI、清理、build/deploy/Migration或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。
 

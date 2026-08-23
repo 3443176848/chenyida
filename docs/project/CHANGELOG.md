@@ -4,6 +4,16 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91 - `docs: audit isolated UAT environment readiness`
+
+- 授权与结论：项目负责人选择新建隔离UAT并授权L1只读核对。D-172固定新环境从`EMPTY → 0046`且不接触现有UAT；L1完成不等于环境已创建、可试运行或可上线。
+- 源码/Migration：当前alpha.47、46项Migration/head 0046、233表snapshot和0041—0046摘要静态一致。0041 AI表保持冻结，0042/0043导入安全、0044 Session绝对寿命、0045 Worker租约和0046窄锁/trigger安全路径已逐项映射；未运行数据库或Migration。
+- 隔离核对：自定义Compose项目名和release overlay使用`--env-file /dev/null`、非敏感占位值渲染退出0，网络、命名Volume和loopback端口可独立前缀；但secret、release identity/candidate、权限operator、全局lock和backup仍是固定宿主root，仓库无独立UAT override，同机只改项目名失败关闭。
+- 镜像/恢复：本机唯一alpha.47 Web/Worker镜像绑定旧`78d96c6`，当前HEAD没有匹配镜像。首轮虚构UAT只采用`DISPOSABLE_SYNTHETIC / RECREATE_FROM_EMPTY`，不伪造备份恢复READY；推荐独立UAT主机，当前主机同机方案需配置和BuildKit清理分别授权。
+- 资源/非动作：起点约2.4GiB available/171.62MiB Swap/`10,791,727,104`B/Load`0.15/0.14/0.11`，收口约2.37GiB/171.62MiB/`10,782,752,768`B/`0.18/0.15/0.12`；根盘只高于10GiB硬线43.23MiB。PSI/OOM0，6容器/75镜像/277 Volume/174 Build Cache和四服务身份不变，TASK91残留0。未连接数据库，未读取业务/凭据/备份/Volume正文，未创建资源、清理、build、pull/push、deploy、restart、账号或业务写。
+- 文档：新增L1报告和TASK92前置任务，更新准备包入口、MASTER、TASKS、PROJECT_CONTEXT、DECISIONS、CHANGELOG和STATUS。无产品代码、Schema/Migration、API、依赖或部署配置变化。
+- 下一门：TASK92等待项目负责人选择独立UAT主机（推荐）或同机隔离路径。独立主机先授权L1 metadata；同机路径先分别授权隔离配置和精确BuildKit-only清理，均不自动获得L2a/L3或生产权限。
+
 ### SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90 - `docs: add synthetic small-team UAT starter pack`
 
 - 无样本起点：新增小团队V1试运行准备包、`CYD-UAT-SYN-001` 10件虚构控制板样本及员工执行/核对清单；不等待或擅自读取真实客户、供应商、联系人、价格、账号或附件。
