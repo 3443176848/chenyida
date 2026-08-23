@@ -4,6 +4,17 @@
 
 ## 2026-08-23
 
+### SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86 - `docs: define small-team ERP business baseline`
+
+- 决策：项目负责人确认九个业务职能暂按每职能2人、约18人估算，但人数不得写死；D-167明确该数字不进入Schema、Seed、权限、并发、许可证或验收条件，`admin`/`operations`只作治理职责。
+- 业务基线：新增十大核心闭环、V1完成定义、必需单据/报表和“有效主数据+Opening+未结事项+旧系统只读历史”的首期数据范围；真实数据盘点、试迁移和切换仍需明确授权。
+- 源码处置：核心Node/PostgreSQL、数据安全底线和已发布Migration为`KEEP`；AI、高级控制面、历史Sites/D1和Python新增业务开发为`PARK`；只有依赖审计、恢复点和回归齐备时才可在独立任务处理`REMOVE_LATER`。
+- 只读盘点：现有11技术角色没有席位限制；自托管源码有50个原生页面、37个一级模块目录、233张表和46项Migration。源码对象存在不等于员工UAT完成，alpha.47/0046与UAT alpha.42/0040差距保持。
+- 代码/数据库/API：仅新增业务/任务Markdown并同步MASTER、TASKS、PROJECT_CONTEXT、DECISIONS、CHANGELOG和STATUS；无业务代码、Schema/Migration、API、依赖、账号、镜像、Compose或运行服务变化。
+- 验证：身份/授权/工作台Node合同38/38、发布Node合同76/76、fixed-executor Python合同130/130及`server.py --self-test`、`smoke_test.py`、`go_live_check.py --no-backup`通过；lint退出0，`git diff --check`和精确变更文件敏感信息检查通过。历史D1 smoke不属于未来自托管方向，本任务未恢复退役依赖或启动数据库测试。
+- 资源/清理：前后available均约2.3GiB，Swap 139→143MiB/1GiB，根盘均约11GiB，Load由`0.39/0.38/0.24`到`0.32/0.60/0.43`；四个常驻服务restart0/OOM false、宿主`oom_kill=0`。全部断网只读限额Node容器以`--rm`清零，无任务临时文件、数据库、网络或Volume；Compose状态命令因缺必填deployment变量无法渲染，已用只读Docker状态/inspect核验且未修改配置。
+- 下一步：`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87`只在隔离PostgreSQL证明现有代码黄金旅程覆盖，先标记`READY / FIX_REQUIRED / PARKED`，没有实际P0阻断前不新增功能。
+
 ### SELFHOST-SMALL-TEAM-SCOPE-RESET-85 - `docs: reset ERP scope for small team`
 
 - 决策：项目负责人确认系统少于20人使用并确认按小团队版重置；D-166固定Caddy+Node单体+PostgreSQL+本地文件、必要时单Worker，业务闭环和真实员工UAT优先于平台级合成治理。

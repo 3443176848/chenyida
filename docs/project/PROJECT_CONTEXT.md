@@ -8,6 +8,8 @@
 
 2026-08-23小团队范围重置：项目负责人确认实际使用人数少于20人并接受D-166。当前生产方向收敛为Caddy、一个Node Web/API单体、PostgreSQL、本地文件及仅在必要时运行的单Worker；优先级改为真实岗位、8—10条业务闭环、真实数据迁移和员工UAT。TASK70转BLOCKED，TASK59—TASK82控制面扩展、R2—R5及AI路线冻结；现有实现暂不删除。
 
+2026-08-23小团队V1业务基线：项目负责人确认管理、市场、工程、计划、采购、仓库、生产、品质、财务九职能先按每职能2人、约18人估算，但人数不得成为任何硬条件。D-167固定人数不进入Schema、Seed、权限、并发、许可证或验收；V1改按十大业务闭环完成。`admin`/`operations`只作治理职责，现有11技术角色不变；真实兼岗出现前不建设多角色平台。TASK86已完成[业务基线](../business/small-team-v1-baseline.md)，下一任务是隔离黄金旅程核验。
+
 ## 2026-08-13 投产准入基线
 
 `SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：TASK41/TASK54已完成四域V2与签名密文外层，TASK55按D-132补齐cluster security/tablespace恢复和readiness v4，但没有真实异机锚点、密钥/调度/WORM、当前数据恢复或真实RTO。TASK56已在alpha.47/0046闭合Web行锁、Backup control/capture、PG17 catalog、角色/ACL、session/secret/container/tablespace及D-134受控operator；TASK59—TASK65按D-135—D-141闭合detached候选、reservation、monitor交付/投影、V2 actual policy/激活和target-bound egress，TASK66—TASK82按D-142—D-157建立授权矩阵、跨岗UAT证据、15检查点控制平面、内容寻址root受信rollback gateway、fixed executor/activation v2及数据库/四文件域/前代运行面固定handler。机器审计仍以动态能力/host activation、隔离回退演练和人工UAT三项条件强制`UAT_PROMOTION_EXECUTOR_NOT_READY`。TASK57曾构建的Web/Worker本机候选和当前安全仓库变化前的镜像均为`STALE / NOT AUTHORIZABLE`，当前没有与最终源码匹配的可授权镜像。当前UAT仍使用共享superuser、环境变量秘密且为alpha.42/0040，host Supervisor/monitor、真实V2/egress policy激活、真实网络出口、A1/A3、正式镜像证据、19步PASS、rollback handler动态证明/host activation、隔离回退演练、真实异机恢复/迁移、业务批准的职责分离、跨岗位验收、员工试运行和正式切换均未完成。
@@ -20,7 +22,7 @@
 
 2026-08-21 TASK70启动增量：TASK70已从`TODO`转为当前唯一`DOING`。三条只读审计和主智能体代码复核确认现有审计把handler实现、隔离动态证明、host activation与真实UAT回退混为一个阻断；首个仓库切片先建立版本化、失败关闭的动态证据/verifier并拆分四类状态，之后才允许在新鲜资源门和磁盘上界内执行单容器PostgreSQL 17原子切换case。任何隔离结果都不得冒充host或真实UAT证据；现有UAT数据库、四卷、备份正文、凭据和业务数据保持禁止访问。
 
-项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。当前保持零`DOING`，在小团队业务基线获确认前不得自动开始任何代码、控制面、AI、Migration、build/deploy或员工UAT任务；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
+项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。D-167业务基线现已完成，当前保持零`DOING`；下一任务只能是TASK87隔离黄金旅程核验，不得自动恢复控制面、AI、build/deploy或员工UAT。真实数据、账号、备份恢复和生产动作仍须专项明确授权。
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。
 
@@ -351,7 +353,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-2026-08-23 D-166已取代原持续交付路线：TASK59—TASK82既有发布/监控/授权/回退控制面只保留历史，不继续扩展或激活；TASK70转`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE`，D-165源码与历史部分证据保留但不得自动续跑。R2—R5和PHASE4 AI路线冻结。当前零`DOING`；下一步只确认实际岗位、8—10条真实端到端流程、必须单据/报表、首期数据范围和源码`KEEP / PARK / REMOVE_LATER`清单。源码alpha.47/0046、UAT alpha.42/0040及全部运行服务保持不变，系统继续`PRODUCTION NO-GO`。
+2026-08-23 D-166/D-167已取代原持续交付路线：TASK59—TASK82既有发布/监控/授权/回退控制面只保留历史，不继续扩展或激活；TASK70转`BLOCKED / OWNER-REQUESTED SMALL-TEAM RESCOPE`，R2—R5和PHASE4 AI路线冻结。TASK86已完成九职能可变人数、十大闭环、单据/报表、首期数据及源码`KEEP / PARK / REMOVE_LATER`基线。当前零`DOING`；下一任务`SELFHOST-SMALL-TEAM-GOLDEN-JOURNEY-READINESS-87`只在隔离PostgreSQL证明现有alpha.47/0046黄金旅程覆盖。UAT alpha.42/0040及全部运行服务保持不变，系统继续`PRODUCTION NO-GO`。
 
 ## 恢复上下文检查清单
 

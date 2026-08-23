@@ -2,11 +2,27 @@
 
 最后更新时间：2026-08-23（Asia/Shanghai）
 
+## SELFHOST-SMALL-TEAM-BUSINESS-BASELINE-86（完成；小团队V1业务基线）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DONE / BUSINESS BASELINE APPROVED / HEADCOUNT VARIABLE / DOCS ONLY / PRODUCTION NO-GO | D-167已接受；当前零DOING，下一任务为隔离黄金旅程就绪核验 |
+| 岗位容量 | PASS / VARIABLE | 管理、市场、工程、计划、采购、仓库、生产、品质、财务各2人只作约18人容量参考；不是Schema、Seed、权限、并发、许可证或验收硬条件 |
+| 第一性原则 | PASS / FLOW-FIRST | 以十大跨岗位闭环、共享事实守恒、可追溯交接和恢复验收，不再以模块、页面、表或技术任务数量衡量完成 |
+| 业务范围 | PASS / BASELINED | 必需单据/报表、首期“有效主数据+Opening+未结事项+旧系统只读历史”、`KEEP / PARK / REMOVE_LATER`和V1完成定义已固定 |
+| 源码核对 | PASS / READ-ONLY | 11技术角色无席位限制、50个原生页面、37个一级模块目录、233张表和46项Migration；现有服务覆盖十大闭环大部分对象，但不等于员工UAT完成 |
+| 代码/数据库/API | UNCHANGED | 只修改Markdown业务/治理文档；无业务代码、Schema/Migration、API、依赖、账号、镜像或Compose变化 |
+| 自动验证 | PASS / SCOPED | 身份/授权/工作台Node合同38/38、发布Node合同76/76、fixed-executor Python合同130/130及Python三项基线通过；lint退出0，最终diff与精确变更文件敏感信息检查通过 |
+| 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | 未连接UAT/生产数据库，未读取受保护Volume、真实备份正文、凭据或业务数据；alpha.47/0046源码和alpha.42/0040 UAT均保持 |
+| 资源/清理 | PASS / NO TASK RESIDUE | 前后available均约2.3GiB，Swap 139→143MiB/1GiB，根盘均约11GiB，Load由`0.39/0.38/0.24`到`0.32/0.60/0.43`；四服务restart0/OOM false、宿主`oom_kill=0`。断网只读限额测试容器均以`--rm`清零，无任务临时文件；Compose状态命令因缺必填deployment变量无法渲染，已用只读Docker状态/inspect核验且未改配置 |
+| 下一步 | TASK87 GOLDEN JOURNEY READINESS | 在隔离PostgreSQL按ST-01—ST-10证明现有代码覆盖并标记`READY / FIX_REQUIRED / PARKED`，没有实际P0前不新增功能 |
+| 系统是否可用 | NO | 业务基线不是试迁移、员工UAT、恢复演练或生产切换，系统继续`PRODUCTION NO-GO` |
+
 ## SELFHOST-SMALL-TEAM-SCOPE-RESET-85（完成；小团队范围重置）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / SMALL-TEAM RESET RECORDED / TASK70 FROZEN / DOCS ONLY / PRODUCTION NO-GO | D-166已接受；当前零DOING，下一步等待实际岗位与业务流程基线确认 |
+| 当前状态 | DONE / SMALL-TEAM RESET RECORDED / TASK70 FROZEN / DOCS ONLY / PRODUCTION NO-GO | D-166历史重置结果保持；后续业务基线已由TASK86/D-167完成 |
 | 目标架构 | PASS / MONOLITH-FIRST | Caddy + 一个Node Web/API + PostgreSQL + 本地文件；只有确需异步任务时保留一个Worker |
 | 保留底线 | PASS / UNCHANGED | 稳定ID、关系约束、事务、幂等、并发、服务端权限、审计、Migration、备份和过账冲销规则不放宽 |
 | 冻结范围 | PASS | TASK70、TASK59—TASK82扩展、R2—R5及AI路线均不自动继续；历史实现保留，不批量删除 |
@@ -14,7 +30,7 @@
 | 自动验证 | PASS / SCOPED | Node发布合同76/76、Python fixed-executor合同130/130、Python三项基线通过；lint退出0，为0 error/50个既有warning；`git diff --check`通过 |
 | 运行面/数据 | UNCHANGED / NO UAT OR PRODUCTION ACCESS | 未连接自托管UAT/生产数据库、读取Volume/正式备份正文或执行build、Migration、部署、重启、业务写。Python基线只检查既有本地开发SQLite；首次默认生成的本任务时间戳备份已精确删除并以`--no-backup`重跑通过 |
 | 资源/清理 | PASS / NO TASK RESIDUE | 前后available均约2.4GiB，Swap 145→147MiB/1GiB，根盘均约11GiB，Load由`0.49/0.50/0.36`降至`0.16/0.35/0.35`；四服务restart0/OOM false、宿主`oom_kill=0`。本任务测试容器与精确时间戳备份均已清零；Compose状态命令因本机缺必填release deployment ID无法渲染，已用只读Docker状态/inspect核验且未改配置 |
-| 下一步 | OWNER BUSINESS BASELINE REQUIRED | 确认实际岗位、8—10条真实流程、必须单据/报表、首期数据范围和`KEEP / PARK / REMOVE_LATER`清单 |
+| 下一步 | HISTORICAL / COMPLETED BY TASK86 | 九职能可变人数、十大闭环、单据/报表、首期数据及`KEEP / PARK / REMOVE_LATER`已由TASK86固定；当前转入TASK87黄金旅程核验 |
 | 系统是否可用 | NO | 该治理重置不代表真实数据迁移、员工UAT、备份恢复或生产切换完成 |
 
 ## SELFHOST-UAT-PROMOTION-DYNAMIC-VALIDATION-70（已冻结；负责人要求按小团队重新定范围）
