@@ -11,7 +11,11 @@
 
 ## 当前任务
 
-当前零`DOING`。`SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91`已完成新隔离UAT的L1只读核对；新UAT尚未创建。下一任务`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`等待项目负责人选择独立主机（推荐）或当前主机同机隔离路径并给予对应授权。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理已完成，Cache从174项/10.31 GB降为0，根盘available从`10,825,478,144`增至`17,909,628,928` bytes；运行对象和四个受保护卷不变。项目负责人仍需选择独立主机（推荐）或当前主机同机隔离；不因磁盘恢复自动取得配置、build、Migration、部署、账号或业务写授权。
+
+2026-08-24磁盘清理收口事件：TASK92按最小影响顺序执行三次BuildKit-only命令并全部退出0：24小时前普通缓存回收607.3 MB、24小时前全部内部缓存回收35.76 MB、最终全部未使用缓存回收9.667 GB，Cache`174 → 164 → 149 → 0`且active始终为0。根盘实际增加约6.60 GiB，最终约16.68 GiB可用、比10 GiB硬线高约6.68 GiB；清理前后容器/镜像/Volume/网络集合摘要一致，6容器/75镜像/277 Volume、四服务ID、restart0/OOM false、Web/PostgreSQL healthy及四个受保护卷保持。60秒Swap增长0、PSI/OOM0、任务残留0。磁盘子步骤完成，但宿主路径仍未选择，TASK92继续`DOING`。
+
+2026-08-24磁盘清理调度事件：项目负责人明确指令`先清理磁盘`，`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 TODO → DOING`。允许删除的对象只限未使用BuildKit cache，先以24小时过滤器最小化影响，并根据active/reclaimable和磁盘实效证据在同一BuildKit边界内逐步放宽；执行前后必须核对资源、Docker对象集合、四个受保护卷和常驻服务身份。禁止`docker system prune`、镜像/容器/网络/Volume删除、服务重启、数据库连接、Migration、部署或业务写；不把本授权解释为同机UAT路径选择。
 
 2026-08-24新隔离UAT只读核对收口事件：`SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91 DOING → DONE`。源码alpha.47/46项Migration/233表snapshot和Compose静态渲染通过；新UAT固定从`EMPTY → 0046`且不升级/复制现有UAT。项目名可隔离网络/Volume/loopback端口，但固定secret/release/operator宿主root不能隔离；唯一alpha.47镜像绑定旧`78d96c6`且当前HEAD无匹配镜像。根盘收口只高于10 GiB硬线约43.23 MiB，因此同机L2失败关闭。未创建或修改运行资源，未访问数据库/业务/备份/Volume正文。D-172推荐独立UAT主机但仍待负责人选择；TASK92只登记为TODO。
 
@@ -271,13 +275,12 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-当前无执行中任务。
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（后续宿主路径选择）、Codex（已完成BuildKit清理证据；等待所选路径授权） | 2026-08-24 06:37 CST | TASK91、D-172、低资源规则 | `DOING / BUILDKIT CLEANUP COMPLETE / RESOURCE GATE PASS / HOST PATH REQUIRED / PRODUCTION NO-GO`。Cache清零、根盘约16.68 GiB可用且运行资源不变；固定宿主root和精确镜像阻断仍在。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | TODO | 项目负责人（宿主路径选择与授权）、Codex（所选路径最小前置） | TASK91、D-172、低资源规则 | `TODO / OWNER HOST PATH AND AUTHORIZATION REQUIRED / PRODUCTION NO-GO`。独立UAT主机为推荐路径；当前主机备选需隔离配置和BuildKit-only清理分别授权。TASK92不创建UAT或执行Migration/账号/业务写。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 已冻结任务
 
@@ -289,7 +292,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 完成时间 | 依赖任务 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91 | UAT环境只读就绪核对 | DONE | 项目负责人（指定新隔离UAT与L1范围）、Codex（版本/Migration/隔离/资源/恢复核对） | 2026-08-24 01:47 CST | 2026-08-24 01:55 CST | TASK90、D-170、D-171、低资源规则 | `DONE / L1 READ-ONLY COMPLETE / SAME-HOST L2 NO-GO / NEW UAT NOT CREATED / PRODUCTION NO-GO`。源码/0046基线可用；固定host root、旧镜像和仅43.23 MiB硬线余量阻止同机L2。推荐独立主机；无运行资源或数据动作。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91.md)、[就绪报告](../uat/small-team-v1/environment-readiness.md)及[D-172](DECISIONS.md#d-172-新隔离uat从空库0046建立l1通过但同机l2因控制根镜像和磁盘失败关闭)。 |
+| SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91 | UAT环境只读就绪核对 | DONE | 项目负责人（指定新隔离UAT与L1范围）、Codex（版本/Migration/隔离/资源/恢复核对） | 2026-08-24 01:47 CST | 2026-08-24 01:55 CST | TASK90、D-170、D-171、低资源规则 | `DONE / L1 READ-ONLY COMPLETE / SAME-HOST L2 NO-GO / NEW UAT NOT CREATED / PRODUCTION NO-GO`。源码/0046基线可用；TASK91时固定host root、旧镜像和仅43.23 MiB硬线余量阻止同机L2。后续TASK92已解除磁盘阻断，另外两项仍在；无运行资源或数据动作。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91.md)、[就绪报告](../uat/small-team-v1/environment-readiness.md)及[D-172](DECISIONS.md#d-172-新隔离uat从空库0046建立l1通过但同机l2因控制根镜像和磁盘失败关闭)。 |
 | SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90 | 真实样本与员工UAT准备 | DONE | Codex（无样本准备包）、项目负责人（后续业务门、环境与写入授权） | 2026-08-24 01:34 CST | 2026-08-24 01:43 CST | TASK89、D-167、D-170 | `DONE / SYNTHETIC STARTER PACK READY / NO UAT EXECUTED / PRODUCTION NO-GO`。三份文档固定10件虚构控制板、27步旅程、8项负向检查、守恒/谱系/P0停止线和L0—L5授权；人数和日期不写死。`SO_REQUIRED / PRE_SALES_EXCEPTION`待确认；无UAT/生产或数据动作。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90.md)、[准备包](../uat/small-team-v1/README.md)及[D-171](DECISIONS.md#d-171-无真实样本时先建立可人工复算的虚构uat准备包商务启动门保持待确认)。 |
 | SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89 | 现代接口同库黄金旅程 | DONE | Codex（隔离测试旅程）、项目负责人（后续真实样本/UAT授权） | 2026-08-23 22:40 CST | 2026-08-23 23:10 CST | TASK88、D-168、D-169、低资源规则 | `DONE / TEST-HARNESS CLOSED / MODERN GOLDEN JOURNEY PASS / PRODUCTION NO-GO`。全新0046隔离库连续完成现代Mapping及跨域旅程；稳定ID、数量10守恒、采购120/销售200、403/409、幂等/CAS、异人审核和追加式付款冲销均验证。统一旅程两次空库1/1及13组Unit合同通过；无产品P0、Schema/Migration/UAT变化，临时资源清零。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UNIFIED-GOLDEN-JOURNEY-89.md)及[D-170](DECISIONS.md#d-170-现代同库合成黄金旅程成为当前基线历史全erp-smoke不再作为正式入口)。 |
 | SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88 | 需求日期时区无关修复 | DONE | Codex（最小源码与回归）、项目负责人（后续真实样本/UAT授权） | 2026-08-23 22:11 CST | 2026-08-23 22:18 CST | TASK87、D-168、低资源规则 | `DONE / P0-01 FIXED / 10 READY / PRODUCTION NO-GO`。单一规范化保留PostgreSQL `date`日历分量并严格拒绝无效值，提交重算/采购追溯统一使用；Unit UTC/Asia各4/4、UI 6/6、0046隔离PG UTC/Asia各8/8。无Schema/Migration/UAT变化，临时资源清零。见[任务文档](../tasks/SELFHOST-MATERIAL-REQUIREMENT-DATE-ONLY-FIX-88.md)及[D-169](DECISIONS.md#d-169-postgresql-date按日历分量规范化utc时间点不得决定material-requirement业务日)。 |

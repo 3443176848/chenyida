@@ -4,6 +4,8 @@
 > 核对时间：2026-08-24 01:47—01:55 CST
 > 授权：项目负责人明确选择“新建隔离UAT”，并授权L1只读核对
 
+> TASK92后续：BuildKit-only清理已将根盘available恢复到`17,909,628,928` bytes（约16.68 GiB），磁盘停止线阻断已解除；固定宿主控制root和精确镜像阻断仍在，因此总体L2 NO-GO不变。详见[TASK92](../../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。
+
 ## 1. 直接结论
 
 当前alpha.47/0046源码和空库迁移基线可以作为新UAT的输入，但现在还不能开始试运行，也不能在本机直接启动第二套正式UAT栈。
@@ -12,7 +14,7 @@
 
 1. 本机唯一带alpha.47运行标签的Web/Worker镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`；其后运行代码、Dockerfile和发布合同已改变，当前HEAD没有匹配镜像。
 2. Compose项目名能隔离网络和命名Volume，但运行secret、release candidate、release identity、权限operator状态及全局锁使用固定宿主机路径；同机只改项目名不构成完整隔离。
-3. 收口时根盘可用`10,782,752,768` bytes，只高于10 GiB硬停止线`45,334,528` bytes（约43.23 MiB）。任何build、新镜像或新PostgreSQL Volume都不得在此资源门下启动。
+3. TASK91收口时根盘可用`10,782,752,768` bytes，只高于10 GiB硬停止线约43.23 MiB；TASK92后续已清空未使用BuildKit cache并恢复约16.68 GiB可用空间。后续重任务仍须重新通过新鲜资源门。
 
 因此：L1核对通过；L2创建、build、Migration、部署、账号和业务写仍为`NO-GO / NOT AUTHORIZED`。
 
@@ -95,7 +97,7 @@
 
 - 独立主机使固定secret、release identity、operator状态、Docker网络/Volume和资源成为天然独占边界，不需要为不到20人的系统再建设一套同机多租户控制平面。
 - 目标仍按2核、约4 GiB内存、1 GiB Swap的低资源规则执行；磁盘必须在每个重任务前保留10 GiB硬线，并按实际构建上界留余量。`20 GiB available`只可作为保守采购/准备参考，不是产品容量限制。
-- 当前主机同机方案仅作为备选；它必须先获得“隔离配置改造”和“精确BuildKit清理”两项独立授权，且清理后重新通过资源门。
+- 当前主机同机方案仅作为备选；TASK92已完成精确BuildKit清理并通过资源门，但仍必须另获“隔离配置改造”授权并完成固定宿主root的失败关闭合同。
 
 ## 7. 后续授权包
 
@@ -110,7 +112,7 @@
 负责人明确接受同故障域，并另行授权：
 
 1. 只实现/验证独立宿主root与Compose override，不创建运行资源。
-2. 在列出保护清单和前后集合摘要后，专项批准一次精确BuildKit-only清理；不得删除镜像、容器或Volume。
+2. TASK92 BuildKit-only清理证据保持有效；任何后续清理必须重新列出精确对象、保护清单和授权，不得删除镜像、容器或Volume。
 
 路径确定并解除资源/隔离阻断后，才可申请L2a：串行构建精确Web/Worker镜像、创建空PostgreSQL和独立文件卷、生成独立secret、bootstrap运行角色、以`EMPTY → 0046`迁移、reconcile ACL、启动Worker/Web并验证loopback health。账号创建、公开HTTPS、虚构业务写、真实样本和生产仍需分别授权。
 
@@ -134,3 +136,5 @@
 | Docker对象 | 6容器、75镜像、277 Volume、174 Build Cache | 数量不变；TASK91容器/网络/Volume/共享内存残留0 |
 
 Build Cache为10.31 GB，其中5.674 GB显示为reclaimable；镜像显示13.81 GB reclaimable。`reclaimable`不等于删除授权，本轮没有清理任何对象。
+
+以上表格是TASK91 L1时点证据。TASK92随后在专项授权下只清理未使用BuildKit cache：Cache由174项降为0，根盘最终available为`17,909,628,928` bytes，容器/镜像/Volume/网络摘要及四服务、四个受保护Volume保持不变。

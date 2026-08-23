@@ -4,7 +4,7 @@
 > 日期：2026-08-24（Asia/Shanghai）
 > 业务基线：D-167、D-170
 
-环境进度见[新建隔离UAT L1只读就绪报告](environment-readiness.md)：源码/0046基线可用，但新UAT尚未创建；当前主机因固定控制路径、过期候选镜像和磁盘硬线余量不足而保持L2 NO-GO。
+环境进度见[新建隔离UAT L1只读就绪报告](environment-readiness.md)：源码/0046基线可用，但新UAT尚未创建；TASK92已清空BuildKit cache并解除磁盘停止线，固定控制路径和过期候选镜像仍使L2保持NO-GO。
 
 ## 1. 这套准备包解决什么
 

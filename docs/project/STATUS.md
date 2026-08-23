@@ -2,6 +2,22 @@
 
 最后更新时间：2026-08-24（Asia/Shanghai）
 
+## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；BuildKit清理已完成）
+
+| 验证项 | 结果 | 说明 |
+| --- | --- | --- |
+| 当前状态 | DOING / BUILDKIT CLEANUP COMPLETE / RESOURCE GATE PASS / HOST PATH REQUIRED / PRODUCTION NO-GO | 磁盘子步骤完成；TASK92继续等待独立主机或当前主机同机隔离选择 |
+| 授权范围 | PASS / BUILDKIT CACHE ONLY | 项目负责人指令`先清理磁盘`；不授权镜像、容器、网络、Volume、服务、数据库、Migration、部署或业务写 |
+| 清理执行 | PASS / 3 BOUNDED PASSES | 三次BuildKit-only命令均rc0，分别报告607.3MB、35.76MB和9.667GB；Cache`174 → 164 → 149 → 0`，active始终0 |
+| 根盘 | PASS / 16.68 GiB AVAILABLE | `10,825,478,144 → 17,909,628,928` bytes，实际增加约6.60GiB；最终比10GiB硬线高约6.68GiB |
+| 内存/Swap/Load | PASS | 最终MemAvailable `2,467,676,160`B，Swap used `179,859,456`B且60秒增长0，Load`0.24/0.28/0.26`，PSI/OOM0 |
+| Docker对象完整性 | PASS / IDENTICAL | 6容器/75镜像/277 Volume不变；容器/镜像/Volume/网络集合摘要前后一致，Build Cache最终0/0B |
+| 服务完整性 | PASS / UNCHANGED | Web/PostgreSQL/Worker/Caddy ID不变，restart0/OOM false；Web/PostgreSQL healthy |
+| 受保护Volume | PASS / ALL PRESENT | `erp_postgres`、`erp_uploads`、`erp_attachments`、`erp_backup_status` metadata不变，未读取正文 |
+| 禁止动作 | PASS / NONE EXECUTED | 未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源；TASK92残留0 |
+| 仍有阻断 | FIXED HOST ROOTS + STALE IMAGE | 磁盘不再阻断，但同机隔离合同和当前源码匹配Web/Worker镜像仍缺失 |
+| 下一步 | OWNER HOST PATH DECISION | 独立主机优先；如选同机，只先授权隔离host-root/Compose override实现与静态测试 |
+
 ## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
 
 | 验证项 | 结果 | 说明 |
@@ -13,10 +29,10 @@
 | 宿主控制隔离 | FAIL / FIXED ROOTS | secret、release candidate/identity、operator状态、全局lock和backup root固定；仓库无独立UAT override，项目名不足以证明同机隔离 |
 | 精确镜像 | FAIL / STALE ONLY | 唯一alpha.47 Web/Worker镜像绑定`78d96c6`；当前HEAD无匹配镜像，禁止复用 |
 | 恢复方式 | PARTIAL / SYNTHETIC RECREATE ONLY | 首轮虚构环境可精确销毁并从空库重建；不声称Dashboard recovery ready、真实恢复或生产灾备 |
-| 当前主机资源 | FAIL FOR L2 | 收口MemAvailable约2.37GiB、Swap171.62MiB、Load`0.18/0.15/0.12`正常；根盘`10,782,752,768`B，仅高于10GiB硬线43.23MiB |
+| 当前主机资源 | HISTORICAL FAIL / TASK92 RESOLVED DISK | TASK91收口时根盘仅高于硬线43.23MiB；后续TASK92已清空BuildKit cache并恢复约16.68GiB available，固定root和精确镜像仍阻断L2 |
 | 运行面完整性 | PASS / UNCHANGED | 6容器/75镜像/277 Volume/174 Build Cache不变；四ERP服务restart0/OOM false，Web/PostgreSQL healthy，TASK91残留0 |
 | 授权/非动作 | PASS / L1 ONLY | 未连接数据库，未读业务/凭据/备份/Volume正文；未创建资源、清理、build、deploy、Migration、账号或业务写 |
-| 推荐路径 | SEPARATE UAT HOST / OWNER DECISION REQUIRED | 独立主机天然隔离固定root；同机备选需隔离配置与BuildKit-only清理分别授权 |
+| 推荐路径 | SEPARATE UAT HOST / OWNER DECISION REQUIRED | 独立主机天然隔离固定root；同机备选的BuildKit清理已由TASK92完成，隔离配置仍需单独授权 |
 | 下一步 | TASK92 / OWNER HOST PATH + AUTHORIZATION | 只解除宿主/资源/精确输入前置；不自动取得L2a、账号、HTTPS或L3写权限 |
 | 系统是否可试运行 | NO | 环境尚未创建，L1通过不能替代部署、Migration、账号和员工UAT |
 

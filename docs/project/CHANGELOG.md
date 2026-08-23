@@ -4,6 +4,16 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: clear unused BuildKit cache`
+
+- 授权：项目负责人明确要求`先清理磁盘`。范围只含未使用BuildKit cache，不等于选择同机UAT；禁止system/image/container/volume prune、网络/服务/数据库/Migration/部署/账号和业务写。
+- 清理：按最小影响证据逐步执行三次BuildKit-only命令，均退出0并分别报告607.3MB、35.76MB和9.667GB；Build Cache由174项/10.31GB经164/149项降为0/0B，active始终为0。
+- 磁盘：根盘available由`10,825,478,144`增至`17,909,628,928` bytes，文件系统实际增加约6.60GiB，最终约16.68GiB可用、比10GiB停止线高约6.68GiB。Docker逻辑回收量与文件系统增量按不同计量口径分别保留。
+- 完整性：容器/镜像/Volume/网络集合摘要前后一致，数量保持6/75/277；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四个受保护Volume metadata不变，TASK92运行资源残留0。
+- 资源门：清理前与最终60秒窗口Swap增长均为0；最终MemAvailable约2.30GiB、Swap171.53MiB、Load`0.24/0.28/0.26`、Memory PSI/kernel OOM0。
+- 运行面：未删除任何镜像、容器、网络或Volume，未读取数据库/Volume/备份正文，未build、restart、deploy、Migration、创建UAT资源或写业务数据。无产品代码、Schema、API、依赖或部署配置变化。
+- 下一门：磁盘阻断已解除；固定宿主控制root和当前源码匹配镜像仍缺失。TASK92保持`DOING`，等待负责人选择独立UAT主机（推荐）或当前主机同机隔离。
+
 ### SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91 - `docs: audit isolated UAT environment readiness`
 
 - 授权与结论：项目负责人选择新建隔离UAT并授权L1只读核对。D-172固定新环境从`EMPTY → 0046`且不接触现有UAT；L1完成不等于环境已创建、可试运行或可上线。
