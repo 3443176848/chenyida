@@ -58,6 +58,7 @@ SOURCE_PATHS = [
     "operations/runtime-secret-file-policy-v1.json",
     "scripts/isolated-uat-compose-policy.py",
     "scripts/isolated-uat-control-plane-policy.py",
+    "scripts/isolated-uat-one-shot.py",
 ]
 
 

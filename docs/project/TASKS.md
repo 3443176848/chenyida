@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理、Compose消费者隔离和D-174 producer/operator非执行请求合同已通过；六类namespace root、五个数据库服务角色、凭据映射、`EMPTY → 0046`及精确输入门可机械验证。专用one-shot adapter和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理、Compose消费者隔离、D-174请求和D-175默认只读one-shot计划入口已通过；六类namespace root、五个数据库服务角色、凭据映射、`EMPTY → 0046`、精确输入门和九步顺序可机械验证。固定动作执行绑定和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+
+2026-08-24 one-shot计划入口事件：项目负责人要求继续下一步。新增专用`isolated-uat-one-shot.py`、D-175、静态runner和5项Unit；同一D-174 request确定性编译九步规范计划，默认只读且不含人员基数字段。当前policy保持`deployment_authorized=false / runtime_actions_authorized=[] / CONTRACT_ONLY_NOT_EXECUTABLE`，`execute`在输出计划或调用执行器前固定拒绝；生产supervisor/runner只在禁用清单中，生产控制面未改。原4项请求合同和新5项测试均PASS；未创建或访问运行资源。TASK92继续`DOING`等待固定动作绑定和精确镜像。
 
 2026-08-24控制请求合同事件：第一性原理盘点确认生产release supervisor及`ACTUAL_CONTROLLED` operator runner应保持生产专用，不扩成任意root平台。新增D-174、非执行policy、严格validator、4项Unit/9类负例和静态runner；项目派生六类root，复用现有五个技术数据库角色并区分六份runtime Secret与backup service，绑定alpha.47、46项Migration、`EMPTY → 0046`、allowlist及后续精确Git/镜像/Compose摘要。生产root、旧head、浮动镜像、运行动作、source/角色漂移和人员数字段均失败关闭。Policy保持`deployment_authorized=false / CONTRACT_ONLY_NOT_EXECUTABLE`，未创建或修改运行资源；TASK92继续`DOING`。
 
@@ -279,7 +281,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者合同和非执行控制请求；继续实现专用adapter） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、低资源规则 | `DOING / CONSUMER + CONTROL-REQUEST CONTRACT PASS / EXECUTABLE ADAPTER + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。六类root、五角色、空库0046和精确输入门通过；policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求合同和只读计划入口；继续实现固定动作绑定） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、低资源规则 | `DOING / CONSUMER + CONTROL-REQUEST + READ-ONLY PLAN PASS / EXECUTION BINDINGS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。六类root、五角色、空库0046、精确输入门和九步顺序通过；policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

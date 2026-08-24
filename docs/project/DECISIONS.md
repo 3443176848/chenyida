@@ -3878,6 +3878,39 @@
 - 拒绝为了人数少而合并为单一数据库超级用户，或把员工人数写死到角色、账号、容量、Schema或验收条件。
 - 拒绝把静态request PASS解释为producer已实现、L2a已授权、环境已建立或可以试运行。
 
+## D-175 隔离UAT的一次性入口先固定确定性计划，执行权限与动作实现继续分离
+
+- 日期：2026-08-24
+- 状态：`ACCEPTED / READ-ONLY PLAN ENTRYPOINT PASS / EXECUTION DISABLED / RUNTIME NOT AUTHORIZED / PRODUCTION NO-GO`
+- 发起：项目负责人要求继续下一步；Codex按D-174和小团队第一性原理实现最小、可审阅入口
+- 实施范围：只新增计划编译入口、失败关闭执行门和静态测试；不实现或调用任何运行时动作
+
+### Context
+
+- D-174已经冻结一个UAT namespace的输入，但仅有请求验证器时，目录、凭据、PostgreSQL、Migration、发布身份和服务启动的先后关系仍只存在于文字中。
+- 当前既无精确HEAD镜像，也无L2a运行授权。若入口在此时直接带Docker、文件或数据库副作用，就会把“定义流程”误当成“允许执行”。
+- 少于20人的规模不需要通用工作流引擎；当前只需一个固定顺序、无人员数量字段、可在授权前审阅的计划。
+
+### Decision
+
+1. 新增`isolated-uat-one-shot.py`作为唯一专用入口。默认命令只读取并验证D-174 request，输出规范JSON计划及内容摘要；不读取Secret值，不创建目录，也不调用Docker、数据库、Migration或生产控制面。
+2. 计划固定九步：精确输入核对、私有root准备、独立凭据准备、仅启动PostgreSQL、复用既有PostgreSQL权限原语、`EMPTY → 0046` Migration、发布身份、启动Web/Worker、loopback只读就绪核对。步骤数是技术依赖，不是员工人数或席位。
+3. `execute`命令在当前`deployment_authorized=false`、空运行动作和`CONTRACT_ONLY_NOT_EXECUTABLE`状态下必须在输出计划或调用执行器前返回`ISOLATED_UAT_ONE_SHOT_EXECUTION_NOT_AUTHORIZED`。
+4. 计划明确把生产`release-supervisor-launcher.py`和`postgresql-runtime-privilege-runner.mjs`列为禁用入口；生产policy、路径、代码和运行面保持不变。
+5. 本入口只关闭“顺序未机械定义”和“默认可能误执行”两个缺口。它不是可执行adapter、L2a授权、精确镜像、已建环境或试运行证据；下一步仍需实现固定动作绑定并单独取得精确build/运行授权。
+
+### Consequences
+
+- 当前request可以得到确定、可复算且不含人员基数的九步计划；重复输入得到相同`plan_sha256`，篡改步骤或请求运行动作均失败关闭。
+- TASK92继续`DOING`，缺口收敛为“固定动作执行绑定 + 当前源码精确Web/Worker镜像”。新UAT没有创建，系统仍不能试运行。
+- 后续实现动作时不得把当前计划入口扩为任意namespace平台，也不得以修改policy布尔值替代真实执行实现和隔离测试。
+
+### Rejected alternatives
+
+- 拒绝在无L2a授权时加入目录、Secret、Docker或数据库副作用，也拒绝输出可由shell直接拼接执行的自由命令列表。
+- 拒绝复制生产supervisor、复用生产runner，或新增通用队列、daemon、多租户调度器。
+- 拒绝把九步技术顺序解释为九个岗位、固定人数、并发或账号数量。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

@@ -4,6 +4,18 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: add isolated UAT one-shot plan`
+
+- 第一性原理：不复制生产supervisor、不建设通用多租户编排器；先把单个隔离UAT真正需要的顺序机械固定，同时让无L2a授权的入口保持零副作用。
+- 入口：新增`isolated-uat-one-shot.py`。同一D-174 request确定性生成九步规范JSON计划与`plan_sha256`；默认命令只读，不创建目录、不读取Secret值、不连接Docker或数据库。
+- 执行门：当前policy继续`deployment_authorized=false / runtime_actions_authorized=[] / CONTRACT_ONLY_NOT_EXECUTABLE`；`execute`在输出计划或调用执行器前固定返回`ISOLATED_UAT_ONE_SHOT_EXECUTION_NOT_AUTHORIZED`。
+- 隔离：九步仅表达输入、root、凭据、PostgreSQL、既有权限原语、`EMPTY → 0046`、release identity、Web/Worker及loopback核对的技术依赖；不含人员、席位、账号或并发基数。生产supervisor/runner只在禁用清单中。
+- Policy：one-shot入口加入source binding；control policy SHA-256更新为`bc507050de94470f722a1d11cfc06370ee6f8e379d446a89e2c17405d404ecab`，授权状态和既有业务/数据库合同不变。
+- 测试：原控制请求4项Unit和新入口5项Unit全部PASS；覆盖默认只读、确定性/摘要、执行前拒绝、非法动作、计划篡改、生产入口隔离和无staff字段。Shell语法及`git diff --check`通过。
+- 资源：10:02→10:09静态段available memory `2,432,094,208 → 2,449,072,128`B、Swap保持`179,748,864`B、根盘 `17,864,470,528 → 17,874,239,488`B、Load `0.07/0.21/0.20 → 0.29/0.26/0.21`；PSI/OOM0。Docker保持6容器/75镜像/277 Volume/0 Cache，四服务restart0/OOM false且保护卷完整，临时目录/pyc残留0。
+- 代码/数据：无产品代码、Schema、Migration、API、页面、依赖或员工角色变化；没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，未build/deploy/Migration/restart/账号/业务写，也未访问现有UAT或生产数据。
+- 文档：新增D-175并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`，下一缺口为固定动作执行绑定与当前源码精确Web/Worker镜像；新UAT仍未创建、不能试运行。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: define isolated UAT control request`
 
 - 第一性原理：生产release supervisor和`ACTUAL_CONTROLLED` PostgreSQL runner继续生产专用；不为单个小团队UAT参数化或复制完整生产控制面。新增D-174，后续只允许一个专用one-shot UAT入口。

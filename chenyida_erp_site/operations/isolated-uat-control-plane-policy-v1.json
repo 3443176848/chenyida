@@ -99,8 +99,12 @@
     },
     {
       "path": "scripts/isolated-uat-control-plane-policy.py",
-      "sha256": "a81eb418ed60525cb204429980d2813eb03794589172f8106cfe16307c8e768f"
+      "sha256": "c9cb000ab84ca3ce79c364cbbbc478a63c516400d9a4b04bb47c5fa84205eafd"
+    },
+    {
+      "path": "scripts/isolated-uat-one-shot.py",
+      "sha256": "f093a624a97aacd6af55b669387365ed51a98583633c5e0599e48ff5c6498cc4"
     }
   ],
-  "policy_sha256": "cd52627b3a27952f1cf7556c93a6d8c93b4e5404b01203e459aae8ce610a7b61"
+  "policy_sha256": "bc507050de94470f722a1d11cfc06370ee6f8e379d446a89e2c17405d404ecab"
 }
