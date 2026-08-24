@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理已完成，Cache从174项/10.31 GB降为0，根盘available从`10,825,478,144`增至`17,909,628,928` bytes；运行对象和四个受保护卷不变。项目负责人仍需选择独立主机（推荐）或当前主机同机隔离；不因磁盘恢复自动取得配置、build、Migration、部署、账号或业务写授权。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理已完成，Cache从174项/10.31 GB降为0，根盘available从`10,825,478,144`增至`17,909,628,928` bytes；运行对象和四个受保护卷不变。项目负责人已选择当前主机同机隔离并接受同一故障域；Compose消费者侧独立host-root/项目/loopback合同和五类负向静态门已通过。release producer/operator及当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+
+2026-08-24同机B路径静态合同事件：项目负责人明确选择`B`并授权仓库内独立host-root/Compose override及静态测试。新增UAT overlay、非Secret示例、严格validator和runner；有效渲染固定六服务、七个项目作用域Volume、两个网络、只读不自动建路径的Secret/release bind和loopback-only端口，缺root、生产root、生产项目、生产Web端口、遗漏overlay均失败关闭。生产Compose/策略未改，未创建目录、Secret、容器、网络、Volume或数据库，未build/deploy/Migration/restart。release supervisor/operator仍固定生产root，TASK92继续`DOING`。
 
 2026-08-24磁盘清理收口事件：TASK92按最小影响顺序执行三次BuildKit-only命令并全部退出0：24小时前普通缓存回收607.3 MB、24小时前全部内部缓存回收35.76 MB、最终全部未使用缓存回收9.667 GB，Cache`174 → 164 → 149 → 0`且active始终为0。根盘实际增加约6.60 GiB，最终约16.68 GiB可用、比10 GiB硬线高约6.68 GiB；清理前后容器/镜像/Volume/网络集合摘要一致，6容器/75镜像/277 Volume、四服务ID、restart0/OOM false、Web/PostgreSQL healthy及四个受保护卷保持。60秒Swap增长0、PSI/OOM0、任务残留0。磁盘子步骤完成，但宿主路径仍未选择，TASK92继续`DOING`。
 
@@ -275,7 +277,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（后续宿主路径选择）、Codex（已完成BuildKit清理证据；等待所选路径授权） | 2026-08-24 06:37 CST | TASK91、D-172、低资源规则 | `DOING / BUILDKIT CLEANUP COMPLETE / RESOURCE GATE PASS / HOST PATH REQUIRED / PRODUCTION NO-GO`。Cache清零、根盘约16.68 GiB可用且运行资源不变；固定宿主root和精确镜像阻断仍在。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理和Compose消费者合同；继续关闭producer/operator前置） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、低资源规则 | `DOING / SAME-HOST B SELECTED / ISOLATED COMPOSE CONSUMER CONTRACT PASS / PRODUCER-OPERATOR AND EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。Cache清零、根盘约16.68GiB可用；独立项目/root/端口静态正负门通过且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

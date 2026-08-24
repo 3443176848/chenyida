@@ -3809,6 +3809,40 @@
 - 该证据只移除D-172的磁盘阻断，不改写空库0046、精确镜像、宿主控制root、合成重建或逐层授权决策。当前源码匹配镜像和固定root隔离仍缺失，`SAME-HOST L2 NO-GO`继续成立。
 - 磁盘清理不等于项目负责人已选择同机路径；独立主机仍为推荐方案，TASK92继续等待宿主路径选择。
 
+## D-173 选择当前主机同机隔离，先冻结Compose消费者边界并保持运行失败关闭
+
+- 日期：2026-08-24
+- 状态：`ACCEPTED / SAME-HOST B SELECTED / COMPOSE CONSUMER ISOLATION PASS / RUNTIME NOT AUTHORIZED / PRODUCTION NO-GO`
+- 发起与确认：项目负责人明确选择`B`，接受新隔离UAT与现有运行面处于同一宿主故障域
+- 实施范围：Codex只实现仓库内独立host-root/Compose override、非Secret示例和静态正负验证；不创建或修改运行资源
+
+### Context
+
+- TASK92已清空未使用BuildKit cache并恢复约16.68GiB根盘可用空间；项目负责人随后选择当前主机，而非同时建设独立主机和同机两套方案。
+- 少于20人和各职能暂按约2人只影响人员排班，不要求多租户平台。真正需要隔离的是数据库/文件/Secret/发布身份/端口与Docker命名资源，人数不能成为项目名、账号数、容量或验收硬编码。
+- 基础Compose固定生产Secret和release bind；单独改变Compose项目名只隔离网络和命名Volume。release supervisor和runtime privilege operator还固定生产producer/state/secret/backup root，不能由消费者overlay自动解决。
+
+### Decision
+
+1. 接受同一宿主故障域，但不降低数据边界：UAT必须使用独立Compose项目、网络、全部命名Volume、loopback端口、Secret root、release candidate root和release identity root；不得读取或覆盖生产及现有UAT对应对象。
+2. 新增独立`compose.uat-isolated.yml`，用`!override`替换所有宿主控制bind和发布端口。必要变量为空即渲染失败；Caddy从`production` profile改为显式`uat-edge`且仍只绑定loopback。
+3. 非Secret示例中的项目名、root和端口是L2a前待核对输入，不是人数、并发、容量、许可证或产品规则。实际值必须通过碰撞核对后才能授权使用。
+4. 独立静态validator固定服务/Volume/网络/挂载/端口/环境/镜像形状，并拒绝缺失root、生产root、生产项目名、生产Web端口或遗漏overlay。该门只消费`docker compose config` JSON，不连接数据库或创建Docker对象。
+5. 生产Compose和生产container/runtime-secret/operator/supervisor政策保持原样。共享全局release lock以后只可作为跨环境串行协调，不得承载环境数据；本次没有启用或修改该锁。
+6. 当前只关闭Compose消费者侧阻断。release producer/operator的独立root适配、精确当前源码Web/Worker镜像及L2a空环境运行包仍缺失，所以TASK92继续`DOING`且新UAT仍未创建。
+
+### Consequences
+
+- 同机路径从“只有项目名前缀”提升为可机器验证的消费者隔离合同；生产配置行为不变，也没有第二套运行资源。
+- 下一最小仓库工作是为release producer/operator定义同一UAT namespace的失败关闭适配，并保持生产策略独立；完成后才可提交L2a build/Secret/角色/空库0046/deploy授权申请。
+- 首轮恢复模式仍为`DISPOSABLE_SYNTHETIC / RECREATE_FROM_EMPTY`，不能冒充备份恢复；真实样本、账号、公开HTTPS、业务写和生产仍按L3—L5分别授权。
+
+### Rejected alternatives
+
+- 拒绝把生产Compose改成宽泛的任意root参数，避免扩大生产策略和既有发布合同的攻击面。
+- 拒绝只用`--project-name`后直接启动，也拒绝把静态Compose PASS解释为producer/operator、精确镜像、Migration或运行健康已通过。
+- 拒绝为少于20人的系统建设通用多租户控制平面；只实现新UAT实际需要的一个隔离namespace，值可配置且不编码人员数量。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

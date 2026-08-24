@@ -2,27 +2,32 @@
 
 最后更新时间：2026-08-24（Asia/Shanghai）
 
-## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；BuildKit清理已完成）
+## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；同机B路径消费者合同已完成）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / BUILDKIT CLEANUP COMPLETE / RESOURCE GATE PASS / HOST PATH REQUIRED / PRODUCTION NO-GO | 磁盘子步骤完成；TASK92继续等待独立主机或当前主机同机隔离选择 |
-| 授权范围 | PASS / BUILDKIT CACHE ONLY | 项目负责人指令`先清理磁盘`；不授权镜像、容器、网络、Volume、服务、数据库、Migration、部署或业务写 |
+| 当前状态 | DOING / SAME-HOST B SELECTED / ISOLATED COMPOSE CONSUMER CONTRACT PASS / PRODUCER-OPERATOR AND EXACT IMAGE REQUIRED / PRODUCTION NO-GO | 负责人已接受同一故障域；磁盘和容器消费者隔离完成，运行producer/operator仍失败关闭 |
+| 授权范围 | PASS / REPOSITORY STATIC ONLY | 清理后负责人选择`B`；本段只授权host-root/Compose override及静态测试，不授权目录、Secret、Docker资源、数据库、build、Migration、部署或业务写 |
 | 清理执行 | PASS / 3 BOUNDED PASSES | 三次BuildKit-only命令均rc0，分别报告607.3MB、35.76MB和9.667GB；Cache`174 → 164 → 149 → 0`，active始终0 |
 | 根盘 | PASS / 16.68 GiB AVAILABLE | `10,825,478,144 → 17,909,628,928` bytes，实际增加约6.60GiB；最终比10GiB硬线高约6.68GiB |
 | 内存/Swap/Load | PASS | 最终MemAvailable `2,467,676,160`B，Swap used `179,859,456`B且60秒增长0，Load`0.24/0.28/0.26`，PSI/OOM0 |
 | Docker对象完整性 | PASS / IDENTICAL | 6容器/75镜像/277 Volume不变；容器/镜像/Volume/网络集合摘要前后一致，Build Cache最终0/0B |
 | 服务完整性 | PASS / UNCHANGED | Web/PostgreSQL/Worker/Caddy ID不变，restart0/OOM false；Web/PostgreSQL healthy |
 | 受保护Volume | PASS / ALL PRESENT | `erp_postgres`、`erp_uploads`、`erp_attachments`、`erp_backup_status` metadata不变，未读取正文 |
-| 禁止动作 | PASS / NONE EXECUTED | 未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源；TASK92残留0 |
-| 仍有阻断 | FIXED HOST ROOTS + STALE IMAGE | 磁盘不再阻断，但同机隔离合同和当前源码匹配Web/Worker镜像仍缺失 |
-| 下一步 | OWNER HOST PATH DECISION | 独立主机优先；如选同机，只先授权隔离host-root/Compose override实现与静态测试 |
+| Compose消费者隔离 | PASS / STATIC | 独立项目、7 Volume、2网络、3 host root和loopback-only端口；Secret/release bind只读且`create_host_path:false` |
+| 负向静态门 | PASS / 5 FAIL-CLOSED CASES | 缺root、生产root、生产项目名、生产Web端口和遗漏overlay均被拒绝；有效合同输出双PASS |
+| 生产策略回归 | BLOCKED / PRE-EXISTING DIGEST DRIFT | 生产Compose渲染成功；既有policy对Dockerfile/release overlay摘要与本任务前HEAD不一致，按设计`POLICY_SOURCE_DIGEST_MISMATCH`，未改策略或降断言 |
+| 本地Python基线 | PASS / TEMP EFFECT CLEANED | self-test、venv smoke、go-live通过；system Python缺openpyxl后改用既有venv。go-live生成的精确backup和唯一activity记录已清理，未连接自托管PG/UAT/生产 |
+| 收口资源/完整性 | PASS / NO UAT RESIDUE | `2,452,017,152`B available memory、`179,843,072`B Swap、`17,893,322,752`B根盘、Load`0.19/0.17/0.12`、OOM0；6/75/277/6、Cache0，四服务restart0/OOM false且保护卷完整 |
+| 生产配置/运行面 | PASS / UNCHANGED | 生产Compose与政策未改；未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源 |
+| 仍有阻断 | PRODUCER/OPERATOR FIXED ROOTS + STALE IMAGE | release supervisor/operator仍绑定生产root；当前源码匹配Web/Worker镜像缺失 |
+| 下一步 | TASK92 / PRODUCER-OPERATOR STATIC ADAPTER | 只继续同一UAT namespace的最小失败关闭适配；通过后再申请L2a，不自动运行 |
 
 ## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DONE / L1 READ-ONLY COMPLETE / SAME-HOST L2 NO-GO / NEW UAT NOT CREATED / PRODUCTION NO-GO | D-172已记录；当前零DOING，TASK92等待宿主路径与授权 |
+| 当前状态 | DONE / L1 READ-ONLY COMPLETE / SAME-HOST L2 NO-GO / NEW UAT NOT CREATED / PRODUCTION NO-GO | D-172历史结论保持；后续D-173已选同机B并完成消费者合同，TASK92仍DOING |
 | 新UAT数据边界 | PASS / EMPTY 0046 ONLY | 从`EMPTY → 0046`，不升级、复制或读取现有alpha.42/0040 UAT数据库/文件域 |
 | 源码/Migration | PASS / alpha.47 / 46 / 233 TABLES | 0041—0046摘要、journal顺序和0046 snapshot静态一致；本轮未运行数据库Migration |
 | Compose逻辑隔离 | PASS / PROJECT-SCOPED | 自定义项目名渲染退出0，基础4服务、2网络、5命名Volume和loopback端口可独立前缀 |
@@ -32,8 +37,8 @@
 | 当前主机资源 | HISTORICAL FAIL / TASK92 RESOLVED DISK | TASK91收口时根盘仅高于硬线43.23MiB；后续TASK92已清空BuildKit cache并恢复约16.68GiB available，固定root和精确镜像仍阻断L2 |
 | 运行面完整性 | PASS / UNCHANGED | 6容器/75镜像/277 Volume/174 Build Cache不变；四ERP服务restart0/OOM false，Web/PostgreSQL healthy，TASK91残留0 |
 | 授权/非动作 | PASS / L1 ONLY | 未连接数据库，未读业务/凭据/备份/Volume正文；未创建资源、清理、build、deploy、Migration、账号或业务写 |
-| 推荐路径 | SEPARATE UAT HOST / OWNER DECISION REQUIRED | 独立主机天然隔离固定root；同机备选的BuildKit清理已由TASK92完成，隔离配置仍需单独授权 |
-| 下一步 | TASK92 / OWNER HOST PATH + AUTHORIZATION | 只解除宿主/资源/精确输入前置；不自动取得L2a、账号、HTTPS或L3写权限 |
+| 已选路径 | SAME HOST / FAILURE DOMAIN ACCEPTED | D-173已取代此前待选状态；Compose消费者隔离已通过，producer/operator仍待适配 |
+| 下一步 | TASK92 / PRODUCER-OPERATOR + EXACT IMAGE PREREQUISITES | 只解除宿主控制与精确输入前置；不自动取得L2a、账号、HTTPS或L3写权限 |
 | 系统是否可试运行 | NO | 环境尚未创建，L1通过不能替代部署、Migration、账号和员工UAT |
 
 ## SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90（完成；无样本试运行准备包）

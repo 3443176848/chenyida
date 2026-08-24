@@ -1,0 +1,114 @@
+name: ${ERP_UAT_COMPOSE_PROJECT:?ERP_UAT_COMPOSE_PROJECT is required}
+
+# Same-host UAT is an explicit non-production overlay.  It replaces every
+# host-controlled bind and published port instead of inheriting production
+# paths from compose.yml.  Named volumes and networks are isolated by the
+# required Compose project name above.
+x-app-volumes: !override
+  - type: volume
+    source: erp_uploads
+    target: /data/chenyida-erp/uploads
+  - type: volume
+    source: erp_attachments
+    target: /data/chenyida-erp/attachments
+  - type: bind
+    source: ${ERP_UAT_RUNTIME_SECRET_ROOT:?ERP_UAT_RUNTIME_SECRET_ROOT is required}/worker-database-password
+    target: /run/chenyida-erp-secrets/worker-database-password
+    read_only: true
+    bind:
+      create_host_path: false
+
+services:
+  postgres:
+    volumes: !override
+      - type: volume
+        source: erp_postgres
+        target: /var/lib/postgresql/data
+      - type: volume
+        source: erp_postgres_tablespaces
+        target: /var/lib/postgresql/tablespaces
+      - type: bind
+        source: ${ERP_UAT_RUNTIME_SECRET_ROOT:?ERP_UAT_RUNTIME_SECRET_ROOT is required}/postgres-bootstrap-password
+        target: /run/chenyida-erp-secrets/postgres-bootstrap-password
+        read_only: true
+        bind:
+          create_host_path: false
+
+  migrate:
+    volumes: !override
+      - type: bind
+        source: ${ERP_UAT_RELEASE_CANDIDATE_ROOT:?ERP_UAT_RELEASE_CANDIDATE_ROOT is required}
+        target: /run/chenyida-erp-release-candidate
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ERP_UAT_RUNTIME_SECRET_ROOT:?ERP_UAT_RUNTIME_SECRET_ROOT is required}/migration-database-password
+        target: /run/chenyida-erp-secrets/migration-database-password
+        read_only: true
+        bind:
+          create_host_path: false
+
+  web:
+    volumes: !override
+      - type: volume
+        source: erp_uploads
+        target: /data/chenyida-erp/uploads
+      - type: volume
+        source: erp_attachments
+        target: /data/chenyida-erp/attachments
+      - type: volume
+        source: erp_backup_status
+        target: /data/chenyida-erp/backup-status
+        read_only: true
+      - type: bind
+        source: ${ERP_UAT_RELEASE_IDENTITY_ROOT:?ERP_UAT_RELEASE_IDENTITY_ROOT is required}
+        target: /run/chenyida-erp-release
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ERP_UAT_RUNTIME_SECRET_ROOT:?ERP_UAT_RUNTIME_SECRET_ROOT is required}/web-database-password
+        target: /run/chenyida-erp-secrets/web-database-password
+        read_only: true
+        bind:
+          create_host_path: false
+    ports: !override
+      - 127.0.0.1:${ERP_UAT_HTTP_PORT:?ERP_UAT_HTTP_PORT is required}:3000
+
+  worker:
+    volumes: !override
+      - type: volume
+        source: erp_uploads
+        target: /data/chenyida-erp/uploads
+      - type: volume
+        source: erp_attachments
+        target: /data/chenyida-erp/attachments
+      - type: bind
+        source: ${ERP_UAT_RUNTIME_SECRET_ROOT:?ERP_UAT_RUNTIME_SECRET_ROOT is required}/worker-database-password
+        target: /run/chenyida-erp-secrets/worker-database-password
+        read_only: true
+        bind:
+          create_host_path: false
+
+  admin:
+    volumes: !override
+      - type: bind
+        source: ${ERP_UAT_RUNTIME_SECRET_ROOT:?ERP_UAT_RUNTIME_SECRET_ROOT is required}/admin-database-password
+        target: /run/chenyida-erp-secrets/admin-database-password
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ERP_UAT_RUNTIME_SECRET_ROOT:?ERP_UAT_RUNTIME_SECRET_ROOT is required}/admin-password
+        target: /run/chenyida-erp-secrets/admin-password
+        read_only: true
+        bind:
+          create_host_path: false
+
+  caddy:
+    profiles: !override [uat-edge]
+    ports: !override
+      - 127.0.0.1:${ERP_UAT_CADDY_HTTP_PORT:?ERP_UAT_CADDY_HTTP_PORT is required}:80
+      - 127.0.0.1:${ERP_UAT_CADDY_HTTPS_PORT:?ERP_UAT_CADDY_HTTPS_PORT is required}:443
+      - 127.0.0.1:${ERP_UAT_CADDY_HTTPS_PORT:?ERP_UAT_CADDY_HTTPS_PORT is required}:443/udp

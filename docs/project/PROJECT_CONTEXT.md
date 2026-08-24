@@ -22,6 +22,8 @@
 
 2026-08-24 TASK92磁盘清理增量：项目负责人明确要求先清理磁盘，只授权未使用BuildKit cache。清理按证据逐步执行三次并均退出0，Docker分别报告607.3MB、35.76MB和9.667GB，Build Cache从174项/10.31GB降到0/0B。根盘available从`10,825,478,144`增至`17,909,628,928` bytes，实际增加约6.60GiB；最终约16.68GiB可用、比10GiB硬线高约6.68GiB。容器/镜像/Volume/网络摘要完全不变，6容器/75镜像/277 Volume、四个受保护卷、四服务ID、restart0/OOM false及Web/PostgreSQL healthy保持；最终60秒Swap增长0、PSI/OOM0、任务残留0。磁盘阻断已解除，但固定宿主root和精确当前镜像仍阻止同机L2；TASK92继续`DOING`等待负责人选择独立主机或同机隔离，不自动build/deploy/Migration。
 
+2026-08-24 TASK92同机B路径增量：项目负责人明确选择当前主机并接受同一宿主故障域，只授权仓库内独立host-root/Compose override和静态测试。D-173新增`compose.uat-isolated.yml`、非Secret示例、严格Python validator及runner；有效渲染固定独立项目名、七个项目作用域Volume、两个网络、三个独立宿主root和loopback-only端口，所有Secret/release bind均只读且禁止自动创建宿主路径。缺root、生产root、生产项目名、生产Web端口及遗漏overlay五类输入全部失败关闭。生产Compose和既有生产政策未改，未创建目录、Secret、Docker对象或数据库，也未build/deploy/Migration/restart。直接生产policy回归另发现本任务前HEAD的Dockerfile/release overlay摘要已与冻结policy漂移，按设计`POLICY_SOURCE_DIGEST_MISMATCH`，未降断言或冒充PASS。该结果只关闭容器消费者侧阻断；release supervisor/operator仍固定生产producer/state/secret/backup root，当前HEAD匹配Web/Worker镜像仍缺失，因此TASK92继续`DOING`、L2和生产继续NO-GO。
+
 ## 2026-08-13 投产准入基线
 
 `SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：TASK41/TASK54已完成四域V2与签名密文外层，TASK55按D-132补齐cluster security/tablespace恢复和readiness v4，但没有真实异机锚点、密钥/调度/WORM、当前数据恢复或真实RTO。TASK56已在alpha.47/0046闭合Web行锁、Backup control/capture、PG17 catalog、角色/ACL、session/secret/container/tablespace及D-134受控operator；TASK59—TASK65按D-135—D-141闭合detached候选、reservation、monitor交付/投影、V2 actual policy/激活和target-bound egress，TASK66—TASK82按D-142—D-157建立授权矩阵、跨岗UAT证据、15检查点控制平面、内容寻址root受信rollback gateway、fixed executor/activation v2及数据库/四文件域/前代运行面固定handler。机器审计仍以动态能力/host activation、隔离回退演练和人工UAT三项条件强制`UAT_PROMOTION_EXECUTOR_NOT_READY`。TASK57曾构建的Web/Worker本机候选和当前安全仓库变化前的镜像均为`STALE / NOT AUTHORIZABLE`，当前没有与最终源码匹配的可授权镜像。当前UAT仍使用共享superuser、环境变量秘密且为alpha.42/0040，host Supervisor/monitor、真实V2/egress policy激活、真实网络出口、A1/A3、正式镜像证据、19步PASS、rollback handler动态证明/host activation、隔离回退演练、真实异机恢复/迁移、业务批准的职责分离、跨岗位验收、员工试运行和正式切换均未完成。
@@ -34,7 +36,7 @@
 
 2026-08-21 TASK70启动增量：TASK70已从`TODO`转为当前唯一`DOING`。三条只读审计和主智能体代码复核确认现有审计把handler实现、隔离动态证明、host activation与真实UAT回退混为一个阻断；首个仓库切片先建立版本化、失败关闭的动态证据/verifier并拆分四类状态，之后才允许在新鲜资源门和磁盘上界内执行单容器PostgreSQL 17原子切换case。任何隔离结果都不得冒充host或真实UAT证据；现有UAT数据库、四卷、备份正文、凭据和业务数据保持禁止访问。
 
-项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK91已按D-172完成新隔离UAT L1核对；TASK92已在专项授权下完成BuildKit-only清理并保持唯一`DOING`，等待项目负责人选择独立主机或同机隔离路径。不得自动恢复控制面、AI、进一步清理、build/deploy/Migration或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
+项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK91已按D-172完成新隔离UAT L1核对；TASK92已完成BuildKit-only清理，负责人又按D-173选择同机B路径并完成Compose消费者静态隔离合同。TASK92保持唯一`DOING`以关闭producer/operator和精确镜像前置。不得自动恢复控制面、AI、进一步清理、build/deploy/Migration或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。
 

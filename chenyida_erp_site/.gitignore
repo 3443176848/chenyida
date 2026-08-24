@@ -30,6 +30,7 @@ chenyida_erp_app/data/
 # Environment and local workspace metadata
 .env*
 !.env.example
+!.env.uat-isolated.example
 .agents/
 .codex/
 .git.invalid-empty-backup/

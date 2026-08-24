@@ -4,6 +4,18 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: add isolated UAT Compose contract`
+
+- 路径决定：项目负责人选择当前主机同机隔离并接受同一故障域；不同时建设独立主机方案。人数、岗位约2人和总用户少于20人不进入项目名、端口、容量、账号或验收硬条件。
+- Compose：新增`compose.uat-isolated.yml`，必要UAT项目/root/端口为空即失败；用`!override`完整替换PostgreSQL、Migration、Web、Worker、Admin宿主挂载和Web/Caddy端口。命名Volume/网络按独立项目隔离，Secret/release bind只读且禁止自动创建宿主路径，所有入口只监听loopback。
+- 合同：新增非Secret `.env.uat-isolated.example`、严格Python validator和静态runner。有效配置双PASS；缺root、生产root、生产项目名、生产Web端口和遗漏overlay五类输入全部失败关闭。
+- 回归边界：生产Compose直接渲染成功；既有production runtime policy对`Dockerfile`/`compose.release.yml`摘要在本任务前HEAD已漂移，验证器正确返回`POLICY_SOURCE_DIGEST_MISMATCH`。本任务不修改生产policy或降低断言，该发布门继续失败关闭。
+- 生产保护：生产`compose.yml`、`compose.release.yml`、container runtime/runtime secret/operator/supervisor政策均未修改。未创建UAT目录、Secret、容器、网络、Volume或数据库，未build、deploy、Migration、restart、账号或业务写；未连接自托管PostgreSQL、现有UAT或生产数据。
+- Python基线：self-test、venv smoke和go-live均PASS；系统Python smoke先因缺`openpyxl`在导入前失败。go-live按既有行为写入本地legacy SQLite并生成一份测试备份/活动记录；精确备份文件已删除，唯一活动记录已事务删除并复核为0，未触碰自托管PostgreSQL或UAT/生产。
+- 资源与清理：静态子步骤约2.3GiB available/171MiB Swap/17GiB磁盘/Load`0.07/0.08/0.07`起步，收口为`2,452,017,152`B/`179,843,072`B/`17,893,322,752`B/`0.19/0.17/0.12`，kernel OOM0；6容器/75镜像/277 Volume/6网络/0 Cache，四服务restart0/OOM false且Web/PostgreSQL healthy。Compose temp、render JSON和本地测试副作用残留0。
+- 当前边界：只关闭Compose消费者侧固定root。release supervisor/operator仍固定生产producer/state/secret/backup root，当前HEAD匹配Web/Worker镜像仍缺失；TASK92保持`DOING`，新UAT和生产继续NO-GO。
+- 文档：D-173及MASTER、TASKS、PROJECT_CONTEXT、当前任务、UAT就绪报告、CHANGELOG、STATUS同步；产品代码、Schema、Migration、业务API、角色和依赖不变。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: clear unused BuildKit cache`
 
 - 授权：项目负责人明确要求`先清理磁盘`。范围只含未使用BuildKit cache，不等于选择同机UAT；禁止system/image/container/volume prune、网络/服务/数据库/Migration/部署/账号和业务写。

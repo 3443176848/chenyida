@@ -27,6 +27,18 @@ docker compose -f compose.yml --profile tools run --rm admin
 ERP_DOMAIN=erp.example.com docker compose -f compose.yml --profile production up -d
 ```
 
+## 当前主机的隔离 UAT 合同
+
+`compose.uat-isolated.yml`只用于同机、非生产UAT。它要求独立Compose项目名，完整替换Secret、release candidate、release identity宿主挂载，并把Web及可选`uat-edge`入口限制在loopback；命名Volume和网络随项目名隔离。`.env.uat-isolated.example`中的路径和端口只是待L2a核对的非Secret示例，不是容量、人数或产品限制。
+
+以下命令只渲染和验证静态Compose，不创建目录、Secret、容器、网络、Volume或数据库：
+
+```bash
+COMPOSE_PARALLEL_LIMIT=1 ./scripts/run-isolated-uat-compose-config-test.sh
+```
+
+生产`compose.yml`、生产容器运行策略和固定生产root保持不变。当前PostgreSQL运行角色operator及release supervisor仍绑定生产控制root，不能用于这个同机UAT；必须先完成独立producer/operator适配并取得L2a授权，才可创建任何运行资源。
+
 ## 常用命令
 
 ```bash

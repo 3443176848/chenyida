@@ -4,7 +4,7 @@
 > 核对时间：2026-08-24 01:47—01:55 CST
 > 授权：项目负责人明确选择“新建隔离UAT”，并授权L1只读核对
 
-> TASK92后续：BuildKit-only清理已将根盘available恢复到`17,909,628,928` bytes（约16.68 GiB），磁盘停止线阻断已解除；固定宿主控制root和精确镜像阻断仍在，因此总体L2 NO-GO不变。详见[TASK92](../../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。
+> TASK92后续：BuildKit-only清理已将根盘available恢复到`17,909,628,928` bytes（约16.68 GiB）；负责人已选择同机B路径，Compose消费者侧独立项目/host-root/loopback合同和静态负测通过。release producer/operator仍固定生产控制root，当前源码精确镜像也缺失，因此总体L2 NO-GO不变。详见[TASK92](../../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。
 
 ## 1. 直接结论
 
@@ -97,7 +97,7 @@
 
 - 独立主机使固定secret、release identity、operator状态、Docker网络/Volume和资源成为天然独占边界，不需要为不到20人的系统再建设一套同机多租户控制平面。
 - 目标仍按2核、约4 GiB内存、1 GiB Swap的低资源规则执行；磁盘必须在每个重任务前保留10 GiB硬线，并按实际构建上界留余量。`20 GiB available`只可作为保守采购/准备参考，不是产品容量限制。
-- 当前主机同机方案仅作为备选；TASK92已完成精确BuildKit清理并通过资源门，但仍必须另获“隔离配置改造”授权并完成固定宿主root的失败关闭合同。
+- 负责人已选择当前主机同机方案并接受同一故障域。TASK92已完成BuildKit清理以及Compose消费者侧固定root的失败关闭合同；producer/operator适配和精确当前镜像仍未完成。
 
 ## 7. 后续授权包
 
@@ -109,10 +109,11 @@
 
 ### 路径B：当前主机同机隔离
 
-负责人明确接受同故障域，并另行授权：
+负责人已明确接受同故障域，并授权第一段仓库静态改造：
 
-1. 只实现/验证独立宿主root与Compose override，不创建运行资源。
+1. 独立宿主root与Compose override消费者合同已实现并通过静态正负测试；未创建运行资源。
 2. TASK92 BuildKit-only清理证据保持有效；任何后续清理必须重新列出精确对象、保护清单和授权，不得删除镜像、容器或Volume。
+3. release supervisor和runtime privilege operator的UAT producer/state/secret root仍需后续最小适配；适配完成前不得进入L2a运行。
 
 路径确定并解除资源/隔离阻断后，才可申请L2a：串行构建精确Web/Worker镜像、创建空PostgreSQL和独立文件卷、生成独立secret、bootstrap运行角色、以`EMPTY → 0046`迁移、reconcile ACL、启动Worker/Web并验证loopback health。账号创建、公开HTTPS、虚构业务写、真实样本和生产仍需分别授权。
 
