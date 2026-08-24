@@ -19,7 +19,8 @@ from typing import Any, BinaryIO, TextIO
 SITE_ROOT = Path(__file__).resolve().parent.parent
 POLICY_VALIDATOR_PATH = SITE_ROOT / "scripts/isolated-uat-control-plane-policy.py"
 LEGACY_RECEIPT_BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v3.json"
-ACTIVE_ACTION_BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v4.json"
+EXTERNAL_ANCHOR_BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v4.json"
+ACTIVE_ACTION_BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v5.json"
 BINDINGS_PATH = ACTIVE_ACTION_BINDINGS_PATH
 RUNTIME_CONTRACTS_PATH = SITE_ROOT / "scripts/isolated-uat-runtime-contracts.py"
 RUNTIME_CONTRACT_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-runtime-contract-policy-v1.json"
@@ -27,21 +28,28 @@ RUNTIME_RECEIPTS_PATH = SITE_ROOT / "scripts/isolated-uat-runtime-receipts.py"
 RUNTIME_RECEIPT_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-runtime-receipt-policy-v1.json"
 EXTERNAL_ANCHORS_PATH = SITE_ROOT / "scripts/isolated-uat-external-anchor-contracts.py"
 EXTERNAL_ANCHOR_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-external-anchor-policy-v1.json"
+OWNER_COMPLETION_PATH = SITE_ROOT / "scripts/isolated-uat-owner-completion-contracts.py"
+OWNER_COMPLETION_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-owner-completion-policy-v1.json"
 PRIVILEGE_POLICY_PATH = SITE_ROOT / "operations/postgresql-runtime-privilege-policy-v2.json"
-PLAN_CONTRACT = "chenyida-erp-isolated-uat-one-shot-plan/v4"
-BINDINGS_CONTRACT = "chenyida-erp-isolated-uat-one-shot-action-bindings/v4"
+PLAN_CONTRACT = "chenyida-erp-isolated-uat-one-shot-plan/v5"
+BINDINGS_CONTRACT = "chenyida-erp-isolated-uat-one-shot-action-bindings/v5"
 BINDING_IMPLEMENTATION_STATUS = (
+    "V4_EXACTLY_INHERITED_OWNER_COMPLETION_PURE_CONTRACT_VALID_RUNTIME_FACTS_NOT_ESTABLISHED"
+)
+EXTERNAL_BINDING_IMPLEMENTATION_STATUS = (
     "V3_ACTIONS_EXACTLY_INHERITED_EXTERNAL_ANCHOR_CONTRACTS_VALID_RUNTIME_FACTS_NOT_ESTABLISHED"
 )
 LEGACY_BINDING_IMPLEMENTATION_STATUS = (
     "FIXED_BINDINGS_RECEIPT_CHAIN_VALIDATORS_IMPLEMENTED_RUNTIME_PATH_NOT_IMPLEMENTED"
 )
-EXPECTED_BINDING_SHA256 = "fb83e0f20823b632525823f3d6c012769501fff1aec9763abc64d8d10d2b050b"
-EXPECTED_BINDING_RAW_SHA256 = "4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262"
+EXPECTED_BINDING_SHA256 = "349fb247d271d3c749129c151ebb0b3c7054b64f5ee0c5646ea9e1d238c49c3f"
+EXPECTED_BINDING_RAW_SHA256 = "95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363"
+EXPECTED_EXTERNAL_BINDING_SHA256 = "fb83e0f20823b632525823f3d6c012769501fff1aec9763abc64d8d10d2b050b"
+EXPECTED_EXTERNAL_BINDING_RAW_SHA256 = "4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262"
 EXPECTED_LEGACY_BINDING_SHA256 = "50ddd73fb4745c8fcc0b91fd7e4130e2cb3a9ef0d2f52773c64cd6112afc74bd"
 EXPECTED_LEGACY_BINDING_RAW_SHA256 = "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4"
 EXPECTED_EXTERNAL_ANCHOR_POLICY_RAW_SHA256 = "92c59a9f9f800a243324c0a6e24ca8258e58483fe759cf30c2c98d53aead6ef3"
-ENTRYPOINT_ID = "chenyida-erp-isolated-uat-one-shot-v4"
+ENTRYPOINT_ID = "chenyida-erp-isolated-uat-one-shot-v5"
 PLAN_MODE = "READ_ONLY_PLAN"
 FORBIDDEN_PRODUCTION_ENTRYPOINTS = [
     "scripts/postgresql-runtime-privilege-runner.mjs",
@@ -112,6 +120,21 @@ def load_external_anchors() -> Any:
 
 
 EXTERNAL_ANCHORS = load_external_anchors()
+
+
+def load_owner_completion() -> Any:
+    specification = importlib.util.spec_from_file_location(
+        "isolated_uat_owner_completion_contracts",
+        OWNER_COMPLETION_PATH,
+    )
+    if specification is None or specification.loader is None:
+        raise RuntimeError("isolated UAT owner completion contracts cannot be loaded")
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+OWNER_COMPLETION = load_owner_completion()
 
 
 def fail(code: str) -> None:
@@ -196,7 +219,9 @@ def read_legacy_receipt_bindings(
     return value
 
 
-def read_bindings(path: Path = ACTIVE_ACTION_BINDINGS_PATH) -> dict[str, Any]:
+def read_external_anchor_bindings(
+    path: Path = EXTERNAL_ANCHOR_BINDINGS_PATH,
+) -> dict[str, Any]:
     try:
         raw = path.read_bytes()
         value = POLICY.parse_json(raw, "ISOLATED_UAT_ACTION_BINDING_FILE_INVALID")
@@ -207,13 +232,14 @@ def read_bindings(path: Path = ACTIVE_ACTION_BINDINGS_PATH) -> dict[str, Any]:
         "execution_boundary", "base_binding", "source_extensions",
         "external_anchor_contract", "binding_sha256",
     }, "ISOLATED_UAT_ACTION_BINDING_FIELDS_INVALID")
-    if value["schema_version"] != 4 or value["contract"] != BINDINGS_CONTRACT \
+    if value["schema_version"] != 4 \
+            or value["contract"] != "chenyida-erp-isolated-uat-one-shot-action-bindings/v4" \
             or value["binding_id"] != "chenyida-erp-isolated-uat-fixed-actions-v4" \
-            or value["implementation_status"] != BINDING_IMPLEMENTATION_STATUS \
-            or hashlib.sha256(raw).hexdigest() != EXPECTED_BINDING_RAW_SHA256:
+            or value["implementation_status"] != EXTERNAL_BINDING_IMPLEMENTATION_STATUS \
+            or hashlib.sha256(raw).hexdigest() != EXPECTED_EXTERNAL_BINDING_RAW_SHA256:
         fail("ISOLATED_UAT_ACTION_BINDING_IDENTITY_INVALID")
     body = {key: item for key, item in value.items() if key != "binding_sha256"}
-    if value["binding_sha256"] != EXPECTED_BINDING_SHA256 \
+    if value["binding_sha256"] != EXPECTED_EXTERNAL_BINDING_SHA256 \
             or POLICY.canonical_sha256(body) != value["binding_sha256"]:
         fail("ISOLATED_UAT_ACTION_BINDING_SHA256_INVALID")
     legacy = read_legacy_receipt_bindings()
@@ -280,6 +306,266 @@ def read_bindings(path: Path = ACTIVE_ACTION_BINDINGS_PATH) -> dict[str, Any]:
         "actions": actions,
         "receipt_chain": legacy["receipt_chain"],
         "external_anchor_contract": external,
+        "binding_sha256": value["binding_sha256"],
+    }
+
+
+def read_bindings(path: Path = ACTIVE_ACTION_BINDINGS_PATH) -> dict[str, Any]:
+    try:
+        raw = path.read_bytes()
+        value = POLICY.parse_json(raw, "ISOLATED_UAT_ACTION_BINDING_FILE_INVALID")
+    except OSError:
+        fail("ISOLATED_UAT_ACTION_BINDING_FILE_INVALID")
+    POLICY.exact(value, {
+        "schema_version", "contract", "binding_id", "implementation_status",
+        "execution_boundary", "base_binding", "plan_digest_routing", "source_extensions",
+        "owner_completion_contract", "binding_sha256",
+    }, "ISOLATED_UAT_ACTION_BINDING_FIELDS_INVALID")
+    if value["schema_version"] != 5 or value["contract"] != BINDINGS_CONTRACT \
+            or value["binding_id"] != "chenyida-erp-isolated-uat-fixed-actions-v5" \
+            or value["implementation_status"] != BINDING_IMPLEMENTATION_STATUS \
+            or hashlib.sha256(raw).hexdigest() != EXPECTED_BINDING_RAW_SHA256:
+        fail("ISOLATED_UAT_ACTION_BINDING_IDENTITY_INVALID")
+    body = {key: item for key, item in value.items() if key != "binding_sha256"}
+    if value["binding_sha256"] != EXPECTED_BINDING_SHA256 \
+            or POLICY.canonical_sha256(body) != value["binding_sha256"]:
+        fail("ISOLATED_UAT_ACTION_BINDING_SHA256_INVALID")
+    base = read_external_anchor_bindings()
+    try:
+        base_raw_sha256 = hashlib.sha256(EXTERNAL_ANCHOR_BINDINGS_PATH.read_bytes()).hexdigest()
+    except OSError:
+        fail("ISOLATED_UAT_ACTION_BINDING_FILE_INVALID")
+    expected_base = {
+        "contract": base["contract"],
+        "binding_id": base["binding_id"],
+        "binding_sha256": base["binding_sha256"],
+        "raw_sha256": base_raw_sha256,
+        "action_inheritance": {
+            "mode": "EXACT_BASE_FIELDS_ADDITIVE_SOURCES_INPUTS_OUTPUTS_ONLY",
+            "action_count": 9,
+            "ordinal_sequence": list(range(1, 10)),
+            "augmented_ordinals": [7, 9],
+            "status": "EXACT_BASE_ACTIONS_WITH_DECLARED_ADDITIONS",
+        },
+        "receipt_chain_inheritance": {
+            "mode": "EXACT_NO_OVERRIDE",
+            "internal_node_count": 18,
+            "external_node_count": 5,
+            "status": "EXACTLY_INHERITED",
+        },
+    }
+    if value["base_binding"] != expected_base \
+            or base_raw_sha256 != EXPECTED_EXTERNAL_BINDING_RAW_SHA256:
+        fail("ISOLATED_UAT_ACTION_BINDING_BASE_INVALID")
+    expected_plan_digest_routing = {
+        "schema_version": 1,
+        "active_control_plan": {
+            "contract": PLAN_CONTRACT,
+            "argument": "control_plan",
+            "digest_field": "plan_sha256",
+            "input_name": "control_plan_sha256",
+        },
+        "external_anchor_base_plan": {
+            "contract": "chenyida-erp-isolated-uat-one-shot-plan/v4",
+            "argument": "external_anchor_base_plan",
+            "digest_field": "plan_sha256",
+            "active_plan_reference_field": "external_anchor_base_plan_sha256",
+            "legacy_input_name": "plan_sha256",
+            "receipt_producer_ordinals": list(range(2, 10)),
+        },
+        "owner_completion_log": {
+            "control_digest_field": "control_plan_sha256",
+            "base_digest_field": "external_anchor_base_plan_sha256",
+        },
+        "status": "EXPLICIT_ACTIVE_V5_AND_LEGACY_RECEIPT_V4_DIGEST_ROUTING",
+    }
+    if value["plan_digest_routing"] != expected_plan_digest_routing:
+        fail("ISOLATED_UAT_ACTION_BINDING_PLAN_DIGEST_ROUTING_INVALID")
+    expected_sources = [
+        "operations/isolated-uat-owner-completion-policy-v1.json",
+        "scripts/isolated-uat-owner-completion-contracts.py",
+    ]
+    extensions = value["source_extensions"]
+    if not isinstance(extensions, list) or len(extensions) != 2:
+        fail("ISOLATED_UAT_ACTION_BINDING_EXTENSION_INVALID")
+    expected_extensions = {
+        7: {
+            "additional_inputs": [
+                "control_plan_sha256", "external_anchor_base_plan_sha256",
+                "namespace_root_receipt", "credential_generation_receipt",
+                "postgres_container_identity", "database_cluster_identity",
+            ],
+            "additional_outputs": ["owner_completion_log"],
+        },
+        9: {
+            "additional_inputs": [
+                "control_plan", "external_anchor_base_plan", "namespace_root_receipt",
+                "credential_generation_receipt", "database_cluster_identity",
+                "external_anchor_policy", "database_target_identity",
+                "database_bootstrap_receipt", "expected_migration_allowlist",
+                "runtime_receipt_binding", "verification_time",
+                "runtime_receipt_policy_raw", "expected_runtime_policy_roots",
+                "runtime_policy_sources", "owner_completion_policy",
+                "owner_completion_policy_sources", "owner_completion_log",
+            ],
+            "additional_outputs": ["owner_completion_validation"],
+        },
+    }
+    extension_by_ordinal: dict[int, dict[str, Any]] = {}
+    for extension in extensions:
+        POLICY.exact(extension, {
+            "ordinal", "inheritance_status", "additional_sources",
+            "additional_inputs", "additional_outputs",
+        }, "ISOLATED_UAT_ACTION_BINDING_EXTENSION_INVALID")
+        ordinal = extension["ordinal"]
+        if ordinal not in expected_extensions \
+                or extension["inheritance_status"] != "BASE_ACTION_EXACT_WITH_DECLARED_ADDITIONS" \
+                or extension["additional_sources"] != expected_sources \
+                or extension["additional_inputs"] != expected_extensions[ordinal]["additional_inputs"] \
+                or extension["additional_outputs"] != expected_extensions[ordinal]["additional_outputs"]:
+            fail("ISOLATED_UAT_ACTION_BINDING_EXTENSION_INVALID")
+        extension_by_ordinal[ordinal] = extension
+    if set(extension_by_ordinal) != {7, 9}:
+        fail("ISOLATED_UAT_ACTION_BINDING_EXTENSION_INVALID")
+    owner = value["owner_completion_contract"]
+    expected_input_bundles = {
+        "runtime_intents": {
+            "DATABASE_BOOTSTRAP": "database_bootstrap_intent",
+            "MIGRATION": "migration_intent",
+            "RUNTIME_PRIVILEGE": "runtime_privilege_intent",
+            "EVIDENCE": "evidence_intent",
+        },
+        "runtime_receipts": {
+            "database_target_identity": "database_target_identity",
+            "database_bootstrap_receipt": "database_bootstrap_receipt",
+            "release_candidate_receipt": "release_candidate_receipt",
+            "migration_execution_receipt": "migration_execution_receipt",
+            "runtime_privilege_receipt": "runtime_privilege_receipt",
+            "readiness_receipt": "readiness_receipt",
+            "isolated_uat_postdeploy_receipt": "isolated_uat_postdeploy_receipt",
+            "isolated_uat_runtime_identity_receipt": (
+                "isolated_uat_runtime_identity_receipt"
+            ),
+        },
+        "runtime_evidence_payloads": {
+            "database_bootstrap_observation": "database_bootstrap_observation",
+            "migration_applied_ledger": "migration_applied_ledger",
+            "migration_observation": "migration_observation",
+            "runtime_privilege_observation": "runtime_privilege_observation",
+            "container_identity_set": "container_identity_set",
+        },
+    }
+    expected_validator_arguments = {
+        "direct": {
+            "control_plan": "control_plan",
+            "external_anchor_base_plan": "external_anchor_base_plan",
+            "namespace_root_receipt": "namespace_root_receipt",
+            "credential_generation_receipt": "credential_generation_receipt",
+            "postgres_container_identity": "postgres_container_identity",
+            "database_cluster_identity": "database_cluster_identity",
+            "external_anchor_policy": "external_anchor_policy",
+            "expected_migration_allowlist": "expected_migration_allowlist",
+            "runtime_receipt_binding": "runtime_receipt_binding",
+            "verification_time": "verification_time",
+            "runtime_intent_policy": "runtime_contract_policy",
+            "runtime_receipt_policy": "runtime_receipt_policy",
+            "runtime_receipt_policy_raw": "runtime_receipt_policy_raw",
+            "expected_runtime_policy_roots": "expected_runtime_policy_roots",
+            "runtime_policy_sources": "runtime_policy_sources",
+            "owner_completion_log": "owner_completion_log",
+            "policy": "owner_completion_policy",
+            "policy_sources": "owner_completion_policy_sources",
+        },
+        "bundled": {
+            "runtime_intents": "runtime_intents",
+            "runtime_receipts": "runtime_receipts",
+            "runtime_evidence_payloads": "runtime_evidence_payloads",
+        },
+    }
+    expected_validation_pipeline = [
+        {
+            "order": 1,
+            "validator": "validate_control_plan",
+            "bound_source": "scripts/isolated-uat-external-anchor-contracts.py",
+            "input": "external_anchor_base_plan",
+        },
+        {
+            "order": 2,
+            "validator": "validate_external_anchor_contracts",
+            "bound_source": "scripts/isolated-uat-external-anchor-contracts.py",
+            "input": "caller_supplied_external_anchor_bundle",
+        },
+        {
+            "order": 3,
+            "validator": "validate_receipt_chain",
+            "bound_source": "scripts/isolated-uat-runtime-receipts.py",
+            "input": "caller_supplied_runtime_contract_bundles",
+        },
+        {
+            "order": 4,
+            "validator": "validate_owner_completion_contracts",
+            "bound_source": "scripts/isolated-uat-owner-completion-contracts.py",
+            "input": "owner_completion_log_and_revalidated_upstream_values",
+        },
+    ]
+    if owner != {
+        "policy_source": expected_sources[0],
+        "policy_contract": OWNER_COMPLETION.POLICY_CONTRACT,
+        "validator_source": expected_sources[1],
+        "validator_method": "validate_owner_completion_contracts",
+        "producer": {
+            "action_ordinal": 7,
+            "handler_id": "POSTGRESQL_RUNTIME_PRIVILEGE_PRIMITIVES",
+            "adapter_method": "reconcile_final_runtime_privileges",
+            "output": "owner_completion_log",
+        },
+        "consumer": {
+            "action_ordinal": 9,
+            "handler_id": "ISOLATED_UAT_POSTDEPLOY_EVIDENCE_ADAPTER",
+            "adapter_method": "verify_and_publish_isolated_uat_evidence",
+            "input": "owner_completion_log",
+            "output": "owner_completion_validation",
+        },
+        "operator_state_root_source": {
+            "source_output": "namespace_root_receipt",
+            "root_name": "operator_state_root",
+            "digest_field": "identity.identity_sha256",
+        },
+        "input_bundles": expected_input_bundles,
+        "validator_arguments": expected_validator_arguments,
+        "validation_pipeline": expected_validation_pipeline,
+        "journal_success_chain": OWNER_COMPLETION.SUCCESS_PHASES,
+        "terminal_location": "COMPLETED",
+        "validation_status": (
+            "PURE_OWNER_COMPLETION_CONTRACT_JOIN_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+        ),
+        "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION",
+    }:
+        fail("ISOLATED_UAT_ACTION_BINDING_OWNER_CONTRACT_INVALID")
+    actions = []
+    for base_action in base["actions"]:
+        extension = extension_by_ordinal.get(base_action["ordinal"])
+        action = {key: list(item) if isinstance(item, list) else item for key, item in base_action.items()}
+        if extension is not None:
+            action["sources"] += extension["additional_sources"]
+            action["inputs"] += extension["additional_inputs"]
+            action["outputs"] += extension["additional_outputs"]
+        for field in ("sources", "inputs", "outputs"):
+            if len(action[field]) != len(set(action[field])):
+                fail("ISOLATED_UAT_ACTION_BINDING_EXTENSION_INVALID")
+        actions.append(action)
+    return {
+        "schema_version": value["schema_version"],
+        "contract": value["contract"],
+        "binding_id": value["binding_id"],
+        "implementation_status": value["implementation_status"],
+        "execution_boundary": value["execution_boundary"],
+        "base_binding": value["base_binding"],
+        "plan_digest_routing": value["plan_digest_routing"],
+        "actions": actions,
+        "receipt_chain": base["receipt_chain"],
+        "external_anchor_contract": base["external_anchor_contract"],
+        "owner_completion_contract": owner,
         "binding_sha256": value["binding_sha256"],
     }
 
@@ -358,6 +644,29 @@ def read_external_anchor_policy(
         fail(str(error))
 
 
+def read_owner_completion_policy(
+    path: Path = OWNER_COMPLETION_POLICY_PATH,
+) -> dict[str, Any]:
+    try:
+        value = POLICY.parse_json(
+            path.read_bytes(),
+            "ISOLATED_UAT_OWNER_COMPLETION_POLICY_JSON_INVALID",
+        )
+        sources = {
+            source: (SITE_ROOT / source).read_bytes()
+            for source in sorted([
+                *OWNER_COMPLETION.BOUND_SOURCE_SHA256,
+                "scripts/isolated-uat-owner-completion-contracts.py",
+            ])
+        }
+    except OSError:
+        fail("ISOLATED_UAT_OWNER_COMPLETION_POLICY_JSON_INVALID")
+    try:
+        return OWNER_COMPLETION.validate_policy(value, sources)
+    except OWNER_COMPLETION.ContractError as error:
+        fail(str(error))
+
+
 PLANNED_ACTIONS = [
     ("VERIFY_EXACT_INPUTS", "READ_ONLY"),
     ("PREPARE_PRIVATE_NAMESPACE_ROOTS", "MUTATING"),
@@ -371,6 +680,37 @@ PLANNED_ACTIONS = [
 ]
 
 
+def _external_anchor_base_plan_from_body(body: dict[str, Any]) -> dict[str, Any]:
+    base_body = {
+        key: item for key, item in body.items()
+        if key not in OWNER_COMPLETION.OWNER_PLAN_FIELDS
+    }
+    base_body.update({
+        "schema_version": 4,
+        "contract": OWNER_COMPLETION.BASE_PLAN_CONTRACT,
+        "entrypoint_id": OWNER_COMPLETION.BASE_PLAN_ENTRYPOINT,
+        "action_binding_id": OWNER_COMPLETION.BASE_ACTION_BINDING_ID,
+        "action_binding_sha256": OWNER_COMPLETION.BASE_ACTION_BINDING_SHA256,
+        "action_binding_status": OWNER_COMPLETION.BASE_ACTION_BINDING_STATUS,
+    })
+    return {**base_body, "plan_sha256": POLICY.canonical_sha256(base_body)}
+
+
+def external_anchor_base_plan(value: dict[str, Any]) -> dict[str, Any]:
+    POLICY.exact(
+        value,
+        OWNER_COMPLETION.PLAN_FIELDS,
+        "ISOLATED_UAT_OWNER_COMPLETION_CONTROL_PLAN_INVALID",
+    )
+    body = {key: item for key, item in value.items() if key != "plan_sha256"}
+    if POLICY.canonical_sha256(body) != value["plan_sha256"]:
+        fail("ISOLATED_UAT_OWNER_COMPLETION_CONTROL_PLAN_INVALID")
+    base = _external_anchor_base_plan_from_body(body)
+    if value["external_anchor_base_plan_sha256"] != base["plan_sha256"]:
+        fail("ISOLATED_UAT_OWNER_COMPLETION_CONTROL_PLAN_INVALID")
+    return base
+
+
 def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any]:
     policy = POLICY.validate_policy(policy)
     request = POLICY.validate_request(request, policy)
@@ -379,6 +719,7 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
     runtime_contract_policy = read_runtime_contract_policy()
     runtime_receipt_policy = read_runtime_receipt_policy()
     external_anchor_policy = read_external_anchor_policy()
+    owner_completion_policy = read_owner_completion_policy()
     source_state = POLICY.source_state()
     if source_state["package_version"] != policy["release"]["package_version"] \
             or source_state["package_version"] != request["source"]["package_version"] \
@@ -401,8 +742,11 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         "scripts/isolated-uat-runtime-receipts.py",
         "operations/isolated-uat-one-shot-action-bindings-v3.json",
         "operations/isolated-uat-one-shot-action-bindings-v4.json",
+        "operations/isolated-uat-one-shot-action-bindings-v5.json",
         "operations/isolated-uat-external-anchor-policy-v1.json",
         "scripts/isolated-uat-external-anchor-contracts.py",
+        "operations/isolated-uat-owner-completion-policy-v1.json",
+        "scripts/isolated-uat-owner-completion-contracts.py",
     }
     if not (referenced_sources | runtime_contract_sources).issubset(policy_sources):
         fail("ISOLATED_UAT_ACTION_BINDING_SOURCE_UNBOUND")
@@ -417,7 +761,7 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         for binding in bindings["actions"]
     ]
     body = {
-        "schema_version": 4,
+        "schema_version": 5,
         "contract": PLAN_CONTRACT,
         "entrypoint_id": ENTRYPOINT_ID,
         "mode": PLAN_MODE,
@@ -444,6 +788,16 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         "external_anchor_capability_status": external_anchor_policy["capability_status"],
         "external_anchor_validation_status": "NOT_RUN_NO_EXTERNAL_EVIDENCE",
         "external_anchor_success_output_contract": external_anchor_policy["validation_output"],
+        "owner_completion_policy_sha256": owner_completion_policy["policy_sha256"],
+        "owner_completion_source_closure_sha256": owner_completion_policy["source_closure"][
+            "source_closure_sha256"
+        ],
+        "owner_completion_capability_status": owner_completion_policy["capability_status"],
+        "owner_completion_validation_status": "NOT_RUN_NO_OWNER_COMPLETION_LOG",
+        "owner_completion_success_output_contract": owner_completion_policy[
+            "validation_output"
+        ],
+        "owner_completion_binding": OWNER_COMPLETION.OWNER_PLAN_BINDING,
         "receipt_chain_binding": {
             "internal_contract": legacy_receipt_bindings["receipt_chain"]["contract"],
             "internal_validator_method": legacy_receipt_bindings["receipt_chain"]["validator_method"],
@@ -484,6 +838,9 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         },
         "forbidden_production_entrypoints": FORBIDDEN_PRODUCTION_ENTRYPOINTS,
     }
+    body["external_anchor_base_plan_sha256"] = _external_anchor_base_plan_from_body(body)[
+        "plan_sha256"
+    ]
     return {**body, "plan_sha256": POLICY.canonical_sha256(body)}
 
 
@@ -505,10 +862,13 @@ def assert_execution_allowed(policy: dict[str, Any]) -> None:
 def require_runtime_backend() -> None:
     try:
         EXTERNAL_ANCHORS.require_external_anchor_publisher()
+        OWNER_COMPLETION.require_owner_completion_publisher()
+        OWNER_COMPLETION.require_owner_completion_runtime_observer()
         RUNTIME_RECEIPTS.require_receipt_publisher()
         RUNTIME_CONTRACTS.require_runtime_backend()
     except (
         EXTERNAL_ANCHORS.ContractError,
+        OWNER_COMPLETION.ContractError,
         RUNTIME_RECEIPTS.ContractError,
         RUNTIME_CONTRACTS.ContractError,
     ) as error:

@@ -2,6 +2,22 @@
 
 本文件记录可审计的项目变化。每个任务提交前必须增加一条记录，包含 Git Commit、功能、数据库、API 和文档影响。当前提交无法在自身内容中稳定写入自身哈希，因此使用“任务编号 + 提交消息”作为本条标识，实际哈希以 `git log` 为准。
 
+## 2026-08-25
+
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: validate isolated UAT owner completion`
+
+- 第一性原理：不到20人的单一内部UAT只增加一份owner completion policy、一个纯validator和binding/plan v5；不建设证据平台、队列、daemon、多租户控制面，也不把工程、计划、市场等人数写入合同。
+- 固定上游重验：owner入口不接收可自签的D-179/D-180 validation envelope，而从原始外锚、四类intent、八类receipt和五类evidence调用固定D-180/D-179模块重验。External policy必须等于owner source closure内固定raw，source usage按path精确锁定。
+- Owner连续性：固定同一operation/request/project、active v5与base v4双摘要、namespace/credential/container/cluster/database/Migration/runtime privilege前驱和`operator_state_root`准备/完成identity。正常成功只接受六阶段journal、空recovery authorization及`COMPLETED/VERIFIED`终态；`final_privilege_projection_sha256`不冒充生产structure report。
+- 失败关闭：external anchor→Migration→owner→runtime observation/receipt→verification的因果时间不可倒置；自签v99 observation、privilege policy、external policy、plan、source usage、state root、phase、terminal或摘要混用均被拒绝。
+- Binding/plan：v5 body/raw为`349fb247d271d3c749129c151ebb0b3c7054b64f5ee0c5646ea9e1d238c49c3f`/`95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363`；显式路由active v5控制摘要和v4 legacy receipt摘要，完整声明action 7/9输入、三个runtime束组、validator参数映射及四步验证顺序。v1—v4 raw字节不变。
+- 诚实边界：成功仍固定`SOURCE_CALLER_INJECTED_NOT_ATTESTED / AUTHORIZATION_NOT_ESTABLISHED / NOT_PUBLISHED / NOT_ESTABLISHED_BY_PURE_VALIDATION`；publisher、runtime observer/backend继续固定失败。纯合同PASS不表示宿主已观察、UAT已创建或运行证据已发布。
+- 摘要：owner policy内部/raw/closure为`47d70021…87d0`/`e86831d5…5cf5`/`4238653e…055b`，module/one-shot/control policy内部/raw为`1a6d2848…9c17`/`0ce8417f…d198`/`a62a9664…2681`/`013d50d6…549b`。
+- 测试/复核：控制5/5、one-shot 13/13、runtime contracts 7/7、runtime receipts 16/16、external anchors 13/13、owner completion 15/15，共69项Unit及隔离Compose policy/config双PASS；`git diff --check`通过。两路最终独立只读复核均为P0=0/P1=0。
+- 资源：00:52→01:00收口静态门前后available memory `2,262,908,928 → 2,247,430,144`B，Swap保持`180,166,656`B且10秒`si/so=0/0`，根盘available `17,742,811,136 → 17,757,143,040`B，Load `0.14/0.20/0.20 → 0.53/0.38/0.27`，PSI/OOM0。Docker保持6容器/75镜像/277 Volume/6网络/0 Cache，四服务ID不变、restart0/OOM false且保护卷完整；Compose `ps`在未注入`ERP_DEPLOYMENT_CLASS`时严格拒绝插值，改用只读Docker metadata核对；任务`.pyc`/Compose临时目录残留0。
+- 代码/数据：无产品业务代码、Schema、Migration、API、页面、依赖、员工角色或生产配置变化；未创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，未build/deploy/Migration/restart/账号/业务写，也未访问现有UAT或生产数据。
+- 文档：新增D-181并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一独立切片只处理Caddy Host/SNI纯intent/contract，再处理全动作closure、publisher/runtime backend和精确镜像，不自动运行。
+
 ## 2026-08-24
 
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: validate isolated UAT external anchors`

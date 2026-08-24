@@ -1,0 +1,246 @@
+{
+  "schema_version": 5,
+  "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v5",
+  "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v5",
+  "implementation_status": "V4_EXACTLY_INHERITED_OWNER_COMPLETION_PURE_CONTRACT_VALID_RUNTIME_FACTS_NOT_ESTABLISHED",
+  "execution_boundary": {
+    "evidence_scope": "ISOLATED_UAT_ONLY",
+    "shell_allowed": false,
+    "free_form_argv_allowed": false,
+    "production_entrypoints_allowed": false,
+    "production_release_identity_allowed": false,
+    "runtime_path_implemented": false,
+    "extension_mode": "EXACT_V4_INHERITANCE_WITH_ACTION_7_OWNER_OUTPUT_AND_ACTION_9_VALIDATION_INPUT",
+    "owner_completion_validation_scope": "PURE_CONTRACT_JOIN_SOURCE_CALLER_INJECTED_NOT_ATTESTED",
+    "production_operator_profile_status": "REFERENCE_PRIMITIVES_ONLY_ENTRYPOINT_FORBIDDEN",
+    "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+  },
+  "base_binding": {
+    "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v4",
+    "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v4",
+    "binding_sha256": "fb83e0f20823b632525823f3d6c012769501fff1aec9763abc64d8d10d2b050b",
+    "raw_sha256": "4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262",
+    "action_inheritance": {
+      "mode": "EXACT_BASE_FIELDS_ADDITIVE_SOURCES_INPUTS_OUTPUTS_ONLY",
+      "action_count": 9,
+      "ordinal_sequence": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "augmented_ordinals": [
+        7,
+        9
+      ],
+      "status": "EXACT_BASE_ACTIONS_WITH_DECLARED_ADDITIONS"
+    },
+    "receipt_chain_inheritance": {
+      "mode": "EXACT_NO_OVERRIDE",
+      "internal_node_count": 18,
+      "external_node_count": 5,
+      "status": "EXACTLY_INHERITED"
+    }
+  },
+  "plan_digest_routing": {
+    "schema_version": 1,
+    "active_control_plan": {
+      "contract": "chenyida-erp-isolated-uat-one-shot-plan/v5",
+      "argument": "control_plan",
+      "digest_field": "plan_sha256",
+      "input_name": "control_plan_sha256"
+    },
+    "external_anchor_base_plan": {
+      "contract": "chenyida-erp-isolated-uat-one-shot-plan/v4",
+      "argument": "external_anchor_base_plan",
+      "digest_field": "plan_sha256",
+      "active_plan_reference_field": "external_anchor_base_plan_sha256",
+      "legacy_input_name": "plan_sha256",
+      "receipt_producer_ordinals": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    "owner_completion_log": {
+      "control_digest_field": "control_plan_sha256",
+      "base_digest_field": "external_anchor_base_plan_sha256"
+    },
+    "status": "EXPLICIT_ACTIVE_V5_AND_LEGACY_RECEIPT_V4_DIGEST_ROUTING"
+  },
+  "source_extensions": [
+    {
+      "ordinal": 7,
+      "inheritance_status": "BASE_ACTION_EXACT_WITH_DECLARED_ADDITIONS",
+      "additional_sources": [
+        "operations/isolated-uat-owner-completion-policy-v1.json",
+        "scripts/isolated-uat-owner-completion-contracts.py"
+      ],
+      "additional_inputs": [
+        "control_plan_sha256",
+        "external_anchor_base_plan_sha256",
+        "namespace_root_receipt",
+        "credential_generation_receipt",
+        "postgres_container_identity",
+        "database_cluster_identity"
+      ],
+      "additional_outputs": [
+        "owner_completion_log"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "inheritance_status": "BASE_ACTION_EXACT_WITH_DECLARED_ADDITIONS",
+      "additional_sources": [
+        "operations/isolated-uat-owner-completion-policy-v1.json",
+        "scripts/isolated-uat-owner-completion-contracts.py"
+      ],
+      "additional_inputs": [
+        "control_plan",
+        "external_anchor_base_plan",
+        "namespace_root_receipt",
+        "credential_generation_receipt",
+        "database_cluster_identity",
+        "external_anchor_policy",
+        "database_target_identity",
+        "database_bootstrap_receipt",
+        "expected_migration_allowlist",
+        "runtime_receipt_binding",
+        "verification_time",
+        "runtime_receipt_policy_raw",
+        "expected_runtime_policy_roots",
+        "runtime_policy_sources",
+        "owner_completion_policy",
+        "owner_completion_policy_sources",
+        "owner_completion_log"
+      ],
+      "additional_outputs": [
+        "owner_completion_validation"
+      ]
+    }
+  ],
+  "owner_completion_contract": {
+    "policy_source": "operations/isolated-uat-owner-completion-policy-v1.json",
+    "policy_contract": "chenyida-erp-isolated-uat-owner-completion-policy/v1",
+    "validator_source": "scripts/isolated-uat-owner-completion-contracts.py",
+    "validator_method": "validate_owner_completion_contracts",
+    "producer": {
+      "action_ordinal": 7,
+      "handler_id": "POSTGRESQL_RUNTIME_PRIVILEGE_PRIMITIVES",
+      "adapter_method": "reconcile_final_runtime_privileges",
+      "output": "owner_completion_log"
+    },
+    "consumer": {
+      "action_ordinal": 9,
+      "handler_id": "ISOLATED_UAT_POSTDEPLOY_EVIDENCE_ADAPTER",
+      "adapter_method": "verify_and_publish_isolated_uat_evidence",
+      "input": "owner_completion_log",
+      "output": "owner_completion_validation"
+    },
+    "operator_state_root_source": {
+      "source_output": "namespace_root_receipt",
+      "root_name": "operator_state_root",
+      "digest_field": "identity.identity_sha256"
+    },
+    "input_bundles": {
+      "runtime_intents": {
+        "DATABASE_BOOTSTRAP": "database_bootstrap_intent",
+        "MIGRATION": "migration_intent",
+        "RUNTIME_PRIVILEGE": "runtime_privilege_intent",
+        "EVIDENCE": "evidence_intent"
+      },
+      "runtime_receipts": {
+        "database_target_identity": "database_target_identity",
+        "database_bootstrap_receipt": "database_bootstrap_receipt",
+        "release_candidate_receipt": "release_candidate_receipt",
+        "migration_execution_receipt": "migration_execution_receipt",
+        "runtime_privilege_receipt": "runtime_privilege_receipt",
+        "readiness_receipt": "readiness_receipt",
+        "isolated_uat_postdeploy_receipt": "isolated_uat_postdeploy_receipt",
+        "isolated_uat_runtime_identity_receipt": "isolated_uat_runtime_identity_receipt"
+      },
+      "runtime_evidence_payloads": {
+        "database_bootstrap_observation": "database_bootstrap_observation",
+        "migration_applied_ledger": "migration_applied_ledger",
+        "migration_observation": "migration_observation",
+        "runtime_privilege_observation": "runtime_privilege_observation",
+        "container_identity_set": "container_identity_set"
+      }
+    },
+    "validator_arguments": {
+      "direct": {
+        "control_plan": "control_plan",
+        "external_anchor_base_plan": "external_anchor_base_plan",
+        "namespace_root_receipt": "namespace_root_receipt",
+        "credential_generation_receipt": "credential_generation_receipt",
+        "postgres_container_identity": "postgres_container_identity",
+        "database_cluster_identity": "database_cluster_identity",
+        "external_anchor_policy": "external_anchor_policy",
+        "expected_migration_allowlist": "expected_migration_allowlist",
+        "runtime_receipt_binding": "runtime_receipt_binding",
+        "verification_time": "verification_time",
+        "runtime_intent_policy": "runtime_contract_policy",
+        "runtime_receipt_policy": "runtime_receipt_policy",
+        "runtime_receipt_policy_raw": "runtime_receipt_policy_raw",
+        "expected_runtime_policy_roots": "expected_runtime_policy_roots",
+        "runtime_policy_sources": "runtime_policy_sources",
+        "owner_completion_log": "owner_completion_log",
+        "policy": "owner_completion_policy",
+        "policy_sources": "owner_completion_policy_sources"
+      },
+      "bundled": {
+        "runtime_intents": "runtime_intents",
+        "runtime_receipts": "runtime_receipts",
+        "runtime_evidence_payloads": "runtime_evidence_payloads"
+      }
+    },
+    "validation_pipeline": [
+      {
+        "order": 1,
+        "validator": "validate_control_plan",
+        "bound_source": "scripts/isolated-uat-external-anchor-contracts.py",
+        "input": "external_anchor_base_plan"
+      },
+      {
+        "order": 2,
+        "validator": "validate_external_anchor_contracts",
+        "bound_source": "scripts/isolated-uat-external-anchor-contracts.py",
+        "input": "caller_supplied_external_anchor_bundle"
+      },
+      {
+        "order": 3,
+        "validator": "validate_receipt_chain",
+        "bound_source": "scripts/isolated-uat-runtime-receipts.py",
+        "input": "caller_supplied_runtime_contract_bundles"
+      },
+      {
+        "order": 4,
+        "validator": "validate_owner_completion_contracts",
+        "bound_source": "scripts/isolated-uat-owner-completion-contracts.py",
+        "input": "owner_completion_log_and_revalidated_upstream_values"
+      }
+    ],
+    "journal_success_chain": [
+      "PREPARED",
+      "AUTHORIZATION_CONSUMED",
+      "TRANSACTION_DISPATCHED",
+      "POSTCOMMIT_CAPTURED",
+      "VERIFIED",
+      "COMMITTED"
+    ],
+    "terminal_location": "COMPLETED",
+    "validation_status": "PURE_OWNER_COMPLETION_CONTRACT_JOIN_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED",
+    "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+  },
+  "binding_sha256": "349fb247d271d3c749129c151ebb0b3c7054b64f5ee0c5646ea9e1d238c49c3f"
+}

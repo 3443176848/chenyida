@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-180已在D-179内部回执链之上新增外部锚点policy/纯validator，固定核对plan、七类namespace root、七份凭据metadata、PostgreSQL容器和cluster identity，并以binding/plan v4接线。成功只表示调用方注入对象满足固定语义及摘要连续性；source仍为`CALLER_INJECTED_NOT_ATTESTED`，runtime evidence仍为`NOT_ESTABLISHED_BY_PURE_VALIDATION`。owner完成日志、Caddy Host-SNI、全动作closure、外锚与内部链的运行时机械join、publisher、runtime backend和当前源码匹配镜像仍缺失。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-181已在D-179内部回执链与D-180外部锚点之上新增owner完成日志纯validator，固定重跑两条上游validator，并核对`operator_state_root`准备/完成身份、六阶段journal、终态、跨链摘要与因果时间；binding/plan升级v5并显式区分active v5控制摘要和冻结v4收据摘要。成功只表示调用方注入对象满足固定纯合同；source/时钟/观察值仍为`CALLER_INJECTED_NOT_ATTESTED`，授权和runtime evidence仍未建立。Caddy Host-SNI、全动作closure、publisher、runtime backend和当前源码匹配镜像仍缺失。
+
+2026-08-25 owner完成日志纯合同事件：项目负责人继续要求“下一步”。新增D-181、owner completion policy/纯validator及binding/plan v5；owner validator不接收可自签的D-179/D-180 validation envelope，而是从原始外锚、intent、receipt和evidence bundle调用固定源码重新验证，并把external policy绑定到owner source closure内的固定raw。正常成功日志只接受六个严格有序阶段、空recovery authorization、同一operation/request/project、同一`operator_state_root`准备/完成身份及`COMPLETED/VERIFIED`终态；cluster observation、Migration observation/completion、owner intent、runtime observation/receipt、journal和verification time形成因果链。v5对v4仅作声明式增量，v1—v4 raw字节保持不变；action 9参数、束组和验证顺序完整列出，v5/v4双摘要不能混用。聚合69/69、Compose双门及两路独立复核P0=0/P1=0；未创建或访问UAT运行资源。TASK92继续`DOING`，下一独立切片只处理Caddy Host/SNI纯合同。
 
 2026-08-24外部锚点纯合同事件：项目负责人继续要求“下一步”。新增D-180、`external-anchor-policy/v1`和无filesystem/Docker/数据库/网络/时钟/Secret能力的纯validator；严格核对v4 control plan、七个项目派生root及从`/`起的完整祖先/mount身份、七份只含metadata的普通凭据文件、PostgreSQL容器完整网络/端口/mount/tmpfs集合及cluster system identifier投影。祖先必须root所有且不可被组/其他用户写入；受保护mount source/root、双前导斜杠、`..`组件、跨mount-ID物理别名、FIFO凭据、额外网络/端口/bind和Secret挂载漂移均失败关闭。外部policy、v4 binding、runtime contract/receipt policy、source closure、capability、成功模板和receipt-chain字段均由执行代码固定，调用方重签`publisher=IMPLEMENTED`、`runtime_evidence=ESTABLISHED`或v99 chain均失败关闭。v4精确继承v3九动作/18节点且只增加外锚source；v1—v3字节不变。输出固定为`PURE_EXTERNAL_ANCHOR_CONTRACTS_VALID / SOURCE_CALLER_INJECTED_NOT_ATTESTED / AUTHORIZATION_NOT_ESTABLISHED / NOT_ESTABLISHED_BY_PURE_VALIDATION`，publisher门继续固定拒绝。聚合53/53与Compose双门PASS，两路最终独立只读复核均为P0=0/P1=0；未创建或访问UAT运行资源。TASK92继续`DOING`，下一切片只处理owner完成日志纯合同。
 
@@ -291,7 +293,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177 v2顺序、D-178纯意图、D-179内部回执链和D-180外部锚点纯合同；继续owner日志/publisher/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、低资源规则 | `DOING / PURE EXTERNAL ANCHOR CONTRACTS VALID WITH CALLER-INJECTED SOURCE NOT ATTESTED / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。binding/plan v4、七root/凭据metadata、PostgreSQL容器/cluster纯合同通过；owner日志、Caddy Host/SNI、全动作closure、外锚与内部链运行时join、publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177 v2顺序、D-178纯意图、D-179内部链、D-180外锚和D-181 owner完成日志纯合同；继续Host/SNI、publisher/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、D-181、低资源规则 | `DOING / PURE OWNER COMPLETION CONTRACT VALID WITH CALLER-INJECTED SOURCE NOT ATTESTED / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。binding/plan v5、固定D-179/D-180重验、operator root和六阶段owner journal纯合同通过；Caddy Host/SNI、全动作closure、publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

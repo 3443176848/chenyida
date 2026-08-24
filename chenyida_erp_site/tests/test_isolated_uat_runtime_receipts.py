@@ -88,9 +88,27 @@ def common(intent_policy: dict, project: str) -> dict:
     }
 
 
-def build_fixture(intent_policy: dict, receipt_policy: dict, binding: dict) -> dict:
-    project = "chenyida-erp-uat-runtime-receipt-test"
+def build_fixture(
+    intent_policy: dict,
+    receipt_policy: dict,
+    binding: dict,
+    *,
+    project: str = "chenyida-erp-uat-runtime-receipt-test",
+    request_id: str = "uat-one-shot-request-001",
+    plan_sha256: str = "a" * 64,
+    external_anchors: dict | None = None,
+    postgres_container_identity_sha256: str = "1" * 64,
+    system_identifier: str = "7391051976607354401",
+) -> dict:
     shared = common(intent_policy, project)
+    shared["request_id"] = request_id
+    shared["plan_sha256"] = plan_sha256
+    anchors = {
+        "credential_generation_receipt_sha256": "2" * 64,
+        "release_candidate_root_identity_sha256": "e" * 64,
+        "one_shot_state_root_identity_sha256": "f" * 64,
+        **(external_anchors or {}),
+    }
     roles = [
         {"role": role, "credential_file": intent_policy["invariants"]["role_credentials"][role]}
         for role in intent_policy["invariants"]["technical_login_roles"]
@@ -109,10 +127,12 @@ def build_fixture(intent_policy: dict, receipt_policy: dict, binding: dict) -> d
         **shared,
         "database_cluster_identity": {
             "project": project,
-            "postgres_container_identity_sha256": "1" * 64,
-            "system_identifier": "7391051976607354401",
+            "postgres_container_identity_sha256": postgres_container_identity_sha256,
+            "system_identifier": system_identifier,
         },
-        "credential_generation_receipt_sha256": "2" * 64,
+        "credential_generation_receipt_sha256": anchors[
+            "credential_generation_receipt_sha256"
+        ],
         "database_target_expectation": {
             "deployment_class": "UAT",
             "deployment_id": project,
@@ -130,7 +150,7 @@ def build_fixture(intent_policy: dict, receipt_policy: dict, binding: dict) -> d
         "bootstrap_intent_sha256": database_intent["intent_sha256"],
         "producer": database_producer,
         "database_name": "chenyida_erp",
-        "system_identifier": "7391051976607354401",
+        "system_identifier": system_identifier,
         "database_oid": "16384",
         "marker": f"chenyida-erp-deployment/v2:UAT:{project}",
         "owner": "chenyida_erp_owner",
@@ -189,7 +209,9 @@ def build_fixture(intent_policy: dict, receipt_policy: dict, binding: dict) -> d
             "count": intent_policy["invariants"]["migration_count"],
             "allowlist_sha256": intent_policy["invariants"]["migration_allowlist_sha256"],
         },
-        "release_candidate_root_identity_sha256": "e" * 64,
+        "release_candidate_root_identity_sha256": anchors[
+            "release_candidate_root_identity_sha256"
+        ],
     }, intent_policy)
     migration_producer = producer(binding, "MIGRATION")
     candidate = hashed({
@@ -338,7 +360,9 @@ def build_fixture(intent_policy: dict, receipt_policy: dict, binding: dict) -> d
         "containers": simple_containers,
         "loopback": loopback_ports,
         "release_identity_reader_gid": 65532,
-        "one_shot_state_root_identity_sha256": "f" * 64,
+        "one_shot_state_root_identity_sha256": anchors[
+            "one_shot_state_root_identity_sha256"
+        ],
     }, intent_policy)
     evidence_producer = producer(binding, "EVIDENCE")
     rich_containers = {}

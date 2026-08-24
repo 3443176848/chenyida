@@ -1,13 +1,13 @@
 # 晨亿达ERP状态快照
 
-最后更新时间：2026-08-24（Asia/Shanghai）
+最后更新时间：2026-08-25（Asia/Shanghai）
 
-## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-180外部锚点纯合同已闭合，source与runtime事实仍未认证）
+## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-181 owner完成日志纯合同已闭合，source与runtime事实仍未认证）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / PURE EXTERNAL ANCHOR CONTRACTS VALID WITH CALLER-INJECTED SOURCE NOT ATTESTED / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO | D-180已闭合外部锚点纯字段语义/摘要连续性和binding/plan v4；宿主观察、运行证据、publisher/backend仍失败关闭 |
-| 授权范围 | PASS / REPOSITORY STATIC ONLY | 本段只做external anchor纯policy/validator、binding/plan v4和内存fixture测试；不授权目录、Secret、Docker资源、数据库、build、Migration、部署、账号或业务写 |
+| 当前状态 | DOING / PURE OWNER COMPLETION CONTRACT VALID WITH CALLER-INJECTED SOURCE NOT ATTESTED / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO | D-181已闭合固定D-179/D-180重验、owner journal、operator root连续性和binding/plan v5；宿主观察、运行证据、publisher/backend仍失败关闭 |
+| 授权范围 | PASS / REPOSITORY STATIC ONLY | 本段只做owner完成日志纯policy/validator、binding/plan v5和内存fixture测试；不授权目录、Secret、Docker资源、数据库、build、Migration、部署、账号或业务写 |
 | 清理执行 | PASS / 3 BOUNDED PASSES | 三次BuildKit-only命令均rc0，分别报告607.3MB、35.76MB和9.667GB；Cache`174 → 164 → 149 → 0`，active始终0 |
 | 根盘 | PASS / 16.68 GiB AVAILABLE | `10,825,478,144 → 17,909,628,928` bytes，实际增加约6.60GiB；最终比10GiB硬线高约6.68GiB |
 | 内存/Swap/Load | PASS | 最终MemAvailable `2,467,676,160`B，Swap used `179,859,456`B且60秒增长0，Load`0.24/0.28/0.26`，PSI/OOM0 |
@@ -16,9 +16,9 @@
 | 受保护Volume | PASS / ALL PRESENT | `erp_postgres`、`erp_uploads`、`erp_attachments`、`erp_backup_status` metadata不变，未读取正文 |
 | Compose消费者隔离 | PASS / STATIC | 独立项目、7 Volume、2网络、3 host root和loopback-only端口；Secret/release bind只读且`create_host_path:false` |
 | 负向静态门 | PASS / 5 FAIL-CLOSED CASES | 缺root、生产root、生产项目名、生产Web端口和遗漏overlay均被拒绝；有效合同输出双PASS |
-| 控制请求合同 | PASS / NON-EXECUTING | 七类项目派生root、五个技术数据库角色、六份runtime Secret+backup service、`EMPTY → 0046`及精确非零Git/镜像/Compose输入已冻结；reader GID同源固定`65532`，当前policy SHA `9a09a3f1…d6c8` |
+| 控制请求合同 | PASS / NON-EXECUTING | 七类项目派生root、五个技术数据库角色、六份runtime Secret+backup service、`EMPTY → 0046`及精确非零Git/镜像/Compose输入已冻结；reader GID同源固定`65532`，当前policy SHA `a62a9664…2681` |
 | 控制请求负向门 | PASS / 4 UNIT / FAIL-CLOSED | 生产项目/root、旧head、浮动镜像、运行动作、source/角色/runtime漂移、重复key及人员数字段失败关闭；人数不成为基础设施基数 |
-| one-shot计划入口 | PASS / PLAN V4 / READ-ONLY / 12 UNIT | External policy/closure/capability/status字段使当前计划升级为plan/v4；只输出`NOT_RUN_NO_EXTERNAL_EVIDENCE`及成功模板，返回前二次核对source state；同一request确定性输出九步计划、binding及摘要，默认不执行，篡改/并发漂移失败关闭 |
+| one-shot计划入口 | PASS / PLAN V5 / READ-ONLY / 13 UNIT | Owner policy/closure/capability/status及base v4摘要使当前计划升级为plan/v5；只输出`NOT_RUN_NO_OWNER_COMPLETION_LOG`及成功模板，返回前二次核对source state；同一request确定性输出九步计划、binding及摘要，默认不执行，篡改/并发漂移失败关闭 |
 | one-shot执行门 | PASS / DISABLED BEFORE BACKEND | 当前`execute`在输出计划及唯一runtime backend seam之前返回`ISOLATED_UAT_ONE_SHOT_EXECUTION_NOT_AUTHORIZED`；测试证明backend调用0 |
 | D-179 receipt policy | PASS / PURE VALIDATOR / 16 UNIT | 八类回执、五类证据体及固定producer/字段/摘要/时间语义通过；深层恶意嵌套稳定失败关闭；policy内部/raw/source closure SHA为`58c34e46…9f6e`/`1eee47ed…7aac`/`0a343c32…90d8` |
 | D-179内部前驱链 | PASS / EXTERNAL ANCHORS UNVERIFIED | 成功值固定为`VALIDATED_PURE_INTERNAL_CONTRACT_CHAIN_FROM_UNVERIFIED_EXTERNAL_DIGEST_ANCHORS`；四业务external anchors和control plan为`NOT_EVALUATED`，runtime evidence为`NOT_ESTABLISHED_BY_PURE_VALIDATION` |
@@ -28,12 +28,19 @@
 | D-180 namespace/credential边界 | PASS / FAIL-CLOSED | 祖先从`/`完整列举且root所有/不可group或other写；directory/regular-file类型、非symlink、mount point/root/source、`device+inode`物理唯一性均精确核对，受保护mount、双前导斜杠、`..`组件和跨mount-ID别名失败关闭；Secret正文和内容摘要不进入合同 |
 | D-180 PostgreSQL身份边界 | PASS / COMPLETE DECLARED SET | 固定manifest/config digest、唯一内部backend network、network mode、`published_ports=[]`、两个项目Volume、只读bootstrap Secret bind和三项tmpfs；额外网络/端口/bind、生产Volume或Secret挂载漂移失败关闭 |
 | D-180摘要与binding | PASS / V4 ACTIVE / V3 INTERNAL BASE | External policy内部/raw/closure SHA为`66afa1ee…9a6b`/`92c59a9f…6ef3`/`4452221d…aff4`，module/one-shot/control internal/raw分别为`fc6e76d4…be61`/`8cd1a345…b7f7`/`9a09a3f1…d6c8`/`45bdf961…b83c`；v4 body/raw为`fb83e0f2…b050b`/`4858b8c1…34262`，v1—v3 raw字节不变 |
-| D-180缺失能力 | BLOCKED / EXPLICIT | 调用方source和观察值未认证；owner完成日志、Caddy Host/SNI intent、全动作传递closure、外锚与D-179运行时机械join、atomic publisher及host/Docker/PostgreSQL/HTTP backend均未实现 |
+| D-180后续边界 | SUPERSEDED BY D-181 PURE JOIN | D-181已在纯函数边界重验并join外锚、内部链和owner日志；调用方source/时钟/观察值仍未认证，Caddy Host/SNI、全动作传递closure、atomic publisher及host/Docker/PostgreSQL/HTTP backend仍未实现 |
+| D-181 owner policy | PASS / PURE CONTRACT / 15 UNIT | 固定重跑D-180 plan/external anchors与D-179完整receipt chain，再验证owner log、六阶段journal、空recovery authorization、`COMPLETED/VERIFIED`终态和`operator_state_root`准备/完成身份连续性 |
+| D-181摘要与binding | PASS / V5 ACTIVE / V4 EXTERNAL BASE | v5 body/raw为`349fb247…9c3f`/`95bbf9a2…7363`；owner policy内部/raw/closure为`47d70021…87d0`/`e86831d5…5cf5`/`4238653e…055b`，module/one-shot/control internal/raw为`1a6d2848…9c17`/`0ce8417f…d198`/`a62a9664…2681`/`013d50d6…549b`；v1—v4 raw字节不变 |
+| D-181失败关闭边界 | PASS / UPSTREAM REVALIDATED | External policy必须等于固定raw；双plan摘要显式路由，action 9参数/束组/pipeline闭合。自签validation envelope、v99 observation、privilege policy、source usage、plan/root/terminal及跨链时间漂移均失败关闭 |
+| D-181证据边界 | PASS / CALLER SOURCE NOT ATTESTED | 成功仍固定`SOURCE_CALLER_INJECTED_NOT_ATTESTED / AUTHORIZATION_NOT_ESTABLISHED / NOT_PUBLISHED / NOT_ESTABLISHED_BY_PURE_VALIDATION`；publisher、runtime observer和backend固定未实现，新UAT仍未创建 |
 | D-178纯合同 | PASS / STRUCTURE ONLY / 7 UNIT | 三族意图固定`STRUCTURE_VALID / NOT_EXECUTED / NOT_PUBLISHED / NOT_AVAILABLE / predecessor NOT_VALIDATED`；receipt semantics为`INCOMPLETE_DESCRIPTOR_ONLY`，validator/publisher/backend均`NOT_IMPLEMENTED` |
 | D-178合成端口 | PASS / FIXTURE ONLY | 三个typed fake ports覆盖逐步异常、重签畸形字段、自洽重签intent、跨族source漂移和输入别名，全部首错停止；不生成真实回执或前驱链证据 |
 | D-178 source closure | PASS / SINGLE PURE MODULE ONLY | Runtime policy/closure SHA为`5f24335a…6586`/`978741a0…c939`；固定单文件hash/import allowlist并明示`NOT_A_SANDBOX`，不冒充v2九步传递closure |
-| 固定动作目录 | PASS / V1 + V2 HISTORICAL / V3 INTERNAL BASE / V4 ACTIVE | v1/v2/v3 raw SHA保持`3244d550…7b3a`/`9cc4e3c1…5232`/`da69ce3a…de5c4`；v4精确继承v3九动作/18节点，只增加external policy/validator source和五外层节点/四anchor映射 |
-| 绑定边界 | PASS / INTERNAL + EXTERNAL CONTRACT REFERENCES ONLY | 禁止shell、自由argv和生产入口；数据库身份/角色→Migration→最终ACL→服务→隔离证据。v3/v4只证明声明的内部前驱和外部合同映射，不冒充九步全动作传递source closure或runtime实现 |
+| 固定动作目录 | PASS / V1 + V2 HISTORICAL / V3 INTERNAL BASE / V4 EXTERNAL BASE / V5 ACTIVE | v1/v2/v3/v4 raw SHA保持`3244d550…7b3a`/`9cc4e3c1…5232`/`da69ce3a…de5c4`/`4858b8c1…34262`；v5只为owner policy/validator、双摘要路由及action 7/9输入输出作additive extension |
+| 绑定边界 | PASS / INTERNAL + EXTERNAL + OWNER CONTRACT REFERENCES ONLY | 禁止shell、自由argv和生产入口；数据库身份/角色→Migration→最终ACL/owner journal→服务→隔离证据。v3/v4/v5只证明声明的内部、外锚和owner纯合同，不冒充九步全动作传递source closure或runtime实现 |
+| D-181静态验证 | PASS / 5 + 13 + 7 + 16 + 13 + 15 = 69 UNIT / COMPOSE DOUBLE PASS | 控制合同5/5、one-shot 13/13、runtime contracts 7/7、runtime receipts 16/16、external anchors 13/13、owner completion 15/15；聚合runner与隔离Compose policy/config双PASS |
+| D-181独立复核 | PASS / 2 REVIEWERS / P0=0 / P1=0 | 两路最终稳定树只读复核均无P0/P1；此前双plan、输入闭包、上游伪造、摘要命名、跨链时间、external policy与source usage自签缝均修复进入负测 |
+| D-181资源/完整性 | PASS / STATIC ONLY / NO TASK RESIDUE | 00:52→01:00收口门：available memory `2,262,908,928 → 2,247,430,144`B，Swap保持`180,166,656`B且10秒`si/so=0/0`，根盘 `17,742,811,136 → 17,757,143,040`B，Load `0.14/0.20/0.20 → 0.53/0.38/0.27`，PSI/OOM0。Docker保持6/75/277/6、Build Cache 0；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整；Compose `ps`在未注入`ERP_DEPLOYMENT_CLASS`时严格拒绝插值，改用只读Docker metadata核对；任务`.pyc`/Compose临时目录残留0 |
 | D-180静态验证 | PASS / 5 + 12 + 7 + 16 + 13 = 53 UNIT / COMPOSE DOUBLE PASS | 控制合同5/5、one-shot 12/12、runtime contracts 7/7、runtime receipts 16/16、external anchors 13/13；聚合runner与隔离Compose policy/config双PASS，最终diff/凭据扫描随提交门复核 |
 | D-180独立复核 | PASS / 2 REVIEWERS / P0=0 / P1=0 | 多轮只读复核发现的plan重签、稳定错误、ancestor/mount、路径规范化及完整容器集合问题均修复进入负测；稳定树两路最终结论均无P0/P1，一路1342个逐字段变体为0绕过/0异常泄漏 |
 | D-180资源/完整性 | PASS / STATIC ONLY / NO TASK RESIDUE | 21:42→22:52：available memory `2,363,518,976 → 2,256,683,008`B、Swap `179,556,352 → 179,613,696`B、根盘 `17,812,017,152 → 17,746,034,688`B、Load `0.03/0.35/0.25 → 0.23/0.20/0.22`，Memory PSI/OOM0。Docker保持6/75/277/6、Build Cache 0；四服务ID不变、restart0/OOM false、Web/PostgreSQL healthy，四保护卷完整。精确删除5个任务`.pyc`，任务pyc/Compose临时目录残留0 |
@@ -50,8 +57,8 @@
 | 收口资源/完整性 | PASS / NO UAT RESIDUE | `2,452,017,152`B available memory、`179,843,072`B Swap、`17,893,322,752`B根盘、Load`0.19/0.17/0.12`、OOM0；6/75/277/6、Cache0，四服务restart0/OOM false且保护卷完整 |
 | 生产配置/运行面 | PASS / UNCHANGED | 生产Compose与政策未改；未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源 |
 | 本段资源/完整性 | PASS / STATIC ONLY | 起点约2.3GiB/171MiB/17GiB/Load`0.21/0.20/0.18`；收口`2,445,348,864`B available、`179,769,344`B Swap、`17,871,294,464`B磁盘、Load`0.03/0.11/0.15`、PSI/OOM0。6/75/277/6、Cache0，四服务restart0/OOM false且保护卷保持，任务临时资源0 |
-| 仍有阻断 | OWNER JOURNAL + HOST/SNI + FULL CLOSURE + PUBLISHER + DEDICATED RUNTIME PATH + EXACT IMAGE | owner日志、Caddy Host/SNI、全动作closure、外锚与内部链运行时join、host/Docker/PG/HTTP publisher/backend及当前源码匹配Web/Worker镜像缺失 |
-| 下一步 | TASK92 / OWNER COMPLETION JOURNAL PURE CONTRACT | 下一独立切片只补owner完成日志纯合同并纳入`operator_state_root`身份；之后再补Host/SNI和全动作closure，不自动运行 |
+| 仍有阻断 | HOST/SNI + FULL CLOSURE + PUBLISHER + DEDICATED RUNTIME PATH + EXACT IMAGE | Caddy Host/SNI、全动作closure、外锚/内部链/owner日志的运行时join、host/Docker/PG/HTTP publisher/backend及当前源码匹配Web/Worker镜像缺失 |
+| 下一步 | TASK92 / CADDY HOST-SNI PURE INTENT-CONTRACT | 下一独立切片只补Caddy Host/SNI纯intent/contract；之后再补全动作closure、publisher/runtime backend和精确镜像，不自动运行 |
 
 ## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
 

@@ -4091,6 +4091,42 @@
 - 拒绝把v4复制成第二套九步动作目录、修改冻结v3，或把owner日志、Host/SNI、全动作closure、publisher和runtime backend一次塞入同一大切片。
 - 拒绝因本切片静态测试通过而创建同机UAT、连接PostgreSQL、build镜像或申请运行授权。
 
+## D-181 隔离UAT owner完成日志必须重验两条固定上游链并保持operator root身份连续
+
+- 日期：2026-08-25
+- 状态：Accepted（仓库纯合同边界；不授权L2a或任何运行副作用）
+- 发起：项目负责人继续要求“下一步”；Codex按单一小团队UAT、最小静态切片和失败关闭原则推进D-180之后的owner边界
+
+### Context
+
+- D-179能验证内部receipt chain，D-180能验证外部namespace/credential/PostgreSQL anchors，但二者的validation output若由调用方直接传入owner层，仍可被伪造后自签；生产operator的journal成功语义也尚未投影到隔离UAT合同。
+- One-shot active plan升级后同时存在当前控制计划摘要和冻结外锚/内部回执使用的v4摘要。继续使用模糊`plan_sha256`会让adapter无法确定每类回执应绑定哪一个计划。
+- 不到20人的单一内部UAT不需要新建工作流平台、证据服务或通用编排器；只需要一个可审阅的owner完成日志纯合同，并继续保持运行端口关闭。
+
+### Decision
+
+1. 新增`chenyida-erp-isolated-uat-owner-completion-policy/v1`和纯validator。它不信任调用方提供的D-179/D-180 validation envelope，而是从原始外锚、intent、receipt和evidence bundle调用固定绑定模块重新执行`validate_control_plan`、`validate_external_anchor_contracts`和`validate_receipt_chain`。
+2. External policy必须逐对象等于owner source closure中固定raw文件；owner closure成员的usage按path精确固定。生产journal/operator/reconciler仅作`REFERENCE_PRIMITIVES_ONLY_NOT_EXECUTABLE`语义参照，生产runner/supervisor仍禁止成为隔离执行入口。
+3. Owner完成日志必须同时绑定active v5控制摘要和base v4收据摘要、同一operation/request/project、namespace/credential/container/cluster/database/Migration/runtime privilege前驱，以及同一`operator_state_root`准备/完成identity。正常成功路径的recovery authorization必须为空。
+4. Journal成功阶段固定为`PREPARED → AUTHORIZATION_CONSUMED → TRANSACTION_DISPATCHED → POSTCOMMIT_CAPTURED → VERIFIED → COMMITTED`；终态只接受`COMPLETED/VERIFIED`。隔离receipt使用`final_privilege_projection_sha256`，不得冒充生产operator的structure report摘要。
+5. 因果时间固定为cluster observation不晚于Migration observation/completion和owner intent；runtime observation必须位于transaction dispatch与postcommit capture之间，runtime receipt不晚于COMMITTED，owner receipt不晚于调用方verification time。所有时间仍是caller-injected、not-attested。
+6. 新增binding/plan v5但只对v4作additive extension。`plan_digest_routing`显式区分active v5控制摘要与v4 legacy receipt摘要；action 7/9的新增输入、三个runtime bundle、validator完整参数映射和固定四步验证顺序必须机械闭合。v1—v4原字节不得修改。
+7. 成功输出仍必须包含`SOURCE_CALLER_INJECTED_NOT_ATTESTED`、`AUTHORIZATION_NOT_ESTABLISHED`、`NOT_PUBLISHED`和`NOT_ESTABLISHED_BY_PURE_VALIDATION`。Publisher、runtime observer和runtime backend继续固定失败关闭；本决策不授权创建目录、Secret、容器、Volume、数据库、Migration、账号或业务数据。
+
+### Consequences
+
+- D-181现在能在纯函数边界内机械join D-179、D-180和owner journal，并拒绝自签plan/policy/validation/observation、双计划摘要混用、operator root替换、阶段跳转、终态漂移及跨链时间倒置。
+- Binding v5 body/raw SHA为`349fb247d271d3c749129c151ebb0b3c7054b64f5ee0c5646ea9e1d238c49c3f`/`95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363`；owner policy内部/raw/closure为`47d70021…87d0`/`e86831d5…5cf5`/`4238653e…055b`。v1—v4 raw SHA保持不变。
+- 69项聚合Unit、隔离Compose双门及两路独立最终复核P0=0/P1=0只证明仓库静态合同成立，不证明宿主目录、Secret、PostgreSQL、权限、journal或网络事实已被观察。
+- TASK92继续`DOING`。下一独立切片只处理Caddy Host/SNI纯intent/contract；全动作closure、publisher/runtime adapter、精确镜像及L2a仍分别受阻。
+
+### Rejected alternatives
+
+- 拒绝信任调用方传入且仅自摘要正确的D-179/D-180 validation output。
+- 拒绝让active v5和base v4共用一个含义不明的`plan_sha256`，或修改冻结v4及更早binding。
+- 拒绝把`desired_state_sha256`称为`final_structure_sha256`，以及在没有structure report bytes时声称生产结构报告已验证。
+- 拒绝在本切片实现publisher、宿主observer/runtime backend，或因纯合同PASS而创建同机UAT。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

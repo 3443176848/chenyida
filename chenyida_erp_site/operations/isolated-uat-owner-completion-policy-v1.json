@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-isolated-uat-owner-completion-policy/v1",
+  "policy_id": "chenyida-erp-isolated-uat-owner-completion-v1",
+  "execution_authorized": false,
+  "capability_status": {
+    "owner_completion_log_validator": "IMPLEMENTED_PURE",
+    "journal_success_chain_validator": "IMPLEMENTED_PURE",
+    "operator_state_root_continuity_validator": "IMPLEMENTED_PURE",
+    "upstream_contract_revalidation": "IMPLEMENTED_PURE_BY_FIXED_BOUND_MODULES",
+    "production_operator_primitives": "REFERENCE_SEMANTICS_ONLY_ENTRYPOINT_FORBIDDEN",
+    "runtime_observer": "NOT_IMPLEMENTED",
+    "publisher": "NOT_IMPLEMENTED",
+    "runtime_backend": "NOT_IMPLEMENTED",
+    "execution_authorized": false
+  },
+  "validation_output": {
+    "owner_completion_contract_status": "PURE_OWNER_COMPLETION_CONTRACT_VALID",
+    "journal_success_chain_status": "PURE_SUCCESS_CHAIN_VALID",
+    "operator_state_root_continuity_status": "PURE_IDENTITY_CONTINUITY_VALID",
+    "upstream_join_status": "PURE_D179_D180_REVALIDATED_CONTINUITY_VALID_SOURCE_NOT_ATTESTED",
+    "source_observation_status": "SOURCE_CALLER_INJECTED_NOT_ATTESTED",
+    "authorization_status": "AUTHORIZATION_NOT_ESTABLISHED",
+    "publication_status": "NOT_PUBLISHED",
+    "runtime_evidence_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+  },
+  "upstream_bindings": [
+    {
+      "path": "operations/isolated-uat-runtime-receipt-policy-v1.json",
+      "sha256": "1eee47ed1ed9311529153cc3e7defeb95984e075276af23a453a872c94027aac"
+    },
+    {
+      "path": "operations/isolated-uat-external-anchor-policy-v1.json",
+      "sha256": "92c59a9f9f800a243324c0a6e24ca8258e58483fe759cf30c2c98d53aead6ef3"
+    },
+    {
+      "path": "operations/postgresql-runtime-privilege-policy-v2.json",
+      "sha256": "2aba8ed96202117761ba88212fb84e3d475afbf19e5447fabe2f658bbe9d8a7c"
+    },
+    {
+      "path": "operations/isolated-uat-one-shot-action-bindings-v4.json",
+      "sha256": "4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262"
+    }
+  ],
+  "invariants": {
+    "operator_state_root_template": "/var/lib/{project}/postgresql-runtime-privilege-operator",
+    "root_marker": ".chenyida-erp-postgresql-runtime-privilege-operator-v1",
+    "intent_marker": ".chenyida-erp-postgresql-runtime-privilege-intent-v1",
+    "journal_profile": "ISOLATED_UAT_CONTRACT_ONLY",
+    "terminal_location": "COMPLETED",
+    "success_phases": [
+      "PREPARED",
+      "AUTHORIZATION_CONSUMED",
+      "TRANSACTION_DISPATCHED",
+      "POSTCOMMIT_CAPTURED",
+      "VERIFIED",
+      "COMMITTED"
+    ],
+    "operation": "RECONCILE",
+    "runtime_guard_mode": "ISOLATED_UAT_POST_MIGRATION_PRE_RUNTIME_BOUND",
+    "target_head": "0046_runtime_lock_privilege_boundary.sql",
+    "technical_login_roles": [
+      "chenyida_erp_admin",
+      "chenyida_erp_backup",
+      "chenyida_erp_owner",
+      "chenyida_erp_web",
+      "chenyida_erp_worker"
+    ],
+    "max_owner_journal_duration_seconds": 900,
+    "recovery_authorizations": "EMPTY_FOR_NORMAL_SUCCESS_PATH"
+  },
+  "source_closure": {
+    "schema_version": 1,
+    "algorithm": "PYTHON_STATIC_RESOURCE_CLOSURE_V1",
+    "roots": [
+      "scripts/isolated-uat-owner-completion-contracts.py"
+    ],
+    "members": [
+      {
+        "path": "operations/isolated-uat-external-anchor-policy-v1.json",
+        "sha256": "92c59a9f9f800a243324c0a6e24ca8258e58483fe759cf30c2c98d53aead6ef3",
+        "usage": "UPSTREAM_PURE_VALIDATION_CONTRACT"
+      },
+      {
+        "path": "operations/isolated-uat-one-shot-action-bindings-v4.json",
+        "sha256": "4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262",
+        "usage": "UPSTREAM_PURE_VALIDATION_CONTRACT"
+      },
+      {
+        "path": "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "sha256": "1eee47ed1ed9311529153cc3e7defeb95984e075276af23a453a872c94027aac",
+        "usage": "UPSTREAM_PURE_VALIDATION_CONTRACT"
+      },
+      {
+        "path": "operations/postgresql-runtime-privilege-policy-v2.json",
+        "sha256": "2aba8ed96202117761ba88212fb84e3d475afbf19e5447fabe2f658bbe9d8a7c",
+        "usage": "UPSTREAM_PURE_VALIDATION_CONTRACT"
+      },
+      {
+        "path": "scripts/isolated-uat-external-anchor-contracts.py",
+        "sha256": "fc6e76d4620cbfbb447beb53f5b0b35d1f6df138a028cfb811bffbc51959be61",
+        "usage": "UPSTREAM_PURE_VALIDATION_CONTRACT"
+      },
+      {
+        "path": "scripts/isolated-uat-owner-completion-contracts.py",
+        "sha256": "1a6d284873c50baac93ec87597356d8e04ff2086a0523b8e56961fcf7e769c17",
+        "usage": "EXECUTING_PURE_OWNER_COMPLETION_VALIDATOR"
+      },
+      {
+        "path": "scripts/isolated-uat-runtime-receipts.py",
+        "sha256": "c19d4599abf2b7063a4d82476b651ae0013303f181bcca1b8c45f5d94148e79d",
+        "usage": "UPSTREAM_PURE_VALIDATION_CONTRACT"
+      },
+      {
+        "path": "scripts/postgresql-runtime-privilege-journal.mjs",
+        "sha256": "16d8a311181874f4e6ed49c2251581df0777f038f7d3b10e7a4e7a88f6ef1bfc",
+        "usage": "REFERENCE_PRIMITIVES_ONLY_NOT_EXECUTABLE"
+      },
+      {
+        "path": "scripts/postgresql-runtime-privilege-operator.mjs",
+        "sha256": "13a896aee3c0c36d6c120eb2d9c46b2e514fc9c15f8e7a2becad06e3b84d0dc5",
+        "usage": "REFERENCE_PRIMITIVES_ONLY_NOT_EXECUTABLE"
+      },
+      {
+        "path": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+        "sha256": "22ddda1cf7f77899cbb58f2e6e5ac75f81ea7629d8a4abbf05b07021efc0a6b9",
+        "usage": "REFERENCE_PRIMITIVES_ONLY_NOT_EXECUTABLE"
+      }
+    ],
+    "declared_absent_capabilities": [
+      "CLOCK",
+      "DATABASE",
+      "DOCKER",
+      "FILESYSTEM_RUNTIME_OBSERVATION",
+      "NETWORK",
+      "PROCESS",
+      "RANDOM",
+      "SECRET_VALUES",
+      "SHELL"
+    ],
+    "validation_scope": "SOURCE_HASH_AND_FIXED_REFERENCE_RESOURCES_NOT_A_SANDBOX_OR_RUNTIME_ATTESTATION",
+    "source_closure_sha256": "4238653e9639b34ca932535ed3b360b3722f2f5b3b393045d98ac40fad03055b"
+  },
+  "policy_sha256": "47d70021cf4283a6d5ef0de9c4e5ad275cc8c204a481ae1fcbb778647cda87d0"
+}
