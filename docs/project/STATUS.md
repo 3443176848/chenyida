@@ -2,12 +2,12 @@
 
 最后更新时间：2026-08-24（Asia/Shanghai）
 
-## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；消费者、控制请求、只读计划与固定动作绑定已完成）
+## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-177/v2依赖绑定已纠正，runtime path仍未实现）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / CONSUMER + CONTROL-REQUEST + PLAN + FIXED ACTION BINDINGS PASS / RUNTIME ADAPTER + EXACT IMAGE REQUIRED / PRODUCTION NO-GO | 负责人已接受同一故障域；磁盘、消费者隔离、D-174请求、D-175默认拒绝入口和D-176固定方法目录完成，专用runtime adapter仍失败关闭 |
-| 授权范围 | PASS / REPOSITORY STATIC ONLY | 本段只做固定动作binding、source摘要和静态测试；不授权目录、Secret、Docker资源、数据库、build、Migration、部署或业务写 |
+| 当前状态 | DOING / V2 DEPENDENCY BINDINGS PASS / RUNTIME PATH + EXACT IMAGE REQUIRED / PRODUCTION NO-GO | D-176 v1保留为历史并由D-177/v2取代；物理顺序已纠正，但专用database-bootstrap/Migration/evidence合同、source闭包和runtime adapter仍失败关闭 |
+| 授权范围 | PASS / REPOSITORY STATIC ONLY | 本段只做只读可执行性审计、v2 binding/policy修正和静态测试；不授权目录、Secret、Docker资源、数据库、build、Migration、部署或业务写 |
 | 清理执行 | PASS / 3 BOUNDED PASSES | 三次BuildKit-only命令均rc0，分别报告607.3MB、35.76MB和9.667GB；Cache`174 → 164 → 149 → 0`，active始终0 |
 | 根盘 | PASS / 16.68 GiB AVAILABLE | `10,825,478,144 → 17,909,628,928` bytes，实际增加约6.60GiB；最终比10GiB硬线高约6.68GiB |
 | 内存/Swap/Load | PASS | 最终MemAvailable `2,467,676,160`B，Swap used `179,859,456`B且60秒增长0，Load`0.24/0.28/0.26`，PSI/OOM0 |
@@ -16,13 +16,14 @@
 | 受保护Volume | PASS / ALL PRESENT | `erp_postgres`、`erp_uploads`、`erp_attachments`、`erp_backup_status` metadata不变，未读取正文 |
 | Compose消费者隔离 | PASS / STATIC | 独立项目、7 Volume、2网络、3 host root和loopback-only端口；Secret/release bind只读且`create_host_path:false` |
 | 负向静态门 | PASS / 5 FAIL-CLOSED CASES | 缺root、生产root、生产项目名、生产Web端口和遗漏overlay均被拒绝；有效合同输出双PASS |
-| 控制请求合同 | PASS / NON-EXECUTING | 六类项目派生root、五个技术数据库角色、六份runtime Secret+backup service、`EMPTY → 0046`及精确Git/镜像/Compose输入已冻结；加入binding目录及被引用原语后的policy SHA `01e35bd9…b47` |
-| 控制请求负向门 | PASS / 4 UNIT / 9 CASES | 生产项目/root、旧head、浮动镜像、运行动作、source/角色漂移、重复key及人员数字段失败关闭；人数不成为基础设施基数 |
-| one-shot计划入口 | PASS / READ-ONLY / 7 UNIT | 同一request确定性输出九步规范计划、binding ID/SHA/status和摘要；默认不执行，篡改计划、请求动作或binding失败关闭 |
+| 控制请求合同 | PASS / NON-EXECUTING | 七类项目派生root、五个技术数据库角色、六份runtime Secret+backup service、`EMPTY → 0046`及精确Git/镜像/Compose输入已冻结；reader GID同源固定`65532`，policy SHA `2197a633…6271` |
+| 控制请求负向门 | PASS / 4 UNIT / FAIL-CLOSED | 生产项目/root、旧head、浮动镜像、运行动作、source/角色/runtime漂移、重复key及人员数字段失败关闭；人数不成为基础设施基数 |
+| one-shot计划入口 | PASS / READ-ONLY / 9 UNIT | 同一request确定性输出v2九步规范计划、binding ID/SHA/status和摘要；默认不执行，顺序/计划/request/binding篡改失败关闭 |
 | one-shot执行门 | PASS / DISABLED BEFORE SIDE EFFECTS | 当前`execute`在输出计划或调用执行器前返回`ISOLATED_UAT_ONE_SHOT_EXECUTION_NOT_AUTHORIZED`；没有自由命令或运行时副作用 |
-| 固定动作目录 | PASS / 9 CLOSED BINDINGS | 九步各有唯一handler/method/source/input/output；body SHA `b5b3a7eb…0276`，状态明确为`FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED` |
-| 绑定边界 | PASS / NO SHELL OR PRODUCTION ENTRYPOINT | 禁止shell和自由argv，所有source都由control policy摘要绑定；Migration回执先于identity，identity先于Web/Worker |
-| 固定绑定段验证 | PASS / 4 + 7 UNIT / COMPOSE DOUBLE PASS | 控制合同4/4、one-shot 7/7、隔离Compose policy/config双PASS；Shell语法、`git diff --check`和针对性凭据模式扫描通过 |
+| 固定动作目录 | PASS / V1 HISTORICAL + V2 ACTIVE | v1文件/摘要保持不变；v2九步各有唯一handler/method/direct-source/input/output，body SHA `6f28881b…d463a`，状态为`FIXED_BINDINGS_DEPENDENCY_ORDER_CORRECTED_RUNTIME_PATH_NOT_IMPLEMENTED` |
+| 绑定边界 | PASS / DIRECT SOURCES ONLY | 禁止shell、自由argv和生产入口；数据库身份/角色→Migration→最终ACL→服务→隔离证据。当前只证明直接source摘要，不冒充传递闭包或runtime实现 |
+| v2绑定段验证 | PASS / 4 + 9 UNIT / COMPOSE DOUBLE PASS | 控制合同4/4、one-shot 9/9、隔离Compose policy/config双PASS；Shell语法通过，最终diff/凭据扫描随提交门复核 |
+| D-177资源/完整性 | PASS / STATIC ONLY / NO TASK RESIDUE | 16:09→16:42：available memory `2,395,615,232 → 2,395,176,960`B，Swap `179,658,752 → 179,642,368`B，根盘 `17,809,903,616 → 17,764,696,064`B，Load `0.05/0.29/0.24 → 0.62/0.29/0.18`，Memory PSI/OOM0。Docker保持6容器/75镜像/277 Volume/6网络/0 Cache；四服务restart0/OOM false、Web/PostgreSQL healthy，保护卷完整。当前任务临时目录/pyc残留0；8月15—16日既有26个`/tmp/cyd-uat-promotion-*`和历史pycache不属本任务，未清理 |
 | 固定绑定段资源/完整性 | PASS / STATIC ONLY / NO NEW RESIDUE | 15:55→16:05：available memory `2,449,465,344 → 2,445,877,248`B，Swap保持`179,671,040`B，根盘 `17,836,396,544 → 17,830,621,184`B，Load `0.00/0.08/0.13 → 0.85/0.50/0.26`，PSI/OOM0。Docker保持6/75/277/6、Cache0，四服务restart0/OOM false且Web/PostgreSQL healthy，保护卷完整，临时目录和本段新增`.pyc`为0 |
 | one-shot段资源/完整性 | PASS / STATIC ONLY / NO RESIDUE | 10:02→10:09：available memory `2,432,094,208 → 2,449,072,128`B，Swap `179,748,864 → 179,748,864`B，根盘 `17,864,470,528 → 17,874,239,488`B，Load `0.07/0.21/0.20 → 0.29/0.26/0.21`；PSI/OOM0。Docker保持6容器/75镜像/277 Volume/0 Cache，四服务restart0/OOM false且Web/PostgreSQL healthy，保护卷完整，临时目录/pyc残留0 |
 | 生产控制面保护 | PASS / UNCHANGED | 请求明确禁止生产supervisor/runner；既有生产policy和默认路径未改。新policy为`deployment_authorized=false / CONTRACT_ONLY_NOT_EXECUTABLE` |
@@ -31,8 +32,8 @@
 | 收口资源/完整性 | PASS / NO UAT RESIDUE | `2,452,017,152`B available memory、`179,843,072`B Swap、`17,893,322,752`B根盘、Load`0.19/0.17/0.12`、OOM0；6/75/277/6、Cache0，四服务restart0/OOM false且保护卷完整 |
 | 生产配置/运行面 | PASS / UNCHANGED | 生产Compose与政策未改；未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源 |
 | 本段资源/完整性 | PASS / STATIC ONLY | 起点约2.3GiB/171MiB/17GiB/Load`0.21/0.20/0.18`；收口`2,445,348,864`B available、`179,769,344`B Swap、`17,871,294,464`B磁盘、Load`0.03/0.11/0.15`、PSI/OOM0。6/75/277/6、Cache0，四服务restart0/OOM false且保护卷保持，任务临时资源0 |
-| 仍有阻断 | DEDICATED RUNTIME ADAPTER + EXACT IMAGE | 固定绑定目录已实现，但宿主目录/凭据/角色/Migration/release/Compose的专用runtime methods和其合成隔离测试尚未实现；当前源码匹配Web/Worker镜像缺失 |
-| 下一步 | TASK92 / DEDICATED RUNTIME ADAPTER | 只实现目录已冻结的九个方法和合成隔离测试，不参数化生产supervisor；随后再准备精确镜像和L2a申请，不自动运行 |
+| 仍有阻断 | DEDICATED RUNTIME PATH + EXACT IMAGE | 隔离UAT专用database-bootstrap/Migration/evidence回执、传递source闭包、host/Docker/PG/HTTP typed ports及其合成测试尚未实现；当前源码匹配Web/Worker镜像缺失 |
+| 下一步 | TASK92 / SYNTHETIC RUNTIME CONTRACT | 先定义database-bootstrap/Migration/evidence专用回执/source闭包并用注入fake ports测试固定九步；真实系统端口继续未实现，随后才准备精确镜像和L2a申请，不自动运行 |
 
 ## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
 

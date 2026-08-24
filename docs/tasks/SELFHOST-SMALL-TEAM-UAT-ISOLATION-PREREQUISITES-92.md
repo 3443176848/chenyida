@@ -1,6 +1,6 @@
 # SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 新隔离UAT前置边界
 
-> 状态：`DOING / CONSUMER + REQUEST + PLAN + FIXED ACTION BINDINGS PASS / RUNTIME ADAPTER + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
+> 状态：`DOING / V2 DEPENDENCY BINDINGS PASS / RUNTIME PATH + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
 > 日期：2026-08-24（Asia/Shanghai）
 > 依赖：TASK91、D-172、低资源服务器保护规则
 > 责任：项目负责人已选择当前主机同机隔离并接受同一故障域；Codex只执行仓库内静态前置，运行资源仍逐层授权
@@ -20,6 +20,7 @@
 - 同机选择明确接受与现有UAT处于同一宿主故障域；隔离目标是防止项目名、网络、Volume、端口、Secret和发布文件相互碰撞，不伪装成异机灾备。
 - 2026-08-24，项目负责人继续要求“进行下一步”。本段仅把D-174请求编译为默认只读的确定性one-shot计划并建立执行拒绝门；不把该指令扩张为L2a，不实现或调用目录、Secret、Docker、数据库、Migration、发布或部署动作。
 - 2026-08-24，项目负责人再次要求“下一步”。本段只把九步计划绑定到封闭handler/method/source/input/output目录并做静态顺序测试；仍不实现或调用宿主runtime adapter。
+- 2026-08-24，项目负责人继续要求“下一步”。在实现adapter前先对D-176做只读可执行性审计；发现P0顺序冲突后，本段只保留历史v1、新增D-177/v2并做静态测试，不在错误合同上补executor，也不扩大为L2a运行授权。
 
 ### A. 独立UAT主机（推荐）
 
@@ -39,7 +40,7 @@
 
 - 当前HEAD没有匹配Web/Worker镜像；唯一alpha.47镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`。
 - `compose.uat-isolated.yml`已关闭容器消费者侧固定root：独立项目名、Secret、release candidate/identity、命名Volume、网络和loopback端口均有失败关闭静态合同。生产Compose未参数化、未改变。
-- D-174已冻结namespace与输入，D-175固化九步顺序，D-176又冻结每步handler、方法、source及输入输出依赖。合同仍是`CONTRACT_ONLY_NOT_EXECUTABLE`，宿主runtime adapter尚未实现，不能生成目录、发布文件、角色或凭据。
+- D-176 v1虽冻结字段但物理顺序不可执行，D-177已用保留历史v1、新增v2的方式纠正。合同仍是`CONTRACT_ONLY_NOT_EXECUTABLE`；隔离UAT专用database-bootstrap/Migration/evidence回执、传递source闭包和宿主runtime path尚未实现，不能生成目录、发布文件、角色或凭据。
 - TASK92已把根盘可用恢复到约16.68 GiB、比10 GiB硬线高约6.68 GiB；磁盘停止线阻断已解除，但任何后续build仍须重新执行新鲜资源门并串行控制上界。
 - L2a、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权。
 
@@ -79,8 +80,8 @@
 
 ## 6. 同机UAT控制请求合同结果
 
-- 新增`operations/isolated-uat-control-plane-policy-v1.json`和严格Python验证器/runner；D-176把binding目录及全部被引用原语加入source binding后，Policy SHA-256更新为`01e35bd96971b45cf596767d7db7c554fd93225ec4c68223e092119c736ecb47`。`deployment_authorized=false`且`runtime_actions_authorized=[]`保持不变。
-- 六类root由同一个可配置项目名派生：runtime Secret、operator credential、release candidate、release identity、operator state和synthetic backup；必须彼此不重叠并避开三类生产受保护root。共享全局lock只允许串行协调，不承载任何环境数据。
+- 新增`operations/isolated-uat-control-plane-policy-v1.json`和严格Python验证器/runner；D-177切换binding v2并补运行输入后，Policy SHA-256更新为`2197a633db282423f40ba0ac22e94dc27206bca6ed20f8eb332165811eac6271`。`deployment_authorized=false`且`runtime_actions_authorized=[]`保持不变。
+- 七类root由同一个可配置项目名派生：runtime Secret、operator credential、release candidate、release identity、operator state、one-shot state和synthetic backup；必须彼此不重叠并避开三类生产受保护root。共享全局lock只允许串行协调，不承载任何环境数据。
 - release producer和PostgreSQL operator均只允许后续专用`DEDICATED_ISOLATED_UAT_ONE_SHOT_ADAPTER`入口。生产`release-supervisor-launcher.py`和`postgresql-runtime-privilege-runner.mjs`在该UAT请求中明确禁止；生产政策和默认行为未修改。
 - 数据库服务角色固定为现有五个技术登录角色，六份runtime Secret加独立backup capture service提供凭据；这些是服务边界，不是员工席位。工程、计划、市场等暂按2人仅属于后续实名账号配置，任何`staff_count`类字段都被请求schema拒绝。
 - 合同机械重算当前`0.1.0-alpha.47`、46项Migration、`EMPTY → 0046_runtime_lock_privilege_boundary.sql`及allowlist SHA-256 `8bb2b2d6…8eed`；L2a请求还必须提供精确Git commit/tree、Web/Worker registry/config digest和resolved Compose摘要，浮动tag失败关闭。
@@ -89,6 +90,8 @@
 - 09:26 CST起点约2.3GiB available memory、171MiB Swap、17GiB根盘available、Load`0.21/0.20/0.18`；09:34收口为`2,445,348,864`B available、`179,769,344`B Swap used、根盘`17,871,294,464`B available、Load`0.03/0.11/0.15`。Memory PSI和kernel `oom_kill`均为0，Docker保持6容器/75镜像/277 Volume/6网络/0 Build Cache；现有四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四个受保护Volume存在。本段没有任务临时资源。
 
 ## 7. 默认禁用one-shot计划入口结果
+
+> D-177已取代本节/D-175中“权限→Migration→生产identity→Web/Worker”的历史动作顺序；默认拒绝语义保持，当前有效顺序见第9节。
 
 - 新增`isolated-uat-one-shot.py`。同一个已验证request会确定性输出规范JSON和`plan_sha256`；默认命令只有读取、校验和输出，不导入subprocess，不创建目录，不连接Docker或数据库。
 - 九步只表达技术依赖：精确输入、私有root、独立凭据、PostgreSQL、五角色权限原语、`EMPTY → 0046`、release identity、Web/Worker和loopback就绪。项目名和root仍由request派生，未写死人员、席位、账号或并发数量。
@@ -100,6 +103,8 @@
 
 ## 8. 固定动作绑定合同结果
 
+> 本节记录D-176 v1历史证据。D-177确认其物理顺序不可执行，v1文件和摘要保留不改，但不再作为one-shot当前绑定。
+
 - 新增`isolated-uat-one-shot-action-bindings-v1.json`，body SHA-256为`b5b3a7eb5a1a782290e2a37c5fed0ae8e09230696ae9da26d80398b0b2070276`；状态明确为`FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED`。
 - 九步各有唯一`handler_id`和`adapter_method`，并声明受控sources、inputs和outputs。验证器机械检查先后依赖、输出不复用、source全部进入当前policy摘要且生产入口不在绑定中。
 - Binding禁止shell和自由argv。Compose只绑定三份隔离渲染来源；PostgreSQL只复用policy/operator/reconciler/journal原语；Migration只绑定现有engine/authorization模块；release identity只绑定原子身份合同。
@@ -109,11 +114,22 @@
 - 本段仍没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，没有build、deploy、Migration、restart、账号或业务写，也没有访问现有UAT/生产数据面。
 - 15:55→16:05 CST静态段MemAvailable `2,449,465,344 → 2,445,877,248`B，Swap used保持`179,671,040`B，根盘available `17,836,396,544 → 17,830,621,184`B，Load `0.00/0.08/0.13 → 0.85/0.50/0.26`，Memory PSI和kernel `oom_kill`为0。Docker保持6容器/75镜像/277 Volume/6网络/0 Build Cache；四服务restart0/OOM false，Web/PostgreSQL healthy，四个受保护Volume存在。测试临时目录为0、本段新增`.pyc`为0；历史`__pycache__`未修改或清理。
 
-## 9. 当前停止线与完成标准
+## 9. D-177 v2依赖顺序勘误结果
 
-磁盘、Compose消费者隔离、producer/operator请求、默认只读计划和固定动作绑定目录已经完成，但TASK92继续`DOING`。宿主runtime adapter仍未实现，当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
+- 两项并行只读审计均确认不能直接实现D-176：完整runtime privilege reconcile依赖0046对象目录，必须在Migration后；生产v3 identity依赖Caddy/PostgreSQL/Web/Worker真实容器身份和postdeploy receipt，且绑定生产runtime policy/supervisor语义，不能用于无生产supervisor的隔离UAT。
+- `isolated-uat-one-shot-action-bindings-v1.json`原文件和body SHA `b5b3a7eb…0276`保持不变，仅作历史；新增v2，body SHA为`6f28881beb767f25e469b60f6ef9ae15e62d703659619ce3e7c8aa63e76d463a`，one-shot入口只读取v2。
+- v2九步为：输入核对；七root准备；独立凭据；仅PostgreSQL；数据库marker/owner/Migration及技术登录角色初始化；`EMPTY → 0046`；最终权限收敛；启动Caddy/Web/Worker；loopback核验并发布隔离UAT专用证据。
+- 第5步只建立Migration前最小身份/角色，第7步消费Migration执行回执后处理完整Schema ACL；第9步输出名不表示生产release identity已生成，其专用合同和publisher仍未实现。
+- reader GID由policy固定为Web主GID`65532`，Compose source、非Secret示例和policy三者机械核对；这是容器技术身份，不是人员硬编码。package version/git进入服务启动输入，避免strict readiness静态通过、运行必失败。
+- 当前只验证动作列出的直接source受摘要保护，传递依赖闭包仍是runtime path前置；v2已移除完整privilege原语对空库bootstrap、以及现有生产受控/临时TEST Migration入口的伪实现绑定，它们不能冒充专用database-bootstrap或UAT candidate/execution receipt。
+- 静态结果为控制请求4/4、one-shot 9/9、隔离Compose policy/config双PASS；`execute`仍在任何副作用前拒绝。本段未创建或访问任何UAT/生产运行资源。
+- 16:09→16:42资源核对：MemAvailable `2,395,615,232 → 2,395,176,960`B，Swap used `179,658,752 → 179,642,368`B，根盘available `17,809,903,616 → 17,764,696,064`B，Load `0.05/0.29/0.24 → 0.62/0.29/0.18`，Memory PSI/kernel OOM均0。Docker保持6容器/75镜像/277 Volume/6网络/0 Build Cache；四服务restart0/OOM false、Web/PostgreSQL healthy，四个保护卷存在。当前任务临时目录/pyc残留0；8月15—16日既有26个`/tmp/cyd-uat-promotion-*`及历史pycache不属本任务且未清理。
+
+## 10. 当前停止线与完成标准
+
+磁盘、Compose消费者隔离、producer/operator请求和默认只读计划已经完成；D-177/v2只关闭已知依赖顺序错误，TASK92继续`DOING`。专用database-bootstrap/Migration/evidence合同、传递source闭包、宿主runtime path和当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
 
 - 只完成负责人选定的一条路径，不同时建设两套方案。
-- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、九步顺序、固定方法及失败清理原则已明确；runtime adapter、精确源码/镜像输入和空库Migration执行包仍待完成。
+- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射及v2九步依赖已明确；专用回执合同、source闭包、runtime adapter、精确源码/镜像输入和空库Migration执行包仍待完成。
 - 现有UAT身份、数据、四个受保护Volume和常驻服务不变。
 - TASK92完成后只允许提交L2a授权申请，不自动build、deploy或Migration。

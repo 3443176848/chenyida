@@ -17,10 +17,11 @@ from typing import Any, BinaryIO, TextIO
 
 SITE_ROOT = Path(__file__).resolve().parent.parent
 POLICY_VALIDATOR_PATH = SITE_ROOT / "scripts/isolated-uat-control-plane-policy.py"
-BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v1.json"
+BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v2.json"
 PLAN_CONTRACT = "chenyida-erp-isolated-uat-one-shot-plan/v1"
-BINDINGS_CONTRACT = "chenyida-erp-isolated-uat-one-shot-action-bindings/v1"
-EXPECTED_BINDING_SHA256 = "b5b3a7eb5a1a782290e2a37c5fed0ae8e09230696ae9da26d80398b0b2070276"
+BINDINGS_CONTRACT = "chenyida-erp-isolated-uat-one-shot-action-bindings/v2"
+BINDING_IMPLEMENTATION_STATUS = "FIXED_BINDINGS_DEPENDENCY_ORDER_CORRECTED_RUNTIME_PATH_NOT_IMPLEMENTED"
+EXPECTED_BINDING_SHA256 = "6f28881beb767f25e469b60f6ef9ae15e62d703659619ce3e7c8aa63e76d463a"
 ENTRYPOINT_ID = "chenyida-erp-isolated-uat-one-shot-v1"
 PLAN_MODE = "READ_ONLY_PLAN"
 FORBIDDEN_PRODUCTION_ENTRYPOINTS = [
@@ -66,14 +67,17 @@ def read_bindings(path: Path = BINDINGS_PATH) -> dict[str, Any]:
         "schema_version", "contract", "binding_id", "implementation_status",
         "execution_boundary", "actions", "binding_sha256",
     }, "ISOLATED_UAT_ACTION_BINDING_FIELDS_INVALID")
-    if value["schema_version"] != 1 or value["contract"] != BINDINGS_CONTRACT \
-            or value["binding_id"] != "chenyida-erp-isolated-uat-fixed-actions-v1" \
-            or value["implementation_status"] != "FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED" \
+    if value["schema_version"] != 2 or value["contract"] != BINDINGS_CONTRACT \
+            or value["binding_id"] != "chenyida-erp-isolated-uat-fixed-actions-v2" \
+            or value["implementation_status"] != BINDING_IMPLEMENTATION_STATUS \
             or value["execution_boundary"] != {
                 "evidence_scope": "ISOLATED_UAT_ONLY",
                 "shell_allowed": False,
                 "free_form_argv_allowed": False,
                 "production_entrypoints_allowed": False,
+                "production_release_identity_allowed": False,
+                "runtime_path_implemented": False,
+                "source_binding_scope": "DIRECT_CONTRACT_REFERENCES_ONLY",
             }:
         fail("ISOLATED_UAT_ACTION_BINDING_IDENTITY_INVALID")
     actions = value["actions"]
@@ -98,8 +102,9 @@ def read_bindings(path: Path = BINDINGS_PATH) -> dict[str, Any]:
         available = {
             "policy", "request", "project", "roots", "runtime_secret_root", "backup_credential_root",
             "release_candidate_root", "release_identity_root", "operator_state_root", "backup_root",
+            "one_shot_state_root", "release_identity_reader_gid",
             "runtime_secret_filenames", "backup_service_filename", "password_format", "resolved_compose_sha256",
-            "images", "ports", "technical_login_roles", "migration_current_head", "migration_target_head",
+            "images", "ports", "technical_login_roles", "package_version", "migration_current_head", "migration_target_head",
             "migration_allowlist_sha256", "git_commit", "git_tree", "host_ip", "web_port",
         } | previous_outputs
         if any(item not in available for item in action["inputs"]):
@@ -120,11 +125,11 @@ PLANNED_ACTIONS = [
     ("PREPARE_PRIVATE_NAMESPACE_ROOTS", "MUTATING"),
     ("PROVISION_DISTINCT_CREDENTIAL_FILES", "MUTATING"),
     ("START_POSTGRES_ONLY", "MUTATING"),
-    ("BOOTSTRAP_POSTGRESQL_RUNTIME_PRIVILEGES", "MUTATING"),
+    ("INITIALIZE_DATABASE_IDENTITY_AND_LOGIN_ROLES", "MUTATING"),
     ("MIGRATE_EMPTY_DATABASE_TO_BOUND_HEAD", "MUTATING"),
-    ("PUBLISH_RELEASE_IDENTITY", "MUTATING"),
-    ("START_WEB_AND_WORKER", "MUTATING"),
-    ("VERIFY_LOOPBACK_READINESS", "READ_ONLY"),
+    ("RECONCILE_FINAL_RUNTIME_PRIVILEGES", "MUTATING"),
+    ("START_BOUND_RUNTIME_SERVICES", "MUTATING"),
+    ("VERIFY_AND_PUBLISH_ISOLATED_UAT_EVIDENCE", "MUTATING"),
 ]
 
 

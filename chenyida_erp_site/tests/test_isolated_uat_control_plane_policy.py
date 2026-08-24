@@ -64,6 +64,7 @@ class IsolatedUatControlPlanePolicyTest(unittest.TestCase):
         self.assertFalse(self.policy["deployment_authorized"])
         self.assertEqual(self.policy["safety"]["runtime_actions_authorized"], [])
         self.assertEqual(self.policy["release"]["implementation_status"], "CONTRACT_ONLY_NOT_EXECUTABLE")
+        self.assertEqual(self.policy["runtime"], {"release_identity_reader_gid": 65532})
         self.assertEqual(MODULE.validate_request(request(self.policy), self.policy), request(self.policy))
 
     def test_request_failures_are_closed(self) -> None:
@@ -106,6 +107,11 @@ class IsolatedUatControlPlanePolicyTest(unittest.TestCase):
         sources["source_binding"][0]["sha256"] = "0" * 64
         with self.assertRaisesRegex(MODULE.ContractError, "ISOLATED_UAT_POLICY_SOURCE_BINDING_STALE"):
             MODULE.validate_policy(sources)
+
+        runtime = copy.deepcopy(self.policy)
+        runtime["runtime"]["release_identity_reader_gid"] = 1000
+        with self.assertRaisesRegex(MODULE.ContractError, "ISOLATED_UAT_POLICY_RUNTIME_INVALID"):
+            MODULE.validate_policy(runtime)
 
     def test_duplicate_json_key_fails_closed(self) -> None:
         with self.assertRaisesRegex(MODULE.ContractError, "ISOLATED_UAT_JSON_DUPLICATE_KEY"):

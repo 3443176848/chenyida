@@ -22,6 +22,7 @@ IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 PROJECT = re.compile(r"^chenyida-erp-uat-[a-z0-9][a-z0-9_-]{0,42}$")
 IMAGE = re.compile(r"^[^@\s]+@sha256:[0-9a-f]{64}$")
 MIGRATION = re.compile(r"^[0-9]{4}_[a-z0-9_]+\.sql$")
+RELEASE_IDENTITY_READER_GID = 65532
 
 ROOTS = {
     "runtime_secret_root": "/etc/{project}/runtime-secrets",
@@ -29,6 +30,7 @@ ROOTS = {
     "release_candidate_root": "/var/lib/{project}/release-candidate",
     "release_identity_root": "/var/lib/{project}/release-identity",
     "operator_state_root": "/var/lib/{project}/postgresql-runtime-privilege-operator",
+    "one_shot_state_root": "/var/lib/{project}/isolated-uat-one-shot",
     "backup_root": "/var/backups/{project}",
 }
 PROTECTED_ROOTS = [
@@ -56,18 +58,15 @@ SOURCE_PATHS = [
     "compose.release.yml",
     "compose.uat-isolated.yml",
     "compose.yml",
-    "operations/isolated-uat-one-shot-action-bindings-v1.json",
+    "operations/isolated-uat-one-shot-action-bindings-v2.json",
     "operations/postgresql-runtime-privilege-policy-v2.json",
     "operations/runtime-secret-file-policy-v1.json",
     "scripts/isolated-uat-compose-policy.py",
     "scripts/isolated-uat-control-plane-policy.py",
     "scripts/isolated-uat-one-shot.py",
-    "scripts/migrate-postgres.ts",
     "scripts/postgresql-runtime-privilege-journal.mjs",
     "scripts/postgresql-runtime-privilege-operator.mjs",
     "scripts/postgresql-runtime-privilege-reconciler.mjs",
-    "scripts/release-identity-contract.mjs",
-    "scripts/release-migration-authorization.ts",
 ]
 
 
@@ -169,6 +168,24 @@ def source_state() -> dict[str, Any]:
     }
 
 
+def validate_runtime_source_binding() -> None:
+    try:
+        compose = (SITE_ROOT / "compose.yml").read_text(encoding="utf-8")
+        environment = (SITE_ROOT / ".env.uat-isolated.example").read_text(encoding="utf-8")
+        web_start = compose.index("\n  web:\n")
+        web_end = compose.index("\n  worker:\n", web_start)
+    except (OSError, UnicodeError, ValueError):
+        fail("ISOLATED_UAT_POLICY_RUNTIME_SOURCE_INVALID")
+    web = compose[web_start:web_end]
+    expected_group = 'group_add: ["${ERP_RELEASE_IDENTITY_READER_GID:?ERP_RELEASE_IDENTITY_READER_GID is required}"]'
+    if f'user: "{RELEASE_IDENTITY_READER_GID}:{RELEASE_IDENTITY_READER_GID}"' not in web \
+            or expected_group not in web \
+            or environment.count(f"ERP_RELEASE_IDENTITY_READER_GID={RELEASE_IDENTITY_READER_GID}\n") != 1 \
+            or environment.count("ERP_RELEASE_EXPECTED_VERSION=\n") != 1 \
+            or environment.count("ERP_RELEASE_EXPECTED_GIT_COMMIT=\n") != 1:
+        fail("ISOLATED_UAT_POLICY_RUNTIME_SOURCE_INVALID")
+
+
 def normalized_path(value: Any, code: str) -> PurePosixPath:
     if not isinstance(value, str) or not value.startswith("/") or value == "/" or len(value) > 512:
         fail(code)
@@ -199,13 +216,14 @@ def validate_roots(project: str, value: Any) -> dict[str, str]:
 def validate_policy(value: dict[str, Any]) -> dict[str, Any]:
     exact(value, {
         "schema_version", "contract", "policy_id", "deployment_authorized", "namespace",
-        "release", "database", "secrets", "safety", "source_binding", "policy_sha256",
+        "release", "runtime", "database", "secrets", "safety", "source_binding", "policy_sha256",
     }, "ISOLATED_UAT_POLICY_FIELDS_INVALID")
     if value["schema_version"] != 1 or value["contract"] != POLICY_CONTRACT \
             or value["policy_id"] != "chenyida-erp-isolated-uat-one-shot-bootstrap-v1" \
             or value["deployment_authorized"] is not False:
         fail("ISOLATED_UAT_POLICY_IDENTITY_INVALID")
     state = source_state()
+    validate_runtime_source_binding()
     if value["namespace"] != {
         "project_pattern": PROJECT.pattern,
         "roots": ROOTS,
@@ -226,6 +244,8 @@ def validate_policy(value: dict[str, Any]) -> dict[str, Any]:
         ],
     }:
         fail("ISOLATED_UAT_POLICY_RELEASE_INVALID")
+    if value["runtime"] != {"release_identity_reader_gid": RELEASE_IDENTITY_READER_GID}:
+        fail("ISOLATED_UAT_POLICY_RUNTIME_INVALID")
     if value["database"] != {
         "name": "chenyida_erp",
         "current_head": state["current_head"],

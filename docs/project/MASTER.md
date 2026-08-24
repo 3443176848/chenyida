@@ -44,7 +44,7 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前 Branch | 根仓库 `main` |
 | 当前根仓库功能基线提交 | `SELFHOST-UAT-FIX-38`收货预检提交`401e16b04e3b8cb70ddfd3508661353ff758fdec`保持；运行时版本/health提交`13f72b5f7aa51905af597733356420cc7b017b74`及Docker metadata提交`61f0b56788ef68b9b7aa6d34583d2ddc3bde3f66`使`package.json.version`成为单一权威、health失败关闭并让最终Web `/app/package.json`保留最小`name/version/private/type`。当前运行镜像从固定`569aa954d764309e239d1f6c174e582596d33a24`的Git tree构建，没有新增或运行UAT Migration |
 | 当前根仓库运维基线 | TASK92获项目负责人`先清理磁盘`专项授权后仅清理未使用BuildKit cache：三次逐步命令均退出0并分别报告607.3MB、35.76MB、9.667GB，Build Cache由174项/10.31GB降为0/0B，active始终为0。根盘available由`10,825,478,144`增至`17,909,628,928` bytes，实际增加约6.60GiB且比10GiB硬线高约6.68GiB；最终MemAvailable约2.30GiB、Swap 171.53MiB且60秒增长0、Load`0.24/0.28/0.26`、PSI/OOM0。6容器/75镜像/277 Volume及容器/镜像/Volume/网络摘要不变；四服务restart0/OOM false，Web/PostgreSQL healthy，四个受保护Volume完整。未运行`system prune`、镜像/容器/网络/Volume删除、服务重启或业务动作 |
-| 当前同机UAT隔离基线 | D-173消费者合同、D-174控制请求、D-175默认只读one-shot计划和D-176固定动作绑定均已通过：独立项目、七个命名Volume、两个网络、loopback端口和六类项目派生host root失败关闭；五个数据库服务角色、六份runtime Secret、backup service、`EMPTY → 0046`及后续精确Git/镜像/Compose输入有机器门。九步顺序以封闭handler/method/source/input/output目录绑定，禁止shell、自由argv和生产入口；Migration回执先于release identity且Web/Worker只能在identity后启动。`execute`仍在任何运行动作前拒绝，Policy仍为`CONTRACT_ONLY_NOT_EXECUTABLE / deployment_authorized=false`。专用runtime adapter和精确当前Web/Worker镜像缺失，因此新UAT未创建且L2 NO-GO |
+| 当前同机UAT隔离基线 | D-177只读审计已纠正D-176 v1的两处P0顺序冲突：v1原文件保留为历史，one-shot改用v2；七类项目派生host root、五个数据库技术角色、六份runtime Secret+backup service、`EMPTY → 0046`及精确Git/镜像/Compose输入继续失败关闭。v2先初始化数据库身份/登录角色，再Migration，最后收敛完整Schema权限；Caddy/Web/Worker启动后才核对并发布隔离UAT专用证据，不复用生产release identity/runtime policy。Web技术GID机械绑定`65532`，version/git成为服务启动输入。`execute`仍在任何副作用前拒绝，Policy仍为`CONTRACT_ONLY_NOT_EXECUTABLE / deployment_authorized=false`；专用database-bootstrap/Migration/evidence合同、传递source闭包、runtime adapter和精确镜像均缺失，新UAT未创建且L2 NO-GO |
 | Git 同步与工作区 | D-108的`GIT PRIVATE RECOVERY ANCHOR ESTABLISHED`保持。TASK70早期源代码/证据链、V3 source`d1d8ae8`、32/64MiB修复`cb731df`、owner ACL修复`d7ce5f6`、历史Git blob修复`63c301f`、D-163 SQL归一化`4dbe266`、D-164 `COALESCE`语法修复`28128de`及D-165 psql失败关闭源码锚点`e192f1d7bb63bfafcd39d77a3d543d604364c9c6`均在1,791文件敏感门后非强制送达`recovery-private/main`；后续治理提交只在该锚点之上普通快进。分支tip不在自身文档中循环嵌入，精确local/private一致性以`git rev-parse HEAD`和`git ls-remote`回读为准。未force、未推送公开origin、未修改远端历史。项目负责人既有未跟踪`docs/ERP_CURRENT_STATUS_REPORT.md`保持不读、不改、不提交；TASK82及更早清单/镜像继续只保留历史审计价值并为`STALE / NOT AUTHORIZABLE` |
 | 镜像恢复锚点 | D-109的private GHCR镜像恢复锚点已建立：唯一目标/tag为`ghcr.io/3443176848/chenyida-erp-web:0.1.0-alpha.42-fix38-569aa954d764309e239d1f6c174e582596d33a24`，一次push返回、认证registry与唯一tag package version三方digest均为`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`。package为PRIVATE、无repository association、无`latest`/额外tag；linux/amd64 child、attestation、config和9层均匹配预检，一次按digest pull完全匹配，匿名读取返回401。一次性本机凭据已logout并清理；项目负责人证明已通过GitHub网页撤销一次性PAT，本项目未读取或技术验证PAT正文/远端状态 |
 | PM-000 基线父提交 | `bbefb2e`，`feat: add chenyida erp site project files` |
@@ -54,15 +54,15 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 | 当前数据库 | 源码为`0001`—`0046`，46/head`0046_runtime_lock_privilege_boundary.sql`，0046 SQL/Snapshot SHA-256分别为`ad68aaa4f20d16324fcdc7b234928ac363ecb73313921970d3b4840f4db6d66b`/`c8fe259a7838475bc41ffaf0e843ba9ca69a8ca0c5688d42275a81ea8b21f60d`；0001—0045未修改，Schema/233表snapshot/journal/allowlist一致。并行UAT PostgreSQL仍为`0001`—`0040`，0040 SHA-256`b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93`。0041—0046只在隔离数据库验证，没有连接或应用到UAT；既有UAT业务事实沿用FIX38只读基线且本任务未访问业务数据库 |
 | 当前运行状态 | `https://43.135.148.43.nip.io:18888`经原Caddy到新Web；运行Web及`latest`均为alpha.42的`sha256:e7761e2c61bfe77c6aab526fb0b6cbd840ad1bf6300381f4319f6e279af94964`（88,679,975 bytes），容器`f0066fe6fb07bd2542caf39f8409571125b0b8009592d7dfd3b754c91981a35f`。旧alpha.41完整镜像`sha256:0cf98937…d5f19`保留在`0.1.0-alpha.41-fix38-rollback`；失败候选`sha256:81126136…278e`仍为`REJECTED — DO NOT DEPLOY`。PostgreSQL、Worker、Caddy身份不变，四服务restart0/OOM false及四个受保护Volume完整 |
 | 当前开发环境 | 当前alpha.42镜像的最小`/app/package.json`精确为`name/version/private/type`且version为`0.1.0-alpha.42`；OCI version/revision/task与固定HEAD一致，本地/公开health返回原字段加alpha.42 version。公开Caddy安全头、匿名保护、未来日期422、NORMAL实际模式、四种返回修改和390×844通过；Worker、Compose、Caddy、Receipt POST、0040、Python/SQLite及历史Sites/D1未改 |
-| 当前阶段 | `TASK92 SAME-HOST B / CONSUMER + CONTROL-REQUEST + PLAN + FIXED ACTION BINDINGS PASS / RUNTIME ADAPTER + EXACT IMAGE REQUIRED / NEW UAT NOT CREATED / TASK70 FROZEN / PRODUCTION NO-GO`。磁盘、消费者隔离、请求、默认拒绝入口和固定动作目录已解除；专用runtime adapter与精确镜像仍未解决 |
-| 当前任务 | 唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`；BuildKit清理、同机Compose消费者合同、D-174请求、D-175只读计划和D-176固定动作绑定已完成，继续实现专用runtime adapter的合成隔离测试并准备精确镜像输入 |
-| 下一任务 | 仍在TASK92：仅为已冻结的九个方法实现专用runtime adapter及合成隔离测试，不参数化生产supervisor、不复制通用控制面。随后才准备精确Web/Worker镜像和L2a build/Secret/角色/空库0046/deploy授权包；当前不创建运行资源、不build/deploy/Migration |
+| 当前阶段 | `TASK92 SAME-HOST B / V2 DEPENDENCY BINDINGS PASS / RUNTIME PATH + EXACT IMAGE REQUIRED / NEW UAT NOT CREATED / TASK70 FROZEN / PRODUCTION NO-GO`。磁盘、消费者隔离、请求和默认拒绝入口已完成；D-176 v1已由D-177/v2取代，当前只证明依赖顺序合同，不声称runtime可执行 |
+| 当前任务 | 唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`；D-177/v2已关闭空库ACL、预造生产identity和GID漂移三项合同错误，继续定义隔离UAT专用database-bootstrap/Migration/evidence回执、传递source闭包与注入式合成adapter，并准备精确镜像输入 |
+| 下一任务 | 仍在TASK92：先实现隔离UAT专用database-bootstrap/Migration/evidence纯合同和fake-port合成adapter测试；真实host filesystem、Docker/Compose、PostgreSQL、HTTP和证据发布端口保持未实现。随后才准备精确Web/Worker镜像与L2a授权包；当前不创建资源、不build/deploy/Migration |
 
 ## 当前完成模块
 
 以下模块已有可运行代码或已完成治理交付，但“已实现/已完成”不代表已达到 V2、审计或生产成熟度标准：
 
-- `SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91`已按D-172完成[新建隔离UAT L1只读核对](../uat/small-team-v1/environment-readiness.md)：源码alpha.47/46项Migration/233表snapshot和Compose静态渲染通过，新UAT固定从`EMPTY → 0046`且不接触现有UAT。TASK91当时项目名只能隔离网络/Volume/端口、根盘只高于10GiB硬线43.23MiB；后续TASK92已恢复约16.68GiB可用空间，按D-173完成同机Compose消费者侧隔离，按D-174完成六root/五数据库角色/精确输入请求，按D-175完成默认只读、执行前拒绝的九步计划入口，并按D-176把九项动作固定到无shell/自由argv/生产入口的受控源目录。专用runtime adapter及精确当前镜像仍阻断L2
+- `SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91`已按D-172完成[新建隔离UAT L1只读核对](../uat/small-team-v1/environment-readiness.md)：源码alpha.47/46项Migration/233表snapshot和Compose静态渲染通过，新UAT固定从`EMPTY → 0046`且不接触现有UAT。TASK92后续恢复约16.68GiB空间并完成D-173—D-175；D-176 v1虽有静态绑定证据，但D-177审计确认其物理顺序不可执行，现由保留历史v1、新增v2的方式纠正。专用database-bootstrap/Migration/evidence合同、source闭包、runtime adapter及精确当前镜像仍阻断L2
 
 - `SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90`已按D-171完成[小团队V1试运行准备包](../uat/small-team-v1/README.md)：在没有真实样本时以`CYD-UAT-SYN-001`虚构10件控制板固定27步员工旅程、8项负向检查、采购/AP 120 CNY、销售/AR 200 CNY、数量金额守恒、稳定ID谱系、P0停止线和L0—L5授权分层。人数、日期、数量和价格均不是产品限制；`SO_REQUIRED / PRE_SALES_EXCEPTION`商务门保持待负责人确认。无UAT/生产、账号、数据、Migration、部署或运行服务变化
 
@@ -431,8 +431,8 @@ AI 只提供建议、证据和辅助决策，不得未经审核直接创建、�
 
 ## 当前任务与下一任务
 
-- 当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`；BuildKit-only清理、同机Compose消费者隔离、控制请求和默认只读one-shot计划入口已完成，TASK70保持冻结，AI和高级控制面不恢复。
-- 下一步仍在TASK92内为九步计划增加固定动作执行绑定并做隔离测试；精确当前镜像和L2a运行授权仍需后续门。不得自动build、deploy、Migration、创建账号或写业务数据。
+- 当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`；D-177/v2已取代D-176 v1的不可执行顺序，TASK70保持冻结，AI和高级控制面不恢复。
+- 下一步仍在TASK92内先补隔离UAT专用database-bootstrap/Migration/evidence合同、传递source闭包和注入式合成adapter；精确当前镜像和L2a运行授权仍需后续门。不得自动build、deploy、Migration、创建账号或写业务数据。
 - `SELFHOST-OPS-POSTGRES-CLUSTER-RECOVERY-55`已按D-132完成并释放active slot：冻结源码`b93d838`/tree`269165d4`与manifest-only直接子提交`2136aa3`/tree`c5b78dab`形成49文件bundle，manifest SHA-256`699cdd2a…7dd6`。cluster catalog/security/tablespace、秘密分离、加密传输、V4 readiness、Dashboard/monitor与崩溃安全executor均通过合成双PostgreSQL cluster及完整适用回归；没有真实恢复或部署。
 - `SELFHOST-OPS-BACKUP-OFFHOST-PROVENANCE-54`已按D-131完成并释放active slot：源码`fd0a9cff`与manifest-only直接子提交`315b1f3d`形成47文件bundle；签名密文来源、双向ACK、恢复强绑定、调度/保留和V3 readiness通过合成密文双集群恢复及适用回归。真实异机、密钥托管、timer/WORM、真实数据与RPO/RTO均未执行。
 - `SELFHOST-RELEASE-TYPECHECK-CLOSURE-46`已按D-120完成并释放active slot：精确38配置、ES2022合同和只读干净快照执行器已在两个提交快照38/38通过；一次错误纳入`.wrangler/work`的直接lint发生V8 heap OOM，正式干净快照lint随后0 error通过，宿主/容器OOM与restart均为0。

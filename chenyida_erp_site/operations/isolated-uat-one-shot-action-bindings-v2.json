@@ -1,0 +1,243 @@
+{
+  "schema_version": 2,
+  "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v2",
+  "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v2",
+  "implementation_status": "FIXED_BINDINGS_DEPENDENCY_ORDER_CORRECTED_RUNTIME_PATH_NOT_IMPLEMENTED",
+  "execution_boundary": {
+    "evidence_scope": "ISOLATED_UAT_ONLY",
+    "shell_allowed": false,
+    "free_form_argv_allowed": false,
+    "production_entrypoints_allowed": false,
+    "production_release_identity_allowed": false,
+    "runtime_path_implemented": false,
+    "source_binding_scope": "DIRECT_CONTRACT_REFERENCES_ONLY"
+  },
+  "actions": [
+    {
+      "ordinal": 1,
+      "action": "VERIFY_EXACT_INPUTS",
+      "effect": "READ_ONLY",
+      "handler_id": "CONTROL_REQUEST_VALIDATOR",
+      "adapter_method": "validate_exact_request",
+      "sources": [
+        "scripts/isolated-uat-control-plane-policy.py"
+      ],
+      "inputs": [
+        "policy",
+        "request"
+      ],
+      "outputs": [
+        "validated_request"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "action": "PREPARE_PRIVATE_NAMESPACE_ROOTS",
+      "effect": "MUTATING",
+      "handler_id": "ISOLATED_UAT_HOST_ROOT_ADAPTER",
+      "adapter_method": "prepare_private_namespace_roots",
+      "sources": [
+        "scripts/isolated-uat-one-shot.py"
+      ],
+      "inputs": [
+        "project",
+        "roots",
+        "one_shot_state_root",
+        "validated_request"
+      ],
+      "outputs": [
+        "namespace_root_receipt"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "action": "PROVISION_DISTINCT_CREDENTIAL_FILES",
+      "effect": "MUTATING",
+      "handler_id": "ISOLATED_UAT_CREDENTIAL_ADAPTER",
+      "adapter_method": "provision_distinct_credential_files",
+      "sources": [
+        "operations/runtime-secret-file-policy-v1.json",
+        "scripts/isolated-uat-one-shot.py"
+      ],
+      "inputs": [
+        "project",
+        "runtime_secret_root",
+        "backup_credential_root",
+        "runtime_secret_filenames",
+        "backup_service_filename",
+        "password_format",
+        "namespace_root_receipt"
+      ],
+      "outputs": [
+        "credential_generation_receipt"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "action": "START_POSTGRES_ONLY",
+      "effect": "MUTATING",
+      "handler_id": "ISOLATED_UAT_COMPOSE_ADAPTER",
+      "adapter_method": "start_postgres_only",
+      "sources": [
+        "compose.yml",
+        "compose.release.yml",
+        "compose.uat-isolated.yml"
+      ],
+      "inputs": [
+        "project",
+        "roots",
+        "package_version",
+        "git_commit",
+        "resolved_compose_sha256",
+        "images",
+        "ports",
+        "release_identity_reader_gid",
+        "credential_generation_receipt"
+      ],
+      "outputs": [
+        "postgres_container_identity",
+        "database_cluster_identity"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "action": "INITIALIZE_DATABASE_IDENTITY_AND_LOGIN_ROLES",
+      "effect": "MUTATING",
+      "handler_id": "ISOLATED_UAT_DATABASE_BOOTSTRAP_ADAPTER",
+      "adapter_method": "initialize_database_identity_and_login_roles",
+      "sources": [
+        "scripts/isolated-uat-one-shot.py"
+      ],
+      "inputs": [
+        "project",
+        "database_cluster_identity",
+        "operator_state_root",
+        "runtime_secret_root",
+        "backup_credential_root",
+        "backup_root",
+        "technical_login_roles",
+        "credential_generation_receipt"
+      ],
+      "outputs": [
+        "database_target_identity",
+        "database_bootstrap_receipt"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "action": "MIGRATE_EMPTY_DATABASE_TO_BOUND_HEAD",
+      "effect": "MUTATING",
+      "handler_id": "ISOLATED_UAT_MIGRATION_ADAPTER",
+      "adapter_method": "migrate_empty_database_to_bound_head",
+      "sources": [
+        "scripts/isolated-uat-one-shot.py"
+      ],
+      "inputs": [
+        "database_target_identity",
+        "migration_current_head",
+        "migration_target_head",
+        "migration_allowlist_sha256",
+        "git_commit",
+        "git_tree",
+        "images",
+        "database_bootstrap_receipt"
+      ],
+      "outputs": [
+        "release_candidate_receipt",
+        "migration_execution_receipt"
+      ]
+    },
+    {
+      "ordinal": 7,
+      "action": "RECONCILE_FINAL_RUNTIME_PRIVILEGES",
+      "effect": "MUTATING",
+      "handler_id": "POSTGRESQL_RUNTIME_PRIVILEGE_PRIMITIVES",
+      "adapter_method": "reconcile_final_runtime_privileges",
+      "sources": [
+        "operations/postgresql-runtime-privilege-policy-v2.json",
+        "scripts/postgresql-runtime-privilege-journal.mjs",
+        "scripts/postgresql-runtime-privilege-operator.mjs",
+        "scripts/postgresql-runtime-privilege-reconciler.mjs"
+      ],
+      "inputs": [
+        "project",
+        "database_target_identity",
+        "operator_state_root",
+        "runtime_secret_root",
+        "backup_credential_root",
+        "backup_root",
+        "technical_login_roles",
+        "migration_execution_receipt"
+      ],
+      "outputs": [
+        "runtime_privilege_receipt"
+      ]
+    },
+    {
+      "ordinal": 8,
+      "action": "START_BOUND_RUNTIME_SERVICES",
+      "effect": "MUTATING",
+      "handler_id": "ISOLATED_UAT_COMPOSE_ADAPTER",
+      "adapter_method": "start_bound_runtime_services",
+      "sources": [
+        "compose.yml",
+        "compose.release.yml",
+        "compose.uat-isolated.yml"
+      ],
+      "inputs": [
+        "project",
+        "roots",
+        "package_version",
+        "git_commit",
+        "resolved_compose_sha256",
+        "images",
+        "ports",
+        "release_identity_reader_gid",
+        "runtime_privilege_receipt"
+      ],
+      "outputs": [
+        "caddy_container_identity",
+        "web_container_identity",
+        "worker_container_identity"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "action": "VERIFY_AND_PUBLISH_ISOLATED_UAT_EVIDENCE",
+      "effect": "MUTATING",
+      "handler_id": "ISOLATED_UAT_POSTDEPLOY_EVIDENCE_ADAPTER",
+      "adapter_method": "verify_and_publish_isolated_uat_evidence",
+      "sources": [
+        "scripts/isolated-uat-compose-policy.py",
+        "scripts/isolated-uat-one-shot.py"
+      ],
+      "inputs": [
+        "project",
+        "roots",
+        "package_version",
+        "git_commit",
+        "git_tree",
+        "migration_target_head",
+        "migration_allowlist_sha256",
+        "images",
+        "ports",
+        "resolved_compose_sha256",
+        "release_identity_reader_gid",
+        "one_shot_state_root",
+        "postgres_container_identity",
+        "caddy_container_identity",
+        "web_container_identity",
+        "worker_container_identity",
+        "release_candidate_receipt",
+        "migration_execution_receipt",
+        "runtime_privilege_receipt"
+      ],
+      "outputs": [
+        "readiness_receipt",
+        "isolated_uat_postdeploy_receipt",
+        "isolated_uat_runtime_identity_receipt"
+      ]
+    }
+  ],
+  "binding_sha256": "6f28881beb767f25e469b60f6ef9ae15e62d703659619ce3e7c8aa63e76d463a"
+}

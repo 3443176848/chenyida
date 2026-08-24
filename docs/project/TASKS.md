@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理、Compose消费者隔离、D-174请求、D-175默认只读one-shot计划和D-176固定动作绑定已通过；六类namespace root、五个数据库服务角色、凭据映射、`EMPTY → 0046`、精确输入门、九步顺序和受控方法依赖均可机械验证。专用runtime adapter和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-177只读审计已证明D-176 v1顺序不可执行并以保留历史v1、新增v2的方式纠正：七类namespace root、五个数据库技术角色、凭据映射、`EMPTY → 0046`、精确输入门和九步依赖可机械验证，完整权限只在Migration后收敛，生产release identity不再冒充隔离UAT证据。专用database-bootstrap/Migration/evidence合同、传递source闭包、runtime adapter和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+
+2026-08-24绑定勘误事件：项目负责人再次要求“下一步”。在实现adapter前的两项并行只读审计确认D-176 v1有P0顺序冲突，故没有在错误合同上补executor。v1文件/摘要保持不变；新增D-177和binding v2，顺序改为数据库身份/登录角色初始化→Migration→最终权限收敛→启动Caddy/Web/Worker→隔离UAT专用postdeploy evidence。生产v3 identity/runtime policy/supervisor不复用；第七类one-shot state root、Web主GID`65532`和strict readiness version/git输入补齐。v2 body SHA为`6f28881b…d463a`，policy SHA为`2197a633…6271`；控制4/4、one-shot 9/9及Compose双PASS。`execute`仍在任何副作用前拒绝，TASK92继续`DOING`。
 
 2026-08-24固定动作绑定事件：项目负责人再次要求“下一步”。D-176新增封闭binding目录，为九步逐项固定`handler_id + adapter_method + sources + inputs + outputs`；禁止shell、自由argv和生产runner/supervisor，全部source进入control policy摘要。Migration固定产出release candidate与执行回执，release identity后续消费两者，Web/Worker再消费identity。Binding body SHA-256为`b5b3a7eb…0276`，policy SHA-256为`01e35bd9…b47`；原4项控制合同和更新后7项one-shot Unit均PASS。当前状态仍为`FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED`，未创建或访问任何运行资源。TASK92继续`DOING`等待专用runtime adapter、精确镜像和L2a授权。
 
@@ -283,7 +285,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划/固定绑定；继续实现专用runtime adapter） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176、低资源规则 | `DOING / CONSUMER + CONTROL-REQUEST + PLAN + FIXED ACTION BINDINGS PASS / RUNTIME ADAPTER + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。六类root、五角色、空库0046、精确输入门、九步顺序和封闭方法绑定通过；policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划和D-177 v2依赖修正；继续专用runtime path合同） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、低资源规则 | `DOING / V2 DEPENDENCY BINDINGS PASS / RUNTIME PATH + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。七类root、五角色、空库0046、精确输入门和v2九步依赖通过；只绑定直接source，专用回执/source闭包/adapter未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

@@ -11,6 +11,7 @@
       "release_candidate_root": "/var/lib/{project}/release-candidate",
       "release_identity_root": "/var/lib/{project}/release-identity",
       "operator_state_root": "/var/lib/{project}/postgresql-runtime-privilege-operator",
+      "one_shot_state_root": "/var/lib/{project}/isolated-uat-one-shot",
       "backup_root": "/var/backups/{project}"
     },
     "protected_roots": [
@@ -37,6 +38,9 @@
       "worker_image_config_digest",
       "resolved_compose_sha256"
     ]
+  },
+  "runtime": {
+    "release_identity_reader_gid": 65532
   },
   "database": {
     "name": "chenyida_erp",
@@ -79,7 +83,7 @@
   "source_binding": [
     {
       "path": ".env.uat-isolated.example",
-      "sha256": "1a8ba9bc304ae72c51dd558f5caaa940fa7b928e367b5d23e7c750a3c86b1c3f"
+      "sha256": "6cd069dab00c8f100df30817589c31f3d44ab4faeb54cb419fbf2ab88c6632db"
     },
     {
       "path": "compose.release.yml",
@@ -94,8 +98,8 @@
       "sha256": "2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa"
     },
     {
-      "path": "operations/isolated-uat-one-shot-action-bindings-v1.json",
-      "sha256": "3244d550ae61bffa42fe1fa1c5c4c8bf0b610b60e1e96e8bac9a9c55ca177b3a"
+      "path": "operations/isolated-uat-one-shot-action-bindings-v2.json",
+      "sha256": "9cc4e3c12793785186fcf74560919376cfa5cc82ef5f344b11fcb5b4501e5232"
     },
     {
       "path": "operations/postgresql-runtime-privilege-policy-v2.json",
@@ -111,15 +115,11 @@
     },
     {
       "path": "scripts/isolated-uat-control-plane-policy.py",
-      "sha256": "dfd1dfd17eb355d934f15ea26152abd7a80ae6fac8a56943b660d9cf553ae227"
+      "sha256": "ab38d7b85d2826ff4c7c0813a244795a1bf377a24169c165ff6db44259ff26e0"
     },
     {
       "path": "scripts/isolated-uat-one-shot.py",
-      "sha256": "8085d060df3f60a4063d1192d119bc32095fc25bb78475069ba693a88dcff18f"
-    },
-    {
-      "path": "scripts/migrate-postgres.ts",
-      "sha256": "46a4aa004307c5b9f26a0b30fd0a3ac3581489eb1f3f88a3bfb5fa614b4d9642"
+      "sha256": "5e8146aafd64f28aedd0c46c4cc468687f1df1e3e501cdd4bdedbc6f59fab3b6"
     },
     {
       "path": "scripts/postgresql-runtime-privilege-journal.mjs",
@@ -132,15 +132,7 @@
     {
       "path": "scripts/postgresql-runtime-privilege-reconciler.mjs",
       "sha256": "22ddda1cf7f77899cbb58f2e6e5ac75f81ea7629d8a4abbf05b07021efc0a6b9"
-    },
-    {
-      "path": "scripts/release-identity-contract.mjs",
-      "sha256": "a537d7fc0ed9a7da410191d99b128cfa60b32af22fa4cb8ed9ff29e39d999142"
-    },
-    {
-      "path": "scripts/release-migration-authorization.ts",
-      "sha256": "ee700cb7e1ce438f06114c54d8d4d17be9c630003307df7140932d86bce54f4e"
     }
   ],
-  "policy_sha256": "01e35bd96971b45cf596767d7db7c554fd93225ec4c68223e092119c736ecb47"
+  "policy_sha256": "2197a633db282423f40ba0ac22e94dc27206bca6ed20f8eb332165811eac6271"
 }

@@ -4,6 +4,18 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: correct isolated UAT execution order`
+
+- 审计结论：实现runtime adapter前的两项并行只读审计确认D-176 v1存在P0物理冲突：空库不能先做0046完整对象ACL，生产v3 identity也不能在Caddy/Web/Worker真实身份和postdeploy receipt产生前发布；生产runtime policy/supervisor语义不得冒充隔离UAT证据。
+- 版本处理：D-176的`isolated-uat-one-shot-action-bindings-v1.json`原文件和body SHA保持不变，仅作历史证据；新增v2并由one-shot入口切换使用。v2 body SHA-256为`6f28881beb767f25e469b60f6ef9ae15e62d703659619ce3e7c8aa63e76d463a`，状态为`FIXED_BINDINGS_DEPENDENCY_ORDER_CORRECTED_RUNTIME_PATH_NOT_IMPLEMENTED`。
+- v2顺序：精确输入→七类namespace roots→独立凭据→仅PostgreSQL→数据库身份/登录角色→`EMPTY → 0046`→最终runtime privilege reconcile→Caddy/Web/Worker→隔离UAT专用postdeploy/runtime identity evidence。第5步不再假称空库已有完整ACL，第9步不复用生产release identity合同。
+- 精确输入：新增`one_shot_state_root`；reader GID由policy机械绑定Web主GID`65532`，不是人数/席位；package version/git显式进入Compose启动输入，以供strict readiness使用。Policy SHA-256更新为`2197a633db282423f40ba0ac22e94dc27206bca6ed20f8eb332165811eac6271`。
+- 诚实停止线：v2不再把完整privilege原语冒充空库database-bootstrap，也不再把现有生产受控/临时TEST Migration入口列为UAT实现来源；当前只摘要动作列出的直接合同source，专用database-bootstrap/Migration/evidence合同、传递依赖闭包和host filesystem、Docker/Compose、PostgreSQL、HTTP、证据发布typed ports均未实现。`execute`继续在任何副作用前返回拒绝；fake adapter PASS也不得描述为真实backend可执行。
+- 测试：控制请求4/4、one-shot 9/9、隔离Compose policy/config双PASS，runner Shell语法通过；覆盖v1不改写、角色初始化/Migration/最终ACL顺序、四服务身份后置证据、GID/source drift和执行前拒绝。
+- 资源：16:09→16:42静态段available memory `2,395,615,232 → 2,395,176,960`B、Swap `179,658,752 → 179,642,368`B、根盘 `17,809,903,616 → 17,764,696,064`B、Load `0.05/0.29/0.24 → 0.62/0.29/0.18`，PSI/OOM0。Docker保持6/75/277/6、Cache0，四服务restart0/OOM false且Web/PostgreSQL healthy，四个保护卷完整；本任务临时目录/pyc残留0，8月15—16日既有26个UAT promotion临时目录与历史pycache保持不动。
+- 代码/数据：无产品业务代码、Schema、Migration、API、页面、依赖或员工角色变化；没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，未build/deploy/Migration/restart/账号/业务写，也未访问现有UAT或生产数据。
+- 文档：新增D-177并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一切片是专用database-bootstrap/Migration/evidence合同、source闭包和注入式合成adapter，不是运行部署。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: bind isolated UAT one-shot actions`
 
 - 第一性原理：不为不到20人的单一UAT建设通用编排平台；只把D-175九步顺序锁定到可审阅的方法和现有原语，同时诚实保持runtime adapter未实现。人数、岗位约2人和席位不进入合同。

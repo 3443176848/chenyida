@@ -3913,6 +3913,8 @@
 
 ## D-176 隔离UAT九步动作使用封闭绑定目录，宿主执行器继续保持未实现
 
+> 2026-08-24勘误：D-177证明本节v1顺序只能作为历史审计记录，不能作为runtime实现依据；v1文件和摘要保留不改，由v2取代。
+
 - 日期：2026-08-24
 - 状态：`ACCEPTED / FIXED ACTION BINDING CONTRACT PASS / RUNTIME ADAPTER NOT IMPLEMENTED / PRODUCTION NO-GO`
 - 发起：项目负责人要求继续下一步；Codex依据D-175把计划动作绑定到最小既有原语
@@ -3944,6 +3946,44 @@
 - 拒绝输出可复制执行的shell/argv清单、允许执行器选择任意脚本，或使用环境变量指定handler。
 - 拒绝直接调用生产runner/supervisor，也拒绝复制完整生产控制面。
 - 拒绝把source binding和顺序静态PASS描述为runtime adapter、Migration执行或UAT健康。
+
+## D-177 隔离UAT v2先修正物理依赖，生产发布身份不得冒充隔离证据
+
+- 日期：2026-08-24
+- 状态：`ACCEPTED / V1 SUPERSEDED / V2 DEPENDENCY ORDER PASS / RUNTIME PATH NOT IMPLEMENTED / PRODUCTION NO-GO`
+- 发起：项目负责人要求继续下一步；Codex在实现adapter前对D-176绑定和既有原语做只读可执行性审计
+- 实施范围：只新增v2绑定、补充确定性输入和静态测试；不实现或调用宿主、Docker、数据库、Migration、HTTP或发布动作
+
+### Context
+
+- D-176 v1虽通过跨步字段检查，但把完整runtime privilege reconcile放在空库Migration之前；现有reconciler要求0046完整对象和ACL，该顺序在物理上不能执行。
+- v1又要求在Web/Worker启动前发布release identity，而生产v3 identity必须包含Caddy、PostgreSQL、Web、Worker四个真实容器身份及postdeploy receipt；manifest-only预造路径已被现有合同禁止。
+- 生产v3 identity还绑定生产runtime policy和supervisor/authorization语义。新隔离UAT明确不复用生产supervisor，因此不能用伪摘要把生产身份合同冒充UAT证据。
+- Compose Web主GID是`65532`，应用读取身份文件时核对主GID；若错误填写`1000`，它只会成为supplemental group，造成静态渲染通过但运行读取失败。UAT strict readiness还需要精确expected version/git。
+- 当前source binding只证明动作列出的直接source有摘要，不证明其传递依赖闭包；现有Migration isolated测试入口也不产v2要求的UAT candidate/execution receipts。两者必须在runtime path实现前继续失败关闭。
+
+### Decision
+
+1. D-176的`isolated-uat-one-shot-action-bindings-v1.json`保持原文件和摘要不变，仅作历史证据；新增`chenyida-erp-isolated-uat-one-shot-action-bindings/v2`并由one-shot入口切换使用。v2 body SHA-256为`6f28881beb767f25e469b60f6ef9ae15e62d703659619ce3e7c8aa63e76d463a`。
+2. v2固定九步为：精确输入核对；准备七类私有namespace roots；生成独立凭据；仅启动PostgreSQL并取得未标记集群身份；初始化UAT数据库身份和登录角色；`EMPTY → 0046` Migration；在完整Schema上收敛最终runtime privileges；启动Caddy/Web/Worker绑定服务；核对loopback并发布隔离UAT专用postdeploy/runtime identity evidence。
+3. 第5步只允许建立数据库marker、owner/Migration和技术登录角色所需的最小前置，不得假称完整表级ACL已存在；现有完整privilege原语不能实现该前置，因此v2不把它列为第5步source，专用database-bootstrap合同仍未实现。第7步才绑定完整权限原语，并必须消费Migration execution receipt后执行最终reconcile。第6步同样不把现有生产受控/临时TEST migration入口列为UAT实现来源，专用授权与双回执合同未完成前保持未实现。
+4. 第9步不再绑定生产`release-identity-contract.mjs`或生产postdeploy identity。隔离UAT evidence使用独立语义和`one_shot_state_root`；其专用合同、传递source闭包和typed runtime adapter尚未实现，不能把当前输出名当作已生成回执。
+5. `release_identity_reader_gid`不再由请求任意提供，control policy机械固定为Web主GID`65532`；Compose source、非Secret示例和policy三者同源核对。`package_version`和`git_commit`显式进入服务启动输入，用于未来填充strict readiness的expected version/git。
+6. 新增第七类`one_shot_state_root`承载幂等/失败账本和隔离证据。当前control policy SHA-256为`2197a633db282423f40ba0ac22e94dc27206bca6ed20f8eb332165811eac6271`；v2状态固定为`FIXED_BINDINGS_DEPENDENCY_ORDER_CORRECTED_RUNTIME_PATH_NOT_IMPLEMENTED`。
+7. `deployment_authorized=false`、空`runtime_actions_authorized`和执行前拒绝保持不变。D-177只纠正合同，未授权创建目录、Secret、Docker对象、数据库、角色、Migration、部署或证据文件。
+8. 只有action binding升级v2：D-176已把v1 body SHA作为独立不可变目录发布，必须保留勘误链。Control policy v1从D-174起就是由`policy_sha256`标识精确revision的未投产滚动envelope；本次仍无外部消费者且plan JSON字段集合未变化，因此不额外复制一套policy/plan文件。进入可执行门前必须冻结并重新评估其版本兼容性。
+
+### Consequences
+
+- 当前九步不再包含已知的空库ACL和预造生产identity矛盾，但仍不是可执行路径。TASK92继续`DOING`，新UAT仍未创建、不能试运行。
+- 下一安全切片是先定义隔离UAT专用database-bootstrap、Migration和evidence回执与传递source闭包，再以注入式fake ports做合成runtime adapter测试；真实host filesystem、Docker/Compose、PostgreSQL、HTTP和发布端口继续未实现。
+- 人员约2人、总用户少于20人仍只影响后续账号配置，不进入九步、GID、角色数量、容量或验收硬编码。`65532`是容器技术身份，不是席位数。
+
+### Rejected alternatives
+
+- 拒绝在v1文件上原地覆盖历史摘要，也拒绝在已知物理冲突上直接补executor。
+- 拒绝预造Web/Worker/Caddy容器身份、复用生产runtime policy SHA或伪造supervisor/authorization证据。
+- 拒绝把直接source摘要描述为传递依赖闭包，或把fake adapter PASS描述为Docker/数据库可执行。
 
 ## 待确认业务决策
 

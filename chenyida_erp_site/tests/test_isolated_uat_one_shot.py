@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import io
 import json
@@ -85,10 +86,49 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertFalse(first["execution_authorized"])
         self.assertEqual(first["action_binding_id"], self.bindings["binding_id"])
         self.assertEqual(first["action_binding_sha256"], self.bindings["binding_sha256"])
-        self.assertEqual(first["action_binding_status"], "FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED")
+        self.assertEqual(first["action_binding_status"], ONE_SHOT.BINDING_IMPLEMENTATION_STATUS)
         self.assertEqual([item["ordinal"] for item in first["actions"]], list(range(1, 10)))
         self.assertEqual(first["roots"], self.request["roots"])
         self.assertNotIn("staff", ONE_SHOT.canonical_json(first).lower())
+
+    def test_database_bootstrap_migration_and_final_privileges_are_ordered(self) -> None:
+        actions = self.bindings["actions"]
+        self.assertIn("validated_request", actions[1]["inputs"])
+        for previous, current in zip(actions, actions[1:]):
+            self.assertTrue(set(previous["outputs"]) & set(current["inputs"]))
+        self.assertEqual([item["action"] for item in actions[4:8]], [
+            "INITIALIZE_DATABASE_IDENTITY_AND_LOGIN_ROLES",
+            "MIGRATE_EMPTY_DATABASE_TO_BOUND_HEAD",
+            "RECONCILE_FINAL_RUNTIME_PRIVILEGES",
+            "START_BOUND_RUNTIME_SERVICES",
+        ])
+        self.assertIn("database_bootstrap_receipt", actions[5]["inputs"])
+        self.assertIn("migration_execution_receipt", actions[6]["inputs"])
+        self.assertIn("runtime_privilege_receipt", actions[7]["inputs"])
+        self.assertIn("package_version", actions[7]["inputs"])
+        self.assertIn("git_commit", actions[7]["inputs"])
+        self.assertEqual(actions[4]["sources"], ["scripts/isolated-uat-one-shot.py"])
+        self.assertEqual(actions[5]["sources"], ["scripts/isolated-uat-one-shot.py"])
+        self.assertNotIn("scripts/release-migration-authorization.ts", actions[5]["sources"])
+
+    def test_isolated_evidence_requires_all_runtime_identities(self) -> None:
+        actions = self.bindings["actions"]
+        self.assertEqual(actions[7]["outputs"], [
+            "caddy_container_identity", "web_container_identity", "worker_container_identity",
+        ])
+        for required in (
+            "postgres_container_identity", "caddy_container_identity",
+            "web_container_identity", "worker_container_identity",
+        ):
+            self.assertIn(required, actions[8]["inputs"])
+        self.assertIn("runtime_privilege_receipt", actions[8]["inputs"])
+        for required in ("roots", "package_version", "resolved_compose_sha256", "release_identity_reader_gid"):
+            self.assertIn(required, actions[8]["inputs"])
+        self.assertEqual(actions[8]["outputs"], [
+            "readiness_receipt", "isolated_uat_postdeploy_receipt",
+            "isolated_uat_runtime_identity_receipt",
+        ])
+        self.assertNotIn("scripts/release-identity-contract.mjs", actions[8]["sources"])
 
     def test_execute_fails_before_any_plan_is_emitted(self) -> None:
         output = io.StringIO()
@@ -135,12 +175,15 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertNotIn("/etc/chenyida-erp", plan["roots"].values())
         self.assertNotIn("/var/lib/chenyida-erp", plan["roots"].values())
 
-    def test_action_bindings_are_closed_source_bound_and_not_commands(self) -> None:
+    def test_action_bindings_have_direct_bound_sources_and_no_commands(self) -> None:
         self.assertEqual(self.bindings["execution_boundary"], {
             "evidence_scope": "ISOLATED_UAT_ONLY",
             "shell_allowed": False,
             "free_form_argv_allowed": False,
             "production_entrypoints_allowed": False,
+            "production_release_identity_allowed": False,
+            "runtime_path_implemented": False,
+            "source_binding_scope": "DIRECT_CONTRACT_REFERENCES_ONLY",
         })
         policy_sources = {item["path"] for item in self.policy["source_binding"]}
         bound_sources = {source for item in self.bindings["actions"] for source in item["sources"]}
@@ -153,6 +196,15 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertNotIn('"argv"', serialized)
         self.assertNotIn('"command"', serialized)
         self.assertNotIn("staff", serialized)
+        legacy_path = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v1.json"
+        legacy_raw = legacy_path.read_bytes()
+        self.assertEqual(
+            hashlib.sha256(legacy_raw).hexdigest(),
+            "3244d550ae61bffa42fe1fa1c5c4c8bf0b610b60e1e96e8bac9a9c55ca177b3a",
+        )
+        legacy = json.loads(legacy_raw)
+        legacy_body = {key: value for key, value in legacy.items() if key != "binding_sha256"}
+        self.assertEqual(POLICY.canonical_sha256(legacy_body), legacy["binding_sha256"])
 
     def test_recomputed_tampered_binding_is_rejected(self) -> None:
         tampered = copy.deepcopy(self.bindings)
