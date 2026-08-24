@@ -34,6 +34,8 @@
 
 2026-08-24 TASK92纯合同结构增量：D-178新增`chenyida-erp-isolated-uat-runtime-contract-policy/v1`和一个无host/Docker/数据库/网络能力的纯函数模块，为database-bootstrap、`EMPTY → 0046` Migration及isolated evidence冻结意图结构与未来回执字段目录。意图只允许`STRUCTURE_VALID / NOT_EXECUTED / NOT_PUBLISHED / NOT_AVAILABLE / predecessor NOT_VALIDATED`；receipt semantics明确`INCOMPLETE_DESCRIPTOR_ONLY`，validator/publisher/backend均为`NOT_IMPLEMENTED`。单文件source closure绑定固定raw SHA和固定import allowlist并明示`NOT_A_SANDBOX`，不冒充v2全动作传递闭包。typed fake ports只证明三段顺序、输入隔离、重签篡改拒绝和首错停止，不生成真实回执。one-shot因新增runtime policy/closure字段明确升级为plan/v2并绑定对应SHA，`execute`在唯一backend seam前继续拒绝。Binding v1/v2字节不变；runtime policy/closure/control policy SHA为`5f24335a…6586`/`978741a0…c939`/`dd442418…6150`。控制4/4、one-shot 10/10、新合同7/7及Compose双门通过；新UAT未创建。
 
+2026-08-24 TASK92纯回执链增量：D-179新增独立`runtime-receipt-policy/v1`和只消费注入JSON/source bytes的纯validator，把D-178目录收敛为八类回执、五类证据体、固定producer、46项Migration allowlist/applied ledger、完整五角色属性、ACL、release/image、唯一容器身份/网络/health、loopback、规范UTC/链龄及前驱摘要连续性。控制请求和回执层均拒绝全零Git、Compose与OCI摘要；跨项目/跨意图拼接、自洽policy/receipt重签、过期重放、非法Unicode、全零身份和PostgreSQL身份越界均失败关闭。新增binding v3/18节点predecessor目录并升级plan/v3；计划只声明`NOT_RUN_NO_RECEIPTS`和成功输出合同模板，返回前二次核对source state以拒绝并发漂移；receipt policy同时钉住v3 body/raw SHA，历史v1/v2字节不变。成功结果严格命名为`VALIDATED_PURE_INTERNAL_CONTRACT_CHAIN_FROM_UNVERIFIED_EXTERNAL_DIGEST_ANCHORS`；四个业务external anchors、control plan和调用方时钟均不建立runtime truth，receipt expected roots也明确为caller-supplied。外部root/credential/cluster、owner完成日志、Caddy Host/SNI、全动作closure、publisher、host/Docker/PostgreSQL/HTTP backend和精确镜像仍缺失；39项Unit及Compose双门PASS，新UAT未创建。
+
 ## 2026-08-13 投产准入基线
 
 `SELFHOST-PRODUCTION-READINESS-40`是当前持续交付主线的事实起点，完整门禁见[PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)。当前结论仍为`PRODUCTION NO-GO`：TASK41/TASK54已完成四域V2与签名密文外层，TASK55按D-132补齐cluster security/tablespace恢复和readiness v4，但没有真实异机锚点、密钥/调度/WORM、当前数据恢复或真实RTO。TASK56已在alpha.47/0046闭合Web行锁、Backup control/capture、PG17 catalog、角色/ACL、session/secret/container/tablespace及D-134受控operator；TASK59—TASK65按D-135—D-141闭合detached候选、reservation、monitor交付/投影、V2 actual policy/激活和target-bound egress，TASK66—TASK82按D-142—D-157建立授权矩阵、跨岗UAT证据、15检查点控制平面、内容寻址root受信rollback gateway、fixed executor/activation v2及数据库/四文件域/前代运行面固定handler。机器审计仍以动态能力/host activation、隔离回退演练和人工UAT三项条件强制`UAT_PROMOTION_EXECUTOR_NOT_READY`。TASK57曾构建的Web/Worker本机候选和当前安全仓库变化前的镜像均为`STALE / NOT AUTHORIZABLE`，当前没有与最终源码匹配的可授权镜像。当前UAT仍使用共享superuser、环境变量秘密且为alpha.42/0040，host Supervisor/monitor、真实V2/egress policy激活、真实网络出口、A1/A3、正式镜像证据、19步PASS、rollback handler动态证明/host activation、隔离回退演练、真实异机恢复/迁移、业务批准的职责分离、跨岗位验收、员工试运行和正式切换均未完成。
@@ -46,7 +48,7 @@
 
 2026-08-21 TASK70启动增量：TASK70已从`TODO`转为当前唯一`DOING`。三条只读审计和主智能体代码复核确认现有审计把handler实现、隔离动态证明、host activation与真实UAT回退混为一个阻断；首个仓库切片先建立版本化、失败关闭的动态证据/verifier并拆分四类状态，之后才允许在新鲜资源门和磁盘上界内执行单容器PostgreSQL 17原子切换case。任何隔离结果都不得冒充host或真实UAT证据；现有UAT数据库、四卷、备份正文、凭据和业务数据保持禁止访问。
 
-项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK91已按D-172完成新隔离UAT L1核对；TASK92已完成BuildKit-only清理、D-173同机Compose消费者合同、D-174非执行控制请求、D-175默认只读计划入口、D-177/v2顺序勘误和D-178纯意图/字段目录。TASK92保持唯一`DOING`，下一步是完整receipt semantics/validator、前驱摘要链和binding v3接线，不是运行部署。不得自动恢复高级控制面、AI、进一步清理、build/deploy/Migration或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
+项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK91已按D-172完成新隔离UAT L1核对；TASK92已完成BuildKit-only清理、D-173同机Compose消费者合同、D-174非执行控制请求、D-175默认只读计划入口、D-177/v2顺序勘误、D-178纯意图和D-179纯内部回执链/binding v3。TASK92保持唯一`DOING`，下一步是external anchor/owner日志/Caddy Host-SNI validator、全动作closure和publisher/runtime adapter，不是运行部署。不得自动恢复高级控制面、AI、进一步清理、build/deploy/Migration或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。
 
@@ -383,7 +385,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-2026-08-24 D-166—D-178已取代原持续交付路线：TASK59—TASK82既有高级控制面只保留历史，TASK70及R2—R5/AI路线冻结。TASK86完成可变人数和十大闭环基线，TASK87/88关闭日期型P0，TASK89完成现代同库合成旅程，TASK90完成无真实样本准备包，TASK91完成新隔离UAT L1核对。当前唯一`DOING`为TASK92；D-177/v2已纠正D-176 v1顺序，D-178已冻结三族纯意图和不完整回执字段目录，但真实validator/publisher、前驱摘要链、v2全动作传递closure、runtime backend与精确镜像仍缺失。UAT alpha.42/0040及全部运行服务保持不变，新UAT未创建，系统继续`PRODUCTION NO-GO`。
+2026-08-24 D-166—D-179已取代原持续交付路线：TASK59—TASK82既有高级控制面只保留历史，TASK70及R2—R5/AI路线冻结。TASK86完成可变人数和十大闭环基线，TASK87/88关闭日期型P0，TASK89完成现代同库合成旅程，TASK90完成无真实样本准备包，TASK91完成新隔离UAT L1核对。当前唯一`DOING`为TASK92；D-179已完成从未验证external digest anchors出发的纯内部回执语义/摘要链和binding/plan v3，但外部anchor/owner日志/Caddy Host-SNI validator、全动作closure、publisher、runtime backend与精确镜像仍缺失。UAT alpha.42/0040及全部运行服务保持不变，新UAT未创建，系统继续`PRODUCTION NO-GO`。
 
 ## 恢复上下文检查清单
 

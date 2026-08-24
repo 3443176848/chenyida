@@ -10,6 +10,7 @@ import io
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -77,6 +78,7 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         cls.request = request(cls.policy)
         cls.bindings = ONE_SHOT.read_bindings()
         cls.runtime_contract_policy = ONE_SHOT.read_runtime_contract_policy()
+        cls.runtime_receipt_policy = ONE_SHOT.read_runtime_receipt_policy()
 
     def test_plan_is_deterministic_exact_and_non_executing(self) -> None:
         first = ONE_SHOT.build_plan(self.request, self.policy)
@@ -84,9 +86,9 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(ONE_SHOT.validate_plan(first, self.request, self.policy), first)
         self.assertEqual(first["mode"], "READ_ONLY_PLAN")
-        self.assertEqual(first["schema_version"], 2)
-        self.assertEqual(first["contract"], "chenyida-erp-isolated-uat-one-shot-plan/v2")
-        self.assertEqual(first["entrypoint_id"], "chenyida-erp-isolated-uat-one-shot-v2")
+        self.assertEqual(first["schema_version"], 3)
+        self.assertEqual(first["contract"], "chenyida-erp-isolated-uat-one-shot-plan/v3")
+        self.assertEqual(first["entrypoint_id"], "chenyida-erp-isolated-uat-one-shot-v3")
         self.assertFalse(first["execution_authorized"])
         self.assertEqual(first["action_binding_id"], self.bindings["binding_id"])
         self.assertEqual(first["action_binding_sha256"], self.bindings["binding_sha256"])
@@ -104,9 +106,31 @@ class IsolatedUatOneShotTest(unittest.TestCase):
             first["runtime_contract_capability_status"]["runtime_backends"],
             "NOT_IMPLEMENTED",
         )
+        self.assertEqual(
+            first["runtime_receipt_policy_sha256"],
+            self.runtime_receipt_policy["policy_sha256"],
+        )
+        self.assertEqual(first["receipt_chain_binding"]["node_count"], 18)
+        self.assertEqual(
+            first["runtime_receipt_success_output_contract"]["external_anchor_validation_status"],
+            "NOT_EVALUATED",
+        )
+        self.assertEqual(first["runtime_receipt_validation_status"], "NOT_RUN_NO_RECEIPTS")
+        self.assertEqual(len(first["migration_allowlist_entries"]), 46)
         self.assertEqual([item["ordinal"] for item in first["actions"]], list(range(1, 10)))
         self.assertEqual(first["roots"], self.request["roots"])
         self.assertNotIn("staff", ONE_SHOT.canonical_json(first).lower())
+
+    def test_plan_fails_if_source_state_changes_after_policy_validation(self) -> None:
+        current = ONE_SHOT.POLICY.source_state()
+        changed = copy.deepcopy(current)
+        changed["migration_allowlist_sha256"] = "f" * 64
+        with mock.patch.object(
+            ONE_SHOT.POLICY, "source_state", side_effect=[current, changed],
+        ), self.assertRaisesRegex(
+            ONE_SHOT.ContractError, "ISOLATED_UAT_SOURCE_STATE_CHANGED_DURING_PLAN",
+        ):
+            ONE_SHOT.build_plan(self.request, self.policy)
 
     def test_database_bootstrap_migration_and_final_privileges_are_ordered(self) -> None:
         actions = self.bindings["actions"]
@@ -124,8 +148,13 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertIn("runtime_privilege_receipt", actions[7]["inputs"])
         self.assertIn("package_version", actions[7]["inputs"])
         self.assertIn("git_commit", actions[7]["inputs"])
-        self.assertEqual(actions[4]["sources"], ["scripts/isolated-uat-one-shot.py"])
-        self.assertEqual(actions[5]["sources"], ["scripts/isolated-uat-one-shot.py"])
+        for index in (4, 5):
+            self.assertIn("scripts/isolated-uat-one-shot.py", actions[index]["sources"])
+            self.assertIn("scripts/isolated-uat-runtime-receipts.py", actions[index]["sources"])
+            self.assertIn(
+                "operations/isolated-uat-runtime-receipt-policy-v1.json",
+                actions[index]["sources"],
+            )
         self.assertNotIn("scripts/release-migration-authorization.ts", actions[5]["sources"])
 
     def test_isolated_evidence_requires_all_runtime_identities(self) -> None:
@@ -142,8 +171,9 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         for required in ("roots", "package_version", "resolved_compose_sha256", "release_identity_reader_gid"):
             self.assertIn(required, actions[8]["inputs"])
         self.assertEqual(actions[8]["outputs"], [
-            "readiness_receipt", "isolated_uat_postdeploy_receipt",
-            "isolated_uat_runtime_identity_receipt",
+            "evidence_intent", "container_identity_set", "readiness_receipt",
+            "isolated_uat_postdeploy_receipt", "isolated_uat_runtime_identity_receipt",
+            "receipt_chain_validation",
         ])
         self.assertNotIn("scripts/release-identity-contract.mjs", actions[8]["sources"])
 
@@ -184,6 +214,11 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         with self.assertRaisesRegex(ONE_SHOT.ContractError, "ISOLATED_UAT_REQUEST_AUTHORIZATION_INVALID"):
             ONE_SHOT.build_plan(invalid, self.policy)
 
+        zero_identity = copy.deepcopy(self.request)
+        zero_identity["images"]["web"]["image_reference"] = f"example.invalid/web@sha256:{'0' * 64}"
+        with self.assertRaisesRegex(ONE_SHOT.ContractError, "ISOLATED_UAT_REQUEST_IMAGE_INVALID"):
+            ONE_SHOT.build_plan(zero_identity, self.policy)
+
         plan = ONE_SHOT.build_plan(self.request, self.policy)
         plan["actions"][3]["action"] = "START_ALL_SERVICES"
         with self.assertRaisesRegex(ONE_SHOT.ContractError, "ISOLATED_UAT_ONE_SHOT_PLAN_INVALID"):
@@ -206,6 +241,9 @@ class IsolatedUatOneShotTest(unittest.TestCase):
             "production_release_identity_allowed": False,
             "runtime_path_implemented": False,
             "source_binding_scope": "DIRECT_CONTRACT_REFERENCES_ONLY",
+            "receipt_validation_scope": (
+                "PURE_CONTRACT_SEMANTICS_RUNTIME_FACTS_NOT_ESTABLISHED"
+            ),
         })
         policy_sources = {item["path"] for item in self.policy["source_binding"]}
         bound_sources = {source for item in self.bindings["actions"] for source in item["sources"]}
@@ -230,10 +268,15 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         current_raw = ONE_SHOT.BINDINGS_PATH.read_bytes()
         self.assertEqual(
             hashlib.sha256(current_raw).hexdigest(),
+            "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4",
+        )
+        v2_raw = (SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v2.json").read_bytes()
+        self.assertEqual(
+            hashlib.sha256(v2_raw).hexdigest(),
             "9cc4e3c12793785186fcf74560919376cfa5cc82ef5f344b11fcb5b4501e5232",
         )
 
-    def test_runtime_contract_closure_is_pure_and_separate_from_binding_v2(self) -> None:
+    def test_runtime_contract_and_receipt_closures_are_pure_and_binding_v3_is_explicit(self) -> None:
         closure = self.runtime_contract_policy["source_closure"]
         self.assertEqual(closure["roots"], ["scripts/isolated-uat-runtime-contracts.py"])
         self.assertEqual(closure["edges"], [])
@@ -249,6 +292,21 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertEqual(
             self.bindings["execution_boundary"]["source_binding_scope"],
             "DIRECT_CONTRACT_REFERENCES_ONLY",
+        )
+        receipt_closure = self.runtime_receipt_policy["source_closure"]
+        self.assertEqual(receipt_closure["roots"], ["scripts/isolated-uat-runtime-receipts.py"])
+        self.assertEqual(len(receipt_closure["members"]), 4)
+        self.assertIn(
+            "operations/isolated-uat-one-shot-action-bindings-v3.json",
+            {item["path"] for item in receipt_closure["members"]},
+        )
+        self.assertEqual(
+            self.runtime_receipt_policy["action_binding"]["binding_sha256"],
+            self.bindings["binding_sha256"],
+        )
+        self.assertEqual(
+            self.runtime_receipt_policy["capability_status"]["external_anchor_validators"],
+            "NOT_IMPLEMENTED",
         )
 
     def test_recomputed_tampered_binding_is_rejected(self) -> None:

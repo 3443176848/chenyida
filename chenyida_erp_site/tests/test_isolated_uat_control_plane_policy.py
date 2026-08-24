@@ -97,6 +97,30 @@ class IsolatedUatControlPlanePolicyTest(unittest.TestCase):
             with self.subTest(code=code), self.assertRaisesRegex(MODULE.ContractError, code):
                 MODULE.validate_request(value, self.policy)
 
+    def test_zero_source_and_image_identities_fail_closed(self) -> None:
+        cases = []
+        for field in ("git_commit", "git_tree"):
+            value = request(self.policy)
+            value["source"][field] = "0" * 40
+            cases.append((field, value, "ISOLATED_UAT_REQUEST_SOURCE_INVALID"))
+
+        compose = request(self.policy)
+        compose["source"]["resolved_compose_sha256"] = "0" * 64
+        cases.append(("resolved_compose_sha256", compose, "ISOLATED_UAT_REQUEST_SOURCE_INVALID"))
+
+        for role in ("web", "worker"):
+            manifest = request(self.policy)
+            manifest["images"][role]["image_reference"] = f"example.invalid/{role}@sha256:{'0' * 64}"
+            cases.append((f"{role}_manifest", manifest, "ISOLATED_UAT_REQUEST_IMAGE_INVALID"))
+
+            config = request(self.policy)
+            config["images"][role]["config_digest"] = f"sha256:{'0' * 64}"
+            cases.append((f"{role}_config", config, "ISOLATED_UAT_REQUEST_IMAGE_INVALID"))
+
+        for name, value, code in cases:
+            with self.subTest(name=name), self.assertRaisesRegex(MODULE.ContractError, code):
+                MODULE.validate_request(value, self.policy)
+
     def test_policy_role_and_source_drift_fail_closed(self) -> None:
         roles = copy.deepcopy(self.policy)
         roles["database"]["role_credentials"].pop("chenyida_erp_worker")
@@ -107,6 +131,16 @@ class IsolatedUatControlPlanePolicyTest(unittest.TestCase):
         sources["source_binding"][0]["sha256"] = "0" * 64
         with self.assertRaisesRegex(MODULE.ContractError, "ISOLATED_UAT_POLICY_SOURCE_BINDING_STALE"):
             MODULE.validate_policy(sources)
+
+        malformed_sources = copy.deepcopy(self.policy)
+        malformed_sources["source_binding"][0]["sha256"] = None
+        with self.assertRaisesRegex(MODULE.ContractError, "ISOLATED_UAT_POLICY_SOURCE_BINDING_STALE"):
+            MODULE.validate_policy(malformed_sources)
+
+        malformed_policy_sha = copy.deepcopy(self.policy)
+        malformed_policy_sha["policy_sha256"] = None
+        with self.assertRaisesRegex(MODULE.ContractError, "ISOLATED_UAT_POLICY_SHA256_INVALID"):
+            MODULE.validate_policy(malformed_policy_sha)
 
         runtime = copy.deepcopy(self.policy)
         runtime["runtime"]["release_identity_reader_gid"] = 1000

@@ -4,6 +4,20 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: validate isolated UAT receipt chain`
+
+- 第一性原理：单一小团队UAT只需要固定、可审阅的回执链，不建设通用证据平台。本切片新增一份receipt policy、一个无运行能力的纯validator和binding v3；不增加队列、daemon、服务、多租户或人员基数配置。
+- 回执语义：严格验证database target/bootstrap、release candidate、Migration execution、runtime privilege、readiness、postdeploy及runtime identity八类回执和五类证据体；固定producer、project/request/operation、数据库身份、46项allowlist/applied ledger、五角色完整属性、ACL、release/image、容器网络/health、loopback、时间和前驱摘要连续性。
+- 失败关闭：控制请求和回执层均拒绝全零Git、Compose与OCI摘要；策略摘要的非字符串值及深层恶意嵌套都转换为稳定合同错误。跨项目/跨意图拼接、自洽policy/receipt重签、局部证据重签、过期重放、非法Unicode、PostgreSQL OID/system identifier越界、全零容器身份、重复容器ID、角色或镜像漂移均被拒绝；链龄从bootstrap observation起上限1小时、future skew 300秒，调用方不能注入任意intent validator或自选expected binding SHA。
+- Binding/plan：新增v3及18节点predecessor目录，body/raw SHA为`50ddd73fb4745c8fcc0b91fd7e4130e2cb3a9ef0d2f52773c64cd6112afc74bd`/`da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4`；receipt policy同时钉住两者，one-shot升级plan/v3。计划只输出`runtime_receipt_validation_status=NOT_RUN_NO_RECEIPTS`和成功输出合同模板，不把未运行结果写成validation output；返回前二次读取source state并拒绝并发漂移。历史v1/v2 raw SHA保持`3244d550…7b3a`/`9cc4e3c1…5232`。
+- 诚实证据边界：成功状态只为`VALIDATED_PURE_INTERNAL_CONTRACT_CHAIN_FROM_UNVERIFIED_EXTERNAL_DIGEST_ANCHORS`；四个业务external anchors和control plan固定`NOT_EVALUATED`，verification time固定`CALLER_INJECTED_NOT_ATTESTED`，runtime evidence固定`NOT_ESTABLISHED_BY_PURE_VALIDATION`。三个dependency policy raw SHA由执行validator常量固定，receipt expected roots仍明确来自调用方；合成fixture不是运行证据。
+- 能力停止线：全动作传递closure、atomic publisher及host/Docker/PostgreSQL/HTTP backend仍为`NOT_IMPLEMENTED`；`require_receipt_publisher()`固定失败关闭。`deployment_authorized=false`、空运行动作和生产入口禁用不变。
+- 摘要：receipt policy内部/raw/source closure SHA为`58c34e46…9f6e`/`1eee47ed…7aac`/`0a343c32…90d8`，control policy内部SHA更新为`d899da83…68d2`；Migration allowlist/applied ledger SHA为`8bb2b2d6…8eed`/`e4a7bc4b…6a34`。
+- 测试：控制请求5/5、runtime contracts 7/7、runtime receipts 16/16、one-shot 11/11，共39项Unit PASS；聚合runner输出`ISOLATED_UAT_ONE_SHOT_TEST_PASS`，隔离Compose policy/config双PASS。
+- 资源：19:09→20:05静态段available memory `2,395,295,744 → 2,338,922,496`B、Swap `179,580,928 → 179,576,832`B、根盘available `17,755,828,224 → 17,713,516,544`B、Load `0.01/0.04/0.09 → 0.58/0.39/0.32`，Memory PSI和kernel `oom_kill`均0。Docker保持6容器/75镜像/277 Volume/6网络；四服务restart0/OOM false，Web/PostgreSQL healthy。精确删除本段生成的2个`.pyc`后，任务pyc和Compose测试临时目录残留均0；未清理任何历史或运行资源。
+- 代码/数据：无产品业务代码、Schema、Migration、API、页面、依赖、员工角色或生产配置变化；未创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，未build/deploy/Migration/restart/账号/业务写，也未访问现有UAT或生产数据。
+- 文档：新增D-179并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一切片是external anchor/owner日志/Caddy Host-SNI validator与全动作closure，再到publisher/runtime adapter和精确镜像，不是运行部署。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: define isolated UAT runtime contract intents`
 
 - 第一性原理：不到20人的单一隔离UAT不建设通用工作流/多租户平台。本切片只增加一份runtime contract policy、一个纯函数模块和内存fake ports；不增加daemon、队列、服务或人员基数配置。

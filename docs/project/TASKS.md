@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-177/v2已纠正空库ACL和预造生产identity顺序；D-178新增单文件纯合同policy/module，把database-bootstrap、Migration和isolated evidence收敛为`STRUCTURE_VALID / NOT_EXECUTED / predecessor NOT_VALIDATED`意图及`INCOMPLETE_DESCRIPTOR_ONLY`回执字段目录。typed fake ports只证明三段顺序、输入隔离和首错停止；真实receipt validator/publisher、前驱摘要链、v2全动作传递closure、runtime backend和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-179已在D-177/v2顺序和D-178纯意图之上完成八类回执、五类证据体、46项Migration ledger、时间/重放、角色/ACL、容器/loopback与内部前驱摘要链的纯语义验证，并以binding/plan v3接线。成功只表示从四个未验证业务external digest anchors和一个未验证control plan出发的内部链一致；verification time也由调用方注入且未认证。外部anchor/owner日志/Caddy Host-SNI validator、全动作closure、publisher、runtime backend和当前源码匹配镜像仍缺失。
+
+2026-08-24纯回执链事件：项目负责人继续要求“下一步”。新增D-179、独立runtime receipt policy和无运行能力的纯validator，固定八类回执/五类证据体、producer、完整角色属性、46项allowlist/applied ledger、PostgreSQL/非零Git-OCI/唯一容器身份、容器网络/health、规范时间、从链首起算1小时链龄及前驱摘要连续性；控制请求和回执层均拒绝全零Git、Compose与OCI摘要，跨项目拼接、自洽policy/receipt重签和过期重放失败关闭。新增binding v3/18节点目录并升级plan/v3；receipt policy同时钉住v3 body/raw SHA，v1/v2字节不变。计划只输出`NOT_RUN_NO_RECEIPTS`及成功输出合同模板，并在返回前二次读取source state拒绝并发漂移。成功状态明确为`VALIDATED_PURE_INTERNAL_CONTRACT_CHAIN_FROM_UNVERIFIED_EXTERNAL_DIGEST_ANCHORS`，并标明caller-supplied policy roots、caller-injected time和control plan未验证，不建立runtime truth。控制5、合同7、回执16、one-shot 11共39项Unit与Compose双门PASS；publisher/backends仍固定未实现，未创建或访问运行资源。TASK92继续`DOING`。
 
 2026-08-24纯合同结构事件：项目负责人继续要求“下一步”。新增D-178、runtime contract policy和单一纯函数模块；固定五角色独立凭据映射、标准UAT数据库marker/system identifier、alpha.47、`EMPTY → 0046`/46项allowlist、loopback和GID`65532`。单文件source closure只证明固定hash/import allowlist且明示`NOT_A_SANDBOX`，binding v2字节不变并继续仅`DIRECT_CONTRACT_REFERENCES_ONLY`。one-shot因新增字段升级为plan/v2；合成端口覆盖自洽篡改、字段目录篡改、非法source扩张及逐步失败，所有fixture均`NOT_EXECUTED/NOT_PUBLISHED/NOT_AVAILABLE`；`execute`在唯一backend seam前拒绝。Runtime policy/closure/control policy SHA分别为`5f24335a…6586`/`978741a0…c939`/`dd442418…6150`；新7项、one-shot 10项、控制4项和Compose双门通过。TASK92继续`DOING`。
 
@@ -287,7 +289,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177 v2顺序和D-178纯意图结构；继续真实回执链/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、低资源规则 | `DOING / PURE INTENTS STRUCTURE VALID / RECEIPT VALIDATORS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。七类root、五角色、空库0046、v2顺序及三族意图/字段目录通过；predecessor仍未验证，v2仍只绑定直接source，真实validator/publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177 v2顺序、D-178纯意图和D-179内部回执链；继续external anchors/publisher/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、低资源规则 | `DOING / PURE INTERNAL RECEIPT CHAIN VALID FROM UNVERIFIED EXTERNAL ANCHORS / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。八回执/五证据体、46项ledger、binding/plan v3及内部predecessor通过；external anchors、owner日志、Caddy Host/SNI、全动作closure、publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

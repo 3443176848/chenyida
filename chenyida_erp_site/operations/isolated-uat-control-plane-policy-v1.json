@@ -98,12 +98,16 @@
       "sha256": "2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa"
     },
     {
-      "path": "operations/isolated-uat-one-shot-action-bindings-v2.json",
-      "sha256": "9cc4e3c12793785186fcf74560919376cfa5cc82ef5f344b11fcb5b4501e5232"
+      "path": "operations/isolated-uat-one-shot-action-bindings-v3.json",
+      "sha256": "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4"
     },
     {
       "path": "operations/isolated-uat-runtime-contract-policy-v1.json",
       "sha256": "4b7f6f741ff84c4ae7a4d8ee3d3641e7a9d3dc52b62c2b00d4c9f9c0f98020cc"
+    },
+    {
+      "path": "operations/isolated-uat-runtime-receipt-policy-v1.json",
+      "sha256": "1eee47ed1ed9311529153cc3e7defeb95984e075276af23a453a872c94027aac"
     },
     {
       "path": "operations/postgresql-runtime-privilege-policy-v2.json",
@@ -119,15 +123,19 @@
     },
     {
       "path": "scripts/isolated-uat-control-plane-policy.py",
-      "sha256": "fd8583fb962a584858c79d3624bcda0fb53f45f664e5433074226a161484d570"
+      "sha256": "08043630dbfc50ba4b9aab70e777335af0fd740f905375edce10495239907b89"
     },
     {
       "path": "scripts/isolated-uat-one-shot.py",
-      "sha256": "d2f047d7f7ff266495d0d7beb77a746d8a26baab333a0ddddea6f35a99b216a3"
+      "sha256": "641f6abc2e2d18772110e8ec46480e0ef57fa056469785d4c9e72296312b9cc4"
     },
     {
       "path": "scripts/isolated-uat-runtime-contracts.py",
       "sha256": "c293e1872e6700dfb4b129450f666fba86612dc16678a613cc7b050fb8ebdc6a"
+    },
+    {
+      "path": "scripts/isolated-uat-runtime-receipts.py",
+      "sha256": "c19d4599abf2b7063a4d82476b651ae0013303f181bcca1b8c45f5d94148e79d"
     },
     {
       "path": "scripts/postgresql-runtime-privilege-journal.mjs",
@@ -142,5 +150,5 @@
       "sha256": "22ddda1cf7f77899cbb58f2e6e5ac75f81ea7629d8a4abbf05b07021efc0a6b9"
     }
   ],
-  "policy_sha256": "dd442418af220070b133063ea555dde0a1e1b4cfcc266ad1aa1706829b5c6150"
+  "policy_sha256": "d899da83cfefff7974e969dd337472234a902ed9797903b2e0e53709e20868d2"
 }

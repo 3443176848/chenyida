@@ -4019,6 +4019,41 @@
 - 拒绝把AST denylist冒充Python capability sandbox，或把单文件纯合同closure描述为v2全动作传递closure。
 - 拒绝在没有精确镜像、真实backend和专项授权时切换`deployment_authorized`、创建资源或执行Migration。
 
+## D-179 隔离UAT只验证内部回执链，未验证外部根不得升级为运行证据
+
+- 日期：2026-08-24
+- 状态：`ACCEPTED / PURE INTERNAL RECEIPT CHAIN VALID / EXTERNAL ANCHORS NOT EVALUATED / PUBLISHERS AND RUNTIME BACKENDS NOT IMPLEMENTED / PRODUCTION NO-GO`
+- 发起：项目负责人要求继续下一步；Codex按小团队单一namespace、固定流程和最小能力边界完成D-178的下一仓库切片
+- 实施范围：只新增纯回执policy/validator、binding v3和静态测试；不读取运行环境、创建资源、发布回执或执行任何UAT/生产动作
+
+### Context
+
+- D-178已经冻结三族意图与字段目录，但`INCOMPLETE_DESCRIPTOR_ONLY / predecessor NOT_VALIDATED`不能证明字段值、前驱连续性、角色/ACL、Migration ledger或容器身份一致。
+- 调用方能够提供一个格式正确且自洽重签的JSON时，若validator只验摘要格式或允许调用方自选binding/intent validator，就会把自签声明误当成受策略约束的证据。
+- 当前没有L2a、精确HEAD镜像、外部root/credential/cluster validator或publisher。纯函数可以验证内部语义与引用闭包，但不能观察一个目录、容器、数据库或HTTP请求是否真实存在。
+
+### Decision
+
+1. 新增独立`runtime-receipt-policy/v1`和单一纯函数validator。它只消费注入JSON及source bytes，不具备文件系统、Docker、数据库、网络、时钟、随机数、进程、Secret、publisher或任意回调能力；不为少于20人的系统增加队列、daemon、通用证据平台或多租户控制面。Intent/privilege/binding三个依赖raw SHA由执行validator常量固定；receipt policy raw/internal SHA只匹配调用方传入的expected roots，不能把调用方本身描述为受信根。
+2. 冻结八类回执和五类证据体的精确字段、producer及语义，机械验证project/request/operation、数据库身份、46项Migration allowlist/applied ledger、五角色完整属性、ACL、release/image、非零且唯一的容器身份、网络/health、loopback、规范时间和前驱摘要连续性。控制请求在进入plan前同样拒绝全零Git commit/tree、Compose摘要及Web/Worker manifest/config摘要；策略摘要非字符串、深层恶意嵌套、自洽policy/receipt重签、跨项目/跨意图拼接、非法Unicode和PostgreSQL身份越界均转换为稳定合同错误并失败关闭。一小时链龄从首个bootstrap observation起算，但仅相对调用方注入、未认证的verification time成立。
+3. 成功结果只允许命名为`VALIDATED_PURE_INTERNAL_CONTRACT_CHAIN_FROM_UNVERIFIED_EXTERNAL_DIGEST_ANCHORS`；四个业务外部摘要根及control plan的状态固定为`NOT_EVALUATED`，verification time固定为`CALLER_INJECTED_NOT_ATTESTED`，runtime evidence固定为`NOT_ESTABLISHED_BY_PURE_VALIDATION`。格式/引用有效不等于对应root、credential、cluster、one-shot状态、plan或宿主时钟真实可信。
+4. 新增action binding v3和18节点predecessor目录，并由receipt policy同时钉住v3 body/raw SHA；调用方不得提供任意expected binding SHA。历史v1/v2文件保持字节不变，one-shot因输出字段不兼容明确升级为plan/v3。计划阶段只输出`NOT_RUN_NO_RECEIPTS`和成功输出合同模板，不把尚未消费回执的模板称作验证结果；在返回计划前必须二次读取source state并与请求/策略包核对，检测到并发漂移即失败关闭。
+5. Runtime privilege仅作为既有policy的隔离UAT acceptance projection；owner侧完成日志尚无隔离operator profile。D-178 evidence intent v1未承载Caddy server name，因此Host/SNI信任绑定明确不在当前证明范围，必须由后续intent v2补齐。
+6. 原子publisher、外部anchor validator、全动作传递source closure和host/Docker/PostgreSQL/HTTP adapter继续为`NOT_IMPLEMENTED`。`require_receipt_publisher()`固定失败关闭；即使未来先改变执行授权，也不得绕过publisher门进入旧runtime backend。
+7. `deployment_authorized=false`、空运行动作和生产入口禁用保持不变。本决策不授权目录、Secret、容器、网络、Volume、数据库、角色、Migration、build、deploy、restart、账号或业务写。
+
+### Consequences
+
+- 第5、6、7、9步现在有受执行validator固定dependency roots及调用方expected receipt roots约束、可重复验证的内部语义与摘要链；重签一个局部对象不能跨过固定producer、连续性、ledger、binding和相对时间门。该结论不把caller-supplied roots或caller-injected time升级为受信运行根。
+- TASK92仍为`DOING`，新UAT仍未创建且不能试运行。下一安全切片是补外部root/credential/cluster与owner完成日志validator、Caddy Host/SNI intent v2和全动作传递closure；再实现原子publisher/runtime adapters及精确镜像，最后才形成L2a申请。
+- 纯validator输出可用于未来运行端口的验收，但在publisher和外部anchor validator落地前只能作为仓库合同证据，不能写成运行完成、UAT健康或可试运行。
+
+### Rejected alternatives
+
+- 拒绝让调用方注入任意intent validator、expected binding SHA或泛化publisher，也拒绝只验JSON摘要后把自签对象标为真实证据。
+- 拒绝把四个业务外部摘要根、control plan或调用方时钟的格式/相对检查描述为已验证来源，或把合成fixture、loopback leaf observation描述为Host/SNI/容器/数据库实测。
+- 拒绝在缺少精确镜像、publisher、runtime backend和专项授权时创建隔离UAT或复用生产supervisor/runner。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

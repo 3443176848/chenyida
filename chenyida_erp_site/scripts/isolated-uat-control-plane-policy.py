@@ -18,6 +18,8 @@ REQUEST_CONTRACT = "chenyida-erp-isolated-uat-control-plane-request/v1"
 MAX_JSON_BYTES = 2 * 1024 * 1024
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 GIT_OBJECT = re.compile(r"^[0-9a-f]{40}$")
+ZERO_SHA256 = "0" * 64
+ZERO_GIT_OBJECT = "0" * 40
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$")
 PROJECT = re.compile(r"^chenyida-erp-uat-[a-z0-9][a-z0-9_-]{0,42}$")
 IMAGE = re.compile(r"^[^@\s]+@sha256:[0-9a-f]{64}$")
@@ -58,14 +60,16 @@ SOURCE_PATHS = [
     "compose.release.yml",
     "compose.uat-isolated.yml",
     "compose.yml",
-    "operations/isolated-uat-one-shot-action-bindings-v2.json",
+    "operations/isolated-uat-one-shot-action-bindings-v3.json",
     "operations/isolated-uat-runtime-contract-policy-v1.json",
+    "operations/isolated-uat-runtime-receipt-policy-v1.json",
     "operations/postgresql-runtime-privilege-policy-v2.json",
     "operations/runtime-secret-file-policy-v1.json",
     "scripts/isolated-uat-compose-policy.py",
     "scripts/isolated-uat-control-plane-policy.py",
     "scripts/isolated-uat-one-shot.py",
     "scripts/isolated-uat-runtime-contracts.py",
+    "scripts/isolated-uat-runtime-receipts.py",
     "scripts/postgresql-runtime-privilege-journal.mjs",
     "scripts/postgresql-runtime-privilege-operator.mjs",
     "scripts/postgresql-runtime-privilege-reconciler.mjs",
@@ -166,6 +170,7 @@ def source_state() -> dict[str, Any]:
         "current_head": "EMPTY",
         "target_head": files[-1].name,
         "migration_count": len(files),
+        "migration_allowlist_entries": entries,
         "migration_allowlist_sha256": hashlib.sha256(allowlist.encode("utf-8")).hexdigest(),
     }
 
@@ -281,10 +286,12 @@ def validate_policy(value: dict[str, Any]) -> dict[str, Any]:
         fail("ISOLATED_UAT_POLICY_SOURCE_BINDING_INVALID")
     for binding in bindings:
         exact(binding, {"path", "sha256"}, "ISOLATED_UAT_POLICY_SOURCE_BINDING_INVALID")
-        if not SHA256.fullmatch(binding["sha256"]) or file_sha256(SITE_ROOT / binding["path"]) != binding["sha256"]:
+        if not isinstance(binding["sha256"], str) or not SHA256.fullmatch(binding["sha256"]) \
+                or file_sha256(SITE_ROOT / binding["path"]) != binding["sha256"]:
             fail("ISOLATED_UAT_POLICY_SOURCE_BINDING_STALE")
     body = {key: item for key, item in value.items() if key != "policy_sha256"}
-    if not SHA256.fullmatch(value["policy_sha256"]) or canonical_sha256(body) != value["policy_sha256"]:
+    if not isinstance(value["policy_sha256"], str) or not SHA256.fullmatch(value["policy_sha256"]) \
+            or canonical_sha256(body) != value["policy_sha256"]:
         fail("ISOLATED_UAT_POLICY_SHA256_INVALID")
     return value
 
@@ -312,14 +319,21 @@ def validate_request(value: dict[str, Any], policy: dict[str, Any]) -> dict[str,
             or source["migration_target_head"] != state["target_head"] \
             or source["migration_allowlist_sha256"] != state["migration_allowlist_sha256"] \
             or not GIT_OBJECT.fullmatch(source["git_commit"] if isinstance(source["git_commit"], str) else "") \
+            or source["git_commit"] == ZERO_GIT_OBJECT \
             or not GIT_OBJECT.fullmatch(source["git_tree"] if isinstance(source["git_tree"], str) else "") \
-            or not SHA256.fullmatch(source["resolved_compose_sha256"] if isinstance(source["resolved_compose_sha256"], str) else ""):
+            or source["git_tree"] == ZERO_GIT_OBJECT \
+            or not SHA256.fullmatch(source["resolved_compose_sha256"] if isinstance(source["resolved_compose_sha256"], str) else "") \
+            or source["resolved_compose_sha256"] == ZERO_SHA256:
         fail("ISOLATED_UAT_REQUEST_SOURCE_INVALID")
     images = exact(value["images"], {"web", "worker"}, "ISOLATED_UAT_REQUEST_IMAGES_INVALID")
     for image in images.values():
         exact(image, {"image_reference", "config_digest"}, "ISOLATED_UAT_REQUEST_IMAGE_INVALID")
-        if not IMAGE.fullmatch(image.get("image_reference") if isinstance(image.get("image_reference"), str) else "") \
-                or not re.fullmatch(r"sha256:[0-9a-f]{64}", image.get("config_digest") if isinstance(image.get("config_digest"), str) else ""):
+        image_reference = image.get("image_reference") if isinstance(image.get("image_reference"), str) else ""
+        config_digest = image.get("config_digest") if isinstance(image.get("config_digest"), str) else ""
+        if not IMAGE.fullmatch(image_reference) \
+                or image_reference.endswith(f"@sha256:{ZERO_SHA256}") \
+                or not re.fullmatch(r"sha256:[0-9a-f]{64}", config_digest) \
+                or config_digest == f"sha256:{ZERO_SHA256}":
             fail("ISOLATED_UAT_REQUEST_IMAGE_INVALID")
     ports = exact(value["ports"], {"host_ip", "web", "caddy_http", "caddy_https"}, "ISOLATED_UAT_REQUEST_PORTS_INVALID")
     numbers = [ports.get("web"), ports.get("caddy_http"), ports.get("caddy_https")]

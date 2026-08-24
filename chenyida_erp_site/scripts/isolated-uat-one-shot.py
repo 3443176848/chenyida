@@ -17,14 +17,19 @@ from typing import Any, BinaryIO, TextIO
 
 SITE_ROOT = Path(__file__).resolve().parent.parent
 POLICY_VALIDATOR_PATH = SITE_ROOT / "scripts/isolated-uat-control-plane-policy.py"
-BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v2.json"
+BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v3.json"
 RUNTIME_CONTRACTS_PATH = SITE_ROOT / "scripts/isolated-uat-runtime-contracts.py"
 RUNTIME_CONTRACT_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-runtime-contract-policy-v1.json"
-PLAN_CONTRACT = "chenyida-erp-isolated-uat-one-shot-plan/v2"
-BINDINGS_CONTRACT = "chenyida-erp-isolated-uat-one-shot-action-bindings/v2"
-BINDING_IMPLEMENTATION_STATUS = "FIXED_BINDINGS_DEPENDENCY_ORDER_CORRECTED_RUNTIME_PATH_NOT_IMPLEMENTED"
-EXPECTED_BINDING_SHA256 = "6f28881beb767f25e469b60f6ef9ae15e62d703659619ce3e7c8aa63e76d463a"
-ENTRYPOINT_ID = "chenyida-erp-isolated-uat-one-shot-v2"
+RUNTIME_RECEIPTS_PATH = SITE_ROOT / "scripts/isolated-uat-runtime-receipts.py"
+RUNTIME_RECEIPT_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-runtime-receipt-policy-v1.json"
+PRIVILEGE_POLICY_PATH = SITE_ROOT / "operations/postgresql-runtime-privilege-policy-v2.json"
+PLAN_CONTRACT = "chenyida-erp-isolated-uat-one-shot-plan/v3"
+BINDINGS_CONTRACT = "chenyida-erp-isolated-uat-one-shot-action-bindings/v3"
+BINDING_IMPLEMENTATION_STATUS = (
+    "FIXED_BINDINGS_RECEIPT_CHAIN_VALIDATORS_IMPLEMENTED_RUNTIME_PATH_NOT_IMPLEMENTED"
+)
+EXPECTED_BINDING_SHA256 = "50ddd73fb4745c8fcc0b91fd7e4130e2cb3a9ef0d2f52773c64cd6112afc74bd"
+ENTRYPOINT_ID = "chenyida-erp-isolated-uat-one-shot-v3"
 PLAN_MODE = "READ_ONLY_PLAN"
 FORBIDDEN_PRODUCTION_ENTRYPOINTS = [
     "scripts/postgresql-runtime-privilege-runner.mjs",
@@ -67,6 +72,21 @@ def load_runtime_contracts() -> Any:
 RUNTIME_CONTRACTS = load_runtime_contracts()
 
 
+def load_runtime_receipts() -> Any:
+    specification = importlib.util.spec_from_file_location(
+        "isolated_uat_runtime_receipts",
+        RUNTIME_RECEIPTS_PATH,
+    )
+    if specification is None or specification.loader is None:
+        raise RuntimeError("isolated UAT runtime receipts cannot be loaded")
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+RUNTIME_RECEIPTS = load_runtime_receipts()
+
+
 def fail(code: str) -> None:
     raise ContractError(code)
 
@@ -82,10 +102,10 @@ def read_bindings(path: Path = BINDINGS_PATH) -> dict[str, Any]:
         fail("ISOLATED_UAT_ACTION_BINDING_FILE_INVALID")
     POLICY.exact(value, {
         "schema_version", "contract", "binding_id", "implementation_status",
-        "execution_boundary", "actions", "binding_sha256",
+        "execution_boundary", "actions", "receipt_chain", "binding_sha256",
     }, "ISOLATED_UAT_ACTION_BINDING_FIELDS_INVALID")
-    if value["schema_version"] != 2 or value["contract"] != BINDINGS_CONTRACT \
-            or value["binding_id"] != "chenyida-erp-isolated-uat-fixed-actions-v2" \
+    if value["schema_version"] != 3 or value["contract"] != BINDINGS_CONTRACT \
+            or value["binding_id"] != "chenyida-erp-isolated-uat-fixed-actions-v3" \
             or value["implementation_status"] != BINDING_IMPLEMENTATION_STATUS \
             or value["execution_boundary"] != {
                 "evidence_scope": "ISOLATED_UAT_ONLY",
@@ -95,6 +115,9 @@ def read_bindings(path: Path = BINDINGS_PATH) -> dict[str, Any]:
                 "production_release_identity_allowed": False,
                 "runtime_path_implemented": False,
                 "source_binding_scope": "DIRECT_CONTRACT_REFERENCES_ONLY",
+                "receipt_validation_scope": (
+                    "PURE_CONTRACT_SEMANTICS_RUNTIME_FACTS_NOT_ESTABLISHED"
+                ),
             }:
         fail("ISOLATED_UAT_ACTION_BINDING_IDENTITY_INVALID")
     actions = value["actions"]
@@ -123,6 +146,8 @@ def read_bindings(path: Path = BINDINGS_PATH) -> dict[str, Any]:
             "runtime_secret_filenames", "backup_service_filename", "password_format", "resolved_compose_sha256",
             "images", "ports", "technical_login_roles", "package_version", "migration_current_head", "migration_target_head",
             "migration_allowlist_sha256", "git_commit", "git_tree", "host_ip", "web_port",
+            "migration_allowlist_entries", "plan_sha256", "runtime_contract_policy",
+            "runtime_receipt_policy",
         } | previous_outputs
         if any(item not in available for item in action["inputs"]):
             fail("ISOLATED_UAT_ACTION_BINDING_INPUT_ORDER_INVALID")
@@ -134,6 +159,10 @@ def read_bindings(path: Path = BINDINGS_PATH) -> dict[str, Any]:
             or not POLICY.SHA256.fullmatch(value["binding_sha256"] if isinstance(value["binding_sha256"], str) else "") \
             or POLICY.canonical_sha256(body) != value["binding_sha256"]:
         fail("ISOLATED_UAT_ACTION_BINDING_SHA256_INVALID")
+    try:
+        RUNTIME_RECEIPTS.validate_action_binding(value, EXPECTED_BINDING_SHA256)
+    except RUNTIME_RECEIPTS.ContractError as error:
+        fail(str(error))
     return value
 
 
@@ -151,6 +180,33 @@ def read_runtime_contract_policy(path: Path = RUNTIME_CONTRACT_POLICY_PATH) -> d
     try:
         return RUNTIME_CONTRACTS.validate_policy(value, sources)
     except RUNTIME_CONTRACTS.ContractError as error:
+        fail(str(error))
+
+
+def read_runtime_receipt_policy(path: Path = RUNTIME_RECEIPT_POLICY_PATH) -> dict[str, Any]:
+    try:
+        value = POLICY.parse_json(
+            path.read_bytes(),
+            "ISOLATED_UAT_RUNTIME_RECEIPT_POLICY_JSON_INVALID",
+        )
+        intent_policy = read_runtime_contract_policy()
+        sources = {
+            "operations/isolated-uat-runtime-contract-policy-v1.json": (
+                RUNTIME_CONTRACT_POLICY_PATH.read_bytes()
+            ),
+            "operations/postgresql-runtime-privilege-policy-v2.json": (
+                PRIVILEGE_POLICY_PATH.read_bytes()
+            ),
+            "operations/isolated-uat-one-shot-action-bindings-v3.json": (
+                BINDINGS_PATH.read_bytes()
+            ),
+            "scripts/isolated-uat-runtime-receipts.py": RUNTIME_RECEIPTS_PATH.read_bytes(),
+        }
+    except OSError:
+        fail("ISOLATED_UAT_RUNTIME_RECEIPT_POLICY_JSON_INVALID")
+    try:
+        return RUNTIME_RECEIPTS.validate_policy(value, sources, intent_policy)
+    except RUNTIME_RECEIPTS.ContractError as error:
         fail(str(error))
 
 
@@ -172,11 +228,27 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
     request = POLICY.validate_request(request, policy)
     bindings = read_bindings()
     runtime_contract_policy = read_runtime_contract_policy()
+    runtime_receipt_policy = read_runtime_receipt_policy()
+    source_state = POLICY.source_state()
+    if source_state["package_version"] != policy["release"]["package_version"] \
+            or source_state["package_version"] != request["source"]["package_version"] \
+            or source_state["current_head"] != policy["database"]["current_head"] \
+            or source_state["current_head"] != request["source"]["migration_current_head"] \
+            or source_state["target_head"] != policy["database"]["target_head"] \
+            or source_state["target_head"] != request["source"]["migration_target_head"] \
+            or source_state["migration_count"] != policy["database"]["migration_count"] \
+            or source_state["migration_allowlist_sha256"] \
+                != policy["database"]["migration_allowlist_sha256"] \
+            or source_state["migration_allowlist_sha256"] \
+                != request["source"]["migration_allowlist_sha256"]:
+        fail("ISOLATED_UAT_SOURCE_STATE_CHANGED_DURING_PLAN")
     policy_sources = {item["path"] for item in policy["source_binding"]}
     referenced_sources = {source for action in bindings["actions"] for source in action["sources"]}
     runtime_contract_sources = {
         "operations/isolated-uat-runtime-contract-policy-v1.json",
         "scripts/isolated-uat-runtime-contracts.py",
+        "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "scripts/isolated-uat-runtime-receipts.py",
     }
     if not (referenced_sources | runtime_contract_sources).issubset(policy_sources):
         fail("ISOLATED_UAT_ACTION_BINDING_SOURCE_UNBOUND")
@@ -191,7 +263,7 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         for binding in bindings["actions"]
     ]
     body = {
-        "schema_version": 2,
+        "schema_version": 3,
         "contract": PLAN_CONTRACT,
         "entrypoint_id": ENTRYPOINT_ID,
         "mode": PLAN_MODE,
@@ -204,6 +276,23 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
             "source_closure_sha256"
         ],
         "runtime_contract_capability_status": runtime_contract_policy["capability_status"],
+        "runtime_receipt_policy_sha256": runtime_receipt_policy["policy_sha256"],
+        "runtime_receipt_source_closure_sha256": runtime_receipt_policy["source_closure"][
+            "source_closure_sha256"
+        ],
+        "runtime_receipt_capability_status": runtime_receipt_policy["capability_status"],
+        "runtime_receipt_validation_status": "NOT_RUN_NO_RECEIPTS",
+        "runtime_receipt_success_output_contract": runtime_receipt_policy["validation_output"],
+        "receipt_chain_binding": {
+            "contract": bindings["receipt_chain"]["contract"],
+            "validator_method": bindings["receipt_chain"]["validator_method"],
+            "validation_status": bindings["receipt_chain"]["validation_status"],
+            "node_count": len(bindings["receipt_chain"]["nodes"]),
+            "external_root_validation_statuses": sorted({
+                item["validation_status"]
+                for item in bindings["receipt_chain"]["external_roots"]
+            }),
+        },
         "request_id": request["request_id"],
         "policy_sha256": policy["policy_sha256"],
         "project": request["project"],
@@ -217,6 +306,7 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
             "target_head": policy["database"]["target_head"],
             "technical_login_roles": sorted(policy["database"]["role_credentials"]),
         },
+        "migration_allowlist_entries": source_state["migration_allowlist_entries"],
         "actions": actions,
         "failure_boundary": {
             "cleanup_scope": "EXACT_PROJECT_NAMESPACE_ONLY",
@@ -245,8 +335,9 @@ def assert_execution_allowed(policy: dict[str, Any]) -> None:
 
 def require_runtime_backend() -> None:
     try:
+        RUNTIME_RECEIPTS.require_receipt_publisher()
         RUNTIME_CONTRACTS.require_runtime_backend()
-    except RUNTIME_CONTRACTS.ContractError as error:
+    except (RUNTIME_RECEIPTS.ContractError, RUNTIME_CONTRACTS.ContractError) as error:
         fail(str(error))
 
 
