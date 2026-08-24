@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-181已在D-179内部回执链与D-180外部锚点之上新增owner完成日志纯validator，固定重跑两条上游validator，并核对`operator_state_root`准备/完成身份、六阶段journal、终态、跨链摘要与因果时间；binding/plan升级v5并显式区分active v5控制摘要和冻结v4收据摘要。成功只表示调用方注入对象满足固定纯合同；source/时钟/观察值仍为`CALLER_INJECTED_NOT_ATTESTED`，授权和runtime evidence仍未建立。Caddy Host-SNI、全动作closure、publisher、runtime backend和当前源码匹配镜像仍缺失。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-182已把隔离Caddy的连接地址、HTTP Host、TLS SNI、站点名和Web Public Origin统一为`127.0.0.1 + localhost + HTTPS`纯合同，并把one-shot升级为binding/plan v6；evidence intent v2携带active v6、owner v5及external/receipt v4完整计划对象，核对固定角色、合同、摘要、确定性投影及基础证据连续性。成功只表示调用方注入source bytes及对象满足固定纯合同；TLS/HTTP/宿主仍未观察，授权和runtime evidence仍未建立。全动作closure、publisher、runtime observer/backend和当前源码匹配镜像仍缺失。
+
+2026-08-25 Caddy Host/SNI纯合同事件：项目负责人继续要求“下一步”。新增D-182、Host/SNI policy/纯validator、evidence intent v2及binding/plan v6；隔离Compose的Web Origin改为`https://localhost:<Caddy HTTPS发布端口>`，Caddy显式固定`ERP_DOMAIN=localhost / ERP_HTTPS_PORT=443`，静态validator拒绝HTTP Origin与环境漂移。所有公开Host/SNI builder/validator都会重验固定policy及调用方注入source bytes；v2完整重验D-178 evidence v1，验证v6→v5→v4计划角色/摘要/投影和source/Compose/Web/Worker镜像连续性，但明确不冒充完整active-plan语义或运行证据。v1—v5 raw字节不变；聚合80/80与Compose连续两次双门PASS，最终独立复核P0/P1结果记录于当前任务文档。未创建或访问UAT运行资源。TASK92继续`DOING`，下一独立切片只处理九步全动作传递source closure。
 
 2026-08-25 owner完成日志纯合同事件：项目负责人继续要求“下一步”。新增D-181、owner completion policy/纯validator及binding/plan v5；owner validator不接收可自签的D-179/D-180 validation envelope，而是从原始外锚、intent、receipt和evidence bundle调用固定源码重新验证，并把external policy绑定到owner source closure内的固定raw。正常成功日志只接受六个严格有序阶段、空recovery authorization、同一operation/request/project、同一`operator_state_root`准备/完成身份及`COMPLETED/VERIFIED`终态；cluster observation、Migration observation/completion、owner intent、runtime observation/receipt、journal和verification time形成因果链。v5对v4仅作声明式增量，v1—v4 raw字节保持不变；action 9参数、束组和验证顺序完整列出，v5/v4双摘要不能混用。聚合69/69、Compose双门及两路独立复核P0=0/P1=0；未创建或访问UAT运行资源。TASK92继续`DOING`，下一独立切片只处理Caddy Host/SNI纯合同。
 
@@ -293,7 +295,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177 v2顺序、D-178纯意图、D-179内部链、D-180外锚和D-181 owner完成日志纯合同；继续Host/SNI、publisher/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、D-181、低资源规则 | `DOING / PURE OWNER COMPLETION CONTRACT VALID WITH CALLER-INJECTED SOURCE NOT ATTESTED / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。binding/plan v5、固定D-179/D-180重验、operator root和六阶段owner journal纯合同通过；Caddy Host/SNI、全动作closure、publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177—D-181纯合同及D-182 Host/SNI intent v2/binding v6；继续全动作closure、publisher/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、D-181、D-182、低资源规则 | `DOING / PURE CADDY HOST-SNI INTENT CONTRACT VALID / RUNTIME NOT OBSERVED / FULL CLOSURE + PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。localhost Host/SNI/HTTPS Origin、三层完整计划投影和binding/plan v6纯合同通过；TLS/HTTP仍未观察，全动作closure、publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

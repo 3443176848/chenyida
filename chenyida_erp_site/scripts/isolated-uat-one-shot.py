@@ -20,7 +20,8 @@ SITE_ROOT = Path(__file__).resolve().parent.parent
 POLICY_VALIDATOR_PATH = SITE_ROOT / "scripts/isolated-uat-control-plane-policy.py"
 LEGACY_RECEIPT_BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v3.json"
 EXTERNAL_ANCHOR_BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v4.json"
-ACTIVE_ACTION_BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v5.json"
+OWNER_COMPLETION_BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v5.json"
+ACTIVE_ACTION_BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v6.json"
 BINDINGS_PATH = ACTIVE_ACTION_BINDINGS_PATH
 RUNTIME_CONTRACTS_PATH = SITE_ROOT / "scripts/isolated-uat-runtime-contracts.py"
 RUNTIME_CONTRACT_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-runtime-contract-policy-v1.json"
@@ -30,10 +31,16 @@ EXTERNAL_ANCHORS_PATH = SITE_ROOT / "scripts/isolated-uat-external-anchor-contra
 EXTERNAL_ANCHOR_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-external-anchor-policy-v1.json"
 OWNER_COMPLETION_PATH = SITE_ROOT / "scripts/isolated-uat-owner-completion-contracts.py"
 OWNER_COMPLETION_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-owner-completion-policy-v1.json"
+HOST_SNI_CONTRACTS_PATH = SITE_ROOT / "scripts/isolated-uat-caddy-host-sni-contracts.py"
+HOST_SNI_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-caddy-host-sni-policy-v1.json"
 PRIVILEGE_POLICY_PATH = SITE_ROOT / "operations/postgresql-runtime-privilege-policy-v2.json"
-PLAN_CONTRACT = "chenyida-erp-isolated-uat-one-shot-plan/v5"
-BINDINGS_CONTRACT = "chenyida-erp-isolated-uat-one-shot-action-bindings/v5"
+PLAN_CONTRACT = "chenyida-erp-isolated-uat-one-shot-plan/v6"
+BINDINGS_CONTRACT = "chenyida-erp-isolated-uat-one-shot-action-bindings/v6"
 BINDING_IMPLEMENTATION_STATUS = (
+    "V5_EXACTLY_INHERITED_CADDY_HOST_SNI_PURE_INTENT_V2_CONTRACT_VALID_"
+    "RUNTIME_FACTS_NOT_ESTABLISHED"
+)
+OWNER_BINDING_IMPLEMENTATION_STATUS = (
     "V4_EXACTLY_INHERITED_OWNER_COMPLETION_PURE_CONTRACT_VALID_RUNTIME_FACTS_NOT_ESTABLISHED"
 )
 EXTERNAL_BINDING_IMPLEMENTATION_STATUS = (
@@ -42,14 +49,20 @@ EXTERNAL_BINDING_IMPLEMENTATION_STATUS = (
 LEGACY_BINDING_IMPLEMENTATION_STATUS = (
     "FIXED_BINDINGS_RECEIPT_CHAIN_VALIDATORS_IMPLEMENTED_RUNTIME_PATH_NOT_IMPLEMENTED"
 )
-EXPECTED_BINDING_SHA256 = "349fb247d271d3c749129c151ebb0b3c7054b64f5ee0c5646ea9e1d238c49c3f"
-EXPECTED_BINDING_RAW_SHA256 = "95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363"
+EXPECTED_OWNER_BINDING_SHA256 = "349fb247d271d3c749129c151ebb0b3c7054b64f5ee0c5646ea9e1d238c49c3f"
+EXPECTED_OWNER_BINDING_RAW_SHA256 = "95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363"
+EXPECTED_BINDING_SHA256 = "f1a3fd38d0a49eea284caa704016d92de336e2eafb4d46a4fd23c59113266dc5"
+EXPECTED_BINDING_RAW_SHA256 = "459bb65d42c71551797bf4cbf56a022700780caeb8a3d987b51bd96560d9f1f0"
 EXPECTED_EXTERNAL_BINDING_SHA256 = "fb83e0f20823b632525823f3d6c012769501fff1aec9763abc64d8d10d2b050b"
 EXPECTED_EXTERNAL_BINDING_RAW_SHA256 = "4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262"
 EXPECTED_LEGACY_BINDING_SHA256 = "50ddd73fb4745c8fcc0b91fd7e4130e2cb3a9ef0d2f52773c64cd6112afc74bd"
 EXPECTED_LEGACY_BINDING_RAW_SHA256 = "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4"
 EXPECTED_EXTERNAL_ANCHOR_POLICY_RAW_SHA256 = "92c59a9f9f800a243324c0a6e24ca8258e58483fe759cf30c2c98d53aead6ef3"
-ENTRYPOINT_ID = "chenyida-erp-isolated-uat-one-shot-v5"
+EXPECTED_HOST_SNI_POLICY_RAW_SHA256 = "c3edf759d2b342f91931c4b529f993c89cae72656a4fa951b06b9be72c30f39a"
+EXPECTED_HOST_SNI_POLICY_SHA256 = "dad404daf3d0d6348242184e9157fa8e80615a3b2b630f5c54708896fb753010"
+EXPECTED_HOST_SNI_SOURCE_CLOSURE_SHA256 = "cde30bd66d1973768ac0be29f41c1b077843ca69cef9496350ddd28ca250cedc"
+EXPECTED_HOST_SNI_CONTRACTS_RAW_SHA256 = "53283460f5c868efaed57bc977499dd69d88d43cacbd6e2e7e1178826db0a6ff"
+ENTRYPOINT_ID = "chenyida-erp-isolated-uat-one-shot-v6"
 PLAN_MODE = "READ_ONLY_PLAN"
 FORBIDDEN_PRODUCTION_ENTRYPOINTS = [
     "scripts/postgresql-runtime-privilege-runner.mjs",
@@ -135,6 +148,21 @@ def load_owner_completion() -> Any:
 
 
 OWNER_COMPLETION = load_owner_completion()
+
+
+def load_host_sni_contracts() -> Any:
+    specification = importlib.util.spec_from_file_location(
+        "isolated_uat_caddy_host_sni_contracts",
+        HOST_SNI_CONTRACTS_PATH,
+    )
+    if specification is None or specification.loader is None:
+        raise RuntimeError("isolated UAT Caddy Host/SNI contracts cannot be loaded")
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+HOST_SNI_CONTRACTS = load_host_sni_contracts()
 
 
 def fail(code: str) -> None:
@@ -310,7 +338,9 @@ def read_external_anchor_bindings(
     }
 
 
-def read_bindings(path: Path = ACTIVE_ACTION_BINDINGS_PATH) -> dict[str, Any]:
+def read_owner_completion_bindings(
+    path: Path = OWNER_COMPLETION_BINDINGS_PATH,
+) -> dict[str, Any]:
     try:
         raw = path.read_bytes()
         value = POLICY.parse_json(raw, "ISOLATED_UAT_ACTION_BINDING_FILE_INVALID")
@@ -321,13 +351,14 @@ def read_bindings(path: Path = ACTIVE_ACTION_BINDINGS_PATH) -> dict[str, Any]:
         "execution_boundary", "base_binding", "plan_digest_routing", "source_extensions",
         "owner_completion_contract", "binding_sha256",
     }, "ISOLATED_UAT_ACTION_BINDING_FIELDS_INVALID")
-    if value["schema_version"] != 5 or value["contract"] != BINDINGS_CONTRACT \
+    if value["schema_version"] != 5 \
+            or value["contract"] != "chenyida-erp-isolated-uat-one-shot-action-bindings/v5" \
             or value["binding_id"] != "chenyida-erp-isolated-uat-fixed-actions-v5" \
-            or value["implementation_status"] != BINDING_IMPLEMENTATION_STATUS \
-            or hashlib.sha256(raw).hexdigest() != EXPECTED_BINDING_RAW_SHA256:
+            or value["implementation_status"] != OWNER_BINDING_IMPLEMENTATION_STATUS \
+            or hashlib.sha256(raw).hexdigest() != EXPECTED_OWNER_BINDING_RAW_SHA256:
         fail("ISOLATED_UAT_ACTION_BINDING_IDENTITY_INVALID")
     body = {key: item for key, item in value.items() if key != "binding_sha256"}
-    if value["binding_sha256"] != EXPECTED_BINDING_SHA256 \
+    if value["binding_sha256"] != EXPECTED_OWNER_BINDING_SHA256 \
             or POLICY.canonical_sha256(body) != value["binding_sha256"]:
         fail("ISOLATED_UAT_ACTION_BINDING_SHA256_INVALID")
     base = read_external_anchor_bindings()
@@ -360,7 +391,7 @@ def read_bindings(path: Path = ACTIVE_ACTION_BINDINGS_PATH) -> dict[str, Any]:
     expected_plan_digest_routing = {
         "schema_version": 1,
         "active_control_plan": {
-            "contract": PLAN_CONTRACT,
+            "contract": "chenyida-erp-isolated-uat-one-shot-plan/v5",
             "argument": "control_plan",
             "digest_field": "plan_sha256",
             "input_name": "control_plan_sha256",
@@ -570,6 +601,260 @@ def read_bindings(path: Path = ACTIVE_ACTION_BINDINGS_PATH) -> dict[str, Any]:
     }
 
 
+def read_bindings(path: Path = ACTIVE_ACTION_BINDINGS_PATH) -> dict[str, Any]:
+    try:
+        raw = path.read_bytes()
+        value = POLICY.parse_json(raw, "ISOLATED_UAT_ACTION_BINDING_FILE_INVALID")
+    except OSError:
+        fail("ISOLATED_UAT_ACTION_BINDING_FILE_INVALID")
+    POLICY.exact(value, {
+        "schema_version", "contract", "binding_id", "implementation_status",
+        "execution_boundary", "base_binding", "plan_digest_routing",
+        "source_extensions", "caddy_host_sni_contract", "binding_sha256",
+    }, "ISOLATED_UAT_ACTION_BINDING_FIELDS_INVALID")
+    if value["schema_version"] != 6 or value["contract"] != BINDINGS_CONTRACT \
+            or value["binding_id"] != "chenyida-erp-isolated-uat-fixed-actions-v6" \
+            or value["implementation_status"] != BINDING_IMPLEMENTATION_STATUS \
+            or hashlib.sha256(raw).hexdigest() != EXPECTED_BINDING_RAW_SHA256:
+        fail("ISOLATED_UAT_ACTION_BINDING_IDENTITY_INVALID")
+    body = {key: item for key, item in value.items() if key != "binding_sha256"}
+    if value["binding_sha256"] != EXPECTED_BINDING_SHA256 \
+            or POLICY.canonical_sha256(body) != value["binding_sha256"]:
+        fail("ISOLATED_UAT_ACTION_BINDING_SHA256_INVALID")
+
+    base = read_owner_completion_bindings()
+    expected_base = {
+        "contract": base["contract"],
+        "binding_id": base["binding_id"],
+        "binding_sha256": base["binding_sha256"],
+        "raw_sha256": EXPECTED_OWNER_BINDING_RAW_SHA256,
+        "action_inheritance": {
+            "mode": "EXACT_BASE_FIELDS_ADDITIVE_SOURCES_INPUTS_OUTPUTS_ONLY",
+            "action_count": 9,
+            "ordinal_sequence": list(range(1, 10)),
+            "augmented_ordinals": [8, 9],
+            "status": "EXACT_BASE_ACTIONS_WITH_DECLARED_ADDITIONS",
+        },
+        "receipt_chain_inheritance": {
+            "mode": "EXACT_NO_OVERRIDE",
+            "internal_node_count": 18,
+            "external_node_count": 5,
+            "status": "EXACTLY_INHERITED",
+        },
+    }
+    if value["base_binding"] != expected_base:
+        fail("ISOLATED_UAT_ACTION_BINDING_BASE_INVALID")
+
+    expected_routing = {
+        "schema_version": 2,
+        "active_control_plan": {
+            "contract": PLAN_CONTRACT,
+            "argument": "active_control_plan",
+            "digest_field": "plan_sha256",
+            "input_name": "active_control_plan_sha256",
+        },
+        "owner_completion_base_plan": {
+            "contract": OWNER_COMPLETION.PLAN_CONTRACT,
+            "argument": "owner_completion_base_plan",
+            "digest_field": "plan_sha256",
+            "active_plan_reference_field": "owner_completion_base_plan_sha256",
+            "legacy_argument": "control_plan",
+            "legacy_input_name": "control_plan_sha256",
+            "consumer_ordinals": [7, 9],
+        },
+        "external_anchor_base_plan": {
+            "contract": OWNER_COMPLETION.BASE_PLAN_CONTRACT,
+            "argument": "external_anchor_base_plan",
+            "digest_field": "plan_sha256",
+            "active_plan_reference_field": "external_anchor_base_plan_sha256",
+            "owner_base_plan_reference_field": "external_anchor_base_plan_sha256",
+            "legacy_input_name": "plan_sha256",
+            "receipt_producer_ordinals": list(range(2, 10)),
+        },
+        "owner_completion_log": {
+            "control_digest_field": "control_plan_sha256",
+            "control_digest_source": "owner_completion_base_plan.plan_sha256",
+            "base_digest_field": "external_anchor_base_plan_sha256",
+            "base_digest_source": "external_anchor_base_plan.plan_sha256",
+        },
+        "host_sni_evidence_intent_v2": {
+            "active_digest_field": "active_control_plan_sha256",
+            "active_digest_source": "active_control_plan.plan_sha256",
+            "owner_base_digest_field": "owner_completion_base_plan_sha256",
+            "owner_base_digest_source": "owner_completion_base_plan.plan_sha256",
+            "external_base_digest_field": "external_anchor_base_plan_sha256",
+            "external_base_digest_source": "external_anchor_base_plan.plan_sha256",
+            "base_evidence_intent_plan_source": "external_anchor_base_plan.plan_sha256",
+        },
+        "status": "EXPLICIT_ACTIVE_V6_OWNER_V5_AND_LEGACY_RECEIPT_V4_DIGEST_ROUTING",
+    }
+    if value["plan_digest_routing"] != expected_routing:
+        fail("ISOLATED_UAT_ACTION_BINDING_PLAN_DIGEST_ROUTING_INVALID")
+
+    sources = [
+        "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+        "scripts/isolated-uat-caddy-host-sni-contracts.py",
+    ]
+    expected_extensions = [
+        {
+            "ordinal": 8,
+            "inheritance_status": "BASE_ACTION_EXACT_WITH_DECLARED_ADDITIONS",
+            "additional_sources": sources,
+            "additional_inputs": [
+                "request_id", "runtime_contract_policy", "runtime_receipt_policy",
+                "caddy_host_sni_policy", "caddy_host_sni_policy_sources",
+            ],
+            "additional_outputs": ["caddy_host_sni_expectation"],
+        },
+        {
+            "ordinal": 9,
+            "inheritance_status": "BASE_ACTION_EXACT_WITH_DECLARED_ADDITIONS",
+            "additional_sources": sources,
+            "additional_inputs": [
+                "active_control_plan", "owner_completion_base_plan",
+                "active_control_plan_sha256", "owner_completion_base_plan_sha256",
+                "external_anchor_base_plan_sha256", "caddy_host_sni_policy",
+                "caddy_host_sni_policy_sources", "caddy_host_sni_expectation",
+            ],
+            "additional_outputs": ["evidence_intent_v2", "caddy_host_sni_validation"],
+        },
+    ]
+    if value["source_extensions"] != expected_extensions:
+        fail("ISOLATED_UAT_ACTION_BINDING_EXTENSION_INVALID")
+
+    expected_host_sni = {
+        "policy_source": sources[0],
+        "policy_contract": HOST_SNI_CONTRACTS.POLICY_CONTRACT,
+        "policy_id": HOST_SNI_CONTRACTS.POLICY_ID,
+        "policy_raw_sha256": EXPECTED_HOST_SNI_POLICY_RAW_SHA256,
+        "policy_sha256": EXPECTED_HOST_SNI_POLICY_SHA256,
+        "policy_source_closure_sha256": EXPECTED_HOST_SNI_SOURCE_CLOSURE_SHA256,
+        "validator_source": sources[1],
+        "validator_source_raw_sha256": EXPECTED_HOST_SNI_CONTRACTS_RAW_SHA256,
+        "expectation_contract": HOST_SNI_CONTRACTS.EXPECTATION_CONTRACT,
+        "expectation_builder_method": "build_expectation",
+        "expectation_validator_method": "validate_expectation",
+        "evidence_intent_v2_contract": HOST_SNI_CONTRACTS.EVIDENCE_INTENT_CONTRACT,
+        "evidence_intent_v2_builder_method": "build_evidence_intent_v2",
+        "evidence_intent_v2_validator_method": "validate_evidence_intent_v2",
+        "producer": {
+            "expectation": {
+                "action_ordinal": 8,
+                "handler_id": "ISOLATED_UAT_COMPOSE_ADAPTER",
+                "adapter_method": "start_bound_runtime_services",
+                "output": "caddy_host_sni_expectation",
+            },
+            "evidence_intent_v2": {
+                "action_ordinal": 9,
+                "handler_id": "ISOLATED_UAT_POSTDEPLOY_EVIDENCE_ADAPTER",
+                "adapter_method": "verify_and_publish_isolated_uat_evidence",
+                "output": "evidence_intent_v2",
+            },
+            "validation": {
+                "action_ordinal": 9,
+                "handler_id": "ISOLATED_UAT_POSTDEPLOY_EVIDENCE_ADAPTER",
+                "adapter_method": "verify_and_publish_isolated_uat_evidence",
+                "output": "caddy_host_sni_validation",
+            },
+        },
+        "expectation_builder_inputs": {
+            "request_id": "request_id",
+            "project": "project",
+            "resolved_compose_sha256": "resolved_compose_sha256",
+            "runtime_contract_policy_sha256": "runtime_contract_policy.policy_sha256",
+            "runtime_receipt_policy_sha256": "runtime_receipt_policy.policy_sha256",
+            "ports": "ports",
+        },
+        "evidence_intent_v2_inputs": {
+            "active_control_plan_sha256": "active_control_plan.plan_sha256",
+            "owner_completion_base_plan_sha256": "owner_completion_base_plan.plan_sha256",
+            "external_anchor_base_plan_sha256": "external_anchor_base_plan.plan_sha256",
+            "active_control_plan": "active_control_plan",
+            "owner_completion_base_plan": "owner_completion_base_plan",
+            "external_anchor_base_plan": "external_anchor_base_plan",
+            "host_sni_expectation": "caddy_host_sni_expectation",
+            "base_evidence_intent": "evidence_intent",
+        },
+        "intent_bridge": {
+            "base_intent_contract": HOST_SNI_CONTRACTS.BASE_EVIDENCE_INTENT_CONTRACT,
+            "base_intent_output": "evidence_intent",
+            "base_intent_plan_contract": OWNER_COMPLETION.BASE_PLAN_CONTRACT,
+            "target_intent_contract": HOST_SNI_CONTRACTS.EVIDENCE_INTENT_CONTRACT,
+            "target_intent_output": "evidence_intent_v2",
+            "bridge_status": "DIGEST_CONTRACT_ONLY_FULL_ACTION_CLOSURE_NOT_IMPLEMENTED",
+        },
+        "validation_pipeline": [
+            {
+                "order": 1,
+                "validator": "validate_policy",
+                "bound_source": sources[1],
+                "input": "caddy_host_sni_policy_and_caller_injected_source_bytes",
+            },
+            {
+                "order": 2,
+                "validator": "validate_expectation",
+                "bound_source": sources[1],
+                "input": "caddy_host_sni_expectation",
+            },
+            {
+                "order": 3,
+                "validator": "validate_evidence_intent_v2",
+                "bound_source": sources[1],
+                "input": "evidence_intent_v2_with_embedded_base_evidence_intent_v1",
+            },
+        ],
+        "legacy_receipt_chain": {
+            "inheritance_mode": "EXACT_NO_OVERRIDE",
+            "internal_node_count": 18,
+            "external_node_count": 5,
+            "readiness_receipt_contract": "chenyida-erp-isolated-uat-readiness-receipt/v1",
+            "legacy_server_name_status": "NOT_VALIDATED_MISSING_BOUND_SERVER_NAME",
+            "host_sni_receipt_node_added": False,
+            "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION",
+        },
+        "validation_output": HOST_SNI_CONTRACTS.VALIDATION_OUTPUT,
+        "validation_status": (
+            "PURE_HOST_SNI_INTENT_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+        ),
+        "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION",
+    }
+    if value["caddy_host_sni_contract"] != expected_host_sni:
+        fail("ISOLATED_UAT_ACTION_BINDING_CADDY_HOST_SNI_CONTRACT_INVALID")
+
+    extensions = {item["ordinal"]: item for item in expected_extensions}
+    actions = []
+    for base_action in base["actions"]:
+        extension = extensions.get(base_action["ordinal"])
+        action = {
+            key: list(item) if isinstance(item, list) else item
+            for key, item in base_action.items()
+        }
+        if extension:
+            action["sources"] += extension["additional_sources"]
+            action["inputs"] += extension["additional_inputs"]
+            action["outputs"] += extension["additional_outputs"]
+        if any(len(action[field]) != len(set(action[field])) for field in (
+            "sources", "inputs", "outputs",
+        )):
+            fail("ISOLATED_UAT_ACTION_BINDING_EXTENSION_INVALID")
+        actions.append(action)
+    return {
+        "schema_version": value["schema_version"],
+        "contract": value["contract"],
+        "binding_id": value["binding_id"],
+        "implementation_status": value["implementation_status"],
+        "execution_boundary": value["execution_boundary"],
+        "base_binding": value["base_binding"],
+        "plan_digest_routing": value["plan_digest_routing"],
+        "actions": actions,
+        "receipt_chain": base["receipt_chain"],
+        "external_anchor_contract": base["external_anchor_contract"],
+        "owner_completion_contract": base["owner_completion_contract"],
+        "caddy_host_sni_contract": value["caddy_host_sni_contract"],
+        "binding_sha256": value["binding_sha256"],
+    }
+
+
 def read_runtime_contract_policy(path: Path = RUNTIME_CONTRACT_POLICY_PATH) -> dict[str, Any]:
     try:
         value = POLICY.parse_json(
@@ -667,6 +952,41 @@ def read_owner_completion_policy(
         fail(str(error))
 
 
+def read_host_sni_policy(
+    path: Path = HOST_SNI_POLICY_PATH,
+) -> dict[str, Any]:
+    try:
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != EXPECTED_HOST_SNI_POLICY_RAW_SHA256:
+            fail("ISOLATED_UAT_CADDY_HOST_SNI_POLICY_DIGEST_MISMATCH")
+        value = POLICY.parse_json(
+            raw,
+            "ISOLATED_UAT_CADDY_HOST_SNI_POLICY_JSON_INVALID",
+        )
+        sources = read_host_sni_policy_sources()
+    except OSError:
+        fail("ISOLATED_UAT_CADDY_HOST_SNI_POLICY_JSON_INVALID")
+    try:
+        validated = HOST_SNI_CONTRACTS.validate_policy(value, sources)
+    except HOST_SNI_CONTRACTS.ContractError as error:
+        fail(str(error))
+    if validated["policy_sha256"] != EXPECTED_HOST_SNI_POLICY_SHA256 \
+            or validated["source_closure"]["source_closure_sha256"] \
+                != EXPECTED_HOST_SNI_SOURCE_CLOSURE_SHA256:
+        fail("ISOLATED_UAT_CADDY_HOST_SNI_POLICY_DIGEST_MISMATCH")
+    return validated
+
+
+def read_host_sni_policy_sources() -> dict[str, bytes]:
+    try:
+        return {
+            source: (SITE_ROOT / source).read_bytes()
+            for source in sorted(HOST_SNI_CONTRACTS.SOURCE_USAGE)
+        }
+    except OSError:
+        fail("ISOLATED_UAT_CADDY_HOST_SNI_POLICY_JSON_INVALID")
+
+
 PLANNED_ACTIONS = [
     ("VERIFY_EXACT_INPUTS", "READ_ONLY"),
     ("PREPARE_PRIVATE_NAMESPACE_ROOTS", "MUTATING"),
@@ -678,6 +998,19 @@ PLANNED_ACTIONS = [
     ("START_BOUND_RUNTIME_SERVICES", "MUTATING"),
     ("VERIFY_AND_PUBLISH_ISOLATED_UAT_EVIDENCE", "MUTATING"),
 ]
+
+V6_ONLY_PLAN_FIELDS = {
+    "host_sni_policy_sha256",
+    "host_sni_source_closure_sha256",
+    "host_sni_capability_status",
+    "host_sni_expectation_validation_status",
+    "host_sni_evidence_intent_v2_validation_status",
+    "host_sni_success_output_contract",
+    "caddy_host_sni_binding",
+    "caddy_host_sni_expectation",
+    "owner_completion_base_plan_sha256",
+}
+V6_PLAN_FIELDS = OWNER_COMPLETION.PLAN_FIELDS | V6_ONLY_PLAN_FIELDS
 
 
 def _external_anchor_base_plan_from_body(body: dict[str, Any]) -> dict[str, Any]:
@@ -696,18 +1029,51 @@ def _external_anchor_base_plan_from_body(body: dict[str, Any]) -> dict[str, Any]
     return {**base_body, "plan_sha256": POLICY.canonical_sha256(base_body)}
 
 
-def external_anchor_base_plan(value: dict[str, Any]) -> dict[str, Any]:
+def _owner_completion_base_plan_from_body(body: dict[str, Any]) -> dict[str, Any]:
+    base_body = {
+        key: item for key, item in body.items()
+        if key not in V6_ONLY_PLAN_FIELDS
+    }
+    base_body.update({
+        "schema_version": 5,
+        "contract": OWNER_COMPLETION.PLAN_CONTRACT,
+        "entrypoint_id": OWNER_COMPLETION.PLAN_ENTRYPOINT,
+        "action_binding_id": OWNER_COMPLETION.ACTION_BINDING_ID,
+        "action_binding_sha256": OWNER_COMPLETION.ACTION_BINDING_SHA256,
+        "action_binding_status": OWNER_COMPLETION.ACTION_BINDING_STATUS,
+    })
+    return {**base_body, "plan_sha256": POLICY.canonical_sha256(base_body)}
+
+
+def owner_completion_base_plan(value: dict[str, Any]) -> dict[str, Any]:
     POLICY.exact(
         value,
-        OWNER_COMPLETION.PLAN_FIELDS,
-        "ISOLATED_UAT_OWNER_COMPLETION_CONTROL_PLAN_INVALID",
+        V6_PLAN_FIELDS,
+        "ISOLATED_UAT_CADDY_HOST_SNI_CONTROL_PLAN_INVALID",
     )
     body = {key: item for key, item in value.items() if key != "plan_sha256"}
-    if POLICY.canonical_sha256(body) != value["plan_sha256"]:
-        fail("ISOLATED_UAT_OWNER_COMPLETION_CONTROL_PLAN_INVALID")
-    base = _external_anchor_base_plan_from_body(body)
-    if value["external_anchor_base_plan_sha256"] != base["plan_sha256"]:
-        fail("ISOLATED_UAT_OWNER_COMPLETION_CONTROL_PLAN_INVALID")
+    if value["schema_version"] != 6 or value["contract"] != PLAN_CONTRACT \
+            or value["entrypoint_id"] != ENTRYPOINT_ID \
+            or value["action_binding_id"] != "chenyida-erp-isolated-uat-fixed-actions-v6" \
+            or value["action_binding_sha256"] != EXPECTED_BINDING_SHA256 \
+            or value["action_binding_status"] != BINDING_IMPLEMENTATION_STATUS \
+            or POLICY.canonical_sha256(body) != value["plan_sha256"]:
+        fail("ISOLATED_UAT_CADDY_HOST_SNI_CONTROL_PLAN_INVALID")
+    base = _owner_completion_base_plan_from_body(body)
+    if value["owner_completion_base_plan_sha256"] != base["plan_sha256"]:
+        fail("ISOLATED_UAT_CADDY_HOST_SNI_CONTROL_PLAN_INVALID")
+    return base
+
+
+def external_anchor_base_plan(value: dict[str, Any]) -> dict[str, Any]:
+    owner_base = owner_completion_base_plan(value)
+    owner_body = {
+        key: item for key, item in owner_base.items() if key != "plan_sha256"
+    }
+    base = _external_anchor_base_plan_from_body(owner_body)
+    if owner_base["external_anchor_base_plan_sha256"] != base["plan_sha256"] \
+            or value["external_anchor_base_plan_sha256"] != base["plan_sha256"]:
+        fail("ISOLATED_UAT_CADDY_HOST_SNI_CONTROL_PLAN_INVALID")
     return base
 
 
@@ -720,6 +1086,8 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
     runtime_receipt_policy = read_runtime_receipt_policy()
     external_anchor_policy = read_external_anchor_policy()
     owner_completion_policy = read_owner_completion_policy()
+    host_sni_policy = read_host_sni_policy()
+    host_sni_policy_sources = read_host_sni_policy_sources()
     source_state = POLICY.source_state()
     if source_state["package_version"] != policy["release"]["package_version"] \
             or source_state["package_version"] != request["source"]["package_version"] \
@@ -743,11 +1111,12 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         "operations/isolated-uat-one-shot-action-bindings-v3.json",
         "operations/isolated-uat-one-shot-action-bindings-v4.json",
         "operations/isolated-uat-one-shot-action-bindings-v5.json",
+        "operations/isolated-uat-one-shot-action-bindings-v6.json",
         "operations/isolated-uat-external-anchor-policy-v1.json",
         "scripts/isolated-uat-external-anchor-contracts.py",
         "operations/isolated-uat-owner-completion-policy-v1.json",
         "scripts/isolated-uat-owner-completion-contracts.py",
-    }
+    } | set(HOST_SNI_CONTRACTS.SOURCE_USAGE)
     if not (referenced_sources | runtime_contract_sources).issubset(policy_sources):
         fail("ISOLATED_UAT_ACTION_BINDING_SOURCE_UNBOUND")
     actions = [
@@ -760,8 +1129,22 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         }
         for binding in bindings["actions"]
     ]
+    try:
+        host_sni_expectation = HOST_SNI_CONTRACTS.build_expectation({
+            "request_id": request["request_id"],
+            "project": request["project"],
+            "resolved_compose_sha256": request["source"]["resolved_compose_sha256"],
+            "runtime_contract_policy_sha256": runtime_contract_policy["policy_sha256"],
+            "runtime_receipt_policy_sha256": runtime_receipt_policy["policy_sha256"],
+            "ports": request["ports"],
+        }, host_sni_policy, host_sni_policy_sources)
+        HOST_SNI_CONTRACTS.validate_expectation(
+            host_sni_expectation, host_sni_policy, host_sni_policy_sources,
+        )
+    except HOST_SNI_CONTRACTS.ContractError as error:
+        fail(str(error))
     body = {
-        "schema_version": 5,
+        "schema_version": 6,
         "contract": PLAN_CONTRACT,
         "entrypoint_id": ENTRYPOINT_ID,
         "mode": PLAN_MODE,
@@ -798,6 +1181,32 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
             "validation_output"
         ],
         "owner_completion_binding": OWNER_COMPLETION.OWNER_PLAN_BINDING,
+        "host_sni_policy_sha256": host_sni_policy["policy_sha256"],
+        "host_sni_source_closure_sha256": host_sni_policy["source_closure"][
+            "source_closure_sha256"
+        ],
+        "host_sni_capability_status": host_sni_policy["capability_status"],
+        "host_sni_expectation_validation_status": "STRUCTURE_VALID",
+        "host_sni_evidence_intent_v2_validation_status": (
+            "NOT_RUN_NO_BASE_EVIDENCE_INTENT"
+        ),
+        "host_sni_success_output_contract": host_sni_policy["validation_output"],
+        "caddy_host_sni_binding": {
+            "policy_contract": bindings["caddy_host_sni_contract"]["policy_contract"],
+            "expectation_contract": bindings["caddy_host_sni_contract"][
+                "expectation_contract"
+            ],
+            "evidence_intent_v2_contract": bindings["caddy_host_sni_contract"][
+                "evidence_intent_v2_contract"
+            ],
+            "expectation_action_ordinal": 8,
+            "evidence_action_ordinal": 9,
+            "legacy_receipt_chain_status": bindings["caddy_host_sni_contract"][
+                "legacy_receipt_chain"
+            ]["legacy_server_name_status"],
+            "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION",
+        },
+        "caddy_host_sni_expectation": host_sni_expectation,
         "receipt_chain_binding": {
             "internal_contract": legacy_receipt_bindings["receipt_chain"]["contract"],
             "internal_validator_method": legacy_receipt_bindings["receipt_chain"]["validator_method"],
@@ -838,9 +1247,16 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         },
         "forbidden_production_entrypoints": FORBIDDEN_PRODUCTION_ENTRYPOINTS,
     }
-    body["external_anchor_base_plan_sha256"] = _external_anchor_base_plan_from_body(body)[
-        "plan_sha256"
-    ]
+    owner_candidate = _owner_completion_base_plan_from_body(body)
+    owner_candidate_body = {
+        key: item for key, item in owner_candidate.items() if key != "plan_sha256"
+    }
+    body["external_anchor_base_plan_sha256"] = _external_anchor_base_plan_from_body(
+        owner_candidate_body
+    )["plan_sha256"]
+    body["owner_completion_base_plan_sha256"] = _owner_completion_base_plan_from_body(
+        body
+    )["plan_sha256"]
     return {**body, "plan_sha256": POLICY.canonical_sha256(body)}
 
 
@@ -861,12 +1277,16 @@ def assert_execution_allowed(policy: dict[str, Any]) -> None:
 
 def require_runtime_backend() -> None:
     try:
+        HOST_SNI_CONTRACTS.require_runtime_observer()
+        HOST_SNI_CONTRACTS.require_publisher()
+        HOST_SNI_CONTRACTS.require_runtime_backend()
         EXTERNAL_ANCHORS.require_external_anchor_publisher()
         OWNER_COMPLETION.require_owner_completion_publisher()
         OWNER_COMPLETION.require_owner_completion_runtime_observer()
         RUNTIME_RECEIPTS.require_receipt_publisher()
         RUNTIME_CONTRACTS.require_runtime_backend()
     except (
+        HOST_SNI_CONTRACTS.ContractError,
         EXTERNAL_ANCHORS.ContractError,
         OWNER_COMPLETION.ContractError,
         RUNTIME_RECEIPTS.ContractError,

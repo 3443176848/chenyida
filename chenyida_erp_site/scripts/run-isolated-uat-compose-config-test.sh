@@ -33,6 +33,7 @@ render() {
   render_project=$1
   render_secret_root=$2
   render_web_port=$3
+  render_public_origin=$4
   env -i \
     PATH=/usr/bin:/bin HOME=/nonexistent LC_ALL=C \
     COMPOSE_PARALLEL_LIMIT=1 COMPOSE_DISABLE_ENV_FILE=1 \
@@ -46,7 +47,8 @@ render() {
     ERP_DEPLOYMENT_CLASS=uat \
     ERP_RELEASE_EXPECTED_DEPLOYMENT_ID="$render_project" \
     ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true \
-    ERP_PUBLIC_ORIGIN="http://127.0.0.1:$render_web_port" \
+    ERP_DOMAIN=localhost \
+    ERP_PUBLIC_ORIGIN="$render_public_origin" \
     ERP_RELEASE_IDENTITY_READER_GID=1000 \
     ERP_BUILD_VERSION=0.1.0-alpha.47 \
     ERP_BUILD_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
@@ -68,7 +70,8 @@ render_without_isolation_overlay() {
     ERP_DEPLOYMENT_CLASS=uat \
     ERP_RELEASE_EXPECTED_DEPLOYMENT_ID="$PROJECT" \
     ERP_UAT_ALLOW_LOOPBACK_ORIGIN=true \
-    ERP_PUBLIC_ORIGIN="http://127.0.0.1:$WEB_PORT" \
+    ERP_DOMAIN=localhost \
+    ERP_PUBLIC_ORIGIN="https://localhost:$CADDY_HTTPS_PORT" \
     ERP_HTTP_PORT="$WEB_PORT" \
     ERP_RELEASE_IDENTITY_READER_GID=1000 \
     ERP_BUILD_VERSION=0.1.0-alpha.47 \
@@ -99,30 +102,37 @@ validate_file() {
     --caddy-https-port "$CADDY_HTTPS_PORT" < "$config_file"
 }
 
-render "$PROJECT" "$SECRET_ROOT" "$WEB_PORT" > "$TEMP_ROOT/valid.json"
+VALID_PUBLIC_ORIGIN=https://localhost:$CADDY_HTTPS_PORT
+render "$PROJECT" "$SECRET_ROOT" "$WEB_PORT" "$VALID_PUBLIC_ORIGIN" > "$TEMP_ROOT/valid.json"
 validate_file "$TEMP_ROOT/valid.json" "$PROJECT" "$SECRET_ROOT" "$WEB_PORT"
 
 # Every negative case must fail closed before runtime resources can be created.
-if render "$PROJECT" "" "$WEB_PORT" > /dev/null 2>&1; then
+if render "$PROJECT" "" "$WEB_PORT" "$VALID_PUBLIC_ORIGIN" > /dev/null 2>&1; then
   echo "missing isolated secret root was accepted" >&2
   exit 1
 fi
 
-render "$PROJECT" /etc/chenyida-erp/runtime-secrets "$WEB_PORT" > "$TEMP_ROOT/production-root.json"
+render "$PROJECT" /etc/chenyida-erp/runtime-secrets "$WEB_PORT" "$VALID_PUBLIC_ORIGIN" > "$TEMP_ROOT/production-root.json"
 if validate_file "$TEMP_ROOT/production-root.json" "$PROJECT" /etc/chenyida-erp/runtime-secrets "$WEB_PORT" > /dev/null 2>&1; then
   echo "production secret root was accepted" >&2
   exit 1
 fi
 
-render chenyida-erp "$SECRET_ROOT" "$WEB_PORT" > "$TEMP_ROOT/production-project.json"
+render chenyida-erp "$SECRET_ROOT" "$WEB_PORT" "$VALID_PUBLIC_ORIGIN" > "$TEMP_ROOT/production-project.json"
 if validate_file "$TEMP_ROOT/production-project.json" chenyida-erp "$SECRET_ROOT" "$WEB_PORT" > /dev/null 2>&1; then
   echo "production Compose project was accepted" >&2
   exit 1
 fi
 
-render "$PROJECT" "$SECRET_ROOT" 3000 > "$TEMP_ROOT/production-port.json"
+render "$PROJECT" "$SECRET_ROOT" 3000 "$VALID_PUBLIC_ORIGIN" > "$TEMP_ROOT/production-port.json"
 if validate_file "$TEMP_ROOT/production-port.json" "$PROJECT" "$SECRET_ROOT" 3000 > /dev/null 2>&1; then
   echo "production loopback port was accepted" >&2
+  exit 1
+fi
+
+render "$PROJECT" "$SECRET_ROOT" "$WEB_PORT" "http://127.0.0.1:$WEB_PORT" > "$TEMP_ROOT/http-origin.json"
+if validate_file "$TEMP_ROOT/http-origin.json" "$PROJECT" "$SECRET_ROOT" "$WEB_PORT" > /dev/null 2>&1; then
+  echo "production-mode HTTP public origin was accepted" >&2
   exit 1
 fi
 

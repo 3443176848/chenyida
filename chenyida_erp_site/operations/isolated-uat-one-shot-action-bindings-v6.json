@@ -1,0 +1,251 @@
+{
+  "schema_version": 6,
+  "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v6",
+  "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v6",
+  "implementation_status": "V5_EXACTLY_INHERITED_CADDY_HOST_SNI_PURE_INTENT_V2_CONTRACT_VALID_RUNTIME_FACTS_NOT_ESTABLISHED",
+  "execution_boundary": {
+    "evidence_scope": "ISOLATED_UAT_ONLY",
+    "shell_allowed": false,
+    "free_form_argv_allowed": false,
+    "production_entrypoints_allowed": false,
+    "production_release_identity_allowed": false,
+    "runtime_path_implemented": false,
+    "extension_mode": "EXACT_V5_INHERITANCE_WITH_ACTION_8_HOST_SNI_EXPECTATION_AND_ACTION_9_EVIDENCE_INTENT_V2_VALIDATION",
+    "host_sni_validation_scope": "PURE_INTENT_CONTRACT_SOURCE_BYTES_CALLER_INJECTED_HASH_MATCHED_NOT_ATTESTED",
+    "legacy_receipt_chain_status": "EXACTLY_INHERITED_18_INTERNAL_AND_5_EXTERNAL_NO_HOST_SNI_PROMOTION",
+    "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+  },
+  "base_binding": {
+    "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v5",
+    "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v5",
+    "binding_sha256": "349fb247d271d3c749129c151ebb0b3c7054b64f5ee0c5646ea9e1d238c49c3f",
+    "raw_sha256": "95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363",
+    "action_inheritance": {
+      "mode": "EXACT_BASE_FIELDS_ADDITIVE_SOURCES_INPUTS_OUTPUTS_ONLY",
+      "action_count": 9,
+      "ordinal_sequence": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "augmented_ordinals": [
+        8,
+        9
+      ],
+      "status": "EXACT_BASE_ACTIONS_WITH_DECLARED_ADDITIONS"
+    },
+    "receipt_chain_inheritance": {
+      "mode": "EXACT_NO_OVERRIDE",
+      "internal_node_count": 18,
+      "external_node_count": 5,
+      "status": "EXACTLY_INHERITED"
+    }
+  },
+  "plan_digest_routing": {
+    "schema_version": 2,
+    "active_control_plan": {
+      "contract": "chenyida-erp-isolated-uat-one-shot-plan/v6",
+      "argument": "active_control_plan",
+      "digest_field": "plan_sha256",
+      "input_name": "active_control_plan_sha256"
+    },
+    "owner_completion_base_plan": {
+      "contract": "chenyida-erp-isolated-uat-one-shot-plan/v5",
+      "argument": "owner_completion_base_plan",
+      "digest_field": "plan_sha256",
+      "active_plan_reference_field": "owner_completion_base_plan_sha256",
+      "legacy_argument": "control_plan",
+      "legacy_input_name": "control_plan_sha256",
+      "consumer_ordinals": [
+        7,
+        9
+      ]
+    },
+    "external_anchor_base_plan": {
+      "contract": "chenyida-erp-isolated-uat-one-shot-plan/v4",
+      "argument": "external_anchor_base_plan",
+      "digest_field": "plan_sha256",
+      "active_plan_reference_field": "external_anchor_base_plan_sha256",
+      "owner_base_plan_reference_field": "external_anchor_base_plan_sha256",
+      "legacy_input_name": "plan_sha256",
+      "receipt_producer_ordinals": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    "owner_completion_log": {
+      "control_digest_field": "control_plan_sha256",
+      "control_digest_source": "owner_completion_base_plan.plan_sha256",
+      "base_digest_field": "external_anchor_base_plan_sha256",
+      "base_digest_source": "external_anchor_base_plan.plan_sha256"
+    },
+    "host_sni_evidence_intent_v2": {
+      "active_digest_field": "active_control_plan_sha256",
+      "active_digest_source": "active_control_plan.plan_sha256",
+      "owner_base_digest_field": "owner_completion_base_plan_sha256",
+      "owner_base_digest_source": "owner_completion_base_plan.plan_sha256",
+      "external_base_digest_field": "external_anchor_base_plan_sha256",
+      "external_base_digest_source": "external_anchor_base_plan.plan_sha256",
+      "base_evidence_intent_plan_source": "external_anchor_base_plan.plan_sha256"
+    },
+    "status": "EXPLICIT_ACTIVE_V6_OWNER_V5_AND_LEGACY_RECEIPT_V4_DIGEST_ROUTING"
+  },
+  "source_extensions": [
+    {
+      "ordinal": 8,
+      "inheritance_status": "BASE_ACTION_EXACT_WITH_DECLARED_ADDITIONS",
+      "additional_sources": [
+        "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+        "scripts/isolated-uat-caddy-host-sni-contracts.py"
+      ],
+      "additional_inputs": [
+        "request_id",
+        "runtime_contract_policy",
+        "runtime_receipt_policy",
+        "caddy_host_sni_policy",
+        "caddy_host_sni_policy_sources"
+      ],
+      "additional_outputs": [
+        "caddy_host_sni_expectation"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "inheritance_status": "BASE_ACTION_EXACT_WITH_DECLARED_ADDITIONS",
+      "additional_sources": [
+        "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+        "scripts/isolated-uat-caddy-host-sni-contracts.py"
+      ],
+      "additional_inputs": [
+        "active_control_plan",
+        "owner_completion_base_plan",
+        "active_control_plan_sha256",
+        "owner_completion_base_plan_sha256",
+        "external_anchor_base_plan_sha256",
+        "caddy_host_sni_policy",
+        "caddy_host_sni_policy_sources",
+        "caddy_host_sni_expectation"
+      ],
+      "additional_outputs": [
+        "evidence_intent_v2",
+        "caddy_host_sni_validation"
+      ]
+    }
+  ],
+  "caddy_host_sni_contract": {
+    "policy_source": "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+    "policy_contract": "chenyida-erp-isolated-uat-caddy-host-sni-policy/v1",
+    "policy_id": "chenyida-erp-isolated-uat-caddy-host-sni-v1",
+    "policy_raw_sha256": "c3edf759d2b342f91931c4b529f993c89cae72656a4fa951b06b9be72c30f39a",
+    "policy_sha256": "dad404daf3d0d6348242184e9157fa8e80615a3b2b630f5c54708896fb753010",
+    "policy_source_closure_sha256": "cde30bd66d1973768ac0be29f41c1b077843ca69cef9496350ddd28ca250cedc",
+    "validator_source": "scripts/isolated-uat-caddy-host-sni-contracts.py",
+    "validator_source_raw_sha256": "53283460f5c868efaed57bc977499dd69d88d43cacbd6e2e7e1178826db0a6ff",
+    "expectation_contract": "chenyida-erp-isolated-uat-caddy-host-sni-expectation/v1",
+    "expectation_builder_method": "build_expectation",
+    "expectation_validator_method": "validate_expectation",
+    "evidence_intent_v2_contract": "chenyida-erp-isolated-uat-evidence-intent/v2",
+    "evidence_intent_v2_builder_method": "build_evidence_intent_v2",
+    "evidence_intent_v2_validator_method": "validate_evidence_intent_v2",
+    "producer": {
+      "expectation": {
+        "action_ordinal": 8,
+        "handler_id": "ISOLATED_UAT_COMPOSE_ADAPTER",
+        "adapter_method": "start_bound_runtime_services",
+        "output": "caddy_host_sni_expectation"
+      },
+      "evidence_intent_v2": {
+        "action_ordinal": 9,
+        "handler_id": "ISOLATED_UAT_POSTDEPLOY_EVIDENCE_ADAPTER",
+        "adapter_method": "verify_and_publish_isolated_uat_evidence",
+        "output": "evidence_intent_v2"
+      },
+      "validation": {
+        "action_ordinal": 9,
+        "handler_id": "ISOLATED_UAT_POSTDEPLOY_EVIDENCE_ADAPTER",
+        "adapter_method": "verify_and_publish_isolated_uat_evidence",
+        "output": "caddy_host_sni_validation"
+      }
+    },
+    "expectation_builder_inputs": {
+      "request_id": "request_id",
+      "project": "project",
+      "resolved_compose_sha256": "resolved_compose_sha256",
+      "runtime_contract_policy_sha256": "runtime_contract_policy.policy_sha256",
+      "runtime_receipt_policy_sha256": "runtime_receipt_policy.policy_sha256",
+      "ports": "ports"
+    },
+    "evidence_intent_v2_inputs": {
+      "active_control_plan_sha256": "active_control_plan.plan_sha256",
+      "owner_completion_base_plan_sha256": "owner_completion_base_plan.plan_sha256",
+      "external_anchor_base_plan_sha256": "external_anchor_base_plan.plan_sha256",
+      "active_control_plan": "active_control_plan",
+      "owner_completion_base_plan": "owner_completion_base_plan",
+      "external_anchor_base_plan": "external_anchor_base_plan",
+      "host_sni_expectation": "caddy_host_sni_expectation",
+      "base_evidence_intent": "evidence_intent"
+    },
+    "intent_bridge": {
+      "base_intent_contract": "chenyida-erp-isolated-uat-evidence-intent/v1",
+      "base_intent_output": "evidence_intent",
+      "base_intent_plan_contract": "chenyida-erp-isolated-uat-one-shot-plan/v4",
+      "target_intent_contract": "chenyida-erp-isolated-uat-evidence-intent/v2",
+      "target_intent_output": "evidence_intent_v2",
+      "bridge_status": "DIGEST_CONTRACT_ONLY_FULL_ACTION_CLOSURE_NOT_IMPLEMENTED"
+    },
+    "validation_pipeline": [
+      {
+        "order": 1,
+        "validator": "validate_policy",
+        "bound_source": "scripts/isolated-uat-caddy-host-sni-contracts.py",
+        "input": "caddy_host_sni_policy_and_caller_injected_source_bytes"
+      },
+      {
+        "order": 2,
+        "validator": "validate_expectation",
+        "bound_source": "scripts/isolated-uat-caddy-host-sni-contracts.py",
+        "input": "caddy_host_sni_expectation"
+      },
+      {
+        "order": 3,
+        "validator": "validate_evidence_intent_v2",
+        "bound_source": "scripts/isolated-uat-caddy-host-sni-contracts.py",
+        "input": "evidence_intent_v2_with_embedded_base_evidence_intent_v1"
+      }
+    ],
+    "legacy_receipt_chain": {
+      "inheritance_mode": "EXACT_NO_OVERRIDE",
+      "internal_node_count": 18,
+      "external_node_count": 5,
+      "readiness_receipt_contract": "chenyida-erp-isolated-uat-readiness-receipt/v1",
+      "legacy_server_name_status": "NOT_VALIDATED_MISSING_BOUND_SERVER_NAME",
+      "host_sni_receipt_node_added": false,
+      "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+    },
+    "validation_output": {
+      "host_sni_contract_status": "PURE_HOST_SNI_INTENT_CONTRACT_VALID",
+      "source_observation_status": "SOURCE_BYTES_CALLER_INJECTED_HASH_MATCHED_NOT_ATTESTED",
+      "configuration_status": "STATIC_CONFIG_CONTRACT_BOUND_RUNTIME_NOT_OBSERVED",
+      "redirect_status": "NOT_ESTABLISHED_CONTAINER_HOST_PORT_TRANSLATION_UNOBSERVED",
+      "tls_trust_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION",
+      "authorization_status": "AUTHORIZATION_NOT_ESTABLISHED",
+      "publication_status": "NOT_PUBLISHED",
+      "runtime_evidence_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+    },
+    "validation_status": "PURE_HOST_SNI_INTENT_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED",
+    "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+  },
+  "binding_sha256": "f1a3fd38d0a49eea284caa704016d92de336e2eafb4d46a4fd23c59113266dc5"
+}

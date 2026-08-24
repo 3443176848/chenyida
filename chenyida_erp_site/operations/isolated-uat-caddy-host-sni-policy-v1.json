@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-isolated-uat-caddy-host-sni-policy/v1",
+  "policy_id": "chenyida-erp-isolated-uat-caddy-host-sni-v1",
+  "execution_authorized": false,
+  "capability_status": {
+    "host_sni_expectation_builder": "IMPLEMENTED_PURE",
+    "host_sni_expectation_validator": "IMPLEMENTED_PURE",
+    "evidence_intent_v2_builder": "IMPLEMENTED_PURE",
+    "evidence_intent_v2_validator": "IMPLEMENTED_PURE",
+    "base_evidence_intent_v1_revalidation": "IMPLEMENTED_PURE_FIXED_V1_SEMANTICS",
+    "static_compose_binding": "IMPLEMENTED_SOURCE_HASH_BOUND_RUNTIME_NOT_OBSERVED",
+    "legacy_evidence_bridge": "DIGEST_CONTRACT_ONLY_FULL_ACTION_CLOSURE_NOT_IMPLEMENTED",
+    "redirect_observer": "NOT_IMPLEMENTED",
+    "tls_chain_and_hostname_observer": "NOT_IMPLEMENTED",
+    "negative_probe_observer": "NOT_IMPLEMENTED",
+    "publisher": "NOT_IMPLEMENTED",
+    "runtime_backend": "NOT_IMPLEMENTED",
+    "execution_authorized": false
+  },
+  "validation_output": {
+    "host_sni_contract_status": "PURE_HOST_SNI_INTENT_CONTRACT_VALID",
+    "source_observation_status": "SOURCE_BYTES_CALLER_INJECTED_HASH_MATCHED_NOT_ATTESTED",
+    "configuration_status": "STATIC_CONFIG_CONTRACT_BOUND_RUNTIME_NOT_OBSERVED",
+    "redirect_status": "NOT_ESTABLISHED_CONTAINER_HOST_PORT_TRANSLATION_UNOBSERVED",
+    "tls_trust_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION",
+    "authorization_status": "AUTHORIZATION_NOT_ESTABLISHED",
+    "publication_status": "NOT_PUBLISHED",
+    "runtime_evidence_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+  },
+  "invariants": {
+    "deployment_class": "UAT",
+    "connect_host": "127.0.0.1",
+    "server_name": "localhost",
+    "caddy_internal_https_port": 443,
+    "health_path": "/api/health",
+    "http_expected_status": 308,
+    "https_expected_status": 200,
+    "public_origin_scheme": "https",
+    "host_sni_relationship": "ERP_DOMAIN_EQUALS_SNI_EQUALS_AUTHORITY_HOST_EQUALS_PUBLIC_ORIGIN_HOST",
+    "host_port_relationship": "PUBLIC_ORIGIN_PORT_EQUALS_PUBLISHED_CADDY_HTTPS_PORT",
+    "server_name_shape": "HOSTNAME_ONLY_NO_SCHEME_PORT_PATH_WILDCARD_OR_TRAILING_DOT",
+    "tls_verification": "TRUSTED_CHAIN_AND_EXACT_DNS_NAME_REQUIRED",
+    "insecure_skip_verify": false,
+    "leaf_digest_only_sufficient": false,
+    "runtime_dns_allowed": false,
+    "proxy_environment_allowed": false,
+    "redirect_following_allowed": false,
+    "forwarded_headers_are_trust_roots": false,
+    "web_direct_port_role": "LOOPBACK_OPERATIONS_PROBE_NOT_PUBLIC_ORIGIN"
+  },
+  "upstream_bindings": [
+    {
+      "path": "operations/isolated-uat-runtime-contract-policy-v1.json",
+      "raw_sha256": "4b7f6f741ff84c4ae7a4d8ee3d3641e7a9d3dc52b62c2b00d4c9f9c0f98020cc",
+      "policy_sha256": "5f24335aa436309427465b6cb1c5c7ecb3778f0945f3d7ed48598008a0456586"
+    },
+    {
+      "path": "operations/isolated-uat-runtime-receipt-policy-v1.json",
+      "raw_sha256": "1eee47ed1ed9311529153cc3e7defeb95984e075276af23a453a872c94027aac",
+      "policy_sha256": "58c34e4627b379f3b0cdd607673633c339c1e570e8675d2a7108a01f994e9f6e"
+    }
+  ],
+  "source_closure": {
+    "schema_version": 1,
+    "algorithm": "FIXED_RAW_SHA256_RESOURCE_SET_AND_PYTHON_IMPORT_GUARD_V1",
+    "roots": [
+      "scripts/isolated-uat-caddy-host-sni-contracts.py"
+    ],
+    "members": [
+      {
+        "path": ".env.uat-isolated.example",
+        "sha256": "ebf60a09217916ce1ace5732b258bde07574a8add9ae96c8b152b535a3719d4f",
+        "usage": "STATIC_NON_SECRET_INPUT_EXAMPLE"
+      },
+      {
+        "path": "app/lib/infrastructure/config.ts",
+        "sha256": "1215c91915bf1715cf5d143d87443be6664eb6413fdc3516d0d30ec30093cc34",
+        "usage": "STATIC_ORIGIN_CONFIGURATION_REFERENCE"
+      },
+      {
+        "path": "app/lib/infrastructure/request-origin.ts",
+        "sha256": "6745149dc8bda6447f08496535c1813c7b6367e948d11c9a190c3670c254800d",
+        "usage": "STATIC_ORIGIN_MATCHING_REFERENCE"
+      },
+      {
+        "path": "compose.uat-isolated.yml",
+        "sha256": "abcf24c0c9e50ff41188bf4d9e089681f30417739490711081c0c2a6bba71e4b",
+        "usage": "STATIC_ISOLATED_COMPOSE_REFERENCE"
+      },
+      {
+        "path": "compose.yml",
+        "sha256": "2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa",
+        "usage": "STATIC_BASE_COMPOSE_REFERENCE"
+      },
+      {
+        "path": "deploy/Caddyfile",
+        "sha256": "9302c1191d1460dcb34ecceef841100bef97fd8800676a6ddc899cd65ddfc9e9",
+        "usage": "STATIC_CADDY_ROUTE_REFERENCE"
+      },
+      {
+        "path": "operations/isolated-uat-runtime-contract-policy-v1.json",
+        "sha256": "4b7f6f741ff84c4ae7a4d8ee3d3641e7a9d3dc52b62c2b00d4c9f9c0f98020cc",
+        "usage": "LEGACY_INTENT_CONTRACT_REFERENCE"
+      },
+      {
+        "path": "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "sha256": "1eee47ed1ed9311529153cc3e7defeb95984e075276af23a453a872c94027aac",
+        "usage": "LEGACY_RECEIPT_CONTRACT_REFERENCE"
+      },
+      {
+        "path": "scripts/isolated-uat-caddy-host-sni-contracts.py",
+        "sha256": "53283460f5c868efaed57bc977499dd69d88d43cacbd6e2e7e1178826db0a6ff",
+        "usage": "EXECUTING_PURE_HOST_SNI_VALIDATOR"
+      }
+    ],
+    "external_imports": [
+      "ast",
+      "hashlib",
+      "json",
+      "re",
+      "typing"
+    ],
+    "declared_absent_capabilities": [
+      "CERTIFICATE_STORE",
+      "CLOCK",
+      "DNS",
+      "DOCKER",
+      "ENVIRONMENT",
+      "FILESYSTEM_RUNTIME_OBSERVATION",
+      "HTTP",
+      "NETWORK",
+      "PROCESS",
+      "PUBLISHER",
+      "RANDOM",
+      "SECRET_VALUES",
+      "SHELL",
+      "TLS"
+    ],
+    "validation_scope": "CALLER_INJECTED_SOURCE_HASH_AND_DIRECT_IMPORT_GUARD_NOT_A_SANDBOX_OR_RUNTIME_ATTESTATION",
+    "source_closure_sha256": "cde30bd66d1973768ac0be29f41c1b077843ca69cef9496350ddd28ca250cedc"
+  },
+  "policy_sha256": "dad404daf3d0d6348242184e9157fa8e80615a3b2b630f5c54708896fb753010"
+}

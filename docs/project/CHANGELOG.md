@@ -4,6 +4,19 @@
 
 ## 2026-08-25
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: bind isolated UAT Caddy host and SNI`
+
+- 第一性原理：不到20人的单一同机UAT只增加localhost Host/SNI纯合同和既有one-shot的声明式v6扩展；没有引入DNS、证书平台、探针服务、队列、多租户控制面或人员基数配置。
+- 静态配置：隔离Web Public Origin由production-mode下无效的HTTP直连改为`https://localhost:<Caddy HTTPS发布端口>`；Caddy显式固定`ERP_DOMAIN=localhost / ERP_HTTPS_PORT=443`。Compose validator精确核对四个应用服务的HTTPS Origin、Caddy环境和端口，HTTP Origin及漂移失败关闭。
+- Host/SNI合同：新增policy和纯模块，固定连接`127.0.0.1`、HTTP authority/Host、TLS SNI和Origin host均为`localhost`；未来HTTPS观察必须验证受信链及精确DNS name，禁用insecure skip verify、runtime DNS、proxy环境和redirect following。模块不具备HTTP/TLS/Docker/进程/时钟/Secret/publisher能力。
+- Evidence intent v2：完整重验D-178 evidence v1，并携带active v6、owner v5、external/receipt v4三个完整计划对象；固定角色/合同/摘要、v6→v5→v4确定性投影，以及request/project/ports/policy/source/Compose/Web/Worker镜像对基础证据的连续性。状态明确为`FULL_ACTIVE_PLAN_SEMANTICS_NOT_REVALIDATED`，不冒充九步全动作closure。
+- 失败关闭加固：所有公开builder/validator重新验证固定policy和调用方注入source bytes；D-178/D-179固定upstream raw、source closure member和注入bytes必须三方一致。独立复核发现的upstream自重签P1已修复并加入负测；plan swap/digest swap、伪policy、source/image漂移、畸形类型、非有限值、深嵌套和非法surrogate均稳定拒绝。
+- Binding/摘要：v6 body/raw为`f1a3fd38d0a49eea284caa704016d92de336e2eafb4d46a4fd23c59113266dc5`/`459bb65d42c71551797bf4cbf56a022700780caeb8a3d987b51bd96560d9f1f0`，v1—v5 raw字节保持不变。Host policy内部/raw/closure/module为`dad404da…3010`/`c3edf759…f39a`/`cde30bd6…cedc`/`53283460…a6ff`；one-shot raw及control内部/raw为`5ec47d3c…a674`、`b9fabb5e…ade8e`/`a4809ee3…67f0`。
+- 测试/复核：控制5/5、one-shot 13/13、runtime contracts 7/7、runtime receipts 16/16、external anchors 13/13、owner completion 15/15、Host/SNI 11/11，共80/80；隔离Compose policy/config连续两次双PASS。严格JSON、Shell语法、冻结v1—v5摘要、摘要闭包和`git diff --check`通过；两路修复后独立只读复核均为P0=0/P1=0。
+- 资源：02:00→02:07最终门前后available memory `2,210,680,832 → 2,199,441,408`B，Swap `181,915,648 → 185,536,512`B（增长3,620,864B），根盘available `17,697,169,408 → 17,684,115,456`B，Load `1.16/0.79/0.46 → 0.44/0.57/0.48`，kernel `oom_kill=0`。Docker保持6容器/75镜像/277 Volume/6网络；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整。精确清理本任务3个`.pyc`后，任务pyc和Compose临时目录残留0。
+- 代码/数据：无产品业务代码、Schema、Migration、API、页面、依赖、员工角色或生产配置变化；未创建或访问UAT目录、Secret、证书、容器、网络、Volume、数据库、备份或业务数据，未build/deploy/Migration/restart/账号/HTTP-TLS探针/业务写。
+- 文档：新增D-182并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一独立切片只处理九步全动作传递source closure，再分别处理publisher、runtime observer/backend和精确镜像，不自动运行。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: validate isolated UAT owner completion`
 
 - 第一性原理：不到20人的单一内部UAT只增加一份owner completion policy、一个纯validator和binding/plan v5；不建设证据平台、队列、daemon、多租户控制面，也不把工程、计划、市场等人数写入合同。

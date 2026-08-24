@@ -78,11 +78,13 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         cls.policy = POLICY.read_policy(POLICY_FILE)
         cls.request = request(cls.policy)
         cls.bindings = ONE_SHOT.read_bindings()
+        cls.owner_completion_bindings = ONE_SHOT.read_owner_completion_bindings()
         cls.legacy_receipt_bindings = ONE_SHOT.read_legacy_receipt_bindings()
         cls.runtime_contract_policy = ONE_SHOT.read_runtime_contract_policy()
         cls.runtime_receipt_policy = ONE_SHOT.read_runtime_receipt_policy()
         cls.external_anchor_policy = ONE_SHOT.read_external_anchor_policy()
         cls.owner_completion_policy = ONE_SHOT.read_owner_completion_policy()
+        cls.host_sni_policy = ONE_SHOT.read_host_sni_policy()
         cls.external_anchor_bindings = ONE_SHOT.read_external_anchor_bindings()
 
     def test_plan_is_deterministic_exact_and_non_executing(self) -> None:
@@ -91,9 +93,9 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(ONE_SHOT.validate_plan(first, self.request, self.policy), first)
         self.assertEqual(first["mode"], "READ_ONLY_PLAN")
-        self.assertEqual(first["schema_version"], 5)
-        self.assertEqual(first["contract"], "chenyida-erp-isolated-uat-one-shot-plan/v5")
-        self.assertEqual(first["entrypoint_id"], "chenyida-erp-isolated-uat-one-shot-v5")
+        self.assertEqual(first["schema_version"], 6)
+        self.assertEqual(first["contract"], "chenyida-erp-isolated-uat-one-shot-plan/v6")
+        self.assertEqual(first["entrypoint_id"], "chenyida-erp-isolated-uat-one-shot-v6")
         self.assertFalse(first["execution_authorized"])
         self.assertEqual(first["action_binding_id"], self.bindings["binding_id"])
         self.assertEqual(first["action_binding_sha256"], self.bindings["binding_sha256"])
@@ -140,8 +142,30 @@ class IsolatedUatOneShotTest(unittest.TestCase):
             first["owner_completion_success_output_contract"]["runtime_evidence_status"],
             "NOT_ESTABLISHED_BY_PURE_VALIDATION",
         )
-        base = ONE_SHOT.external_anchor_base_plan(first)
-        self.assertEqual(first["external_anchor_base_plan_sha256"], base["plan_sha256"])
+        owner_base = ONE_SHOT.owner_completion_base_plan(first)
+        external_base = ONE_SHOT.external_anchor_base_plan(first)
+        self.assertEqual(
+            first["owner_completion_base_plan_sha256"], owner_base["plan_sha256"],
+        )
+        self.assertEqual(
+            first["external_anchor_base_plan_sha256"], external_base["plan_sha256"],
+        )
+        self.assertEqual(
+            owner_base["external_anchor_base_plan_sha256"], external_base["plan_sha256"],
+        )
+        self.assertEqual(len({
+            first["plan_sha256"], owner_base["plan_sha256"], external_base["plan_sha256"],
+        }), 3)
+        self.assertEqual(first["host_sni_policy_sha256"], self.host_sni_policy["policy_sha256"])
+        self.assertEqual(first["host_sni_expectation_validation_status"], "STRUCTURE_VALID")
+        self.assertEqual(
+            first["host_sni_evidence_intent_v2_validation_status"],
+            "NOT_RUN_NO_BASE_EVIDENCE_INTENT",
+        )
+        expectation = first["caddy_host_sni_expectation"]
+        self.assertEqual(expectation["endpoint_binding"]["server_name"], "localhost")
+        self.assertEqual(expectation["endpoint_binding"]["tls_server_name"], "localhost")
+        self.assertEqual(expectation["endpoint_binding"]["public_origin"], "https://localhost:33443")
         self.assertEqual(len(first["migration_allowlist_entries"]), 46)
         self.assertEqual([item["ordinal"] for item in first["actions"]], list(range(1, 10)))
         self.assertEqual(first["roots"], self.request["roots"])
@@ -215,7 +239,13 @@ class IsolatedUatOneShotTest(unittest.TestCase):
             ],
         )
         routing = self.bindings["plan_digest_routing"]
-        self.assertEqual(routing["active_control_plan"]["input_name"], "control_plan_sha256")
+        self.assertEqual(
+            routing["active_control_plan"]["input_name"], "active_control_plan_sha256",
+        )
+        self.assertEqual(
+            routing["owner_completion_base_plan"]["legacy_input_name"],
+            "control_plan_sha256",
+        )
         self.assertEqual(
             routing["external_anchor_base_plan"]["legacy_input_name"], "plan_sha256",
         )
@@ -227,11 +257,16 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertIn(
             "external_anchor_base_plan_sha256", self.bindings["actions"][6]["inputs"],
         )
+        self.assertIn("active_control_plan_sha256", self.bindings["actions"][8]["inputs"])
+        self.assertIn(
+            "owner_completion_base_plan_sha256", self.bindings["actions"][8]["inputs"],
+        )
 
     def test_isolated_evidence_requires_all_runtime_identities(self) -> None:
         actions = self.bindings["actions"]
         self.assertEqual(actions[7]["outputs"], [
             "caddy_container_identity", "web_container_identity", "worker_container_identity",
+            "caddy_host_sni_expectation",
         ])
         for required in (
             "postgres_container_identity", "caddy_container_identity",
@@ -244,9 +279,11 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertEqual(actions[8]["outputs"], [
             "evidence_intent", "container_identity_set", "readiness_receipt",
             "isolated_uat_postdeploy_receipt", "isolated_uat_runtime_identity_receipt",
-            "receipt_chain_validation", "owner_completion_validation",
+            "receipt_chain_validation", "owner_completion_validation", "evidence_intent_v2",
+            "caddy_host_sni_validation",
         ])
         self.assertIn("owner_completion_log", actions[8]["inputs"])
+        self.assertIn("caddy_host_sni_expectation", actions[8]["inputs"])
         self.assertNotIn("scripts/release-identity-contract.mjs", actions[8]["sources"])
 
     def test_execute_fails_before_any_plan_is_emitted(self) -> None:
@@ -311,7 +348,7 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertFalse(boundary["runtime_path_implemented"])
         self.assertEqual(
             boundary["extension_mode"],
-            "EXACT_V4_INHERITANCE_WITH_ACTION_7_OWNER_OUTPUT_AND_ACTION_9_VALIDATION_INPUT",
+            "EXACT_V5_INHERITANCE_WITH_ACTION_8_HOST_SNI_EXPECTATION_AND_ACTION_9_EVIDENCE_INTENT_V2_VALIDATION",
         )
         self.assertEqual(boundary["runtime_fact_status"], "NOT_ESTABLISHED_BY_PURE_VALIDATION")
         policy_sources = {item["path"] for item in self.policy["source_binding"]}
@@ -339,10 +376,15 @@ class IsolatedUatOneShotTest(unittest.TestCase):
             hashlib.sha256(v3_raw).hexdigest(),
             "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4",
         )
+        owner_raw = ONE_SHOT.OWNER_COMPLETION_BINDINGS_PATH.read_bytes()
+        self.assertEqual(
+            hashlib.sha256(owner_raw).hexdigest(),
+            "95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363",
+        )
         current_raw = ONE_SHOT.ACTIVE_ACTION_BINDINGS_PATH.read_bytes()
         self.assertEqual(
             hashlib.sha256(current_raw).hexdigest(),
-            "95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363",
+            "459bb65d42c71551797bf4cbf56a022700780caeb8a3d987b51bd96560d9f1f0",
         )
         v4_raw = ONE_SHOT.EXTERNAL_ANCHOR_BINDINGS_PATH.read_bytes()
         self.assertEqual(
@@ -370,6 +412,10 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertIn("scripts/isolated-uat-runtime-contracts.py", policy_sources)
         self.assertIn("operations/isolated-uat-owner-completion-policy-v1.json", policy_sources)
         self.assertIn("scripts/isolated-uat-owner-completion-contracts.py", policy_sources)
+        self.assertIn("operations/isolated-uat-caddy-host-sni-policy-v1.json", policy_sources)
+        self.assertIn("scripts/isolated-uat-caddy-host-sni-contracts.py", policy_sources)
+        self.assertIn("operations/isolated-uat-one-shot-action-bindings-v6.json", policy_sources)
+        self.assertIn("deploy/Caddyfile", policy_sources)
         self.assertEqual(self.legacy_receipt_bindings["execution_boundary"]["source_binding_scope"], "DIRECT_CONTRACT_REFERENCES_ONLY")
         receipt_closure = self.runtime_receipt_policy["source_closure"]
         self.assertEqual(receipt_closure["roots"], ["scripts/isolated-uat-runtime-receipts.py"])
@@ -389,7 +435,7 @@ class IsolatedUatOneShotTest(unittest.TestCase):
 
     def test_recomputed_tampered_binding_is_rejected(self) -> None:
         tampered = json.loads(ONE_SHOT.ACTIVE_ACTION_BINDINGS_PATH.read_text(encoding="utf-8"))
-        tampered["source_extensions"][0]["ordinal"] = 8
+        tampered["source_extensions"][0]["ordinal"] = 7
         body = {key: value for key, value in tampered.items() if key != "binding_sha256"}
         tampered["binding_sha256"] = POLICY.canonical_sha256(body)
         with tempfile.TemporaryDirectory(prefix="cyd-uat-action-binding-test.") as directory:

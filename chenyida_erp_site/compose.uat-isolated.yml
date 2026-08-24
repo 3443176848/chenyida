@@ -50,6 +50,8 @@ services:
           create_host_path: false
 
   web:
+    environment:
+      ERP_PUBLIC_ORIGIN: https://localhost:${ERP_UAT_CADDY_HTTPS_PORT:?ERP_UAT_CADDY_HTTPS_PORT is required}
     volumes: !override
       - type: volume
         source: erp_uploads
@@ -108,6 +110,9 @@ services:
 
   caddy:
     profiles: !override [uat-edge]
+    environment:
+      ERP_DOMAIN: localhost
+      ERP_HTTPS_PORT: 443
     ports: !override
       - 127.0.0.1:${ERP_UAT_CADDY_HTTP_PORT:?ERP_UAT_CADDY_HTTP_PORT is required}:80
       - 127.0.0.1:${ERP_UAT_CADDY_HTTPS_PORT:?ERP_UAT_CADDY_HTTPS_PORT is required}:443

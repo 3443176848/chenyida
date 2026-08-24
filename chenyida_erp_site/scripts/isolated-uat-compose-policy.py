@@ -180,17 +180,28 @@ def validate_ports(service: str, actual: Any, expected: list[dict[str, Any]]) ->
             fail("NON_LOOPBACK_PORT_FORBIDDEN")
 
 
-def validate_environment(service: str, value: Any, project: str, web_port: int) -> None:
+def validate_environment(
+    service: str,
+    value: Any,
+    project: str,
+    caddy_https_port: int,
+) -> None:
     environment = exact_mapping(value, f"{service.upper()}_ENVIRONMENT_INVALID")
     expected = {
         "ERP_DEPLOYMENT_CLASS": "uat",
         "ERP_ENV": "production",
-        "ERP_PUBLIC_ORIGIN": f"http://127.0.0.1:{web_port}",
+        "ERP_PUBLIC_ORIGIN": f"https://localhost:{caddy_https_port}",
         "ERP_RELEASE_EXPECTED_DEPLOYMENT_ID": project,
         "ERP_UAT_ALLOW_LOOPBACK_ORIGIN": "true",
     }
     if any(environment.get(key) != item for key, item in expected.items()):
         fail(f"{service.upper()}_UAT_ENVIRONMENT_INVALID")
+
+
+def validate_caddy_environment(value: Any) -> None:
+    environment = exact_mapping(value, "CADDY_ENVIRONMENT_INVALID")
+    if environment != {"ERP_DOMAIN": "localhost", "ERP_HTTPS_PORT": "443"}:
+        fail("CADDY_HOST_SNI_ENVIRONMENT_INVALID")
 
 
 def validate(args: argparse.Namespace, compose: dict[str, Any]) -> None:
@@ -281,7 +292,14 @@ def validate(args: argparse.Namespace, compose: dict[str, Any]) -> None:
         if policy.get("networks") != expected_network_membership[service]:
             fail(f"{service.upper()}_NETWORKS_INVALID")
         if service in {"admin", "migrate", "web", "worker"}:
-            validate_environment(service, policy.get("environment"), project, web_port)
+            validate_environment(
+                service,
+                policy.get("environment"),
+                project,
+                caddy_https_port,
+            )
+        elif service == "caddy":
+            validate_caddy_environment(policy.get("environment"))
 
     validate_ports(
         "web",

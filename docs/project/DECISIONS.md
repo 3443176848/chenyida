@@ -4127,6 +4127,42 @@
 - 拒绝把`desired_state_sha256`称为`final_structure_sha256`，以及在没有structure report bytes时声称生产结构报告已验证。
 - 拒绝在本切片实现publisher、宿主observer/runtime backend，或因纯合同PASS而创建同机UAT。
 
+## D-182 隔离UAT的连接地址、HTTP Host、TLS SNI与Public Origin必须形成同一localhost合同
+
+- 日期：2026-08-25
+- 状态：Accepted（仓库纯intent/contract；未观察TLS、HTTP或运行事实）
+- 发起：项目负责人继续要求“下一步”；Codex按少于20人的单一同机UAT、最小静态切片和失败关闭原则推进D-181之后的Caddy边界
+
+### Context
+
+- D-178 evidence intent v1只绑定loopback端口和任意叶证书摘要，历史readiness状态明确为`NOT_VALIDATED_MISSING_BOUND_SERVER_NAME`；它不能证明请求Host、TLS SNI、证书hostname和应用Public Origin属于同一个名字。
+- 既有隔离示例在`ERP_ENV=production`下使用`http://127.0.0.1:<web-port>`作为Public Origin，未来Web会按现有配置校验拒绝HTTP；隔离overlay又未绑定`ERP_DOMAIN`，Caddy会回退到`erp.invalid`。这两项静态矛盾必须先于任何运行申请关闭。
+- 单一同机UAT不需要DNS服务、证书平台、通用探针系统或按员工人数配置基础设施。固定连接loopback、固定本地server name并保留后续受控运行观察即可。
+
+### Decision
+
+1. 同机隔离边界固定连接地址为`127.0.0.1`，server name、HTTP authority host、Host header、TLS SNI、`ERP_DOMAIN`和Public Origin host全部固定为`localhost`；Public Origin固定为`https://localhost:<published-caddy-https-port>`。Web直接loopback端口只保留运维探针用途，不再作为Public Origin。
+2. `compose.uat-isolated.yml`必须显式设置Caddy `ERP_DOMAIN=localhost / ERP_HTTPS_PORT=443`，并用隔离Caddy HTTPS发布端口覆盖Web的`ERP_PUBLIC_ORIGIN`。`.env.uat-isolated.example`同步表达同一非Secret示例；Compose纯静态validator同时拒绝HTTP Origin、非localhost Caddy环境和端口漂移。
+3. 新增独立`caddy-host-sni-policy/v1`及纯模块。模块只消费调用方注入JSON/source bytes，固定Host/SNI expectation、证书必须满足受信链与精确DNS name、禁用insecure skip verify、runtime DNS、proxy环境和redirect following；不导入网络、HTTP、TLS、Docker、进程、文件系统运行观察、时钟、Secret或publisher能力。
+4. Source closure固定绑定隔离env/Compose、基础Compose、Caddyfile、应用Origin配置、D-178/D-179 policy及执行纯模块。通过只表示这些调用方注入bytes与已审阅摘要一致；`STATIC_CONFIG_CONTRACT_BOUND_RUNTIME_NOT_OBSERVED`不得改写为Caddy已加载或证书已签发。
+5. Evidence intent v2必须完整重验嵌入的evidence intent v1，并同时携带、按固定角色校验active v6、owner base v5和external/receipt base v4三个互不相同的完整计划；v6→v5→v4必须按确定性投影精确一致，计划中的request/project/ports/policy、源码身份、Compose摘要及Web/Worker镜像必须与Host/SNI expectation和v1基础证据连续。该检查不冒充九步计划的全语义重验；v1 readiness receipt及原18个内部、5个外部节点保持原字节/原语义，不能借v2把历史`NOT_VALIDATED_MISSING_BOUND_SERVER_NAME`升级为运行通过。
+6. Binding/plan v6只对冻结v5作additive extension：action 8声明生成Host/SNI expectation，action 9消费expectation和原evidence intent v1并声明v2/validation输出；v1—v5字节不得修改。One-shot默认仍只输出只读计划，`execute`仍在任何backend前因未授权失败。
+7. 纯合同不证明Caddy本地CA已被客户端信任、证书SAN匹配、错误SNI/Host被拒绝、反向代理健康或HTTP高端口重定向Location正确。尤其容器内443与宿主高端口转换未经运行观察，redirect状态必须保持`NOT_ESTABLISHED_CONTAINER_HOST_PORT_TRANSLATION_UNOBSERVED`。
+8. 本决策不授权创建UAT、目录、Secret、证书、容器、网络、Volume、数据库、Migration、账号或业务数据，也不授权build、deploy、restart、HTTP/TLS探针或发布回执。
+
+### Consequences
+
+- 静态配置不再同时表达production-mode HTTP Origin与`erp.invalid`默认站点；未来受控运行端口获得了唯一、可测试的`127.0.0.1 + localhost Host/SNI + HTTPS Origin`输入合同。
+- Binding v6 body/raw SHA为`f1a3fd38d0a49eea284caa704016d92de336e2eafb4d46a4fd23c59113266dc5`/`459bb65d42c71551797bf4cbf56a022700780caeb8a3d987b51bd96560d9f1f0`；Host/SNI policy内部/raw/closure为`dad404daf3d0d6348242184e9157fa8e80615a3b2b630f5c54708896fb753010`/`c3edf759d2b342f91931c4b529f993c89cae72656a4fa951b06b9be72c30f39a`/`cde30bd66d1973768ac0be29f41c1b077843ca69cef9496350ddd28ca250cedc`。所有公开入口重验固定policy/source bytes，且D-178/D-179 upstream raw锚点与closure成员、注入bytes必须三方一致；v1—v5 raw SHA保持不变。
+- 聚合80项Unit与隔离Compose静态双门通过，只证明合同与投影成立；新UAT仍未创建、不能试运行。TASK92继续`DOING`，下一独立切片处理全动作传递source closure，随后才分别处理publisher/runtime observer/backend、精确镜像和L2a申请。
+
+### Rejected alternatives
+
+- 拒绝为单一loopback UAT引入公共DNS、独立证书服务、探针平台、队列或按“每部门两人”硬编码容量/账号数。
+- 拒绝把`127.0.0.1`同时当作TLS server name，或继续让HTTP Web直连地址充当production Public Origin。
+- 拒绝仅凭Location摘要、叶证书摘要或静态配置摘要声称TLS hostname、信任链、错误SNI拒绝和反向代理运行正常。
+- 拒绝修改冻结v1—v5、给旧receipt链追加伪运行节点，或因本切片PASS而创建/启动同机UAT。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

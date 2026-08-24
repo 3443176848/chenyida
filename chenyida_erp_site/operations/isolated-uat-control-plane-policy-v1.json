@@ -83,7 +83,15 @@
   "source_binding": [
     {
       "path": ".env.uat-isolated.example",
-      "sha256": "6cd069dab00c8f100df30817589c31f3d44ab4faeb54cb419fbf2ab88c6632db"
+      "sha256": "ebf60a09217916ce1ace5732b258bde07574a8add9ae96c8b152b535a3719d4f"
+    },
+    {
+      "path": "app/lib/infrastructure/config.ts",
+      "sha256": "1215c91915bf1715cf5d143d87443be6664eb6413fdc3516d0d30ec30093cc34"
+    },
+    {
+      "path": "app/lib/infrastructure/request-origin.ts",
+      "sha256": "6745149dc8bda6447f08496535c1813c7b6367e948d11c9a190c3670c254800d"
     },
     {
       "path": "compose.release.yml",
@@ -91,11 +99,19 @@
     },
     {
       "path": "compose.uat-isolated.yml",
-      "sha256": "0ae2186d6c554b56c460972d25e16ea40431eef3c7227d9607fb39fe63a89ff8"
+      "sha256": "abcf24c0c9e50ff41188bf4d9e089681f30417739490711081c0c2a6bba71e4b"
     },
     {
       "path": "compose.yml",
       "sha256": "2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa"
+    },
+    {
+      "path": "deploy/Caddyfile",
+      "sha256": "9302c1191d1460dcb34ecceef841100bef97fd8800676a6ddc899cd65ddfc9e9"
+    },
+    {
+      "path": "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+      "sha256": "c3edf759d2b342f91931c4b529f993c89cae72656a4fa951b06b9be72c30f39a"
     },
     {
       "path": "operations/isolated-uat-external-anchor-policy-v1.json",
@@ -112,6 +128,10 @@
     {
       "path": "operations/isolated-uat-one-shot-action-bindings-v5.json",
       "sha256": "95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363"
+    },
+    {
+      "path": "operations/isolated-uat-one-shot-action-bindings-v6.json",
+      "sha256": "459bb65d42c71551797bf4cbf56a022700780caeb8a3d987b51bd96560d9f1f0"
     },
     {
       "path": "operations/isolated-uat-owner-completion-policy-v1.json",
@@ -134,12 +154,16 @@
       "sha256": "8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5"
     },
     {
+      "path": "scripts/isolated-uat-caddy-host-sni-contracts.py",
+      "sha256": "53283460f5c868efaed57bc977499dd69d88d43cacbd6e2e7e1178826db0a6ff"
+    },
+    {
       "path": "scripts/isolated-uat-compose-policy.py",
-      "sha256": "6063b65e1a4e42faabfa0e03e11e337b93bee3a83d9b83489ddab76ca5be9274"
+      "sha256": "3299a1a8a8b07e426096ce54cc06a650af7b42260c03989bfe0b6557547361a7"
     },
     {
       "path": "scripts/isolated-uat-control-plane-policy.py",
-      "sha256": "890fb70054ffdbb4df3b88c9bb19f5cc652b613829f55c355c0077ddb9f145c9"
+      "sha256": "2dd1edd389155046e9c658268e5def6c08c36ad6cd7efa4a2b80c3f2ead22c15"
     },
     {
       "path": "scripts/isolated-uat-external-anchor-contracts.py",
@@ -151,7 +175,7 @@
     },
     {
       "path": "scripts/isolated-uat-one-shot.py",
-      "sha256": "0ce8417fbb537d535ffa6abe4089e7f0a64d4f82f4cd023fb407dba49156d198"
+      "sha256": "5ec47d3c43668945c872e3d4f4a485499dc8730b4d6e7d1ac50692b663dea674"
     },
     {
       "path": "scripts/isolated-uat-runtime-contracts.py",
@@ -174,5 +198,5 @@
       "sha256": "22ddda1cf7f77899cbb58f2e6e5ac75f81ea7629d8a4abbf05b07021efc0a6b9"
     }
   ],
-  "policy_sha256": "a62a9664df508f428227f65b097e9c2ff2f9b342c8e5ab8df1891c96564e2681"
+  "policy_sha256": "b9fabb5ec573ae98eaec044470b6ca28f0647e49980d557fc0e055d5e8fade8e"
 }
