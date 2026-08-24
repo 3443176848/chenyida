@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-isolated-uat-control-plane-policy/v1",
+  "policy_id": "chenyida-erp-isolated-uat-one-shot-bootstrap-v1",
+  "deployment_authorized": false,
+  "namespace": {
+    "project_pattern": "^chenyida-erp-uat-[a-z0-9][a-z0-9_-]{0,42}$",
+    "roots": {
+      "runtime_secret_root": "/etc/{project}/runtime-secrets",
+      "backup_credential_root": "/etc/{project}/operator-credentials",
+      "release_candidate_root": "/var/lib/{project}/release-candidate",
+      "release_identity_root": "/var/lib/{project}/release-identity",
+      "operator_state_root": "/var/lib/{project}/postgresql-runtime-privilege-operator",
+      "backup_root": "/var/backups/{project}"
+    },
+    "protected_roots": [
+      "/etc/chenyida-erp",
+      "/var/lib/chenyida-erp",
+      "/var/backups/chenyida-erp-v2"
+    ],
+    "shared_lock": "/run/lock/chenyida-erp-release-gate-v1.lock",
+    "shared_lock_use": "SERIALIZATION_ONLY"
+  },
+  "release": {
+    "producer": "DEDICATED_ISOLATED_UAT_ONE_SHOT",
+    "implementation_status": "CONTRACT_ONLY_NOT_EXECUTABLE",
+    "production_supervisor_allowed": false,
+    "package_version": "0.1.0-alpha.47",
+    "required_inputs": [
+      "control_policy_sha256",
+      "git_commit",
+      "git_tree",
+      "migration_allowlist_sha256",
+      "web_image_reference",
+      "web_image_config_digest",
+      "worker_image_reference",
+      "worker_image_config_digest",
+      "resolved_compose_sha256"
+    ]
+  },
+  "database": {
+    "name": "chenyida_erp",
+    "current_head": "EMPTY",
+    "target_head": "0046_runtime_lock_privilege_boundary.sql",
+    "migration_count": 46,
+    "migration_allowlist_sha256": "8bb2b2d662df03e397d49c4ed5d11f1af1a9406ecbaff37aee8fc0d2d7388eed",
+    "operator": "DEDICATED_ISOLATED_UAT_ONE_SHOT",
+    "implementation_status": "CONTRACT_ONLY_NOT_EXECUTABLE",
+    "production_runner_allowed": false,
+    "role_credentials": {
+      "chenyida_erp_admin": "admin-database-password",
+      "chenyida_erp_backup": "backup-capture-service.conf",
+      "chenyida_erp_owner": "migration-database-password",
+      "chenyida_erp_web": "web-database-password",
+      "chenyida_erp_worker": "worker-database-password"
+    }
+  },
+  "secrets": {
+    "runtime_files": [
+      "admin-database-password",
+      "admin-password",
+      "migration-database-password",
+      "postgres-bootstrap-password",
+      "web-database-password",
+      "worker-database-password"
+    ],
+    "backup_service_file": "backup-capture-service.conf",
+    "password_format": "32_BYTE_CSPRNG_CANONICAL_BASE64URL",
+    "all_values_distinct": true,
+    "values_in_request": false
+  },
+  "safety": {
+    "deployment_class": "UAT",
+    "recovery": "DISPOSABLE_SYNTHETIC_RECREATE_FROM_EMPTY",
+    "staffing": "APPLICATION_CONFIGURATION_NOT_INFRASTRUCTURE_CARDINALITY",
+    "production_data_allowed": false,
+    "runtime_actions_authorized": []
+  },
+  "source_binding": [
+    {
+      "path": ".env.uat-isolated.example",
+      "sha256": "1a8ba9bc304ae72c51dd558f5caaa940fa7b928e367b5d23e7c750a3c86b1c3f"
+    },
+    {
+      "path": "compose.uat-isolated.yml",
+      "sha256": "0ae2186d6c554b56c460972d25e16ea40431eef3c7227d9607fb39fe63a89ff8"
+    },
+    {
+      "path": "operations/postgresql-runtime-privilege-policy-v2.json",
+      "sha256": "2aba8ed96202117761ba88212fb84e3d475afbf19e5447fabe2f658bbe9d8a7c"
+    },
+    {
+      "path": "operations/runtime-secret-file-policy-v1.json",
+      "sha256": "8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5"
+    },
+    {
+      "path": "scripts/isolated-uat-compose-policy.py",
+      "sha256": "6063b65e1a4e42faabfa0e03e11e337b93bee3a83d9b83489ddab76ca5be9274"
+    },
+    {
+      "path": "scripts/isolated-uat-control-plane-policy.py",
+      "sha256": "a81eb418ed60525cb204429980d2813eb03794589172f8106cfe16307c8e768f"
+    }
+  ],
+  "policy_sha256": "cd52627b3a27952f1cf7556c93a6d8c93b4e5404b01203e459aae8ce610a7b61"
+}

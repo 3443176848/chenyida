@@ -3843,6 +3843,41 @@
 - 拒绝只用`--project-name`后直接启动，也拒绝把静态Compose PASS解释为producer/operator、精确镜像、Migration或运行健康已通过。
 - 拒绝为少于20人的系统建设通用多租户控制平面；只实现新UAT实际需要的一个隔离namespace，值可配置且不编码人员数量。
 
+## D-174 同机UAT先冻结非执行控制请求合同，生产发布控制面保持独立
+
+- 日期：2026-08-24
+- 状态：`ACCEPTED / CONTROL REQUEST CONTRACT PASS / EXECUTION NOT IMPLEMENTED / RUNTIME NOT AUTHORIZED / PRODUCTION NO-GO`
+- 发起：项目负责人要求继续下一步，并要求从第一性原理避免为少于20人的系统扩大平台复杂度
+- 实施范围：只新增仓库policy、验证器、静态测试和非Secret输入；不创建运行对象或执行控制动作
+
+### Context
+
+- D-173已经关闭Compose消费者侧隔离，但生产release supervisor仍把authorization、artifact、identity、postdeploy、runtime secret、operator state和backup等root固定到生产namespace；直接参数化会同时扩大大量生产授权、摘要和安装边界。
+- PostgreSQL operator的角色/reconciler/journal原语可复用，但其`ACTUAL_CONTROLLED` runner受生产policy和已安装supervisor约束。生产Migration入口同样要求完整release manifest和受控grant，不能用换项目名绕开。
+- 小团队规模不会减少一物一码、事务、权限和数据隔离底线，也不要求复制一套通用多租户控制平面。当前只需要一个从空库建立的、可销毁重建的UAT namespace。
+
+### Decision
+
+1. 先建立`chenyida-erp-isolated-uat-control-plane-policy/v1`非执行请求合同。Policy固定`deployment_authorized=false`、运行动作空列表，并把下一授权明确为L2a精确build/Secret/角色/空库Migration/deploy；仓库合同本身不构成执行授权。
+2. 六类host root必须由同一可配置Compose项目名机械派生：runtime Secret、operator credential、release candidate、release identity、operator state和synthetic backup。root彼此不得重叠或落入生产受保护范围；共享global lock只用于跨环境串行，不保存环境数据。
+3. release producer和PostgreSQL operator后续只允许一个专用one-shot UAT入口。该请求明确禁止生产`release-supervisor-launcher.py`和`postgresql-runtime-privilege-runner.mjs`，生产policy、路径和默认行为不改。
+4. 复用既有PostgreSQL角色、reconciler和append-only journal业务原语，不复制五套角色SQL。五个数据库登录角色是Web、Worker、Migration、Admin和Backup技术边界；员工人数、工程/计划/市场各约2人和总席位不进入基础设施合同。
+5. 请求必须绑定当前package、`EMPTY → 0046`、46项Migration allowlist、精确Git commit/tree、Web/Worker registry/config digest及resolved Compose SHA-256。浮动tag、旧head、生产root/入口、额外动作、未知人员数字段或source digest漂移全部失败关闭。
+6. 首个policy状态故意保持`CONTRACT_ONLY_NOT_EXECUTABLE`。只有专用adapter实现、静态/隔离测试及精确镜像完成后，TASK92才可形成L2a执行申请；本决策不允许先创建半成品目录或数据库。
+
+### Consequences
+
+- producer/operator的环境边界、角色/凭据映射、精确输入和合成重建范围已成为机器可验证请求，且不会改变生产supervisor攻击面。
+- TASK92仍为`DOING`：当前缺口从“未定义producer/operator边界”收敛为“专用one-shot adapter未实现 + 当前源码精确镜像缺失”。新UAT仍未创建，不能试运行。
+- 首轮失败只允许保留quarantine证据后删除精确UAT namespace并从空库重建；该策略不能替代真实备份或生产恢复。
+
+### Rejected alternatives
+
+- 拒绝把巨大生产supervisor改造成任意环境/任意root的通用平台，也拒绝复制一套完整生产控制面给单个UAT。
+- 拒绝用生产runner、生产Secret/root或旧alpha.47镜像临时启动；消费者隔离不能替代producer授权和镜像身份。
+- 拒绝为了人数少而合并为单一数据库超级用户，或把员工人数写死到角色、账号、容量、Schema或验收条件。
+- 拒绝把静态request PASS解释为producer已实现、L2a已授权、环境已建立或可以试运行。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

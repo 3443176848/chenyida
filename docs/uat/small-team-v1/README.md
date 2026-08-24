@@ -4,7 +4,7 @@
 > 日期：2026-08-24（Asia/Shanghai）
 > 业务基线：D-167、D-170
 
-环境进度见[新建隔离UAT L1只读就绪报告](environment-readiness.md)：源码/0046基线可用，但新UAT尚未创建；TASK92已清空BuildKit cache，并在负责人选择同机B路径后完成Compose消费者侧独立host-root/项目/loopback静态合同。release producer/operator和精确当前镜像仍使L2保持NO-GO。
+环境进度见[新建隔离UAT L1只读就绪报告](environment-readiness.md)：源码/0046基线可用，但新UAT尚未创建；TASK92已清空BuildKit cache，完成同机Compose消费者合同及D-174六root/五数据库角色/精确输入的非执行控制请求合同。专用one-shot adapter和精确当前镜像仍使L2保持NO-GO。
 
 ## 1. 这套准备包解决什么
 

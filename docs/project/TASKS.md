@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理已完成，Cache从174项/10.31 GB降为0，根盘available从`10,825,478,144`增至`17,909,628,928` bytes；运行对象和四个受保护卷不变。项目负责人已选择当前主机同机隔离并接受同一故障域；Compose消费者侧独立host-root/项目/loopback合同和五类负向静态门已通过。release producer/operator及当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理、Compose消费者隔离和D-174 producer/operator非执行请求合同已通过；六类namespace root、五个数据库服务角色、凭据映射、`EMPTY → 0046`及精确输入门可机械验证。专用one-shot adapter和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+
+2026-08-24控制请求合同事件：第一性原理盘点确认生产release supervisor及`ACTUAL_CONTROLLED` operator runner应保持生产专用，不扩成任意root平台。新增D-174、非执行policy、严格validator、4项Unit/9类负例和静态runner；项目派生六类root，复用现有五个技术数据库角色并区分六份runtime Secret与backup service，绑定alpha.47、46项Migration、`EMPTY → 0046`、allowlist及后续精确Git/镜像/Compose摘要。生产root、旧head、浮动镜像、运行动作、source/角色漂移和人员数字段均失败关闭。Policy保持`deployment_authorized=false / CONTRACT_ONLY_NOT_EXECUTABLE`，未创建或修改运行资源；TASK92继续`DOING`。
 
 2026-08-24同机B路径静态合同事件：项目负责人明确选择`B`并授权仓库内独立host-root/Compose override及静态测试。新增UAT overlay、非Secret示例、严格validator和runner；有效渲染固定六服务、七个项目作用域Volume、两个网络、只读不自动建路径的Secret/release bind和loopback-only端口，缺root、生产root、生产项目、生产Web端口、遗漏overlay均失败关闭。生产Compose/策略未改，未创建目录、Secret、容器、网络、Volume或数据库，未build/deploy/Migration/restart。release supervisor/operator仍固定生产root，TASK92继续`DOING`。
 
@@ -277,7 +279,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理和Compose消费者合同；继续关闭producer/operator前置） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、低资源规则 | `DOING / SAME-HOST B SELECTED / ISOLATED COMPOSE CONSUMER CONTRACT PASS / PRODUCER-OPERATOR AND EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。Cache清零、根盘约16.68GiB可用；独立项目/root/端口静态正负门通过且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者合同和非执行控制请求；继续实现专用adapter） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、低资源规则 | `DOING / CONSUMER + CONTROL-REQUEST CONTRACT PASS / EXECUTABLE ADAPTER + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。六类root、五角色、空库0046和精确输入门通过；policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

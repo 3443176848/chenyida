@@ -1,6 +1,6 @@
 # SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 新隔离UAT前置边界
 
-> 状态：`DOING / SAME-HOST B SELECTED / ISOLATED COMPOSE CONSUMER CONTRACT PASS / PRODUCER-OPERATOR AND EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
+> 状态：`DOING / SAME-HOST B SELECTED / CONSUMER + CONTROL-REQUEST CONTRACT PASS / EXECUTABLE ADAPTER + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
 > 日期：2026-08-24（Asia/Shanghai）
 > 依赖：TASK91、D-172、低资源服务器保护规则
 > 责任：项目负责人已选择当前主机同机隔离并接受同一故障域；Codex只执行仓库内静态前置，运行资源仍逐层授权
@@ -37,7 +37,7 @@
 
 - 当前HEAD没有匹配Web/Worker镜像；唯一alpha.47镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`。
 - `compose.uat-isolated.yml`已关闭容器消费者侧固定root：独立项目名、Secret、release candidate/identity、命名Volume、网络和loopback端口均有失败关闭静态合同。生产Compose未参数化、未改变。
-- release supervisor和PostgreSQL runtime privilege operator仍固定生产producer/state/secret/backup root；它们尚不能为同机UAT生成独立发布文件或角色凭据，且不得直接用于该UAT。
+- D-174已为release producer和PostgreSQL角色operator冻结独立namespace、输入、角色/凭据映射和合成重建边界；生产supervisor/runner明确禁止复用。该合同仍是`CONTRACT_ONLY_NOT_EXECUTABLE`，尚不能生成发布文件、角色或凭据。
 - TASK92已把根盘可用恢复到约16.68 GiB、比10 GiB硬线高约6.68 GiB；磁盘停止线阻断已解除，但任何后续build仍须重新执行新鲜资源门并串行控制上界。
 - L2a、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权。
 
@@ -75,11 +75,22 @@
 - 仓库要求的本地Python基线：`server.py --self-test`、venv内`smoke_test.py`、`go_live_check.py`分别输出`SELF_TEST_OK`、`SMOKE_TEST_OK`、`GO_LIVE_CHECK_OK`；系统Python首次smoke因缺`openpyxl`在导入阶段失败，改用仓库既有venv后通过。`go_live_check.py`按既有行为幂等初始化本地legacy SQLite并生成`erp-backup-20260824-084748.sqlite3`及一条活动记录；两项均以精确文件名/条件清理，删除记录前确认唯一1条、删除后为0。未连接自托管PostgreSQL、现有UAT或生产数据库。
 - 静态子步骤起点08:39 CST约2.3GiB MemAvailable、171MiB Swap、17GiB根盘available、Load`0.07/0.08/0.07`；收口08:52 CST为`2,452,017,152`B available、`179,843,072`B Swap used、根盘`17,893,322,752`B available、Load`0.19/0.17/0.12`、kernel `oom_kill=0`。最终Docker为6容器/75镜像/277 Volume/6网络/0 Build Cache；四服务精确ID保持、restart0/OOM false，Web/PostgreSQL healthy，四个受保护Volume metadata完整。UAT Compose测试临时目录、手工render JSON、本地测试backup和对应activity记录残留均为0。
 
-## 6. 当前停止线与完成标准
+## 6. 同机UAT控制请求合同结果
 
-磁盘清理和Compose消费者隔离合同已经完成，但TASK92继续`DOING`。release producer/operator仍固定生产控制root，当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
+- 新增`operations/isolated-uat-control-plane-policy-v1.json`和严格Python验证器/runner。Policy SHA-256为`cd52627b3a27952f1cf7556c93a6d8c93b4e5404b01203e459aae8ce610a7b61`，`deployment_authorized=false`且`runtime_actions_authorized=[]`。
+- 六类root由同一个可配置项目名派生：runtime Secret、operator credential、release candidate、release identity、operator state和synthetic backup；必须彼此不重叠并避开三类生产受保护root。共享全局lock只允许串行协调，不承载任何环境数据。
+- release producer和PostgreSQL operator均只允许后续专用`DEDICATED_ISOLATED_UAT_ONE_SHOT_ADAPTER`入口。生产`release-supervisor-launcher.py`和`postgresql-runtime-privilege-runner.mjs`在该UAT请求中明确禁止；生产政策和默认行为未修改。
+- 数据库服务角色固定为现有五个技术登录角色，六份runtime Secret加独立backup capture service提供凭据；这些是服务边界，不是员工席位。工程、计划、市场等暂按2人仅属于后续实名账号配置，任何`staff_count`类字段都被请求schema拒绝。
+- 合同机械重算当前`0.1.0-alpha.47`、46项Migration、`EMPTY → 0046_runtime_lock_privilege_boundary.sql`及allowlist SHA-256 `8bb2b2d6…8eed`；L2a请求还必须提供精确Git commit/tree、Web/Worker registry/config digest和resolved Compose摘要，浮动tag失败关闭。
+- 有效policy/request和4项Unit均通过，覆盖9类失败关闭case：生产项目/root、旧Migration、浮动镜像、任何运行动作、角色/source漂移、重复JSON key和人员数量基础设施字段均被拒绝。`.env.uat-isolated.example`同步增加operator credential/state和synthetic backup root，但仍不含Secret或授权值。
+- 本段只有仓库静态文件。没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，没有build、deploy、Migration、restart、账号或业务写；现有UAT/生产数据面未访问。
+- 09:26 CST起点约2.3GiB available memory、171MiB Swap、17GiB根盘available、Load`0.21/0.20/0.18`；09:34收口为`2,445,348,864`B available、`179,769,344`B Swap used、根盘`17,871,294,464`B available、Load`0.03/0.11/0.15`。Memory PSI和kernel `oom_kill`均为0，Docker保持6容器/75镜像/277 Volume/6网络/0 Build Cache；现有四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四个受保护Volume存在。本段没有任务临时资源。
+
+## 7. 当前停止线与完成标准
+
+磁盘、Compose消费者隔离和producer/operator请求边界已经完成，但TASK92继续`DOING`。专用one-shot producer/operator仍未实现，当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
 
 - 只完成负责人选定的一条路径，不同时建设两套方案。
-- 目标环境消费者边界和资源上界已明确；producer/operator适配、精确源码/镜像输入、Secret/角色、空库Migration执行包和失败清理清单仍待完成。
+- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射及失败清理原则已明确；可执行producer/operator、精确源码/镜像输入和空库Migration执行包仍待完成。
 - 现有UAT身份、数据、四个受保护Volume和常驻服务不变。
 - TASK92完成后只允许提交L2a授权申请，不自动build、deploy或Migration。

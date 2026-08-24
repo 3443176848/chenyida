@@ -2,12 +2,12 @@
 
 最后更新时间：2026-08-24（Asia/Shanghai）
 
-## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；同机B路径消费者合同已完成）
+## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；消费者与非执行控制请求合同已完成）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / SAME-HOST B SELECTED / ISOLATED COMPOSE CONSUMER CONTRACT PASS / PRODUCER-OPERATOR AND EXACT IMAGE REQUIRED / PRODUCTION NO-GO | 负责人已接受同一故障域；磁盘和容器消费者隔离完成，运行producer/operator仍失败关闭 |
-| 授权范围 | PASS / REPOSITORY STATIC ONLY | 清理后负责人选择`B`；本段只授权host-root/Compose override及静态测试，不授权目录、Secret、Docker资源、数据库、build、Migration、部署或业务写 |
+| 当前状态 | DOING / CONSUMER + CONTROL-REQUEST CONTRACT PASS / EXECUTABLE ADAPTER + EXACT IMAGE REQUIRED / PRODUCTION NO-GO | 负责人已接受同一故障域；磁盘、消费者隔离和D-174请求边界完成，运行adapter仍失败关闭 |
+| 授权范围 | PASS / REPOSITORY STATIC ONLY | 本段只做producer/operator设计、仓库实现和静态测试；不授权目录、Secret、Docker资源、数据库、build、Migration、部署或业务写 |
 | 清理执行 | PASS / 3 BOUNDED PASSES | 三次BuildKit-only命令均rc0，分别报告607.3MB、35.76MB和9.667GB；Cache`174 → 164 → 149 → 0`，active始终0 |
 | 根盘 | PASS / 16.68 GiB AVAILABLE | `10,825,478,144 → 17,909,628,928` bytes，实际增加约6.60GiB；最终比10GiB硬线高约6.68GiB |
 | 内存/Swap/Load | PASS | 最终MemAvailable `2,467,676,160`B，Swap used `179,859,456`B且60秒增长0，Load`0.24/0.28/0.26`，PSI/OOM0 |
@@ -16,12 +16,16 @@
 | 受保护Volume | PASS / ALL PRESENT | `erp_postgres`、`erp_uploads`、`erp_attachments`、`erp_backup_status` metadata不变，未读取正文 |
 | Compose消费者隔离 | PASS / STATIC | 独立项目、7 Volume、2网络、3 host root和loopback-only端口；Secret/release bind只读且`create_host_path:false` |
 | 负向静态门 | PASS / 5 FAIL-CLOSED CASES | 缺root、生产root、生产项目名、生产Web端口和遗漏overlay均被拒绝；有效合同输出双PASS |
+| 控制请求合同 | PASS / NON-EXECUTING | 六类项目派生root、五个技术数据库角色、六份runtime Secret+backup service、`EMPTY → 0046`及精确Git/镜像/Compose输入已冻结；policy SHA `cd52627b…7b61` |
+| 控制请求负向门 | PASS / 4 UNIT / 9 CASES | 生产项目/root、旧head、浮动镜像、运行动作、source/角色漂移、重复key及人员数字段失败关闭；人数不成为基础设施基数 |
+| 生产控制面保护 | PASS / UNCHANGED | 请求明确禁止生产supervisor/runner；既有生产policy和默认路径未改。新policy为`deployment_authorized=false / CONTRACT_ONLY_NOT_EXECUTABLE` |
 | 生产策略回归 | BLOCKED / PRE-EXISTING DIGEST DRIFT | 生产Compose渲染成功；既有policy对Dockerfile/release overlay摘要与本任务前HEAD不一致，按设计`POLICY_SOURCE_DIGEST_MISMATCH`，未改策略或降断言 |
 | 本地Python基线 | PASS / TEMP EFFECT CLEANED | self-test、venv smoke、go-live通过；system Python缺openpyxl后改用既有venv。go-live生成的精确backup和唯一activity记录已清理，未连接自托管PG/UAT/生产 |
 | 收口资源/完整性 | PASS / NO UAT RESIDUE | `2,452,017,152`B available memory、`179,843,072`B Swap、`17,893,322,752`B根盘、Load`0.19/0.17/0.12`、OOM0；6/75/277/6、Cache0，四服务restart0/OOM false且保护卷完整 |
 | 生产配置/运行面 | PASS / UNCHANGED | 生产Compose与政策未改；未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源 |
-| 仍有阻断 | PRODUCER/OPERATOR FIXED ROOTS + STALE IMAGE | release supervisor/operator仍绑定生产root；当前源码匹配Web/Worker镜像缺失 |
-| 下一步 | TASK92 / PRODUCER-OPERATOR STATIC ADAPTER | 只继续同一UAT namespace的最小失败关闭适配；通过后再申请L2a，不自动运行 |
+| 本段资源/完整性 | PASS / STATIC ONLY | 起点约2.3GiB/171MiB/17GiB/Load`0.21/0.20/0.18`；收口`2,445,348,864`B available、`179,769,344`B Swap、`17,871,294,464`B磁盘、Load`0.03/0.11/0.15`、PSI/OOM0。6/75/277/6、Cache0，四服务restart0/OOM false且保护卷保持，任务临时资源0 |
+| 仍有阻断 | EXECUTABLE ONE-SHOT ADAPTER + EXACT IMAGE | 控制请求已经定义，但专用producer/operator尚不可执行；当前源码匹配Web/Worker镜像缺失 |
+| 下一步 | TASK92 / DEDICATED ONE-SHOT ADAPTER | 只实现同一namespace的默认禁用专用入口和隔离测试，不参数化生产supervisor；通过后再形成L2a申请，不自动运行 |
 
 ## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
 

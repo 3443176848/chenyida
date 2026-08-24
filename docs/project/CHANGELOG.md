@@ -4,6 +4,18 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: define isolated UAT control request`
+
+- 第一性原理：生产release supervisor和`ACTUAL_CONTROLLED` PostgreSQL runner继续生产专用；不为单个小团队UAT参数化或复制完整生产控制面。新增D-174，后续只允许一个专用one-shot UAT入口。
+- Policy：新增`chenyida-erp-isolated-uat-control-plane-policy/v1`，SHA-256为`cd52627b3a27952f1cf7556c93a6d8c93b4e5404b01203e459aae8ce610a7b61`；固定`deployment_authorized=false`、空运行动作和`CONTRACT_ONLY_NOT_EXECUTABLE`，静态PASS不构成L2a授权。
+- Namespace：同一可配置项目名派生runtime Secret、operator credential、release candidate/identity、operator state和synthetic backup六类root；生产受保护root和相互重叠失败关闭，共享global lock只作串行协调。
+- 角色/Secret：复用Admin、Backup、Owner、Web、Worker五个技术数据库登录角色及既有reconciler/journal原语；六份runtime Secret和独立backup capture service精确映射。员工人数、各职能约2人和总席位不进入合同。
+- 精确输入：机械重算alpha.47、46项Migration、`EMPTY → 0046`及allowlist `8bb2b2d6…8eed`；未来请求还必须绑定Git commit/tree、Web/Worker registry/config digest和resolved Compose SHA-256，浮动tag或旧head被拒绝。
+- 测试：policy CLI与4项Python Unit PASS，覆盖9类负例：生产项目/root、旧Migration、浮动镜像、运行动作、source/角色漂移、重复JSON key及人员数字段。Compose消费者静态合同回归保持PASS。
+- 资源：静态段起点约2.3GiB available/171MiB Swap/17GiB磁盘/Load`0.21/0.20/0.18`，收口为`2,445,348,864`B/`179,769,344`B/`17,871,294,464`B/`0.03/0.11/0.15`；PSI/OOM0，6容器/75镜像/277 Volume/6网络/0 Cache，四服务restart0/OOM false且Web/PostgreSQL healthy，任务临时资源0。
+- 配置/文档：非Secret UAT示例补充operator credential/state和synthetic backup root；同步MASTER、TASKS、PROJECT_CONTEXT、DECISIONS、当前任务、CHANGELOG和STATUS。产品代码、Schema、Migration、API、员工角色和依赖不变。
+- 生产保护：没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份；未build、deploy、Migration、restart、账号或业务写，未访问现有UAT/生产数据。专用adapter和精确当前镜像仍缺失，TASK92继续`DOING`。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: add isolated UAT Compose contract`
 
 - 路径决定：项目负责人选择当前主机同机隔离并接受同一故障域；不同时建设独立主机方案。人数、岗位约2人和总用户少于20人不进入项目名、端口、容量、账号或验收硬条件。
