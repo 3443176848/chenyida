@@ -4,6 +4,19 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: validate isolated UAT external anchors`
+
+- 第一性原理：少于20人的单一隔离UAT只增加一份external anchor policy、一个纯函数validator和binding/plan v4；不建设证据服务、队列、daemon、多租户控制面，也不把工程、计划、市场等人数写入基础设施合同。
+- 外部合同：严格验证同一plan下七类namespace root、从`/`起的完整ancestor/mount身份、七份不含Secret正文或内容摘要的普通凭据文件metadata、PostgreSQL容器完整network/port/mount/tmpfs集合及cluster system identifier投影，并输出四个external digest anchors。
+- 失败关闭：祖先必须root所有且不可group/other写；directory/regular-file、非symlink、mount point/root/source及`device+inode`唯一性固定。生产保护mount、双前导斜杠、`..`组件、跨mount-ID别名、FIFO凭据、额外网络/端口/bind、生产Volume、Secret挂载和镜像config漂移均进入负测。
+- Binding/plan：v4 body/raw SHA为`fb83e0f2…b050b`/`4858b8c1…34262`，以`EXACT_NO_OVERRIDE`继承v3九动作/18节点，只增加external policy/validator source及五外层节点/四anchor映射；v1—v3 raw字节保持不变。执行validator常量锁定runtime policy/closure/capability、receipt policy/closure/capability/success template和完整chain binding。
+- 诚实证据边界：成功只允许`PURE_EXTERNAL_ANCHOR_CONTRACTS_VALID / SOURCE_CALLER_INJECTED_NOT_ATTESTED / AUTHORIZATION_NOT_ESTABLISHED / NOT_ESTABLISHED_BY_PURE_VALIDATION`。外锚尚未与D-179在运行时机械join，publisher/backend继续固定未实现；纯合同通过不表示宿主已观察、UAT已创建或运行证据已发布。
+- 摘要：External policy内部/raw/source closure为`66afa1ee…9a6b`/`92c59a9f…6ef3`/`4452221d…aff4`，module/one-shot/control internal/raw为`fc6e76d4…be61`/`8cd1a345…b7f7`/`9a09a3f1…d6c8`/`45bdf961…b83c`；20项control source binding全部匹配，摘要依赖为无环DAG。
+- 测试/复核：控制5/5、one-shot 12/12、runtime contracts 7/7、runtime receipts 16/16、external anchors 13/13，共53项Unit及隔离Compose policy/config双PASS；shell语法、摘要DAG和`git diff --check`通过。两路最终独立只读复核均为P0=0/P1=0，一路1342个逐字段变体为0绕过/0异常泄漏。
+- 资源：21:42→22:52 available memory `2,363,518,976 → 2,256,683,008`B、Swap `179,556,352 → 179,613,696`B、根盘available `17,812,017,152 → 17,746,034,688`B、Load `0.03/0.35/0.25 → 0.23/0.20/0.22`，PSI/OOM0。Docker保持6容器/75镜像/277 Volume/6网络/0 Build Cache；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整；精确清理5个任务`.pyc`后任务残留0。
+- 代码/数据：无产品业务代码、Schema、Migration、API、页面、依赖、员工角色或生产配置变化；未创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，未build/deploy/Migration/restart/账号/业务写，也未访问现有UAT或生产业务数据。
+- 文档：新增D-180并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一独立切片只补owner完成日志纯合同，再处理Host/SNI和全动作closure，不自动运行。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: validate isolated UAT receipt chain`
 
 - 第一性原理：单一小团队UAT只需要固定、可审阅的回执链，不建设通用证据平台。本切片新增一份receipt policy、一个无运行能力的纯validator和binding v3；不增加队列、daemon、服务、多租户或人员基数配置。

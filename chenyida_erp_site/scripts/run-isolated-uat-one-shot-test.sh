@@ -12,10 +12,12 @@ ENTRYPOINT=$SITE_ROOT/scripts/isolated-uat-one-shot.py
 TEST=$SITE_ROOT/tests/test_isolated_uat_one_shot.py
 RUNTIME_CONTRACT_TEST=$SITE_ROOT/tests/test_isolated_uat_runtime_contracts.py
 RUNTIME_RECEIPT_TEST=$SITE_ROOT/tests/test_isolated_uat_runtime_receipts.py
+EXTERNAL_ANCHOR_TEST=$SITE_ROOT/tests/test_isolated_uat_external_anchor_contracts.py
 
 [ -x /usr/bin/python3 ] || { echo "python3 is unavailable" >&2; exit 1; }
 [ -x "$POLICY_RUNNER" ] && [ -f "$ENTRYPOINT" ] && [ -f "$TEST" ] \
-  && [ -f "$RUNTIME_CONTRACT_TEST" ] && [ -f "$RUNTIME_RECEIPT_TEST" ] || {
+  && [ -f "$RUNTIME_CONTRACT_TEST" ] && [ -f "$RUNTIME_RECEIPT_TEST" ] \
+  && [ -f "$EXTERNAL_ANCHOR_TEST" ] || {
   echo "isolated UAT one-shot sources are incomplete" >&2
   exit 1
 }
@@ -24,5 +26,6 @@ RUNTIME_RECEIPT_TEST=$SITE_ROOT/tests/test_isolated_uat_runtime_receipts.py
 /usr/bin/python3 -B "$TEST"
 /usr/bin/python3 -B "$RUNTIME_CONTRACT_TEST"
 /usr/bin/python3 -B "$RUNTIME_RECEIPT_TEST"
+/usr/bin/python3 -B "$EXTERNAL_ANCHOR_TEST"
 
 echo "ISOLATED_UAT_ONE_SHOT_TEST_PASS"

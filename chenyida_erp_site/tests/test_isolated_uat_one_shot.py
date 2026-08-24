@@ -77,8 +77,10 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         cls.policy = POLICY.read_policy(POLICY_FILE)
         cls.request = request(cls.policy)
         cls.bindings = ONE_SHOT.read_bindings()
+        cls.legacy_receipt_bindings = ONE_SHOT.read_legacy_receipt_bindings()
         cls.runtime_contract_policy = ONE_SHOT.read_runtime_contract_policy()
         cls.runtime_receipt_policy = ONE_SHOT.read_runtime_receipt_policy()
+        cls.external_anchor_policy = ONE_SHOT.read_external_anchor_policy()
 
     def test_plan_is_deterministic_exact_and_non_executing(self) -> None:
         first = ONE_SHOT.build_plan(self.request, self.policy)
@@ -86,9 +88,9 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(ONE_SHOT.validate_plan(first, self.request, self.policy), first)
         self.assertEqual(first["mode"], "READ_ONLY_PLAN")
-        self.assertEqual(first["schema_version"], 3)
-        self.assertEqual(first["contract"], "chenyida-erp-isolated-uat-one-shot-plan/v3")
-        self.assertEqual(first["entrypoint_id"], "chenyida-erp-isolated-uat-one-shot-v3")
+        self.assertEqual(first["schema_version"], 4)
+        self.assertEqual(first["contract"], "chenyida-erp-isolated-uat-one-shot-plan/v4")
+        self.assertEqual(first["entrypoint_id"], "chenyida-erp-isolated-uat-one-shot-v4")
         self.assertFalse(first["execution_authorized"])
         self.assertEqual(first["action_binding_id"], self.bindings["binding_id"])
         self.assertEqual(first["action_binding_sha256"], self.bindings["binding_sha256"])
@@ -110,12 +112,19 @@ class IsolatedUatOneShotTest(unittest.TestCase):
             first["runtime_receipt_policy_sha256"],
             self.runtime_receipt_policy["policy_sha256"],
         )
-        self.assertEqual(first["receipt_chain_binding"]["node_count"], 18)
+        self.assertEqual(first["receipt_chain_binding"]["internal_node_count"], 18)
+        self.assertEqual(first["receipt_chain_binding"]["external_node_count"], 5)
         self.assertEqual(
             first["runtime_receipt_success_output_contract"]["external_anchor_validation_status"],
             "NOT_EVALUATED",
         )
         self.assertEqual(first["runtime_receipt_validation_status"], "NOT_RUN_NO_RECEIPTS")
+        self.assertEqual(first["external_anchor_policy_sha256"], self.external_anchor_policy["policy_sha256"])
+        self.assertEqual(first["external_anchor_validation_status"], "NOT_RUN_NO_EXTERNAL_EVIDENCE")
+        self.assertEqual(
+            first["external_anchor_success_output_contract"]["source_observation_status"],
+            "SOURCE_CALLER_INJECTED_NOT_ATTESTED",
+        )
         self.assertEqual(len(first["migration_allowlist_entries"]), 46)
         self.assertEqual([item["ordinal"] for item in first["actions"]], list(range(1, 10)))
         self.assertEqual(first["roots"], self.request["roots"])
@@ -131,6 +140,10 @@ class IsolatedUatOneShotTest(unittest.TestCase):
             ONE_SHOT.ContractError, "ISOLATED_UAT_SOURCE_STATE_CHANGED_DURING_PLAN",
         ):
             ONE_SHOT.build_plan(self.request, self.policy)
+
+    def test_active_plan_is_accepted_by_external_anchor_contract(self) -> None:
+        plan = ONE_SHOT.build_plan(self.request, self.policy)
+        self.assertEqual(ONE_SHOT.EXTERNAL_ANCHORS.validate_control_plan(plan), plan)
 
     def test_database_bootstrap_migration_and_final_privileges_are_ordered(self) -> None:
         actions = self.bindings["actions"]
@@ -233,18 +246,12 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertNotIn("/var/lib/chenyida-erp", plan["roots"].values())
 
     def test_action_bindings_have_direct_bound_sources_and_no_commands(self) -> None:
-        self.assertEqual(self.bindings["execution_boundary"], {
-            "evidence_scope": "ISOLATED_UAT_ONLY",
-            "shell_allowed": False,
-            "free_form_argv_allowed": False,
-            "production_entrypoints_allowed": False,
-            "production_release_identity_allowed": False,
-            "runtime_path_implemented": False,
-            "source_binding_scope": "DIRECT_CONTRACT_REFERENCES_ONLY",
-            "receipt_validation_scope": (
-                "PURE_CONTRACT_SEMANTICS_RUNTIME_FACTS_NOT_ESTABLISHED"
-            ),
-        })
+        boundary = self.bindings["execution_boundary"]
+        self.assertFalse(boundary["shell_allowed"])
+        self.assertFalse(boundary["free_form_argv_allowed"])
+        self.assertFalse(boundary["runtime_path_implemented"])
+        self.assertEqual(boundary["extension_mode"], "EXACT_V3_INHERITANCE_WITH_EXTERNAL_ANCHOR_SOURCE_AUGMENTATION")
+        self.assertEqual(boundary["runtime_fact_status"], "NOT_ESTABLISHED_BY_PURE_VALIDATION")
         policy_sources = {item["path"] for item in self.policy["source_binding"]}
         bound_sources = {source for item in self.bindings["actions"] for source in item["sources"]}
         self.assertTrue(bound_sources.issubset(policy_sources))
@@ -265,10 +272,15 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         legacy = json.loads(legacy_raw)
         legacy_body = {key: value for key, value in legacy.items() if key != "binding_sha256"}
         self.assertEqual(POLICY.canonical_sha256(legacy_body), legacy["binding_sha256"])
-        current_raw = ONE_SHOT.BINDINGS_PATH.read_bytes()
+        v3_raw = ONE_SHOT.LEGACY_RECEIPT_BINDINGS_PATH.read_bytes()
+        self.assertEqual(
+            hashlib.sha256(v3_raw).hexdigest(),
+            "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4",
+        )
+        current_raw = ONE_SHOT.ACTIVE_ACTION_BINDINGS_PATH.read_bytes()
         self.assertEqual(
             hashlib.sha256(current_raw).hexdigest(),
-            "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4",
+            "4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262",
         )
         v2_raw = (SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v2.json").read_bytes()
         self.assertEqual(
@@ -289,10 +301,7 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         policy_sources = {item["path"] for item in self.policy["source_binding"]}
         self.assertIn("operations/isolated-uat-runtime-contract-policy-v1.json", policy_sources)
         self.assertIn("scripts/isolated-uat-runtime-contracts.py", policy_sources)
-        self.assertEqual(
-            self.bindings["execution_boundary"]["source_binding_scope"],
-            "DIRECT_CONTRACT_REFERENCES_ONLY",
-        )
+        self.assertEqual(self.legacy_receipt_bindings["execution_boundary"]["source_binding_scope"], "DIRECT_CONTRACT_REFERENCES_ONLY")
         receipt_closure = self.runtime_receipt_policy["source_closure"]
         self.assertEqual(receipt_closure["roots"], ["scripts/isolated-uat-runtime-receipts.py"])
         self.assertEqual(len(receipt_closure["members"]), 4)
@@ -302,7 +311,7 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         )
         self.assertEqual(
             self.runtime_receipt_policy["action_binding"]["binding_sha256"],
-            self.bindings["binding_sha256"],
+            self.legacy_receipt_bindings["binding_sha256"],
         )
         self.assertEqual(
             self.runtime_receipt_policy["capability_status"]["external_anchor_validators"],
@@ -310,14 +319,14 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         )
 
     def test_recomputed_tampered_binding_is_rejected(self) -> None:
-        tampered = copy.deepcopy(self.bindings)
-        tampered["actions"][3]["adapter_method"] = "start_all_services"
+        tampered = json.loads(ONE_SHOT.ACTIVE_ACTION_BINDINGS_PATH.read_text(encoding="utf-8"))
+        tampered["source_extensions"][0]["ordinal"] = 2
         body = {key: value for key, value in tampered.items() if key != "binding_sha256"}
         tampered["binding_sha256"] = POLICY.canonical_sha256(body)
         with tempfile.TemporaryDirectory(prefix="cyd-uat-action-binding-test.") as directory:
             path = Path(directory) / "bindings.json"
             path.write_text(ONE_SHOT.canonical_json(tampered), encoding="utf-8")
-            with self.assertRaisesRegex(ONE_SHOT.ContractError, "ISOLATED_UAT_ACTION_BINDING_SHA256_INVALID"):
+            with self.assertRaisesRegex(ONE_SHOT.ContractError, "ISOLATED_UAT_ACTION_BINDING_(IDENTITY|SHA256)_INVALID"):
                 ONE_SHOT.read_bindings(path)
 
 

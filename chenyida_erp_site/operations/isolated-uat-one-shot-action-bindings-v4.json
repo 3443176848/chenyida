@@ -1,0 +1,174 @@
+{
+  "schema_version": 4,
+  "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v4",
+  "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v4",
+  "implementation_status": "V3_ACTIONS_EXACTLY_INHERITED_EXTERNAL_ANCHOR_CONTRACTS_VALID_RUNTIME_FACTS_NOT_ESTABLISHED",
+  "execution_boundary": {
+    "evidence_scope": "ISOLATED_UAT_ONLY",
+    "shell_allowed": false,
+    "free_form_argv_allowed": false,
+    "production_entrypoints_allowed": false,
+    "production_release_identity_allowed": false,
+    "runtime_path_implemented": false,
+    "extension_mode": "EXACT_V3_INHERITANCE_WITH_EXTERNAL_ANCHOR_SOURCE_AUGMENTATION",
+    "external_anchor_validation_scope": "PURE_CONTRACT_ONLY_SOURCE_CALLER_INJECTED_NOT_ATTESTED",
+    "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+  },
+  "base_binding": {
+    "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v3",
+    "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v3",
+    "binding_sha256": "50ddd73fb4745c8fcc0b91fd7e4130e2cb3a9ef0d2f52773c64cd6112afc74bd",
+    "raw_sha256": "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4",
+    "action_inheritance": {
+      "mode": "EXACT_NO_OVERRIDE",
+      "action_count": 9,
+      "ordinal_sequence": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "EXACTLY_INHERITED"
+    },
+    "receipt_chain_inheritance": {
+      "mode": "EXACT_NO_OVERRIDE",
+      "node_count": 18,
+      "status": "EXACTLY_INHERITED"
+    }
+  },
+  "source_extensions": [
+    {
+      "ordinal": 1,
+      "inheritance_status": "BASE_ACTION_EXACT_NO_OVERRIDE",
+      "additional_sources": [
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "inheritance_status": "BASE_ACTION_EXACT_NO_OVERRIDE",
+      "additional_sources": [
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "inheritance_status": "BASE_ACTION_EXACT_NO_OVERRIDE",
+      "additional_sources": [
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "inheritance_status": "BASE_ACTION_EXACT_NO_OVERRIDE",
+      "additional_sources": [
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "inheritance_status": "BASE_ACTION_EXACT_NO_OVERRIDE",
+      "additional_sources": [
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py"
+      ]
+    }
+  ],
+  "external_anchor_contract": {
+    "policy_source": "operations/isolated-uat-external-anchor-policy-v1.json",
+    "policy_contract": "chenyida-erp-isolated-uat-external-anchor-policy/v1",
+    "validator_source": "scripts/isolated-uat-external-anchor-contracts.py",
+    "validator_method": "validate_external_anchor_contracts",
+    "validation_status": "PURE_EXTERNAL_ANCHOR_CONTRACTS_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED",
+    "runtime_fact_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION",
+    "external_nodes": [
+      {
+        "node": "control_plan",
+        "kind": "PLAN",
+        "source_ordinal": 1,
+        "source_kind": "CONTROL_PLAN_INPUT",
+        "source_name": "control_plan",
+        "digest_field": "plan_sha256",
+        "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+      },
+      {
+        "node": "namespace_root_receipt",
+        "kind": "RECEIPT",
+        "source_ordinal": 2,
+        "source_kind": "ACTION_OUTPUT",
+        "source_name": "namespace_root_receipt",
+        "digest_field": "receipt_sha256",
+        "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+      },
+      {
+        "node": "credential_generation_receipt",
+        "kind": "RECEIPT",
+        "source_ordinal": 3,
+        "source_kind": "ACTION_OUTPUT",
+        "source_name": "credential_generation_receipt",
+        "digest_field": "receipt_sha256",
+        "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+      },
+      {
+        "node": "postgres_container_identity",
+        "kind": "IDENTITY",
+        "source_ordinal": 4,
+        "source_kind": "ACTION_OUTPUT",
+        "source_name": "postgres_container_identity",
+        "digest_field": "identity_sha256",
+        "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+      },
+      {
+        "node": "database_cluster_identity",
+        "kind": "IDENTITY",
+        "source_ordinal": 4,
+        "source_kind": "ACTION_OUTPUT",
+        "source_name": "database_cluster_identity",
+        "digest_field": "identity_sha256",
+        "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+      }
+    ],
+    "control_plan_anchor": {
+      "source_node": "control_plan",
+      "source_digest_field": "plan_sha256",
+      "target_field": "plan_sha256",
+      "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+    },
+    "external_anchor_mappings": [
+      {
+        "anchor": "credential_generation_receipt_sha256",
+        "source_node": "credential_generation_receipt",
+        "source_digest_field": "receipt_sha256",
+        "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+      },
+      {
+        "anchor": "database_cluster_identity_sha256",
+        "source_node": "database_cluster_identity",
+        "source_digest_field": "identity_sha256",
+        "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+      },
+      {
+        "anchor": "release_candidate_root_identity_sha256",
+        "source_node": "namespace_root_receipt",
+        "source_digest_field": "release_candidate_root_identity_sha256",
+        "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+      },
+      {
+        "anchor": "one_shot_state_root_identity_sha256",
+        "source_node": "namespace_root_receipt",
+        "source_digest_field": "one_shot_state_root_identity_sha256",
+        "validation_status": "PURE_CONTRACT_VALID_SOURCE_CALLER_INJECTED_NOT_ATTESTED"
+      }
+    ]
+  },
+  "binding_sha256": "fb83e0f20823b632525823f3d6c012769501fff1aec9763abc64d8d10d2b050b"
+}

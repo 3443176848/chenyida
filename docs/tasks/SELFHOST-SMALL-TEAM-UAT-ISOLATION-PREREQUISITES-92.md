@@ -1,6 +1,6 @@
 # SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 新隔离UAT前置边界
 
-> 状态：`DOING / PURE INTERNAL RECEIPT CHAIN VALIDATED FROM UNVERIFIED EXTERNAL DIGEST ANCHORS / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
+> 状态：`DOING / PURE EXTERNAL ANCHOR CONTRACTS VALID / SOURCE CALLER-INJECTED NOT ATTESTED / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
 > 日期：2026-08-24（Asia/Shanghai）
 > 依赖：TASK91、D-172、低资源服务器保护规则
 > 责任：项目负责人已选择当前主机同机隔离并接受同一故障域；Codex只执行仓库内静态前置，运行资源仍逐层授权
@@ -23,6 +23,7 @@
 - 2026-08-24，项目负责人继续要求“下一步”。在实现adapter前先对D-176做只读可执行性审计；发现P0顺序冲突后，本段只保留历史v1、新增D-177/v2并做静态测试，不在错误合同上补executor，也不扩大为L2a运行授权。
 - 2026-08-24，项目负责人继续要求“下一步”。本段只实现D-178三族纯意图、未来回执字段目录和注入式fake-port顺序测试；fixture固定为未执行/未发布/无运行证据，真实validator、publisher、host/Docker/PostgreSQL/HTTP backend仍不实现，不扩大为L2a。
 - 2026-08-24，项目负责人再次要求“下一步”。本段只在仓库内把D-178字段目录收敛为D-179纯语义validator、前驱摘要链和binding v3；外部摘要根、publisher及host/Docker/PostgreSQL/HTTP backend保持未实现，未创建UAT或扩大为L2a。
+- 2026-08-24，项目负责人继续要求“下一步”。本段只新增D-180外部锚点纯合同、binding/plan v4和静态负测；输入仍由调用方注入且未认证，publisher/backend继续固定拒绝。本指令不授权宿主observer、目录、Secret、Docker、数据库、Migration、build、部署或运行写入。
 
 ### A. 独立UAT主机（推荐）
 
@@ -42,7 +43,7 @@
 
 - 当前HEAD没有匹配Web/Worker镜像；唯一alpha.47镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`。
 - `compose.uat-isolated.yml`已关闭容器消费者侧固定root：独立项目名、Secret、release candidate/identity、命名Volume、网络和loopback端口均有失败关闭静态合同。生产Compose未参数化、未改变。
-- D-176 v1虽冻结字段但物理顺序不可执行，D-177已用保留历史v1、新增v2的方式纠正；D-178冻结纯意图结构，D-179已完成八类回执、五类证据体和内部前驱摘要链的纯语义验证。该链明确从四个**未验证的业务外部摘要根**及一个未验证control plan摘要开始，验证时钟也由调用方注入且未证明可信，因此不是运行证据；外部root/credential/cluster校验、owner完成日志、Caddy Host/SNI合同、全动作传递closure、publisher及宿主runtime path尚未实现。
+- D-180已为plan、七类root/祖先链、七份凭据metadata、PostgreSQL容器和cluster identity建立固定纯合同，并输出四个external anchors；但source和观察值仍为调用方注入且未认证，尚未在运行时与D-179内部链机械join，因此不是运行证据。owner完成日志、Caddy Host/SNI合同、全动作传递closure、publisher及宿主runtime path尚未实现。
 - TASK92已把根盘可用恢复到约16.68 GiB、比10 GiB硬线高约6.68 GiB；磁盘停止线阻断已解除，但任何后续build仍须重新执行新鲜资源门并串行控制上界。
 - L2a、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权。
 
@@ -82,7 +83,7 @@
 
 ## 6. 同机UAT控制请求合同结果
 
-- 新增`operations/isolated-uat-control-plane-policy-v1.json`和严格Python验证器/runner；D-179绑定runtime contract、receipt policy/module及plan/binding v3 source并拒绝全零Git/Compose/OCI摘要后，Policy SHA-256更新为`d899da83cfefff7974e969dd337472234a902ed9797903b2e0e53709e20868d2`。`deployment_authorized=false`且`runtime_actions_authorized=[]`保持不变。
+- 新增`operations/isolated-uat-control-plane-policy-v1.json`和严格Python验证器/runner；D-180在D-179 source之上绑定external policy/module及binding v4，当前Policy内部SHA-256为`9a09a3f136698528e083dd85123e3f4837afb9c0706ed76fbfdcc397f940d6c8`。`deployment_authorized=false`且`runtime_actions_authorized=[]`保持不变。
 - 七类root由同一个可配置项目名派生：runtime Secret、operator credential、release candidate、release identity、operator state、one-shot state和synthetic backup；必须彼此不重叠并避开三类生产受保护root。共享全局lock只允许串行协调，不承载任何环境数据。
 - release producer和PostgreSQL operator的合同身份均为`DEDICATED_ISOLATED_UAT_ONE_SHOT`，未来只能由专用adapter实现。生产`release-supervisor-launcher.py`和`postgresql-runtime-privilege-runner.mjs`在该UAT请求中明确禁止；生产政策和默认行为未修改。
 - 数据库服务角色固定为现有五个技术登录角色，六份runtime Secret加独立backup capture service提供凭据；这些是服务边界，不是员工席位。工程、计划、市场等暂按2人仅属于后续实名账号配置，任何`staff_count`类字段都被请求schema拒绝。
@@ -93,7 +94,7 @@
 
 ## 7. 默认禁用one-shot计划入口结果
 
-> D-177已取代本节/D-175中“权限→Migration→生产identity→Web/Worker”的历史动作顺序；D-179又把当前入口升级为plan/binding v3。默认拒绝语义保持，物理顺序见第9节，当前回执接线见第11节。
+> D-177已取代本节/D-175中的历史动作顺序；D-179加入内部回执链，D-180再把当前入口升级为plan/binding v4。默认拒绝语义保持，物理顺序见第9节，内部链见第11节，当前外锚接线见第12节。
 
 - 新增`isolated-uat-one-shot.py`。同一个已验证request会确定性输出规范JSON和`plan_sha256`；默认命令只有读取、校验和输出，不导入subprocess，不创建目录，不连接Docker或数据库。
 - 九步只表达技术依赖：精确输入、私有root、独立凭据、PostgreSQL、五角色权限原语、`EMPTY → 0046`、release identity、Web/Worker和loopback就绪。项目名和root仍由request派生，未写死人员、席位、账号或并发数量。
@@ -119,7 +120,7 @@
 ## 9. D-177 v2依赖顺序勘误结果
 
 - 两项并行只读审计均确认不能直接实现D-176：完整runtime privilege reconcile依赖0046对象目录，必须在Migration后；生产v3 identity依赖Caddy/PostgreSQL/Web/Worker真实容器身份和postdeploy receipt，且绑定生产runtime policy/supervisor语义，不能用于无生产supervisor的隔离UAT。
-- `isolated-uat-one-shot-action-bindings-v1.json`原文件和body SHA `b5b3a7eb…0276`保持不变，仅作历史；D-177新增v2，body SHA为`6f28881beb767f25e469b60f6ef9ae15e62d703659619ce3e7c8aa63e76d463a`，当时one-shot切换读取v2。D-179后v2同样转为历史，当前入口只读取v3。
+- `isolated-uat-one-shot-action-bindings-v1.json`原文件和body SHA `b5b3a7eb…0276`保持不变，仅作历史；D-177新增v2，body SHA为`6f28881beb767f25e469b60f6ef9ae15e62d703659619ce3e7c8aa63e76d463a`，当时one-shot切换读取v2。D-179后v2转为历史，D-180后v3只作为内部receipt-chain基座；当前入口读取v4。
 - v2九步为：输入核对；七root准备；独立凭据；仅PostgreSQL；数据库marker/owner/Migration及技术登录角色初始化；`EMPTY → 0046`；最终权限收敛；启动Caddy/Web/Worker；loopback核验并发布隔离UAT专用证据。
 - 第5步只建立Migration前最小身份/角色，第7步消费Migration执行回执后处理完整Schema ACL；第9步输出名不表示生产release identity已生成，其专用合同和publisher仍未实现。
 - reader GID由policy固定为Web主GID`65532`，Compose source、非Secret示例和policy三者机械核对；这是容器技术身份，不是人员硬编码。package version/git进入服务启动输入，避免strict readiness静态通过、运行必失败。
@@ -133,7 +134,7 @@
 - 意图状态固定为`STRUCTURE_VALID / NOT_EXECUTED / NOT_PUBLISHED / NOT_AVAILABLE / predecessor NOT_VALIDATED`。回执部分只提供`INCOMPLETE_DESCRIPTOR_ONLY`字段目录；真实receipt validator、publisher和runtime backend均为`NOT_IMPLEMENTED`，任何fixture都不能作为运行证据。
 - Source closure只覆盖纯模块单文件：固定raw SHA、无仓库内传递import、固定标准库import allowlist；validation scope明确`NOT_A_SANDBOX`。v2文件字节不变，仍只声明`DIRECT_CONTRACT_REFERENCES_ONLY`，未冒充九步全动作闭包。
 - typed fake ports按`DATABASE_BOOTSTRAP → MIGRATION → EVIDENCE`执行；覆盖逐步异常、重算摘要后的畸形字段目录、自洽重签intent、非法source/import扩张、输入别名和跨族source漂移。全部首错停止且不调用后续port，不产生真实回执或秘密。
-- D-178当时因新增runtime policy/closure字段把one-shot升级为plan/v2；`execute`真实控制流只在授权门后到达唯一backend seam并精确拒绝，测试证明backend调用为0。Runtime policy SHA为`5f24335a…6586`，closure为`978741a0…c939`，当时control policy为`dd442418…6150`；binding v1/v2 raw SHA保持`3244d550…7b3a`/`9cc4e3c1…5232`。D-179后的当前plan/binding v3见第11节。
+- D-178当时因新增runtime policy/closure字段把one-shot升级为plan/v2；`execute`真实控制流只在授权门后到达唯一backend seam并精确拒绝，测试证明backend调用为0。Runtime policy SHA为`5f24335a…6586`，closure为`978741a0…c939`，当时control policy为`dd442418…6150`；binding v1/v2 raw SHA保持`3244d550…7b3a`/`9cc4e3c1…5232`。D-179的plan/binding v3见第11节，D-180当前v4见第12节。
 - 静态结果为控制请求4/4、one-shot 10/10、新runtime contracts 7/7及隔离Compose policy/config双PASS；未创建或访问UAT/生产运行资源。
 - 18:31→18:50 CST资源核对：available memory `2,399,928,320 → 2,383,667,200`B，Swap used `179,617,792 → 179,580,928`B，根盘available `17,775,542,272 → 17,746,591,744`B，Load `0.05/0.09/0.08 → 0.62/0.33/0.21`；Memory PSI和kernel `oom_kill`均0。Docker保持6容器/75镜像/277 Volume/6网络，四服务restart0/OOM false且Web/PostgreSQL healthy。当前任务`.pyc`/临时资源0；既有26个8月15—16日UAT promotion临时目录和历史pycache不属本任务，未清理。
 
@@ -142,7 +143,7 @@
 - 新增`isolated-uat-runtime-receipt-policy-v1.json`和纯函数`isolated-uat-runtime-receipts.py`；模块只接收调用方注入的JSON/已绑定source bytes，不具备文件系统、Docker、数据库、网络、时钟、随机数、进程、Secret或publisher能力。深层恶意嵌套和畸形字段均转换为稳定合同错误。Receipt policy内部摘要为`58c34e46…9f6e`、raw SHA为`1eee47ed…7aac`，四成员source closure为`0a343c32…90d8`。
 - 严格语义覆盖database target/bootstrap、release candidate、Migration execution、runtime privilege、readiness、isolated postdeploy与runtime identity八类回执，以及database bootstrap observation、Migration applied ledger/observation、runtime privilege observation、container identity set五类证据体。固定producer、project/request/operation、release/image、数据库身份、完整五角色属性、ACL、容器网络/health/loopback与前驱摘要必须连续；重算自摘要不能掩盖字段漂移。
 - Migration必须精确匹配46项allowlist（`8bb2b2d6…8eed`）和按序applied ledger（`e4a7bc4b…6a34`）。PostgreSQL OID/system identifier范围、NFC/非法surrogate、非零Git/OCI/容器身份、四容器ID唯一、规范毫秒UTC、300秒未来偏差及从首个bootstrap observation起算的1小时最大链龄均失败关闭。新鲜度只相对调用方注入且未认证的verification time成立，不声称宿主可信时钟。
-- 新增binding v3和18节点predecessor目录，body/raw SHA分别为`50ddd73f…74bd`/`da69ce3a…de5c4`；历史v1/v2 raw SHA继续保持`3244d550…7b3a`/`9cc4e3c1…5232`。Receipt policy同时钉住v3 body和raw SHA，拒绝由调用方自选一个重签binding；one-shot相应升级为plan/v3。
+- 新增binding v3和18节点predecessor目录，body/raw SHA分别为`50ddd73f…74bd`/`da69ce3a…de5c4`；历史v1/v2 raw SHA继续保持`3244d550…7b3a`/`9cc4e3c1…5232`。Receipt policy同时钉住v3 body和raw SHA，拒绝由调用方自选一个重签binding；D-179时one-shot升级为plan/v3，D-180后v3原字节只作为内部链基座。
 - Plan/v3只输出`runtime_receipt_validation_status=NOT_RUN_NO_RECEIPTS`及成功输出合同模板，不把尚未消费回执的模板写成验证结果；输出前会二次读取source state并与策略/请求包核对，发现规划期间HEAD、Migration目录或摘要漂移即失败关闭。
 - 成功输出只能写作`VALIDATED_PURE_INTERNAL_CONTRACT_CHAIN_FROM_UNVERIFIED_EXTERNAL_DIGEST_ANCHORS`，同时固定`external_anchor_validation_status=NOT_EVALUATED`、`control_plan_anchor_status=NOT_EVALUATED`、`runtime_evidence_status=NOT_ESTABLISHED_BY_PURE_VALIDATION`和`verification_time_source_status=CALLER_INJECTED_NOT_ATTESTED`。三个依赖policy raw SHA由执行validator常量锁定；receipt policy raw/internal SHA只匹配调用方给定expected roots，不把调用方本身描述为受信。四个业务external digest anchor和plan只验证格式/链内引用，未验证真实来源。
 - Runtime privilege目前只是按既有policy形成的隔离UAT acceptance projection；owner侧完成日志validator尚无隔离operator profile。D-178 evidence intent v1也未承载Caddy server name，故本段只核对loopback leaf observation，不声称Host/SNI信任绑定。
@@ -150,11 +151,24 @@
 - 静态结果为控制请求5/5、runtime contracts 7/7、runtime receipts 16/16、one-shot 11/11，共39项Unit PASS；聚合runner输出`ISOLATED_UAT_ONE_SHOT_TEST_PASS`，隔离Compose policy/config双PASS。没有创建或访问UAT/生产运行资源，没有build、deploy、Migration、restart、账号或业务写。
 - 19:09→20:05 CST资源核对：available memory `2,395,295,744 → 2,338,922,496`B，Swap used `179,580,928 → 179,576,832`B，根盘available `17,755,828,224 → 17,713,516,544`B，Load `0.01/0.04/0.09 → 0.58/0.39/0.32`；Memory PSI和kernel `oom_kill`均0。Docker保持6容器/75镜像/277 Volume/6网络，四服务restart0/OOM false且Web/PostgreSQL healthy。精确删除本段生成的2个`.pyc`后，任务pyc及Compose测试临时目录残留0；历史及运行资源均未清理。
 
-## 12. 当前停止线与完成标准
+## 12. D-180外部摘要锚点纯合同结果
 
-磁盘、Compose消费者隔离、producer/operator请求、默认只读计划、v2顺序、D-178纯意图及D-179内部回执链已经完成；TASK92继续`DOING`。外部摘要根validator、owner完成日志、Caddy Host/SNI intent v2、全动作传递closure、原子publisher、宿主runtime backend和当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
+- 新增`isolated-uat-external-anchor-policy-v1.json`和纯函数`isolated-uat-external-anchor-contracts.py`。模块只消费调用方注入JSON/source bytes，无filesystem runtime observer、Docker、数据库、网络、时钟、随机、进程、shell或Secret能力；通过状态明确为`SOURCE_CALLER_INJECTED_NOT_ATTESTED`，不是宿主事实。
+- Control plan必须精确为v4；执行模块常量锁定v4 binding body/status、runtime contract/receipt policy及其closure/capability、receipt成功模板和完整chain binding。自洽重签`publisher=IMPLEMENTED`、`runtime_evidence=ESTABLISHED`或任意v99 chain均返回稳定合同错误。
+- Namespace receipt固定七个project派生root。每个root必须为directory、非symlink、权限匹配，并携带从`/`到parent的完整ancestor chain；每级必须root所有、不可被group/other写、为directory且非symlink。identity同时记录device/inode和mount ID/point/root/source；受保护mount root/source、双前导斜杠、`..`组件与按不同mount ID伪装的同一`device+inode`均失败关闭。重复路径identity必须一致，parent摘要精确绑定，七root彼此不重叠且避开生产受保护root。
+- Credential receipt固定六份runtime Secret加独立backup service的七条metadata，严格核对consumer/root/filename/uid/gid/mode/nlink/size、`REGULAR_FILE`、非symlink、所属root mount描述和物理identity；凭据不得与root/ancestor或其他凭据物理别名，FIFO/directory均被拒绝。Schema拒绝Secret正文与内容摘要；各Secret值不同只保留为producer assertion，不在纯validator中暴露或重算Secret。
+- PostgreSQL container identity固定Compose/project、非零容器ID、manifest/config digest、完整且唯一的内部backend network、对应network mode、`published_ports=[]`、两个项目Volume、只读bootstrap Secret bind、三项精确tmpfs、runtime secret root及running/healthy；额外生产网络、host network、宿主发布端口、额外bind、错误Secret source/target/read-only、生产Volume或镜像漂移均失败关闭。Cluster identity再绑定credential/container前驱、数据库名和合法system identifier投影。
+- 四对象时间只验证规范UTC毫秒和单调顺序；没有可信时钟或新鲜度结论。输出固定为`PURE_EXTERNAL_ANCHOR_CONTRACTS_VALID / AUTHORIZATION_NOT_ESTABLISHED / NOT_ESTABLISHED_BY_PURE_VALIDATION`。外锚结果尚未与D-179内部链运行时机械join，`require_external_anchor_publisher()`继续固定拒绝。
+- 新增binding v4，body/raw SHA为`fb83e0f20823b632525823f3d6c012769501fff1aec9763abc64d8d10d2b050b`/`4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262`。v4精确继承v3九动作和18节点，只增加external policy/validator source及五外层节点/四anchor映射；v1—v3 raw SHA保持不变。
+- External policy内部/raw/source closure SHA为`66afa1ee…9a6b`/`92c59a9f…6ef3`/`4452221d…aff4`，纯模块raw SHA为`fc6e76d4…be61`，one-shot raw SHA为`8cd1a345…b7f7`，control policy内部/raw SHA为`9a09a3f1…d6c8`/`45bdf961…b83c`。摘要闭包为DAG且全部source hash匹配。
+- 聚合runner最终为控制5/5、one-shot 12/12、runtime contracts 7/7、runtime receipts 16/16、external anchors 13/13，共53项Unit；隔离Compose policy/config双PASS。两路独立审计报告的plan重签、稳定错误、祖先/mount、路径规范化、容器完整网络/端口/mount问题均已修复并进入负测；稳定树最终复核均为P0=0/P1=0，其中一路1342个逐字段变体为0绕过/0异常泄漏。
+- 本段没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，没有build、deploy、Migration、restart、账号或业务写；既有UAT/生产数据面未访问。21:42→22:52资源门：available memory `2,363,518,976 → 2,256,683,008`B，Swap used `179,556,352 → 179,613,696`B，根盘available `17,812,017,152 → 17,746,034,688`B，Load `0.03/0.35/0.25 → 0.23/0.20/0.22`，Memory PSI和kernel `oom_kill`均0。Docker保持6容器/75镜像/277 Volume/6网络/0 Build Cache；四服务精确ID不变、restart0/OOM false，Web/PostgreSQL healthy，四个受保护Volume完整。精确删除本段5个`.pyc`后，任务pyc与Compose临时目录残留均为0。
+
+## 13. 当前停止线与完成标准
+
+磁盘、Compose消费者隔离、producer/operator请求、默认只读计划、v2顺序、D-178纯意图、D-179内部回执链及D-180外部锚点纯合同已经完成；TASK92继续`DOING`。owner完成日志、Caddy Host/SNI intent v2、全动作传递closure、外锚/内部链运行时join、原子publisher、宿主runtime backend和当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
 
 - 只完成负责人选定的一条路径，不同时建设两套方案。
-- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、v2九步依赖、D-178意图及D-179纯内部回执链已明确；外部根/owner日志/Caddy Host-SNI validator、全动作source closure、publisher、runtime backend、精确源码/镜像输入和空库Migration执行包仍待完成。
+- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、v2九步依赖、D-178意图、D-179内部链及D-180外锚纯合同已明确；下一独立切片只补owner日志，Caddy Host-SNI、全动作source closure、publisher、runtime backend、精确源码/镜像输入和空库Migration执行包仍待后续。
 - 现有UAT身份、数据、四个受保护Volume和常驻服务不变。
 - TASK92完成后只允许提交L2a授权申请，不自动build、deploy或Migration。

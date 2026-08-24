@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-isolated-uat-external-anchor-policy/v1",
+  "policy_id": "chenyida-erp-isolated-uat-external-anchors-v1",
+  "execution_authorized": false,
+  "capability_status": {
+    "control_plan_validator": "IMPLEMENTED_PURE",
+    "namespace_root_validator": "IMPLEMENTED_PURE",
+    "credential_metadata_validator": "IMPLEMENTED_PURE_WITHOUT_SECRET_VALUES_OR_DIGESTS",
+    "postgres_container_identity_validator": "IMPLEMENTED_PURE",
+    "database_cluster_identity_validator": "IMPLEMENTED_PURE",
+    "runtime_observation": "NOT_IMPLEMENTED",
+    "publisher": "NOT_IMPLEMENTED",
+    "execution_authorized": false
+  },
+  "validation_output": {
+    "external_anchor_contract_status": "PURE_EXTERNAL_ANCHOR_CONTRACTS_VALID",
+    "source_observation_status": "SOURCE_CALLER_INJECTED_NOT_ATTESTED",
+    "control_plan_status": "CONTROL_PLAN_CONTRACT_CONTINUITY_VALID_SOURCE_NOT_ATTESTED",
+    "authorization_status": "AUTHORIZATION_NOT_ESTABLISHED",
+    "runtime_evidence_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+  },
+  "upstream_bindings": [
+    {
+      "path": "operations/isolated-uat-runtime-contract-policy-v1.json",
+      "sha256": "4b7f6f741ff84c4ae7a4d8ee3d3641e7a9d3dc52b62c2b00d4c9f9c0f98020cc"
+    },
+    {
+      "path": "operations/isolated-uat-runtime-receipt-policy-v1.json",
+      "sha256": "1eee47ed1ed9311529153cc3e7defeb95984e075276af23a453a872c94027aac"
+    },
+    {
+      "path": "operations/runtime-secret-file-policy-v1.json",
+      "sha256": "8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5"
+    }
+  ],
+  "invariants": {
+    "project_pattern": "^chenyida-erp-uat-[a-z0-9][a-z0-9_-]{0,42}$",
+    "root_templates": {
+      "runtime_secret_root": "/etc/{project}/runtime-secrets",
+      "backup_credential_root": "/etc/{project}/operator-credentials",
+      "release_candidate_root": "/var/lib/{project}/release-candidate",
+      "release_identity_root": "/var/lib/{project}/release-identity",
+      "operator_state_root": "/var/lib/{project}/postgresql-runtime-privilege-operator",
+      "one_shot_state_root": "/var/lib/{project}/isolated-uat-one-shot",
+      "backup_root": "/var/backups/{project}"
+    },
+    "protected_roots": [
+      "/etc/chenyida-erp",
+      "/var/lib/chenyida-erp",
+      "/var/backups/chenyida-erp-v2"
+    ],
+    "root_profiles": {
+      "runtime_secret_root": { "uid": 0, "gid": 0, "mode": "0700" },
+      "backup_credential_root": { "uid": 0, "gid": 0, "mode": "0700" },
+      "release_candidate_root": { "uid": 0, "gid": 0, "mode": "0750" },
+      "release_identity_root": { "uid": 0, "gid": 65532, "mode": "0750" },
+      "operator_state_root": { "uid": 0, "gid": 0, "mode": "0700" },
+      "one_shot_state_root": { "uid": 0, "gid": 0, "mode": "0700" },
+      "backup_root": { "uid": 0, "gid": 0, "mode": "0700" }
+    },
+    "credential_profile": [
+      {
+        "credential_id": "ADMIN_DATABASE_PASSWORD",
+        "consumer": "chenyida_erp_admin",
+        "root": "runtime_secret_root",
+        "filename": "admin-database-password",
+        "uid": 0,
+        "gid": 65532,
+        "mode": "0440",
+        "kind": "RUNTIME_SECRET"
+      },
+      {
+        "credential_id": "ADMIN_PASSWORD",
+        "consumer": "admin_setup",
+        "root": "runtime_secret_root",
+        "filename": "admin-password",
+        "uid": 0,
+        "gid": 65532,
+        "mode": "0440",
+        "kind": "RUNTIME_SECRET"
+      },
+      {
+        "credential_id": "BACKUP_CAPTURE_SERVICE",
+        "consumer": "chenyida_erp_backup",
+        "root": "backup_credential_root",
+        "filename": "backup-capture-service.conf",
+        "uid": 0,
+        "gid": 0,
+        "mode": "0400",
+        "kind": "BACKUP_SERVICE_FILE"
+      },
+      {
+        "credential_id": "MIGRATION_DATABASE_PASSWORD",
+        "consumer": "chenyida_erp_owner",
+        "root": "runtime_secret_root",
+        "filename": "migration-database-password",
+        "uid": 0,
+        "gid": 0,
+        "mode": "0440",
+        "kind": "RUNTIME_SECRET"
+      },
+      {
+        "credential_id": "POSTGRES_BOOTSTRAP_PASSWORD",
+        "consumer": "postgres_bootstrap",
+        "root": "runtime_secret_root",
+        "filename": "postgres-bootstrap-password",
+        "uid": 0,
+        "gid": 999,
+        "mode": "0440",
+        "kind": "RUNTIME_SECRET"
+      },
+      {
+        "credential_id": "WEB_DATABASE_PASSWORD",
+        "consumer": "chenyida_erp_web",
+        "root": "runtime_secret_root",
+        "filename": "web-database-password",
+        "uid": 0,
+        "gid": 65532,
+        "mode": "0440",
+        "kind": "RUNTIME_SECRET"
+      },
+      {
+        "credential_id": "WORKER_DATABASE_PASSWORD",
+        "consumer": "chenyida_erp_worker",
+        "root": "runtime_secret_root",
+        "filename": "worker-database-password",
+        "uid": 0,
+        "gid": 65532,
+        "mode": "0440",
+        "kind": "RUNTIME_SECRET"
+      }
+    ],
+    "postgres_image_reference": "postgres@sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394",
+    "postgres_image_config_digest": "sha256:4f736ae292687621d4dbe0d499ffd024a36bd2ee7d8ca6f2ccd4c800f047b394",
+    "database_name": "chenyida_erp"
+  },
+  "source_closure": {
+    "schema_version": 1,
+    "algorithm": "PYTHON_STATIC_RESOURCE_CLOSURE_V1",
+    "roots": [
+      "scripts/isolated-uat-external-anchor-contracts.py"
+    ],
+    "members": [
+      {
+        "path": "operations/isolated-uat-runtime-contract-policy-v1.json",
+        "sha256": "4b7f6f741ff84c4ae7a4d8ee3d3641e7a9d3dc52b62c2b00d4c9f9c0f98020cc"
+      },
+      {
+        "path": "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "sha256": "1eee47ed1ed9311529153cc3e7defeb95984e075276af23a453a872c94027aac"
+      },
+      {
+        "path": "operations/runtime-secret-file-policy-v1.json",
+        "sha256": "8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5"
+      },
+      {
+        "path": "scripts/isolated-uat-external-anchor-contracts.py",
+        "sha256": "fc6e76d4620cbfbb447beb53f5b0b35d1f6df138a028cfb811bffbc51959be61"
+      }
+    ],
+    "declared_absent_capabilities": [
+      "CLOCK",
+      "DATABASE",
+      "DOCKER",
+      "FILESYSTEM_RUNTIME_OBSERVATION",
+      "NETWORK",
+      "PROCESS",
+      "RANDOM",
+      "SECRET_VALUES",
+      "SHELL"
+    ],
+    "validation_scope": "SOURCE_HASH_AND_FIXED_UPSTREAM_RESOURCES_NOT_A_SANDBOX",
+    "source_closure_sha256": "4452221d7243a663c97009f67d03828b8cdb16a695aa9dac3a22f7417a15aff4"
+  },
+  "policy_sha256": "66afa1ee1960d3710a06295e55084b9df25214f90592e29e44737f6bb0689a6b"
+}

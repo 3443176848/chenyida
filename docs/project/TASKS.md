@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-179已在D-177/v2顺序和D-178纯意图之上完成八类回执、五类证据体、46项Migration ledger、时间/重放、角色/ACL、容器/loopback与内部前驱摘要链的纯语义验证，并以binding/plan v3接线。成功只表示从四个未验证业务external digest anchors和一个未验证control plan出发的内部链一致；verification time也由调用方注入且未认证。外部anchor/owner日志/Caddy Host-SNI validator、全动作closure、publisher、runtime backend和当前源码匹配镜像仍缺失。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-180已在D-179内部回执链之上新增外部锚点policy/纯validator，固定核对plan、七类namespace root、七份凭据metadata、PostgreSQL容器和cluster identity，并以binding/plan v4接线。成功只表示调用方注入对象满足固定语义及摘要连续性；source仍为`CALLER_INJECTED_NOT_ATTESTED`，runtime evidence仍为`NOT_ESTABLISHED_BY_PURE_VALIDATION`。owner完成日志、Caddy Host-SNI、全动作closure、外锚与内部链的运行时机械join、publisher、runtime backend和当前源码匹配镜像仍缺失。
+
+2026-08-24外部锚点纯合同事件：项目负责人继续要求“下一步”。新增D-180、`external-anchor-policy/v1`和无filesystem/Docker/数据库/网络/时钟/Secret能力的纯validator；严格核对v4 control plan、七个项目派生root及从`/`起的完整祖先/mount身份、七份只含metadata的普通凭据文件、PostgreSQL容器完整网络/端口/mount/tmpfs集合及cluster system identifier投影。祖先必须root所有且不可被组/其他用户写入；受保护mount source/root、双前导斜杠、`..`组件、跨mount-ID物理别名、FIFO凭据、额外网络/端口/bind和Secret挂载漂移均失败关闭。外部policy、v4 binding、runtime contract/receipt policy、source closure、capability、成功模板和receipt-chain字段均由执行代码固定，调用方重签`publisher=IMPLEMENTED`、`runtime_evidence=ESTABLISHED`或v99 chain均失败关闭。v4精确继承v3九动作/18节点且只增加外锚source；v1—v3字节不变。输出固定为`PURE_EXTERNAL_ANCHOR_CONTRACTS_VALID / SOURCE_CALLER_INJECTED_NOT_ATTESTED / AUTHORIZATION_NOT_ESTABLISHED / NOT_ESTABLISHED_BY_PURE_VALIDATION`，publisher门继续固定拒绝。聚合53/53与Compose双门PASS，两路最终独立只读复核均为P0=0/P1=0；未创建或访问UAT运行资源。TASK92继续`DOING`，下一切片只处理owner完成日志纯合同。
 
 2026-08-24纯回执链事件：项目负责人继续要求“下一步”。新增D-179、独立runtime receipt policy和无运行能力的纯validator，固定八类回执/五类证据体、producer、完整角色属性、46项allowlist/applied ledger、PostgreSQL/非零Git-OCI/唯一容器身份、容器网络/health、规范时间、从链首起算1小时链龄及前驱摘要连续性；控制请求和回执层均拒绝全零Git、Compose与OCI摘要，跨项目拼接、自洽policy/receipt重签和过期重放失败关闭。新增binding v3/18节点目录并升级plan/v3；receipt policy同时钉住v3 body/raw SHA，v1/v2字节不变。计划只输出`NOT_RUN_NO_RECEIPTS`及成功输出合同模板，并在返回前二次读取source state拒绝并发漂移。成功状态明确为`VALIDATED_PURE_INTERNAL_CONTRACT_CHAIN_FROM_UNVERIFIED_EXTERNAL_DIGEST_ANCHORS`，并标明caller-supplied policy roots、caller-injected time和control plan未验证，不建立runtime truth。控制5、合同7、回执16、one-shot 11共39项Unit与Compose双门PASS；publisher/backends仍固定未实现，未创建或访问运行资源。TASK92继续`DOING`。
 
@@ -289,7 +291,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177 v2顺序、D-178纯意图和D-179内部回执链；继续external anchors/publisher/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、低资源规则 | `DOING / PURE INTERNAL RECEIPT CHAIN VALID FROM UNVERIFIED EXTERNAL ANCHORS / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。八回执/五证据体、46项ledger、binding/plan v3及内部predecessor通过；external anchors、owner日志、Caddy Host/SNI、全动作closure、publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177 v2顺序、D-178纯意图、D-179内部回执链和D-180外部锚点纯合同；继续owner日志/publisher/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、低资源规则 | `DOING / PURE EXTERNAL ANCHOR CONTRACTS VALID WITH CALLER-INJECTED SOURCE NOT ATTESTED / PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。binding/plan v4、七root/凭据metadata、PostgreSQL容器/cluster纯合同通过；owner日志、Caddy Host/SNI、全动作closure、外锚与内部链运行时join、publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

@@ -4054,6 +4054,43 @@
 - 拒绝把四个业务外部摘要根、control plan或调用方时钟的格式/相对检查描述为已验证来源，或把合成fixture、loopback leaf observation描述为Host/SNI/容器/数据库实测。
 - 拒绝在缺少精确镜像、publisher、runtime backend和专项授权时创建隔离UAT或复用生产supervisor/runner。
 
+## D-180 隔离UAT外部锚点只建立纯合同连续性，不建立宿主运行事实
+
+- 日期：2026-08-24
+- 状态：`ACCEPTED / PURE EXTERNAL ANCHOR CONTRACTS VALID / SOURCE CALLER-INJECTED NOT ATTESTED / PUBLISHER AND RUNTIME BACKEND NOT IMPLEMENTED / PRODUCTION NO-GO`
+- 发起：项目负责人继续要求“下一步”；Codex按单一小团队UAT、最小仓库切片和失败关闭原则推进D-179之后的第一个外部边界
+- 实施范围：只新增external anchor policy/纯validator、binding v4及静态测试；不观察宿主、不创建资源、不发布回执，也不执行UAT或生产动作
+
+### Context
+
+- D-179已经能验证18节点内部回执语义与前驱摘要链，但四个external digest anchors和control plan仍是未验证入口。没有固定外层语义时，调用方可以用格式正确、相互自洽的root、credential、container或cluster声明喂给内部链。
+- 一个纯函数可以核对注入对象的精确字段、摘要和跨对象连续性，却不能证明目录、文件、容器、网络或PostgreSQL cluster真实存在。把纯合同通过写成运行事实，会绕过后续host observer、publisher和授权边界。
+- 本系统少于20人且只有一个目标UAT namespace；不需要通用证据服务、队列、daemon、多租户控制面或按员工人数扩容。员工数量继续只属于应用账号配置，不进入基础设施合同。
+
+### Decision
+
+1. 新增`external-anchor-policy/v1`和单一纯函数validator，只消费调用方注入JSON及显式source bytes。模块不导入filesystem runtime observer、Docker、数据库、网络、时钟、随机数、进程、shell或Secret能力；source closure明确只是静态hash边界，不是sandbox或运行证明。
+2. Control plan必须精确为plan/v4，并由执行模块常量固定action binding body/status、runtime contract policy与source closure/capability、runtime receipt policy与source closure/capability/success template、receipt validation状态和完整receipt-chain binding。调用方不得通过重签把publisher/backend改为已实现、把runtime evidence改为已建立或把chain替换为任意版本。
+3. Namespace root receipt必须覆盖同一可配置project派生的七个root，并提供从`/`到每个parent的完整ancestor chain。祖先必须为root所有、不可被group/other写、类型为directory且非symlink；root固定uid/gid/mode。每个身份同时携带device/inode、mount ID/point/root/source；路径必须是单前导斜杠、无`..`组件的规范绝对路径，mount root/source不得落入三类生产保护树。物理别名按`device+inode`拒绝，不能靠更换mount ID绕过。七root还必须彼此不重叠。该规则验证调用方提供的metadata合同，不声称模块亲自执行`stat`、`findmnt`或观察mount。
+4. Credential generation receipt只允许七份普通文件metadata：六份runtime Secret和独立backup service。固定consumer/root/filename/uid/gid/mode/nlink/size、`REGULAR_FILE`、非symlink、与所属root一致的mount描述及唯一物理identity；凭据不得与任何namespace root/ancestor物理别名。严格字段集拒绝Secret正文和内容摘要。`all_values_distinct`仅保留为producer assertion，状态必须明确`NOT_REVALIDATED_WITHOUT_SECRET_EXPOSURE`。
+5. PostgreSQL container identity固定project、Compose摘要、非零容器ID、digest-pinned PostgreSQL镜像/config digest、唯一内部backend网络与network mode、`published_ports=[]`、两个项目Volume、只读bootstrap Secret bind、三项精确tmpfs、runtime secret root identity及running/healthy；任何额外network、port、mount或tmpfs漂移都失败关闭。Database cluster identity固定数据库名、container/credential前驱和合法system identifier投影。四个对象时间只验证规范UTC毫秒与单调顺序，不冒充可信宿主时钟。
+6. 成功输出只允许`PURE_EXTERNAL_ANCHOR_CONTRACTS_VALID`、`SOURCE_CALLER_INJECTED_NOT_ATTESTED`、`CONTROL_PLAN_CONTRACT_CONTINUITY_VALID_SOURCE_NOT_ATTESTED`、`AUTHORIZATION_NOT_ESTABLISHED`和`NOT_ESTABLISHED_BY_PURE_VALIDATION`。外锚结果尚未在运行时与D-179内部链机械join；任何运行或L2状态升级前必须由后续受控端口完成同一plan和四anchor等值桥接。
+7. 新增binding v4，但对v3九动作和18节点只允许`EXACT_NO_OVERRIDE`继承；仅在相关步骤增加external policy/validator source及五个外层节点/四个anchor映射。历史v1—v3保持字节不变，v3继续只作为D-179内部链基座。
+8. `require_external_anchor_publisher()`固定失败，且位于旧receipt publisher/runtime backend之前。`deployment_authorized=false`、空运行动作和生产入口禁用不变；本决策不授权目录、Secret、容器、网络、Volume、数据库、角色、Migration、build、deploy、restart、账号或业务写。
+
+### Consequences
+
+- 调用方不能再仅靠自洽重签把外层plan capability、成功模板、root、credential、container或cluster结构升级为可接受合同；畸形source类型、不安全祖先权限、受保护mount、跨mount-ID别名、非普通凭据、跨plan拼接、额外网络/端口/bind、生产Volume名、非法system identifier和非单调时间均以稳定合同码失败关闭。
+- 通过结果仍只是“这些注入对象满足当前执行validator的固定规则”。由于source和观察值不是由本模块认证产生，它不能被写成UAT已创建、目录/Secret已生成、PostgreSQL已启动或运行证据已发布。
+- TASK92继续`DOING`。下一安全切片只补隔离operator owner完成日志纯合同，并把`operator_state_root`身份纳入连续性；之后再分别处理Caddy Host/SNI、全动作source closure、publisher/runtime adapters、精确镜像和L2a申请。
+
+### Rejected alternatives
+
+- 拒绝让调用方提供expected binding/policy/closure/capability/success-template roots，或只检查这些字段是64位摘要后接受自签计划。
+- 拒绝在纯validator中读取Secret值或保存Secret内容摘要来证明“各值不同”；producer assertion与后续受控生成器责任保持分离。
+- 拒绝把v4复制成第二套九步动作目录、修改冻结v3，或把owner日志、Host/SNI、全动作closure、publisher和runtime backend一次塞入同一大切片。
+- 拒绝因本切片静态测试通过而创建同机UAT、连接PostgreSQL、build镜像或申请运行授权。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
