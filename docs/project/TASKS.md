@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理、Compose消费者隔离、D-174请求和D-175默认只读one-shot计划入口已通过；六类namespace root、五个数据库服务角色、凭据映射、`EMPTY → 0046`、精确输入门和九步顺序可机械验证。固定动作执行绑定和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。BuildKit-only清理、Compose消费者隔离、D-174请求、D-175默认只读one-shot计划和D-176固定动作绑定已通过；六类namespace root、五个数据库服务角色、凭据映射、`EMPTY → 0046`、精确输入门、九步顺序和受控方法依赖均可机械验证。专用runtime adapter和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+
+2026-08-24固定动作绑定事件：项目负责人再次要求“下一步”。D-176新增封闭binding目录，为九步逐项固定`handler_id + adapter_method + sources + inputs + outputs`；禁止shell、自由argv和生产runner/supervisor，全部source进入control policy摘要。Migration固定产出release candidate与执行回执，release identity后续消费两者，Web/Worker再消费identity。Binding body SHA-256为`b5b3a7eb…0276`，policy SHA-256为`01e35bd9…b47`；原4项控制合同和更新后7项one-shot Unit均PASS。当前状态仍为`FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED`，未创建或访问任何运行资源。TASK92继续`DOING`等待专用runtime adapter、精确镜像和L2a授权。
 
 2026-08-24 one-shot计划入口事件：项目负责人要求继续下一步。新增专用`isolated-uat-one-shot.py`、D-175、静态runner和5项Unit；同一D-174 request确定性编译九步规范计划，默认只读且不含人员基数字段。当前policy保持`deployment_authorized=false / runtime_actions_authorized=[] / CONTRACT_ONLY_NOT_EXECUTABLE`，`execute`在输出计划或调用执行器前固定拒绝；生产supervisor/runner只在禁用清单中，生产控制面未改。原4项请求合同和新5项测试均PASS；未创建或访问运行资源。TASK92继续`DOING`等待固定动作绑定和精确镜像。
 
@@ -281,7 +283,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求合同和只读计划入口；继续实现固定动作绑定） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、低资源规则 | `DOING / CONSUMER + CONTROL-REQUEST + READ-ONLY PLAN PASS / EXECUTION BINDINGS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。六类root、五角色、空库0046、精确输入门和九步顺序通过；policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划/固定绑定；继续实现专用runtime adapter） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176、低资源规则 | `DOING / CONSUMER + CONTROL-REQUEST + PLAN + FIXED ACTION BINDINGS PASS / RUNTIME ADAPTER + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。六类root、五角色、空库0046、精确输入门、九步顺序和封闭方法绑定通过；policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

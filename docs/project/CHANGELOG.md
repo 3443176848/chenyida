@@ -4,6 +4,17 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: bind isolated UAT one-shot actions`
+
+- 第一性原理：不为不到20人的单一UAT建设通用编排平台；只把D-175九步顺序锁定到可审阅的方法和现有原语，同时诚实保持runtime adapter未实现。人数、岗位约2人和席位不进入合同。
+- Binding：新增`isolated-uat-one-shot-action-bindings-v1.json`，九项动作各有唯一`handler_id + adapter_method + sources + inputs + outputs`；body SHA-256为`b5b3a7eb5a1a782290e2a37c5fed0ae8e09230696ae9da26d80398b0b2070276`，状态固定为`FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED`。
+- 执行边界：目录和验证器禁止shell、自由argv及生产runner/supervisor；Migration同时产出release candidate与执行回执，release identity消费两者，Web/Worker只能在identity后启动。`execute`仍在任何副作用前拒绝。
+- Policy：所有binding source纳入control policy摘要，policy SHA-256更新为`01e35bd96971b45cf596767d7db7c554fd93225ec4c68223e092119c736ecb47`；`deployment_authorized=false / runtime_actions_authorized=[] / CONTRACT_ONLY_NOT_EXECUTABLE`不变。
+- 测试：控制请求4/4、one-shot 7/7、隔离Compose policy/config双PASS；覆盖受policy绑定source、无shell/argv/人员字段、跨步依赖、生产入口禁止和重算摘要后篡改仍失败关闭。Shell语法、`git diff --check`和针对性凭据模式扫描通过。
+- 资源：15:55→16:05静态段available memory `2,449,465,344 → 2,445,877,248`B、Swap保持`179,671,040`B、根盘 `17,836,396,544 → 17,830,621,184`B、Load `0.00/0.08/0.13 → 0.85/0.50/0.26`，PSI/OOM0。Docker保持6容器/75镜像/277 Volume/6网络/0 Cache，四服务restart0/OOM false且Web/PostgreSQL healthy，保护卷完整；测试临时目录和本段新增`.pyc`为0。
+- 代码/数据：无产品代码、Schema、Migration、API、页面、依赖或员工角色变化；没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，未build/deploy/Migration/restart/账号/业务写，也未访问现有UAT或生产数据。
+- 文档：新增D-176并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`，下一缺口为专用runtime adapter的合成隔离测试和当前源码精确Web/Worker镜像；新UAT仍未创建、不能试运行。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: add isolated UAT one-shot plan`
 
 - 第一性原理：不复制生产supervisor、不建设通用多租户编排器；先把单个隔离UAT真正需要的顺序机械固定，同时让无L2a授权的入口保持零副作用。

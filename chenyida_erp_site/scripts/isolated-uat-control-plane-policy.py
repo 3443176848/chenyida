@@ -53,12 +53,21 @@ ROLE_CREDENTIALS = {
 }
 SOURCE_PATHS = [
     ".env.uat-isolated.example",
+    "compose.release.yml",
     "compose.uat-isolated.yml",
+    "compose.yml",
+    "operations/isolated-uat-one-shot-action-bindings-v1.json",
     "operations/postgresql-runtime-privilege-policy-v2.json",
     "operations/runtime-secret-file-policy-v1.json",
     "scripts/isolated-uat-compose-policy.py",
     "scripts/isolated-uat-control-plane-policy.py",
     "scripts/isolated-uat-one-shot.py",
+    "scripts/migrate-postgres.ts",
+    "scripts/postgresql-runtime-privilege-journal.mjs",
+    "scripts/postgresql-runtime-privilege-operator.mjs",
+    "scripts/postgresql-runtime-privilege-reconciler.mjs",
+    "scripts/release-identity-contract.mjs",
+    "scripts/release-migration-authorization.ts",
 ]
 
 

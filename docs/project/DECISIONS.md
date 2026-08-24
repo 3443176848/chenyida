@@ -3911,6 +3911,40 @@
 - 拒绝复制生产supervisor、复用生产runner，或新增通用队列、daemon、多租户调度器。
 - 拒绝把九步技术顺序解释为九个岗位、固定人数、并发或账号数量。
 
+## D-176 隔离UAT九步动作使用封闭绑定目录，宿主执行器继续保持未实现
+
+- 日期：2026-08-24
+- 状态：`ACCEPTED / FIXED ACTION BINDING CONTRACT PASS / RUNTIME ADAPTER NOT IMPLEMENTED / PRODUCTION NO-GO`
+- 发起：项目负责人要求继续下一步；Codex依据D-175把计划动作绑定到最小既有原语
+- 实施范围：只新增动作绑定目录、source binding和静态顺序测试；不实现宿主副作用
+
+### Context
+
+- D-175已把九步顺序机械化，但动作仍只有抽象executor名称；如果后续执行器可以自行选择脚本、命令或输入，就不能证明它执行的是已审阅流程。
+- PostgreSQL权限、Migration和release identity已有可复用模块，但生产runner/supervisor及其授权/root不能用于新UAT。目录、凭据和Compose生命周期仍需要独立UAT宿主适配方法。
+- 当前仍无精确HEAD镜像或L2a授权，因此本阶段只能冻结绑定，不得创建“半执行”的目录、Secret或数据库。
+
+### Decision
+
+1. 新增`chenyida-erp-isolated-uat-one-shot-action-bindings/v1`，固定九项`handler_id + adapter_method + sources + inputs + outputs`；步骤顺序、effect和跨步凭证依赖均失败关闭。
+2. 绑定目录禁止shell、自由argv和生产入口。`release-supervisor-launcher.py`与`postgresql-runtime-privilege-runner.mjs`不得作为source或handler；当前CLI仍在任何动作前拒绝`execute`。
+3. Compose动作只绑定基础、release和isolated三份Compose；PostgreSQL权限动作只绑定既有policy、operator、reconciler和append-only journal原语；Migration绑定现有engine/authorization模块；release identity绑定现有原子身份合同。
+4. Migration动作必须从`EMPTY`精确到绑定head，并同时产出`release_candidate_receipt`和`migration_execution_receipt`；release identity随后消费两者。不得绕过Migration回执发布identity，也不得在identity通过前启动Web/Worker。
+5. 所有绑定source都进入control policy摘要。Binding body SHA-256为`b5b3a7eb5a1a782290e2a37c5fed0ae8e09230696ae9da26d80398b0b2070276`；当前policy SHA-256更新为`01e35bd96971b45cf596767d7db7c554fd93225ec4c68223e092119c736ecb47`。
+6. Binding状态固定为`FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED`。本决定不实现host root、凭据、Compose、PostgreSQL或Migration执行器，不修改`deployment_authorized=false`和空运行动作列表。
+
+### Consequences
+
+- 九步计划不再允许未来执行器自由选择实现来源；计划输出现在绑定binding ID/SHA/status和每步精确方法。
+- TASK92继续`DOING`。当前剩余缺口为专用runtime adapter实现及其合成隔离测试、精确当前Web/Worker镜像和L2a授权；新UAT仍未创建、不能试运行。
+- 人员数量仍不进入binding、输入、输出、动作数、角色、容量或验收；九步只是技术依赖。
+
+### Rejected alternatives
+
+- 拒绝输出可复制执行的shell/argv清单、允许执行器选择任意脚本，或使用环境变量指定handler。
+- 拒绝直接调用生产runner/supervisor，也拒绝复制完整生产控制面。
+- 拒绝把source binding和顺序静态PASS描述为runtime adapter、Migration执行或UAT健康。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

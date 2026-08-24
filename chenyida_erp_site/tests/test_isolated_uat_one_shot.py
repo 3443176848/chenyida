@@ -7,6 +7,7 @@ import copy
 import importlib.util
 import io
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -73,6 +74,7 @@ class IsolatedUatOneShotTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.policy = POLICY.read_policy(POLICY_FILE)
         cls.request = request(cls.policy)
+        cls.bindings = ONE_SHOT.read_bindings()
 
     def test_plan_is_deterministic_exact_and_non_executing(self) -> None:
         first = ONE_SHOT.build_plan(self.request, self.policy)
@@ -81,6 +83,9 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertEqual(ONE_SHOT.validate_plan(first, self.request, self.policy), first)
         self.assertEqual(first["mode"], "READ_ONLY_PLAN")
         self.assertFalse(first["execution_authorized"])
+        self.assertEqual(first["action_binding_id"], self.bindings["binding_id"])
+        self.assertEqual(first["action_binding_sha256"], self.bindings["binding_sha256"])
+        self.assertEqual(first["action_binding_status"], "FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED")
         self.assertEqual([item["ordinal"] for item in first["actions"]], list(range(1, 10)))
         self.assertEqual(first["roots"], self.request["roots"])
         self.assertNotIn("staff", ONE_SHOT.canonical_json(first).lower())
@@ -125,10 +130,40 @@ class IsolatedUatOneShotTest(unittest.TestCase):
     def test_production_entrypoints_are_forbidden_not_executors(self) -> None:
         plan = ONE_SHOT.build_plan(self.request, self.policy)
         self.assertEqual(plan["forbidden_production_entrypoints"], ONE_SHOT.FORBIDDEN_PRODUCTION_ENTRYPOINTS)
-        executors = {item["executor_contract"] for item in plan["actions"]}
-        self.assertTrue(executors.isdisjoint(ONE_SHOT.FORBIDDEN_PRODUCTION_ENTRYPOINTS))
+        bound_sources = {source for item in self.bindings["actions"] for source in item["sources"]}
+        self.assertTrue(bound_sources.isdisjoint(ONE_SHOT.FORBIDDEN_PRODUCTION_ENTRYPOINTS))
         self.assertNotIn("/etc/chenyida-erp", plan["roots"].values())
         self.assertNotIn("/var/lib/chenyida-erp", plan["roots"].values())
+
+    def test_action_bindings_are_closed_source_bound_and_not_commands(self) -> None:
+        self.assertEqual(self.bindings["execution_boundary"], {
+            "evidence_scope": "ISOLATED_UAT_ONLY",
+            "shell_allowed": False,
+            "free_form_argv_allowed": False,
+            "production_entrypoints_allowed": False,
+        })
+        policy_sources = {item["path"] for item in self.policy["source_binding"]}
+        bound_sources = {source for item in self.bindings["actions"] for source in item["sources"]}
+        self.assertTrue(bound_sources.issubset(policy_sources))
+        self.assertEqual(
+            [(item["ordinal"], item["action"], item["handler_id"], item["adapter_method"]) for item in self.bindings["actions"]],
+            [(item["ordinal"], item["action"], item["handler_id"], item["adapter_method"]) for item in ONE_SHOT.build_plan(self.request, self.policy)["actions"]],
+        )
+        serialized = ONE_SHOT.canonical_json(self.bindings).lower()
+        self.assertNotIn('"argv"', serialized)
+        self.assertNotIn('"command"', serialized)
+        self.assertNotIn("staff", serialized)
+
+    def test_recomputed_tampered_binding_is_rejected(self) -> None:
+        tampered = copy.deepcopy(self.bindings)
+        tampered["actions"][3]["adapter_method"] = "start_all_services"
+        body = {key: value for key, value in tampered.items() if key != "binding_sha256"}
+        tampered["binding_sha256"] = POLICY.canonical_sha256(body)
+        with tempfile.TemporaryDirectory(prefix="cyd-uat-action-binding-test.") as directory:
+            path = Path(directory) / "bindings.json"
+            path.write_text(ONE_SHOT.canonical_json(tampered), encoding="utf-8")
+            with self.assertRaisesRegex(ONE_SHOT.ContractError, "ISOLATED_UAT_ACTION_BINDING_SHA256_INVALID"):
+                ONE_SHOT.read_bindings(path)
 
 
 if __name__ == "__main__":

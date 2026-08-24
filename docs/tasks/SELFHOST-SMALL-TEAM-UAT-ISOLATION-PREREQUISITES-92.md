@@ -1,6 +1,6 @@
 # SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 新隔离UAT前置边界
 
-> 状态：`DOING / SAME-HOST B SELECTED / CONSUMER + CONTROL-REQUEST + READ-ONLY ONE-SHOT PLAN PASS / EXECUTION BINDINGS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
+> 状态：`DOING / CONSUMER + REQUEST + PLAN + FIXED ACTION BINDINGS PASS / RUNTIME ADAPTER + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
 > 日期：2026-08-24（Asia/Shanghai）
 > 依赖：TASK91、D-172、低资源服务器保护规则
 > 责任：项目负责人已选择当前主机同机隔离并接受同一故障域；Codex只执行仓库内静态前置，运行资源仍逐层授权
@@ -19,6 +19,7 @@
 - 2026-08-24，项目负责人随后明确选择`B`：当前主机同机隔离，并授权仓库内独立host-root/Compose override合同及静态测试。该授权不创建目录、Secret、容器、网络、Volume、数据库，不build、deploy、Migration、restart、创建账号或写业务数据。
 - 同机选择明确接受与现有UAT处于同一宿主故障域；隔离目标是防止项目名、网络、Volume、端口、Secret和发布文件相互碰撞，不伪装成异机灾备。
 - 2026-08-24，项目负责人继续要求“进行下一步”。本段仅把D-174请求编译为默认只读的确定性one-shot计划并建立执行拒绝门；不把该指令扩张为L2a，不实现或调用目录、Secret、Docker、数据库、Migration、发布或部署动作。
+- 2026-08-24，项目负责人再次要求“下一步”。本段只把九步计划绑定到封闭handler/method/source/input/output目录并做静态顺序测试；仍不实现或调用宿主runtime adapter。
 
 ### A. 独立UAT主机（推荐）
 
@@ -38,7 +39,7 @@
 
 - 当前HEAD没有匹配Web/Worker镜像；唯一alpha.47镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`。
 - `compose.uat-isolated.yml`已关闭容器消费者侧固定root：独立项目名、Secret、release candidate/identity、命名Volume、网络和loopback端口均有失败关闭静态合同。生产Compose未参数化、未改变。
-- D-174已为release producer和PostgreSQL角色operator冻结独立namespace、输入、角色/凭据映射和合成重建边界；D-175又把九步顺序固化为默认只读计划并在当前policy下拒绝`execute`。合同仍是`CONTRACT_ONLY_NOT_EXECUTABLE`，尚不能生成目录、发布文件、角色或凭据。
+- D-174已冻结namespace与输入，D-175固化九步顺序，D-176又冻结每步handler、方法、source及输入输出依赖。合同仍是`CONTRACT_ONLY_NOT_EXECUTABLE`，宿主runtime adapter尚未实现，不能生成目录、发布文件、角色或凭据。
 - TASK92已把根盘可用恢复到约16.68 GiB、比10 GiB硬线高约6.68 GiB；磁盘停止线阻断已解除，但任何后续build仍须重新执行新鲜资源门并串行控制上界。
 - L2a、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权。
 
@@ -78,7 +79,7 @@
 
 ## 6. 同机UAT控制请求合同结果
 
-- 新增`operations/isolated-uat-control-plane-policy-v1.json`和严格Python验证器/runner；D-175把one-shot入口加入source binding后，Policy SHA-256更新为`bc507050de94470f722a1d11cfc06370ee6f8e379d446a89e2c17405d404ecab`。`deployment_authorized=false`且`runtime_actions_authorized=[]`保持不变。
+- 新增`operations/isolated-uat-control-plane-policy-v1.json`和严格Python验证器/runner；D-176把binding目录及全部被引用原语加入source binding后，Policy SHA-256更新为`01e35bd96971b45cf596767d7db7c554fd93225ec4c68223e092119c736ecb47`。`deployment_authorized=false`且`runtime_actions_authorized=[]`保持不变。
 - 六类root由同一个可配置项目名派生：runtime Secret、operator credential、release candidate、release identity、operator state和synthetic backup；必须彼此不重叠并避开三类生产受保护root。共享全局lock只允许串行协调，不承载任何环境数据。
 - release producer和PostgreSQL operator均只允许后续专用`DEDICATED_ISOLATED_UAT_ONE_SHOT_ADAPTER`入口。生产`release-supervisor-launcher.py`和`postgresql-runtime-privilege-runner.mjs`在该UAT请求中明确禁止；生产政策和默认行为未修改。
 - 数据库服务角色固定为现有五个技术登录角色，六份runtime Secret加独立backup capture service提供凭据；这些是服务边界，不是员工席位。工程、计划、市场等暂按2人仅属于后续实名账号配置，任何`staff_count`类字段都被请求schema拒绝。
@@ -97,11 +98,22 @@
 - 本段没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，没有build、deploy、Migration、restart、账号或业务写，也没有访问现有UAT/生产数据面。
 - 10:02 CST起点MemAvailable `2,432,094,208`B、Swap used `179,748,864`B、根盘available `17,864,470,528`B、Load`0.07/0.21/0.20`；10:09收口分别为`2,449,072,128`B、`179,748,864`B、`17,874,239,488`B和`0.29/0.26/0.21`。Memory PSI和kernel `oom_kill=0`；Docker保持6容器/75镜像/277 Volume/0 Build Cache，四服务运行、restart0/OOM false且Web/PostgreSQL healthy，四个受保护Volume存在；Compose静态临时目录和任务`.pyc`残留均为0。
 
-## 8. 当前停止线与完成标准
+## 8. 固定动作绑定合同结果
 
-磁盘、Compose消费者隔离、producer/operator请求边界和默认只读计划入口已经完成，但TASK92继续`DOING`。固定动作执行绑定仍未实现，当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
+- 新增`isolated-uat-one-shot-action-bindings-v1.json`，body SHA-256为`b5b3a7eb5a1a782290e2a37c5fed0ae8e09230696ae9da26d80398b0b2070276`；状态明确为`FIXED_BINDINGS_RUNTIME_ADAPTER_NOT_IMPLEMENTED`。
+- 九步各有唯一`handler_id`和`adapter_method`，并声明受控sources、inputs和outputs。验证器机械检查先后依赖、输出不复用、source全部进入当前policy摘要且生产入口不在绑定中。
+- Binding禁止shell和自由argv。Compose只绑定三份隔离渲染来源；PostgreSQL只复用policy/operator/reconciler/journal原语；Migration只绑定现有engine/authorization模块；release identity只绑定原子身份合同。
+- Migration步骤显式同时产出release candidate和Migration执行回执，identity随后消费，Web/Worker再消费identity；不能跳过中间凭证或提前启动应用。
+- one-shot计划输出新增binding ID/SHA/status以及每步固定handler/method。当前`execute`拒绝行为不变，binding静态PASS不构成runtime adapter。
+- 控制请求4项Unit与one-shot 7项Unit全部通过；新增覆盖source全部受policy绑定、无shell/argv/人员字段、重算摘要后的tampered binding仍被拒绝。隔离Compose回归输出`ISOLATED_UAT_COMPOSE_POLICY_PASS`和`ISOLATED_UAT_COMPOSE_CONFIG_TEST_PASS`，两个runner的Shell语法及`git diff --check`通过。
+- 本段仍没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，没有build、deploy、Migration、restart、账号或业务写，也没有访问现有UAT/生产数据面。
+- 15:55→16:05 CST静态段MemAvailable `2,449,465,344 → 2,445,877,248`B，Swap used保持`179,671,040`B，根盘available `17,836,396,544 → 17,830,621,184`B，Load `0.00/0.08/0.13 → 0.85/0.50/0.26`，Memory PSI和kernel `oom_kill`为0。Docker保持6容器/75镜像/277 Volume/6网络/0 Build Cache；四服务restart0/OOM false，Web/PostgreSQL healthy，四个受保护Volume存在。测试临时目录为0、本段新增`.pyc`为0；历史`__pycache__`未修改或清理。
+
+## 9. 当前停止线与完成标准
+
+磁盘、Compose消费者隔离、producer/operator请求、默认只读计划和固定动作绑定目录已经完成，但TASK92继续`DOING`。宿主runtime adapter仍未实现，当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
 
 - 只完成负责人选定的一条路径，不同时建设两套方案。
-- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、九步顺序及失败清理原则已明确；可执行动作绑定、精确源码/镜像输入和空库Migration执行包仍待完成。
+- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、九步顺序、固定方法及失败清理原则已明确；runtime adapter、精确源码/镜像输入和空库Migration执行包仍待完成。
 - 现有UAT身份、数据、四个受保护Volume和常驻服务不变。
 - TASK92完成后只允许提交L2a授权申请，不自动build、deploy或Migration。

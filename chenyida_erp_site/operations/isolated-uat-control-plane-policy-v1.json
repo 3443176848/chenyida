@@ -82,8 +82,20 @@
       "sha256": "1a8ba9bc304ae72c51dd558f5caaa940fa7b928e367b5d23e7c750a3c86b1c3f"
     },
     {
+      "path": "compose.release.yml",
+      "sha256": "ca8aefc35ed30f7d4c2af9424b3cdf5606b7b2166ef0648fbf545be52ed18661"
+    },
+    {
       "path": "compose.uat-isolated.yml",
       "sha256": "0ae2186d6c554b56c460972d25e16ea40431eef3c7227d9607fb39fe63a89ff8"
+    },
+    {
+      "path": "compose.yml",
+      "sha256": "2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa"
+    },
+    {
+      "path": "operations/isolated-uat-one-shot-action-bindings-v1.json",
+      "sha256": "3244d550ae61bffa42fe1fa1c5c4c8bf0b610b60e1e96e8bac9a9c55ca177b3a"
     },
     {
       "path": "operations/postgresql-runtime-privilege-policy-v2.json",
@@ -99,12 +111,36 @@
     },
     {
       "path": "scripts/isolated-uat-control-plane-policy.py",
-      "sha256": "c9cb000ab84ca3ce79c364cbbbc478a63c516400d9a4b04bb47c5fa84205eafd"
+      "sha256": "dfd1dfd17eb355d934f15ea26152abd7a80ae6fac8a56943b660d9cf553ae227"
     },
     {
       "path": "scripts/isolated-uat-one-shot.py",
-      "sha256": "f093a624a97aacd6af55b669387365ed51a98583633c5e0599e48ff5c6498cc4"
+      "sha256": "8085d060df3f60a4063d1192d119bc32095fc25bb78475069ba693a88dcff18f"
+    },
+    {
+      "path": "scripts/migrate-postgres.ts",
+      "sha256": "46a4aa004307c5b9f26a0b30fd0a3ac3581489eb1f3f88a3bfb5fa614b4d9642"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-journal.mjs",
+      "sha256": "16d8a311181874f4e6ed49c2251581df0777f038f7d3b10e7a4e7a88f6ef1bfc"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-operator.mjs",
+      "sha256": "13a896aee3c0c36d6c120eb2d9c46b2e514fc9c15f8e7a2becad06e3b84d0dc5"
+    },
+    {
+      "path": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+      "sha256": "22ddda1cf7f77899cbb58f2e6e5ac75f81ea7629d8a4abbf05b07021efc0a6b9"
+    },
+    {
+      "path": "scripts/release-identity-contract.mjs",
+      "sha256": "a537d7fc0ed9a7da410191d99b128cfa60b32af22fa4cb8ed9ff29e39d999142"
+    },
+    {
+      "path": "scripts/release-migration-authorization.ts",
+      "sha256": "ee700cb7e1ce438f06114c54d8d4d17be9c630003307df7140932d86bce54f4e"
     }
   ],
-  "policy_sha256": "bc507050de94470f722a1d11cfc06370ee6f8e379d446a89e2c17405d404ecab"
+  "policy_sha256": "01e35bd96971b45cf596767d7db7c554fd93225ec4c68223e092119c736ecb47"
 }
