@@ -18,11 +18,13 @@ from typing import Any, BinaryIO, TextIO
 SITE_ROOT = Path(__file__).resolve().parent.parent
 POLICY_VALIDATOR_PATH = SITE_ROOT / "scripts/isolated-uat-control-plane-policy.py"
 BINDINGS_PATH = SITE_ROOT / "operations/isolated-uat-one-shot-action-bindings-v2.json"
-PLAN_CONTRACT = "chenyida-erp-isolated-uat-one-shot-plan/v1"
+RUNTIME_CONTRACTS_PATH = SITE_ROOT / "scripts/isolated-uat-runtime-contracts.py"
+RUNTIME_CONTRACT_POLICY_PATH = SITE_ROOT / "operations/isolated-uat-runtime-contract-policy-v1.json"
+PLAN_CONTRACT = "chenyida-erp-isolated-uat-one-shot-plan/v2"
 BINDINGS_CONTRACT = "chenyida-erp-isolated-uat-one-shot-action-bindings/v2"
 BINDING_IMPLEMENTATION_STATUS = "FIXED_BINDINGS_DEPENDENCY_ORDER_CORRECTED_RUNTIME_PATH_NOT_IMPLEMENTED"
 EXPECTED_BINDING_SHA256 = "6f28881beb767f25e469b60f6ef9ae15e62d703659619ce3e7c8aa63e76d463a"
-ENTRYPOINT_ID = "chenyida-erp-isolated-uat-one-shot-v1"
+ENTRYPOINT_ID = "chenyida-erp-isolated-uat-one-shot-v2"
 PLAN_MODE = "READ_ONLY_PLAN"
 FORBIDDEN_PRODUCTION_ENTRYPOINTS = [
     "scripts/postgresql-runtime-privilege-runner.mjs",
@@ -48,6 +50,21 @@ def load_policy_validator() -> Any:
 
 POLICY = load_policy_validator()
 ContractError = POLICY.ContractError
+
+
+def load_runtime_contracts() -> Any:
+    specification = importlib.util.spec_from_file_location(
+        "isolated_uat_runtime_contracts",
+        RUNTIME_CONTRACTS_PATH,
+    )
+    if specification is None or specification.loader is None:
+        raise RuntimeError("isolated UAT runtime contracts cannot be loaded")
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+RUNTIME_CONTRACTS = load_runtime_contracts()
 
 
 def fail(code: str) -> None:
@@ -120,6 +137,23 @@ def read_bindings(path: Path = BINDINGS_PATH) -> dict[str, Any]:
     return value
 
 
+def read_runtime_contract_policy(path: Path = RUNTIME_CONTRACT_POLICY_PATH) -> dict[str, Any]:
+    try:
+        value = POLICY.parse_json(
+            path.read_bytes(),
+            "ISOLATED_UAT_RUNTIME_CONTRACT_JSON_INVALID",
+        )
+        sources = {
+            "scripts/isolated-uat-runtime-contracts.py": RUNTIME_CONTRACTS_PATH.read_bytes(),
+        }
+    except OSError:
+        fail("ISOLATED_UAT_RUNTIME_CONTRACT_JSON_INVALID")
+    try:
+        return RUNTIME_CONTRACTS.validate_policy(value, sources)
+    except RUNTIME_CONTRACTS.ContractError as error:
+        fail(str(error))
+
+
 PLANNED_ACTIONS = [
     ("VERIFY_EXACT_INPUTS", "READ_ONLY"),
     ("PREPARE_PRIVATE_NAMESPACE_ROOTS", "MUTATING"),
@@ -137,9 +171,14 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
     policy = POLICY.validate_policy(policy)
     request = POLICY.validate_request(request, policy)
     bindings = read_bindings()
+    runtime_contract_policy = read_runtime_contract_policy()
     policy_sources = {item["path"] for item in policy["source_binding"]}
     referenced_sources = {source for action in bindings["actions"] for source in action["sources"]}
-    if not referenced_sources.issubset(policy_sources):
+    runtime_contract_sources = {
+        "operations/isolated-uat-runtime-contract-policy-v1.json",
+        "scripts/isolated-uat-runtime-contracts.py",
+    }
+    if not (referenced_sources | runtime_contract_sources).issubset(policy_sources):
         fail("ISOLATED_UAT_ACTION_BINDING_SOURCE_UNBOUND")
     actions = [
         {
@@ -152,7 +191,7 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         for binding in bindings["actions"]
     ]
     body = {
-        "schema_version": 1,
+        "schema_version": 2,
         "contract": PLAN_CONTRACT,
         "entrypoint_id": ENTRYPOINT_ID,
         "mode": PLAN_MODE,
@@ -160,6 +199,11 @@ def build_plan(request: dict[str, Any], policy: dict[str, Any]) -> dict[str, Any
         "action_binding_id": bindings["binding_id"],
         "action_binding_sha256": bindings["binding_sha256"],
         "action_binding_status": bindings["implementation_status"],
+        "runtime_contract_policy_sha256": runtime_contract_policy["policy_sha256"],
+        "runtime_contract_source_closure_sha256": runtime_contract_policy["source_closure"][
+            "source_closure_sha256"
+        ],
+        "runtime_contract_capability_status": runtime_contract_policy["capability_status"],
         "request_id": request["request_id"],
         "policy_sha256": policy["policy_sha256"],
         "project": request["project"],
@@ -197,7 +241,13 @@ def assert_execution_allowed(policy: dict[str, Any]) -> None:
             or policy["release"]["implementation_status"] != "EXECUTABLE" \
             or policy["database"]["implementation_status"] != "EXECUTABLE":
         fail("ISOLATED_UAT_ONE_SHOT_EXECUTION_NOT_AUTHORIZED")
-    fail("ISOLATED_UAT_ONE_SHOT_EXECUTOR_NOT_IMPLEMENTED")
+
+
+def require_runtime_backend() -> None:
+    try:
+        RUNTIME_CONTRACTS.require_runtime_backend()
+    except RUNTIME_CONTRACTS.ContractError as error:
+        fail(str(error))
 
 
 def read_request(stream: BinaryIO) -> dict[str, Any]:
@@ -227,6 +277,7 @@ def main(
         plan = build_plan(request, policy)
         if arguments.command == "execute":
             assert_execution_allowed(policy)
+            require_runtime_backend()
         output.write(canonical_json(plan))
     except ContractError as error:
         errors.write(f"{error}\n")

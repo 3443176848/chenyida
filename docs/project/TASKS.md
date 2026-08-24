@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-177只读审计已证明D-176 v1顺序不可执行并以保留历史v1、新增v2的方式纠正：七类namespace root、五个数据库技术角色、凭据映射、`EMPTY → 0046`、精确输入门和九步依赖可机械验证，完整权限只在Migration后收敛，生产release identity不再冒充隔离UAT证据。专用database-bootstrap/Migration/evidence合同、传递source闭包、runtime adapter和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-177/v2已纠正空库ACL和预造生产identity顺序；D-178新增单文件纯合同policy/module，把database-bootstrap、Migration和isolated evidence收敛为`STRUCTURE_VALID / NOT_EXECUTED / predecessor NOT_VALIDATED`意图及`INCOMPLETE_DESCRIPTOR_ONLY`回执字段目录。typed fake ports只证明三段顺序、输入隔离和首错停止；真实receipt validator/publisher、前驱摘要链、v2全动作传递closure、runtime backend和当前源码匹配镜像仍缺失，不自动取得build、Migration、部署、账号或业务写授权。
+
+2026-08-24纯合同结构事件：项目负责人继续要求“下一步”。新增D-178、runtime contract policy和单一纯函数模块；固定五角色独立凭据映射、标准UAT数据库marker/system identifier、alpha.47、`EMPTY → 0046`/46项allowlist、loopback和GID`65532`。单文件source closure只证明固定hash/import allowlist且明示`NOT_A_SANDBOX`，binding v2字节不变并继续仅`DIRECT_CONTRACT_REFERENCES_ONLY`。one-shot因新增字段升级为plan/v2；合成端口覆盖自洽篡改、字段目录篡改、非法source扩张及逐步失败，所有fixture均`NOT_EXECUTED/NOT_PUBLISHED/NOT_AVAILABLE`；`execute`在唯一backend seam前拒绝。Runtime policy/closure/control policy SHA分别为`5f24335a…6586`/`978741a0…c939`/`dd442418…6150`；新7项、one-shot 10项、控制4项和Compose双门通过。TASK92继续`DOING`。
 
 2026-08-24绑定勘误事件：项目负责人再次要求“下一步”。在实现adapter前的两项并行只读审计确认D-176 v1有P0顺序冲突，故没有在错误合同上补executor。v1文件/摘要保持不变；新增D-177和binding v2，顺序改为数据库身份/登录角色初始化→Migration→最终权限收敛→启动Caddy/Web/Worker→隔离UAT专用postdeploy evidence。生产v3 identity/runtime policy/supervisor不复用；第七类one-shot state root、Web主GID`65532`和strict readiness version/git输入补齐。v2 body SHA为`6f28881b…d463a`，policy SHA为`2197a633…6271`；控制4/4、one-shot 9/9及Compose双PASS。`execute`仍在任何副作用前拒绝，TASK92继续`DOING`。
 
@@ -285,7 +287,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划和D-177 v2依赖修正；继续专用runtime path合同） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、低资源规则 | `DOING / V2 DEPENDENCY BINDINGS PASS / RUNTIME PATH + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。七类root、五角色、空库0046、精确输入门和v2九步依赖通过；只绑定直接source，专用回执/source闭包/adapter未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177 v2顺序和D-178纯意图结构；继续真实回执链/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、低资源规则 | `DOING / PURE INTENTS STRUCTURE VALID / RECEIPT VALIDATORS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。七类root、五角色、空库0046、v2顺序及三族意图/字段目录通过；predecessor仍未验证，v2仍只绑定直接source，真实validator/publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

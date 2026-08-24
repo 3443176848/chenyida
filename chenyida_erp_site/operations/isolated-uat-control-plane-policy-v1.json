@@ -102,6 +102,10 @@
       "sha256": "9cc4e3c12793785186fcf74560919376cfa5cc82ef5f344b11fcb5b4501e5232"
     },
     {
+      "path": "operations/isolated-uat-runtime-contract-policy-v1.json",
+      "sha256": "4b7f6f741ff84c4ae7a4d8ee3d3641e7a9d3dc52b62c2b00d4c9f9c0f98020cc"
+    },
+    {
       "path": "operations/postgresql-runtime-privilege-policy-v2.json",
       "sha256": "2aba8ed96202117761ba88212fb84e3d475afbf19e5447fabe2f658bbe9d8a7c"
     },
@@ -115,11 +119,15 @@
     },
     {
       "path": "scripts/isolated-uat-control-plane-policy.py",
-      "sha256": "ab38d7b85d2826ff4c7c0813a244795a1bf377a24169c165ff6db44259ff26e0"
+      "sha256": "fd8583fb962a584858c79d3624bcda0fb53f45f664e5433074226a161484d570"
     },
     {
       "path": "scripts/isolated-uat-one-shot.py",
-      "sha256": "5e8146aafd64f28aedd0c46c4cc468687f1df1e3e501cdd4bdedbc6f59fab3b6"
+      "sha256": "d2f047d7f7ff266495d0d7beb77a746d8a26baab333a0ddddea6f35a99b216a3"
+    },
+    {
+      "path": "scripts/isolated-uat-runtime-contracts.py",
+      "sha256": "c293e1872e6700dfb4b129450f666fba86612dc16678a613cc7b050fb8ebdc6a"
     },
     {
       "path": "scripts/postgresql-runtime-privilege-journal.mjs",
@@ -134,5 +142,5 @@
       "sha256": "22ddda1cf7f77899cbb58f2e6e5ac75f81ea7629d8a4abbf05b07021efc0a6b9"
     }
   ],
-  "policy_sha256": "2197a633db282423f40ba0ac22e94dc27206bca6ed20f8eb332165811eac6271"
+  "policy_sha256": "dd442418af220070b133063ea555dde0a1e1b4cfcc266ad1aa1706829b5c6150"
 }

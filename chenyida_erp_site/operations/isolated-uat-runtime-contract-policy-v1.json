@@ -1,0 +1,284 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-isolated-uat-runtime-contract-policy/v1",
+  "policy_id": "chenyida-erp-isolated-uat-runtime-contracts-v1",
+  "execution_authorized": false,
+  "capability_status": {
+    "intent_builders": "IMPLEMENTED_PURE",
+    "receipt_shape_descriptors": "IMPLEMENTED_PURE",
+    "receipt_field_semantics": "INCOMPLETE_DESCRIPTOR_ONLY",
+    "receipt_validators": "NOT_IMPLEMENTED",
+    "receipt_publishers": "NOT_IMPLEMENTED",
+    "runtime_backends": "NOT_IMPLEMENTED",
+    "execution_authorized": false
+  },
+  "output_status": {
+    "contract_validation_status": "STRUCTURE_VALID",
+    "execution_status": "NOT_EXECUTED",
+    "publication_status": "NOT_PUBLISHED",
+    "runtime_evidence_status": "NOT_AVAILABLE",
+    "evidence_scope": "ISOLATED_UAT_CONTRACT_ONLY",
+    "predecessor_chain_status": "NOT_VALIDATED"
+  },
+  "synthetic_fixture_scope": "SYNTHETIC_CONTRACT_FIXTURE_ONLY",
+  "invariants": {
+    "database_current_head": "EMPTY",
+    "database_name": "chenyida_erp",
+    "database_owner": "chenyida_erp_owner",
+    "deployment_class": "UAT",
+    "identity_semantics": "ISOLATED_UAT_ONLY",
+    "loopback_host": "127.0.0.1",
+    "migration_allowlist_sha256": "8bb2b2d662df03e397d49c4ed5d11f1af1a9406ecbaff37aee8fc0d2d7388eed",
+    "migration_count": 46,
+    "migration_target_head": "0046_runtime_lock_privilege_boundary.sql",
+    "package_version": "0.1.0-alpha.47",
+    "production_release_identity_compatible": false,
+    "release_identity_reader_gid": 65532,
+    "role_credentials": {
+      "chenyida_erp_admin": "admin-database-password",
+      "chenyida_erp_backup": "backup-capture-service.conf",
+      "chenyida_erp_owner": "migration-database-password",
+      "chenyida_erp_web": "web-database-password",
+      "chenyida_erp_worker": "worker-database-password"
+    },
+    "technical_login_roles": [
+      "chenyida_erp_admin",
+      "chenyida_erp_backup",
+      "chenyida_erp_owner",
+      "chenyida_erp_web",
+      "chenyida_erp_worker"
+    ]
+  },
+  "families": {
+    "DATABASE_BOOTSTRAP": {
+      "intent_contract": "chenyida-erp-isolated-uat-database-bootstrap-intent/v1",
+      "input_fields": [
+        "credential_generation_receipt_sha256",
+        "database_cluster_identity",
+        "database_target_expectation",
+        "login_role_expectations",
+        "operation_id",
+        "plan_sha256",
+        "project",
+        "request_id",
+        "runtime_contract_policy_sha256",
+        "source_closure_sha256"
+      ],
+      "receipt_shapes": [
+        {
+          "output": "database_target_identity",
+          "contract": "chenyida-erp-isolated-uat-database-target-identity/v1",
+          "required_fields": [
+            "schema_version",
+            "contract",
+            "bootstrap_intent_sha256",
+            "producer",
+            "database_name",
+            "system_identifier",
+            "database_oid",
+            "marker",
+            "owner",
+            "identity_sha256"
+          ]
+        },
+        {
+          "output": "database_bootstrap_receipt",
+          "contract": "chenyida-erp-isolated-uat-database-bootstrap-receipt/v1",
+          "required_fields": [
+            "schema_version",
+            "contract",
+            "bootstrap_intent_sha256",
+            "producer",
+            "database_target_identity_sha256",
+            "observed_login_roles",
+            "observed_login_roles_sha256",
+            "observed_head",
+            "schema_acl_status",
+            "observation_bundle_sha256",
+            "observed_at",
+            "completed_at",
+            "receipt_sha256"
+          ]
+        }
+      ]
+    },
+    "MIGRATION": {
+      "intent_contract": "chenyida-erp-isolated-uat-migration-intent/v1",
+      "input_fields": [
+        "database_bootstrap_receipt_sha256",
+        "database_target_identity_sha256",
+        "migration",
+        "operation_id",
+        "plan_sha256",
+        "project",
+        "release_candidate_root_identity_sha256",
+        "release_source",
+        "request_id",
+        "runtime_contract_policy_sha256",
+        "source_closure_sha256"
+      ],
+      "receipt_shapes": [
+        {
+          "output": "release_candidate_receipt",
+          "contract": "chenyida-erp-isolated-uat-release-candidate-receipt/v1",
+          "required_fields": [
+            "schema_version",
+            "contract",
+            "migration_intent_sha256",
+            "producer",
+            "package_version",
+            "git_commit",
+            "git_tree",
+            "images",
+            "resolved_compose_sha256",
+            "database_target_identity_sha256",
+            "candidate_root_identity_sha256",
+            "published_at",
+            "receipt_sha256"
+          ]
+        },
+        {
+          "output": "migration_execution_receipt",
+          "contract": "chenyida-erp-isolated-uat-migration-execution-receipt/v1",
+          "required_fields": [
+            "schema_version",
+            "contract",
+            "migration_intent_sha256",
+            "producer",
+            "release_candidate_receipt_sha256",
+            "database_target_identity_sha256",
+            "from_head",
+            "to_head",
+            "applied_count",
+            "applied_ledger_sha256",
+            "observed_head",
+            "observation_bundle_sha256",
+            "observed_at",
+            "completed_at",
+            "receipt_sha256"
+          ]
+        }
+      ]
+    },
+    "EVIDENCE": {
+      "intent_contract": "chenyida-erp-isolated-uat-evidence-intent/v1",
+      "input_fields": [
+        "containers",
+        "loopback",
+        "migration_execution_receipt_sha256",
+        "one_shot_state_root_identity_sha256",
+        "operation_id",
+        "plan_sha256",
+        "project",
+        "release_candidate_receipt_sha256",
+        "release_identity_reader_gid",
+        "request_id",
+        "runtime_contract_policy_sha256",
+        "runtime_privilege_receipt_sha256",
+        "runtime_source",
+        "source_closure_sha256"
+      ],
+      "receipt_shapes": [
+        {
+          "output": "readiness_receipt",
+          "contract": "chenyida-erp-isolated-uat-readiness-receipt/v1",
+          "required_fields": [
+            "schema_version",
+            "contract",
+            "evidence_intent_sha256",
+            "producer",
+            "loopback",
+            "expected_package_version",
+            "expected_git_commit",
+            "observed_package_version",
+            "observed_git_commit",
+            "observed_at",
+            "receipt_sha256"
+          ]
+        },
+        {
+          "output": "isolated_uat_postdeploy_receipt",
+          "contract": "chenyida-erp-isolated-uat-postdeploy-receipt/v1",
+          "required_fields": [
+            "schema_version",
+            "contract",
+            "evidence_intent_sha256",
+            "producer",
+            "readiness_receipt_sha256",
+            "release_candidate_receipt_sha256",
+            "migration_execution_receipt_sha256",
+            "runtime_privilege_receipt_sha256",
+            "container_identity_set_sha256",
+            "observed_at",
+            "receipt_sha256"
+          ]
+        },
+        {
+          "output": "isolated_uat_runtime_identity_receipt",
+          "contract": "chenyida-erp-isolated-uat-runtime-identity-receipt/v1",
+          "required_fields": [
+            "schema_version",
+            "contract",
+            "evidence_intent_sha256",
+            "producer",
+            "postdeploy_receipt_sha256",
+            "project",
+            "runtime_source",
+            "containers",
+            "loopback",
+            "release_identity_reader_gid",
+            "identity_semantics",
+            "production_release_identity_compatible",
+            "published_at",
+            "receipt_sha256"
+          ]
+        }
+      ]
+    }
+  },
+  "source_closure": {
+    "schema_version": 1,
+    "algorithm": "PYTHON_SINGLE_FILE_FIXED_IMPORT_ALLOWLIST_V1",
+    "roots": [
+      "scripts/isolated-uat-runtime-contracts.py"
+    ],
+    "members": [
+      {
+        "path": "scripts/isolated-uat-runtime-contracts.py",
+        "sha256": "c293e1872e6700dfb4b129450f666fba86612dc16678a613cc7b050fb8ebdc6a"
+      }
+    ],
+    "edges": [],
+    "external_imports": [
+      "ast",
+      "hashlib",
+      "json",
+      "re",
+      "typing"
+    ],
+    "forbidden_paths": [
+      "scripts/postdeploy-release-verifier.mjs",
+      "scripts/postgresql-runtime-privilege-runner.mjs",
+      "scripts/publish-release-identity-from-manifest.mjs",
+      "scripts/release-migration-authorization.ts",
+      "scripts/release-supervisor-launcher.py",
+      "scripts/uat-promotion-migration-execution-contract.mjs",
+      "scripts/write-release-identity.sh"
+    ],
+    "declared_non_runtime_capabilities": [
+      "CLOCK",
+      "DATABASE",
+      "DOCKER",
+      "ENVIRONMENT",
+      "FILESYSTEM",
+      "NETWORK",
+      "PROCESS",
+      "RANDOM",
+      "SECRET_VALUES",
+      "SHELL"
+    ],
+    "validation_scope": "SOURCE_HASH_IMPORT_ALLOWLIST_AND_DIRECT_BUILTIN_GUARD_NOT_A_SANDBOX",
+    "source_closure_sha256": "978741a0bf244cd40076cca49fbedd0a3e3045e047b795c488e40a40436bc939"
+  },
+  "policy_sha256": "5f24335aa436309427465b6cb1c5c7ecb3778f0945f3d7ed48598008a0456586"
+}

@@ -76,6 +76,7 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         cls.policy = POLICY.read_policy(POLICY_FILE)
         cls.request = request(cls.policy)
         cls.bindings = ONE_SHOT.read_bindings()
+        cls.runtime_contract_policy = ONE_SHOT.read_runtime_contract_policy()
 
     def test_plan_is_deterministic_exact_and_non_executing(self) -> None:
         first = ONE_SHOT.build_plan(self.request, self.policy)
@@ -83,10 +84,26 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(ONE_SHOT.validate_plan(first, self.request, self.policy), first)
         self.assertEqual(first["mode"], "READ_ONLY_PLAN")
+        self.assertEqual(first["schema_version"], 2)
+        self.assertEqual(first["contract"], "chenyida-erp-isolated-uat-one-shot-plan/v2")
+        self.assertEqual(first["entrypoint_id"], "chenyida-erp-isolated-uat-one-shot-v2")
         self.assertFalse(first["execution_authorized"])
         self.assertEqual(first["action_binding_id"], self.bindings["binding_id"])
         self.assertEqual(first["action_binding_sha256"], self.bindings["binding_sha256"])
         self.assertEqual(first["action_binding_status"], ONE_SHOT.BINDING_IMPLEMENTATION_STATUS)
+        self.assertEqual(
+            first["runtime_contract_policy_sha256"],
+            self.runtime_contract_policy["policy_sha256"],
+        )
+        self.assertEqual(
+            first["runtime_contract_source_closure_sha256"],
+            self.runtime_contract_policy["source_closure"]["source_closure_sha256"],
+        )
+        self.assertFalse(first["runtime_contract_capability_status"]["execution_authorized"])
+        self.assertEqual(
+            first["runtime_contract_capability_status"]["runtime_backends"],
+            "NOT_IMPLEMENTED",
+        )
         self.assertEqual([item["ordinal"] for item in first["actions"]], list(range(1, 10)))
         self.assertEqual(first["roots"], self.request["roots"])
         self.assertNotIn("staff", ONE_SHOT.canonical_json(first).lower())
@@ -133,12 +150,17 @@ class IsolatedUatOneShotTest(unittest.TestCase):
     def test_execute_fails_before_any_plan_is_emitted(self) -> None:
         output = io.StringIO()
         errors = io.StringIO()
-        result = ONE_SHOT.main(
-            ["execute", "--policy", str(POLICY_FILE)],
-            input_stream=io.BytesIO(ONE_SHOT.canonical_json(self.request).encode("utf-8")),
-            output_stream=output,
-            error_stream=errors,
-        )
+        original = ONE_SHOT.require_runtime_backend
+        ONE_SHOT.require_runtime_backend = lambda: self.fail("runtime backend was called")
+        try:
+            result = ONE_SHOT.main(
+                ["execute", "--policy", str(POLICY_FILE)],
+                input_stream=io.BytesIO(ONE_SHOT.canonical_json(self.request).encode("utf-8")),
+                output_stream=output,
+                error_stream=errors,
+            )
+        finally:
+            ONE_SHOT.require_runtime_backend = original
         self.assertEqual(result, 1)
         self.assertEqual(output.getvalue(), "")
         self.assertEqual(errors.getvalue(), "ISOLATED_UAT_ONE_SHOT_EXECUTION_NOT_AUTHORIZED\n")
@@ -205,6 +227,29 @@ class IsolatedUatOneShotTest(unittest.TestCase):
         legacy = json.loads(legacy_raw)
         legacy_body = {key: value for key, value in legacy.items() if key != "binding_sha256"}
         self.assertEqual(POLICY.canonical_sha256(legacy_body), legacy["binding_sha256"])
+        current_raw = ONE_SHOT.BINDINGS_PATH.read_bytes()
+        self.assertEqual(
+            hashlib.sha256(current_raw).hexdigest(),
+            "9cc4e3c12793785186fcf74560919376cfa5cc82ef5f344b11fcb5b4501e5232",
+        )
+
+    def test_runtime_contract_closure_is_pure_and_separate_from_binding_v2(self) -> None:
+        closure = self.runtime_contract_policy["source_closure"]
+        self.assertEqual(closure["roots"], ["scripts/isolated-uat-runtime-contracts.py"])
+        self.assertEqual(closure["edges"], [])
+        self.assertIn("FILESYSTEM", closure["declared_non_runtime_capabilities"])
+        self.assertIn("DOCKER", closure["declared_non_runtime_capabilities"])
+        self.assertEqual(
+            closure["validation_scope"],
+            "SOURCE_HASH_IMPORT_ALLOWLIST_AND_DIRECT_BUILTIN_GUARD_NOT_A_SANDBOX",
+        )
+        policy_sources = {item["path"] for item in self.policy["source_binding"]}
+        self.assertIn("operations/isolated-uat-runtime-contract-policy-v1.json", policy_sources)
+        self.assertIn("scripts/isolated-uat-runtime-contracts.py", policy_sources)
+        self.assertEqual(
+            self.bindings["execution_boundary"]["source_binding_scope"],
+            "DIRECT_CONTRACT_REFERENCES_ONLY",
+        )
 
     def test_recomputed_tampered_binding_is_rejected(self) -> None:
         tampered = copy.deepcopy(self.bindings)

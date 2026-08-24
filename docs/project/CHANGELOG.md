@@ -4,6 +4,19 @@
 
 ## 2026-08-24
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: define isolated UAT runtime contract intents`
+
+- 第一性原理：不到20人的单一隔离UAT不建设通用工作流/多租户平台。本切片只增加一份runtime contract policy、一个纯函数模块和内存fake ports；不增加daemon、队列、服务或人员基数配置。
+- 三族意图：database-bootstrap固定标准UAT数据库marker/system identifier和五角色独立凭据映射；Migration固定alpha.47、`EMPTY → 0046`/46项allowlist和release source；evidence固定四容器、loopback、Compose/source及GID`65532`。产物只标记`STRUCTURE_VALID / NOT_EXECUTED / NOT_PUBLISHED / NOT_AVAILABLE / predecessor NOT_VALIDATED`。
+- 诚实能力边界：future receipt只有`INCOMPLETE_DESCRIPTOR_ONLY`字段目录，真实validator、publisher和runtime backend均`NOT_IMPLEMENTED`。fixture固定`SYNTHETIC_CONTRACT_FIXTURE_ONLY`，不生成真实回执或证明前驱摘要链。
+- Source closure：纯模块为唯一root，无仓库内传递import，固定raw SHA和标准库import allowlist；validation scope明示`NOT_A_SANDBOX`。binding v1/v2字节不变，v2继续只声明`DIRECT_CONTRACT_REFERENCES_ONLY`，未冒充九步全动作closure。
+- 合成/执行门：三个typed fake ports覆盖逐步异常、重签畸形字段、自洽重签intent、非法source/import扩张、跨族source漂移和输入别名，全部首错停止。one-shot新增字段后明确升级为plan/v2并绑定runtime policy/closure摘要；`execute`在真实唯一backend seam之前继续精确拒绝，backend调用0。
+- 摘要：runtime contract policy/closure SHA-256为`5f24335aa436309427465b6cb1c5c7ecb3778f0945f3d7ed48598008a0456586`/`978741a0bf244cd40076cca49fbedd0a3e3045e047b795c488e40a40436bc939`，control policy SHA-256更新为`dd442418af220070b133063ea555dde0a1e1b4cfcc266ad1aa1706829b5c6150`；binding v1/v2 raw SHA保持`3244d550…7b3a`/`9cc4e3c1…5232`。
+- 测试：控制请求4/4、one-shot 10/10、runtime contracts 7/7、隔离Compose policy/config双PASS；覆盖zero/stale SHA、角色凭据漂移、标准marker、非法head/loopback、全局alias和执行前零backend。
+- 资源：18:31→18:50静态段available memory `2,399,928,320 → 2,383,667,200`B、Swap `179,617,792 → 179,580,928`B、根盘 `17,775,542,272 → 17,746,591,744`B、Load `0.05/0.09/0.08 → 0.62/0.33/0.21`，PSI/OOM0。Docker保持6容器/75镜像/277 Volume/6网络，四服务restart0/OOM false且Web/PostgreSQL healthy；本任务`.pyc`/临时资源0，既有26个历史UAT promotion目录和历史pycache保持不动。
+- 代码/数据：无产品业务代码、Schema、Migration、API、页面、依赖、员工角色或运行配置变化；没有创建目录、Secret、发布文件、容器、网络、Volume、数据库或备份，未build/deploy/Migration/restart/账号/业务写，也未访问现有UAT或生产数据。
+- 文档：新增D-178并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一切片是完整receipt semantics/validator、前驱摘要链和binding v3接线，不是运行部署。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: correct isolated UAT execution order`
 
 - 审计结论：实现runtime adapter前的两项并行只读审计确认D-176 v1存在P0物理冲突：空库不能先做0046完整对象ACL，生产v3 identity也不能在Caddy/Web/Worker真实身份和postdeploy receipt产生前发布；生产runtime policy/supervisor语义不得冒充隔离UAT证据。

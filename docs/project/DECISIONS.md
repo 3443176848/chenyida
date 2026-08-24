@@ -3985,6 +3985,40 @@
 - 拒绝预造Web/Worker/Caddy容器身份、复用生产runtime policy SHA或伪造supervisor/authorization证据。
 - 拒绝把直接source摘要描述为传递依赖闭包，或把fake adapter PASS描述为Docker/数据库可执行。
 
+## D-178 隔离UAT先冻结三族纯意图和回执字段描述，合成端口不得冒充运行证据
+
+- 日期：2026-08-24
+- 状态：`ACCEPTED / PURE INTENTS STRUCTURE VALID / SYNTHETIC PORT ORDER VERIFIED / RECEIPT VALIDATORS NOT IMPLEMENTED / RUNTIME BACKENDS NOT IMPLEMENTED / PRODUCTION NO-GO`
+- 发起：项目负责人要求继续下一步；Codex按少于20人、小团队不建设通用平台的第一性原理收敛为单一纯模块
+- 实施范围：只新增一份合同policy、一个无运行能力的纯函数模块、内存fake-port测试及只读计划摘要绑定；不实现或调用真实端口
+
+### Context
+
+- D-177/v2已纠正动作顺序，但第5、6、9步仍只有输出名；没有专用database-bootstrap、Migration双回执或隔离evidence语义时，输出名不能证明数据库、Migration或服务实际完成。
+- 当前既没有L2a授权，也没有精确HEAD镜像。此时实现host filesystem、Docker、PostgreSQL、HTTP或publisher会把仓库合同误当成运行许可。
+- v2自身明确只绑定直接source。为避免再建通用依赖图平台，本切片只给新纯合同模块冻结一个单文件、固定hash、固定import allowlist的source closure；它不是Python sandbox，也不声称覆盖v2全部动作的传递依赖。
+
+### Decision
+
+1. 新增`chenyida-erp-isolated-uat-runtime-contract-policy/v1`，只描述三族意图：数据库身份/五个技术登录角色最小bootstrap、`EMPTY → 0046` Migration与release candidate字段目录、以及loopback隔离evidence字段目录。当前package、46项allowlist、标准数据库marker、角色到独立凭据文件映射和Web技术GID`65532`均失败关闭；人员数量不进入合同。
+2. 合同产物固定为`STRUCTURE_VALID / NOT_EXECUTED / NOT_PUBLISHED / NOT_AVAILABLE / predecessor chain NOT_VALIDATED`。receipt field semantics明确为`INCOMPLETE_DESCRIPTOR_ONLY`，真实receipt validator、publisher和runtime backend全部为`NOT_IMPLEMENTED`；合成fixture不得被当作真实回执消费。
+3. 新增一个仅使用标准库纯函数的合同模块。其source closure固定为该单一仓库文件、无本地传递import、固定外部import allowlist和原始文件SHA；校验范围明确为source hash/import allowlist/direct builtin guard，`NOT_A_SANDBOX`。生产runner、supervisor、postdeploy、release identity和TEST执行入口继续禁止成为纯合同source。
+4. 注入式合成adapter只调用三种typed fake port，验证`DATABASE_BOOTSTRAP → MIGRATION → EVIDENCE`的结构顺序、字段目录、失败即停和端口输入隔离。它明确输出`SYNTHETIC_CONTRACT_FIXTURE_ONLY`、`predecessor_chain_status=NOT_VALIDATED`，不生成、发布或验证任何真实receipt摘要链。
+5. one-shot只读计划新增runtime contract policy/source closure SHA和能力状态；由于JSON字段集合发生不兼容变化，计划合同和entrypoint ID明确升级为v2，不沿用历史plan/v1名称。`execute`真实控制流在授权门之后只有一个runtime backend seam；当前policy仍在该seam之前返回`ISOLATED_UAT_ONE_SHOT_EXECUTION_NOT_AUTHORIZED`，backend固定未调用。
+6. binding v1/v2文件保持字节不变；v2仍为当前动作顺序且继续声明`DIRECT_CONTRACT_REFERENCES_ONLY`。Runtime contract policy SHA-256为`5f24335aa436309427465b6cb1c5c7ecb3778f0945f3d7ed48598008a0456586`，纯模块closure SHA-256为`978741a0bf244cd40076cca49fbedd0a3e3045e047b795c488e40a40436bc939`，control policy SHA-256更新为`dd442418af220070b133063ea555dde0a1e1b4cfcc266ad1aa1706829b5c6150`。
+
+### Consequences
+
+- 第5、6、9步现在有可审阅的意图结构和未来回执字段目录，fake-port能证明三段调用顺序及首错停止；这仍不等于真实回执合同完整、前驱摘要链通过或runtime可执行。
+- TASK92继续`DOING`。下一仓库切片只可补完整receipt字段语义/validator、前驱摘要链和binding v3接线；真实host/Docker/PostgreSQL/HTTP/publisher端口及精确镜像仍是L2a前阻断，新UAT没有创建。
+- 小团队只承担一个隔离namespace和一个固定流程，不新增队列、daemon、通用工作流引擎、多租户控制平面或人员基数配置。
+
+### Rejected alternatives
+
+- 拒绝把required-fields目录命名为已实现receipt validator，也拒绝用格式正确但任意的SHA声称前驱已核验。
+- 拒绝把AST denylist冒充Python capability sandbox，或把单文件纯合同closure描述为v2全动作传递closure。
+- 拒绝在没有精确镜像、真实backend和专项授权时切换`deployment_authorized`、创建资源或执行Migration。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
