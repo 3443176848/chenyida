@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-183已从冻结binding v6重建九动作的54个声明source引用和21个直接root，并把固定代码import、control reads与46项Migration数据集收敛为83成员声明式传递闭包；v1—v6原始字节保持不变。成功只表示调用方注入source bytes在该固定图范围内匹配，不是filesystem attestation；现有one-shot的部分模块导入先于该派生证明，因此trusted pre-import、publisher、runtime observer/backend和当前源码匹配镜像仍缺失，授权与runtime evidence仍未建立。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-184 stage-1已把D-183的83成员从caller-injected证明推进到实际文件系统FD快照：固定isolated Python、唯一site root、逐组件非跟随打开、owner/mode/type/nlink/device/读取前后identity及全部摘要，并只从已验bytes执行D-183 validator。它仍明确`BOOTSTRAP IDENTITY NOT ATTESTED / PAYLOAD NOT EXECUTED BY THIS BOOTSTRAP / HANDOFF NOT IMPLEMENTED / NOT PUBLISHED`；v1—v6、D-183和one-shot字节保持不变，授权与runtime evidence未建立。
+
+2026-08-25 pre-import文件系统快照事件：项目负责人继续要求“下一步”。新增D-184、stage-1 bootstrap policy、标准库-only FD verifier和10项专项测试。Trusted CLI固定`/usr/bin/python3 -I -S -B`并从bootstrap绝对路径派生site root，不接受caller root；从`/`逐组件dir-FD打开，拒绝symlink、双前导斜杠、可写目录/文件、wrong owner、hardlink、FIFO、跨device、超限和读中identity变化。先固定核对D-184 policy、D-183 policy/validator和全部83成员hash，再从同一validator bytes执行完整D-183校验；策略/成员自重签及顶层payload sentinel均在执行前失败。聚合102/102、Compose静态双门连续两次PASS，最终对抗复核P0/P1/P2=0。Stage-1不执行one-shot且handoff固定失败；新UAT未创建。TASK92继续`DOING`，下一独立切片合并外部内容寻址bootstrap锚/原子publisher与same-verified-bytes只读handoff。
 
 2026-08-25声明源码闭包事件：项目负责人继续要求“下一步”。新增D-183、独立action source closure policy/纯validator和12项专项测试，不把闭包描述塞回冻结v6，也不新增v7。Validator从v3—v6固定raw锚点机械重建九动作目录，核对54引用/21直接root/83成员、46项Migration+journal/package、Python固定模块装载、TypeScript/ESM静态import（8个ESM模块、23条本地边）、Compose→Caddyfile资源边和全成员hash；动态import/re-export、畸形JSON、布尔冒充整数、自重签策略/source漂移均失败关闭。聚合92/92，独立范围复核P0/P1/P2=0；结果明确为caller-injected bytes、非文件系统认证、非pre-import gate、非镜像/publisher/runtime/执行授权。未创建或访问UAT运行资源。TASK92继续`DOING`，下一独立切片只处理固定trusted pre-import source verification/bootstrap边界。
 
@@ -297,7 +299,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、消费者/请求/计划、D-177—D-182纯合同及D-183冻结v6声明源码闭包；继续trusted pre-import、publisher/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、D-181、D-182、D-183、低资源规则 | `DOING / FROZEN V6 DECLARED ACTION SOURCE CLOSURE VALID / TRUSTED PRE-IMPORT + PUBLISHER + RUNTIME OBSERVER/BACKEND + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。9动作/54引用/21直接root/83成员的有界声明闭包通过；source仍为调用方注入且未认证，现有导入发生在派生证明前，TLS/HTTP仍未观察，publisher/backend未实现，policy无运行动作且运行面不变。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、D-177—D-183合同/闭包及D-184 stage-1文件系统快照；继续外部锚+same-byte handoff、runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、D-181、D-182、D-183、D-184、低资源规则 | `DOING / D-184 FILESYSTEM SOURCE SNAPSHOT VERIFIED / BOOTSTRAP TRUST ROOT + PAYLOAD HANDOFF NOT ESTABLISHED / RUNTIME + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。83成员已从固定site root以FD实际读取且匹配，D-183 validator只从已验bytes执行；bootstrap/CPython未外部attest，stage-1不执行one-shot，TLS/HTTP未观察，publisher/backend未实现，新UAT未创建。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

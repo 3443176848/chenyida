@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-isolated-uat-pre-import-bootstrap-policy/v1",
+  "policy_id": "chenyida-erp-isolated-uat-frozen-v6-pre-import-bootstrap-v1",
+  "execution_authorized": false,
+  "launch_contract": {
+    "python_executable": "/usr/bin/python3",
+    "required_flags": [
+      "-I",
+      "-S",
+      "-B"
+    ],
+    "optimization_level": 0,
+    "site_root_source": "BOOTSTRAP_ABSOLUTE_PATH_PARENT_PARENT_ONLY",
+    "caller_selected_source_root": "FORBIDDEN"
+  },
+  "filesystem_contract": {
+    "reader": "DIRECTORY_FD_COMPONENT_WALK_OPENAT_V1",
+    "directory_rules": [
+      "O_DIRECTORY",
+      "O_NOFOLLOW",
+      "O_CLOEXEC",
+      "ROOT_OWNED",
+      "NOT_GROUP_OR_OTHER_WRITABLE",
+      "SAME_DEVICE_AS_FILESYSTEM_ROOT"
+    ],
+    "file_rules": [
+      "O_NOFOLLOW",
+      "O_CLOEXEC",
+      "O_NONBLOCK",
+      "REGULAR_FILE",
+      "ROOT_OWNED",
+      "NOT_GROUP_OR_OTHER_WRITABLE",
+      "LINK_COUNT_ONE",
+      "SAME_DEVICE_AS_SOURCE_ROOT",
+      "BOUNDED_READ",
+      "IDENTITY_STABLE_BEFORE_AND_AFTER_READ"
+    ],
+    "single_file_max_bytes": 4194304,
+    "total_member_max_bytes": 33554432
+  },
+  "anchors": {
+    "declared_source_policy": {
+      "path": "operations/isolated-uat-action-source-closure-policy-v1.json",
+      "raw_sha256": "7c2a22928c5c80dc21ee21fc8cc99693a480717b7a76f39c4f9b784663c680a8",
+      "policy_sha256": "a85d6abbad072ce5981690f0e266b3b657beb3a707f7ca04db96d97d0bb52d11",
+      "source_closure_sha256": "19e518819ede89a2b5ad4925d0c71b27fa2b5bba41759ffb0e51e90bd7cc0fb3"
+    },
+    "declared_source_validator": {
+      "path": "scripts/isolated-uat-action-source-closure-contracts.py",
+      "raw_sha256": "f4705be0c588947c0f7a968dde153df80b235ee65da760096bf29d7d64e481ad"
+    }
+  },
+  "snapshot_contract": {
+    "member_count": 83,
+    "member_source": "FIXED_D183_POLICY_AFTER_RAW_DIGEST_MATCH",
+    "member_bytes_source": "FILESYSTEM_DIRECTORY_FD_ONLY",
+    "validator_execution": "COMPILE_EXEC_FROM_VERIFIED_VALIDATOR_BYTES_ONLY",
+    "payload_execution": "FORBIDDEN_IN_THIS_SLICE",
+    "execution_handoff": "NOT_IMPLEMENTED_FAIL_CLOSED"
+  },
+  "capability_status": {
+    "filesystem_source_snapshot": "IMPLEMENTED_BOUNDED_FD_READ",
+    "pre_action_payload_module_order": "IMPLEMENTED_D183_VALIDATOR_FROM_VERIFIED_BYTES_ONLY",
+    "bootstrap_external_identity": "NOT_ATTESTED",
+    "python_runtime_and_stdlib_identity": "NOT_ATTESTED",
+    "verified_byte_payload_handoff": "NOT_IMPLEMENTED_FAIL_CLOSED",
+    "publisher": "NOT_IMPLEMENTED",
+    "runtime_observer_backend": "NOT_IMPLEMENTED",
+    "execution_authorized": false
+  },
+  "validation_output": {
+    "source_observation_status": "FILESYSTEM_FD_BYTES_HASH_MATCHED_BOOTSTRAP_NOT_EXTERNALLY_ATTESTED",
+    "pre_import_status": "D183_VALIDATOR_EXECUTED_FROM_VERIFIED_BYTES_AFTER_MEMBER_SNAPSHOT_HASH_MATCH",
+    "trust_root_status": "BOOTSTRAP_IDENTITY_NOT_EXTERNALLY_ATTESTED",
+    "execution_handoff_status": "NOT_IMPLEMENTED_FAIL_CLOSED",
+    "authorization_status": "AUTHORIZATION_NOT_ESTABLISHED",
+    "publication_status": "NOT_PUBLISHED",
+    "runtime_evidence_status": "NOT_ESTABLISHED"
+  },
+  "policy_sha256": "c5359216b393df265d707c764cee53b6430471e0ba16ca5252d98ee4fc232a45"
+}

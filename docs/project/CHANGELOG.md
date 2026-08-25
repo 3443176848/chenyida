@@ -4,6 +4,17 @@
 
 ## 2026-08-25
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: verify isolated UAT source snapshot`
+
+- 第一性原理：单一小团队UAT只增加一个stage-1 policy、标准库-only verifier和专项负测；不修改冻结v1—v6、D-183或one-shot，不新增v7、daemon、队列、服务、临时payload publisher或按职能人数硬编码容量。
+- 真实文件系统观察：CLI固定绝对bootstrap路径和`/usr/bin/python3 -I -S -B`，不接受caller source root。从`/`逐组件dir-FD打开，目录/文件必须root所有且不可group/other写；文件还必须regular、`nlink=1`、同device、有界，读取前后完整identity一致。Symlink、双前导斜杠、可写路径、wrong owner、FIFO、hardlink和读中变化失败关闭。
+- 单向摘要链：先固定核对D-184 policy raw/internal，再核对D-183 policy raw/internal/closure、D-183 validator raw和全部83成员hash；只有83成员共`2,092,585` bytes全部通过，才从已验validator bytes执行一次D-183完整语义校验。Bootstrap raw为`ccb9365c…a9c5`，policy内部/raw为`c5359216…2a45`/`708c96cc…cf1a`；bootstrap raw只作为下一外部锚输入。
+- 诚实停止线：Stage-1不导入one-shot且`require_execution_handoff()`固定失败；输出明确`NOT_EXECUTED_BY_THIS_BOOTSTRAP / PRIOR_PROCESS NOT_ATTESTED / BOOTSTRAP IDENTITY NOT EXTERNALLY ATTESTED / NOT PUBLISHED`。Bootstrap、CPython/stdlib和direct one-shot未建立known-good关系，不能称`TRUSTED_PRE_IMPORT_ENFORCED`或UAT可试运行。
+- 测试/复核：D-184专项10/10，完整聚合`5+13+7+16+13+15+11+12+10=102/102`；隔离Compose policy/config连续两次双PASS。AST锁定标准库import、模块顶层调用及唯一verified-byte `compile/exec`；policy/validator/member自重签、最后成员漂移和payload sentinel均在validator/payload执行前拒绝。三路最终只读复核为P0=0/P1=0/P2=0。
+- 资源：08:24→08:46 available memory `2,147,934,208 → 2,125,922,304`B，Swap `180,957,184 → 182,300,672`B（+`1,343,488`B），根盘available `17,484,529,664 → 17,505,542,144`B，Load `0.46/0.22/0.25 → 0.36/0.34/0.29`，Memory PSI/OOM0。Docker保持6/75/277/6；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整；任务fixture、pycache及精确临时报告残留0。
+- 代码/数据：无产品业务代码、Schema、Migration、API、页面、依赖、员工角色或生产配置变化；未创建或访问UAT目录、Secret、证书、容器、网络、Volume、数据库、备份或业务数据，未build/deploy/Migration/restart/账号/HTTP-TLS探针/业务写。测试fixture在安全父目录串行创建并自动清理，bootstrap验证本身只读。
+- 文档：新增D-184并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一独立切片把外部内容寻址bootstrap锚/原子publisher与same-verified-bytes只读handoff合并处理，仍不开放execute。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: validate isolated UAT action source closure`
 
 - 第一性原理：单一小团队UAT只增加独立派生policy、一个纯validator和静态负测；不建设依赖平台、daemon、队列、服务或按工程/计划/市场“各2人”硬编码容量，也不修改冻结binding v1—v6或新增v7。

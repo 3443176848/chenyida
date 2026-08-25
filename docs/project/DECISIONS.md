@@ -4196,6 +4196,41 @@
 - 拒绝把npm/Python运行时、Docker/Compose实现、OCI层或任意运行文件全部塞进当前静态闭包，制造一个无法审阅的通用供应链平台。
 - 拒绝仅凭调用方注入bytes匹配就声称filesystem attestation、pre-import执行门、publisher/runtime backend已实现，或据此创建/启动同机UAT。
 
+## D-184 先建立文件系统源码快照观察，未有外部信任锚和同字节交接时必须停止
+
+- 日期：2026-08-25
+- 状态：Accepted（stage-1文件系统快照校验；bootstrap身份、Python运行时及payload handoff未建立）
+- 发起：项目负责人继续要求“下一步”；Codex按少于20人的单一同机UAT、最小安全原语和失败关闭原则推进D-183后的pre-import边界
+
+### Context
+
+- D-183只验证调用方注入的83成员bytes；当前one-shot在`main()`、请求校验和执行授权门之前会执行6个唯一Python模块，owner模块又重复装载其中2个，合计8次本地`exec_module`。把校验函数加到one-shot内部仍然太晚。
+- 校验仓库路径后再用`spec_from_file_location`或`Path.read_bytes`重开同一路径会留下TOCTOU。另一方面，同仓bootstrap不能自证自身，bootstrap、CPython和stdlib的known-good身份最终必须由payload之外的固定入口锚定。
+- 小团队单一UAT不需要daemon、队列、依赖服务或通用供应链平台；当前最小可独立验证的事实，是在任何声明action payload或one-shot模块执行前，从固定文件系统边界取得并核对完整源码快照。
+
+### Decision
+
+1. 新增独立stage-1 `isolated-uat-pre-import-bootstrap.py`和固定policy；trusted CLI只接受绝对bootstrap路径派生的唯一site root，不接受环境变量或命令行source-root覆盖，并要求`/usr/bin/python3 -I -S -B`、optimization 0。测试专用caller-root API必须输出`TEST_ONLY...NOT_ATTESTED`，不得冒充trusted launch。
+2. 从`/`开始以directory FD逐组件`openat`，目录使用`O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC`，必须root所有、不可group/other写且与文件系统根同device；文件使用`O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK`，必须为root所有普通文件、不可group/other写、`nlink=1`、与source root同device并在固定上限内。读取前后`fstat`身份必须完全一致，所有FD在成功或异常路径关闭。
+3. Bootstrap先固定核对自身policy raw/internal SHA，再核对D-183 policy raw/internal/closure和D-183 validator raw SHA。83个成员全部从source-root FD读取并先匹配D-183固定member hash；只有全部通过后，才允许从已核对的validator bytes执行一次`compile/exec`并重跑D-183完整语义校验。Caller-injected source map不进入CLI路径。
+4. 成功结果只称`FILESYSTEM_FD_BYTES_HASH_MATCHED_BOOTSTRAP_NOT_EXTERNALLY_ATTESTED`，当前快照为83成员、`2,092,585` bytes；报告同时固定`NOT_EXECUTED_BY_THIS_BOOTSTRAP`、`PRIOR_PROCESS NOT_ATTESTED`、`BOOTSTRAP_IDENTITY_NOT_EXTERNALLY_ATTESTED`、`AUTHORIZATION_NOT_ESTABLISHED`和`NOT_PUBLISHED`。
+5. 本切片不把快照复制到临时执行树，不导入one-shot，也不提供`plan`或`execute` handoff；`require_execution_handoff()`固定失败。这样避免在尚无外部锚时同时引入临时publisher、子进程、崩溃残留和清理边界。下一切片必须把payload外部内容寻址锚与verified-byte handoff作为同一原子边界处理。
+6. Bootstrap不加入D-183的83成员payload，避免自引用；其最终raw SHA作为下一外部锚输入。Binding v1—v6、D-183 policy/validator和one-shot字节保持不变，不新增v7。
+7. 人数、“每职能先按2人”和83成员数互不相关；人数不进入文件、动作、容量或验收基数。本决策不授权创建UAT、Secret、证书、容器、网络、Volume或数据库，也不授权build、deploy、Migration、账号、HTTP/TLS探针或业务写。
+
+### Consequences
+
+- D-183的caller-injected证明现在获得了一个真实、串行、有界的文件系统读取阶段；policy/validator/任一成员漂移、策略自重签、符号链接、可写祖先/文件、错误owner、hardlink、FIFO、双前导斜杠、读中变化或错误Python flags都会在payload handoff前失败。最终bootstrap raw SHA为`ccb9365ca6ef61e983a4b4b4436231a69fe66fdb39b45f513e11bdbb8163a9c5`，只作为下一外部锚输入，不在本仓内自证。
+- 这不是`TRUSTED_PRE_IMPORT_ENFORCED`：bootstrap自身和Python/stdlib没有外部attestation，direct one-shot入口仍存在，且stage-1不会执行one-shot。TASK92继续`DOING`；下一独立切片是外部内容寻址入口/原子publisher与same-verified-bytes handoff，不是runtime backend或L2a。
+- D-184专项10项、更新后聚合102/102及隔离Compose静态双门通过；通过只证明stage-1合同及失败关闭顺序，不表示UAT已创建或可以试运行。
+
+### Rejected alternatives
+
+- 拒绝把gate放进one-shot或在路径hash后普通import，因为两者分别存在校验前执行和TOCTOU。
+- 拒绝让同仓policy、自hash或root-owned mode冒充bootstrap内容的外部known-good锚。
+- 拒绝在本切片临时复制83成员并启动child；这会同时跨入publisher/handoff及异常清理范围，应与下一外部锚原子设计。
+- 拒绝新增v7、通用dependency daemon、容器供应链平台或按员工人数配置源码边界。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。
