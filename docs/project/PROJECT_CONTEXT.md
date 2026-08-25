@@ -62,7 +62,7 @@
 
 2026-08-21 TASK70启动增量：TASK70已从`TODO`转为当前唯一`DOING`。三条只读审计和主智能体代码复核确认现有审计把handler实现、隔离动态证明、host activation与真实UAT回退混为一个阻断；首个仓库切片先建立版本化、失败关闭的动态证据/verifier并拆分四类状态，之后才允许在新鲜资源门和磁盘上界内执行单容器PostgreSQL 17原子切换case。任何隔离结果都不得冒充host或真实UAT证据；现有UAT数据库、四卷、备份正文、凭据和业务数据保持禁止访问。
 
-项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK91已按D-172完成新隔离UAT L1核对；TASK92已完成BuildKit-only清理、D-173—D-185隔离合同/声明闭包/FD快照/verified-byte只读plan交接和D-186固定仓库外摘要文件安装/回读。TASK92保持唯一`DOING`；下一步需另获授权后才可建立anchor写者分离、same-FD bytes执行和受控Python/runtime closure，并处理精确镜像及L2a，不是自动运行plan或部署。不得自动恢复高级控制面、AI、进一步清理、build/deploy/Migration或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
+项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK91已按D-172完成新隔离UAT L1核对；TASK92已完成BuildKit-only清理、D-173—D-186隔离准备证据，并由D-187只冻结以同机独立信任根为目标的高级attestation实现、接受同机空库UAT的root运维信任边界；基础隔离与部署后只读运行不变量继续强制。TASK92保持唯一`DOING`；下一步需另获授权后才可从新的干净固定commit/tree串行build精确镜像、冻结resolved Compose/回退输入并提交或执行L2a，不是自动运行plan或部署。不得自动恢复高级控制面、AI、进一步清理、build/deploy/Migration或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。
 
@@ -352,6 +352,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 55. TASK88采用D-169：Material Requirement的PostgreSQL `date`按node-postgres生成的本地日历分量规范化，规范字符串严格验真；请求/Package回退、提交重算和采购追溯使用同一规则。UTC/Asia隔离PG各8/8后ST-04转`READY`，但现代同库旅程、UAT、真实数据和生产准入仍未证明。
 56. TASK89采用D-170：现代同库合成旅程已在全新0046隔离库连续通过，历史全ERP smoke不再是包脚本正式入口；合成角色数量不构成编制约束。该结果只关闭测试工具缺口，真实样本、实名员工UAT、试迁移/恢复和生产授权继续独立失败关闭。
 57. TASK90采用D-171：没有真实样本时先使用`CYD-UAT-SYN-001`虚构10件控制板准备包，让员工按27步旅程和8项负向检查核对稳定ID、数量、金额和反向记录。当前只完成L0文档，`SO_REQUIRED / PRE_SALES_EXCEPTION`待确认；目标UAT、版本升级、账号和业务写均未授权。
+58. TASK92采用D-187简化同机空库UAT信任边界：D-174—D-186中以同机独立信任根为目标的高级attestation实现冻结，受信root管理员及root-owned OS/Python/Docker作为非生产运维假设；这不是独立信任根或生产证明。隔离root、技术角色/凭据映射、动作顺序、Migration后ACL、Host/SNI及部署后只读运行核对继续为L2a `MUST`，并保留干净固定commit/tree、精确镜像/config digest、隔离Compose/空PG/`0001→0046`、Secret、备份恢复、资源/回退门和新的明确执行授权。历史pin原样保留，新UAT未创建。
 
 ## 当前风险
 
@@ -399,7 +400,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-2026-08-25 D-166—D-186已取代原持续交付路线：TASK59—TASK82既有高级控制面只保留历史，TASK70及R2—R5/AI路线冻结。TASK86完成可变人数和十大闭环基线，TASK87/88关闭日期型P0，TASK89完成现代同库合成旅程，TASK90完成无真实样本准备包，TASK91完成新隔离UAT L1核对。当前唯一`DOING`为TASK92；D-179—D-183完成纯链、localhost Host/SNI和冻结v6的83成员声明闭包，D-184以固定isolated CLI/dir-FD核对这些成员，D-185以固定内存适配器从84份verified bytes直接生成只读plan，D-186把manifest raw SHA安装到仓库外固定路径并双回读。该路径不是独立writer trust root，bootstrap/CPython、受信launcher、runtime publisher/observer/backend与精确镜像仍缺失。UAT alpha.42/0040及全部运行服务保持不变，新UAT未创建，系统继续`PRODUCTION NO-GO`。
+2026-08-25 D-166—D-187已取代原持续交付路线：TASK59—TASK82既有高级控制面只保留历史，TASK70及R2—R5/AI路线冻结。TASK86完成可变人数和十大闭环基线，TASK87/88关闭日期型P0，TASK89完成现代同库合成旅程，TASK90完成无真实样本准备包，TASK91完成新隔离UAT L1核对。当前唯一`DOING`为TASK92；D-174—D-186中以同机独立信任根为目标的纯证明链、声明闭包、verified-byte plan和宿主pin只保留为历史/可选强化证据，隔离root、技术角色/凭据映射、动作顺序、Migration后ACL、localhost Host/SNI及部署后只读运行核对继续为L2a `MUST`。D-187接受受信root及root-owned OS/Python/Docker作为同机空库非生产UAT运维边界，不再用同机独立attestation拖住L2a。当前只剩上述基础不变量、固定commit/tree精确镜像/config digest、resolved Compose/回退、Secret实物门、现有UAT异故障域备份与隔离恢复验证、资源门和明确L2a授权；新空UAT可按`DISPOSABLE`由固定输入重建。UAT alpha.42/0040及全部运行服务保持不变，新UAT未创建，系统继续`PRODUCTION NO-GO`。
 
 ## 恢复上下文检查清单
 

@@ -4,6 +4,16 @@
 
 ## 2026-08-25
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `docs: simplify isolated UAT trust boundary`
+
+- 第一性原理：同一宿主root可以同时修改kernel、Docker、pin、launcher和Python，继续建设独立writer trust root、CPython/stdlib全量attestation及通用publisher/observer/backend不能产生独立信任域。对少于20名内部用户使用的空库、无真实数据、loopback-only UAT，接受受信root管理员及root-owned OS/Python/Docker为明确运维假设；不把它写成生产级或cryptographic证明。部署后最小只读运行核对仍不可省略。
+- 冻结范围：只冻结D-174—D-186中以同机独立信任根为目标的高级证明实现；源码、测试、摘要及`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`原样不动，不删除、不chmod、不继续演进。隔离root、技术角色/凭据映射、动作顺序、Migration后ACL reconcile、localhost Host/SNI/Public Origin继续为L2a `MUST`。D-187未运行新的宿主/运行面plan；D-185历史只读plan事实保留，任何execute动作均未获权或产生副作用。
+- L2a最小P0：新的root-owned `0700`干净detached worktree固定commit/tree；由其构建并回读精确Web/Worker image/config digest；独立Compose项目/host roots/网络/Volume/loopback端口/空PG；Secret使用独立新值，宿主目录`root:root 0700`，每个regular/`nlink=1`文件严格继承`runtime-secret-file-policy-v1`的owner uid 0、固定consumer gid和`0440`，不入日志且容器只读挂载；严格`0001 → 0046`并在部署后只读核对初始空库、Migration ledger、技术角色/owner/ACL、镜像/config、Secret/mount、network/Volume/loopback与health；无生产凭据、保护卷、Docker socket、host network或privileged容器；现有UAT数据库与文件域的异故障域备份通过摘要/清单及隔离恢复验证，同机快照不算灾备；新鲜资源/回退门和新的明确L2a执行授权。新空UAT仍按`DISPOSABLE`由固定输入重建。
+- 分层授权：本切片不授权build、Migration、deploy或创建UAT。后续L2a只允许空库构建/部署和上述只读运行不变量核对；账号、虚构样本、真实样本、公开访问和生产继续按L3—L5独立授权。人数不进入基础设施、线程、容量或验收硬条件。
+- 验证：既有D-174—D-186聚合`124/124`通过，隔离Compose policy/config连续两次双PASS，`git diff --check`通过；多路独立只读评估促成冻结范围、恢复门和Secret模式收紧，最终两路均为P0/P1/P2=0，没有修改或降低既有测试断言。
+- 资源/完整性：10:54→11:07 available memory `2,115,837,952 → 2,106,703,872`B，Swap `185,061,376 → 186,945,536`B（+`1,884,160`B），根盘available `17,477,898,240 → 17,530,789,888`B，Load `0.31/0.17/0.16 → 0.69/0.42/0.31`，PSI/OOM0。四服务restart0/OOM false，Web/PostgreSQL healthy，四保护卷存在；任务临时目录与新增pyc残留0。
+- 代码/数据：仅更新MASTER、TASKS、PROJECT_CONTEXT、DECISIONS、STATUS、当前任务和CHANGELOG；无产品代码、Schema、Migration、Compose或生产配置变化，未连接数据库、读取业务/备份/Volume正文或创建任何运行资源。新UAT仍未创建，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: install isolated UAT external manifest pin`
 
 - 第一性原理：为单一小团队UAT只增加一个固定create-only安装器、一个65-byte宿主摘要文件和12项专项测试；不建设launcher、systemd、journal、账号或通用发布平台，人数不进入路径、线程、容量或验收条件。

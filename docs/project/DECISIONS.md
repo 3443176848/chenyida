@@ -4299,6 +4299,41 @@
 - 拒绝先hash bootstrap路径再重新按路径执行，也拒绝在本步顺带建设launcher、systemd、journal、daemon或通用发布平台。
 - 拒绝自动扫描/删除prepared残留、自动回滚，或因pin回读成功声称UAT已可试运行。
 
+## D-187 同机空库UAT接受root运维信任边界，高级attestation链不再阻断L2a
+
+- 日期：2026-08-25
+- 状态：Accepted（仅适用于同机、空库、无真实数据、loopback-only的非生产UAT；不构成build、部署或L2a执行授权）
+- 发起：项目负责人持续要求推进，并已明确系统少于20名内部用户、人数估算不得写死、应从第一性原理避免复杂化
+
+### Context
+
+- D-174—D-186已经形成九步纯合同、回执/外锚/Host-SNI/source closure、FD捕获、verified-byte只读plan交接和仓库外65-byte pin，但没有创建新UAT。继续方向原本要求独立writer trust root、受信launcher、CPython/stdlib闭包及通用runtime publisher/observer/backend；后者是拟建证明平台，不等于部署后不可省略的只读运行核对。
+- 这些对象全部位于同一宿主root控制域。uid 0能够同时修改kernel、Docker daemon、pin、launcher、snapshot和Python；同机继续自证不能创造独立故障域或独立信任根，只会增加实现、测试和恢复面。
+- 当前目标是供小团队验证的可丢弃空库UAT，不含真实样本、正式账号、生产数据或公网切换。真正影响安全和可回退性的阻断是精确源码/镜像、环境隔离、空库Migration、资源门和现有环境保护，而不是在同一root域内继续叠加证明层。
+
+### Decision
+
+1. 同机非生产UAT接受`ROOT_ADMIN_TRUSTED_NONPRODUCTION_BOUNDARY`：受信root管理员及root-owned宿主OS/Python/Docker是运维控制面；普通运行身份不得写构建快照、发布输入或宿主控制文件。该假设不得描述为cryptographic attestation、独立writer trust root、生产供应链证明或异机灾备。
+2. 冻结的是D-174—D-186中用于在同一root域建立独立信任根的高级证明实现：现有源码、测试、摘要和`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`保持原样，不删除、不chmod、不继续演进；one-shot证明链、通用publisher/observer/backend和CPython/stdlib全量attestation不再是同机空库L2a的必经平台。但D-174—D-183已确定的隔离root、数据库技术角色与凭据映射、动作依赖/顺序、Migration后ACL reconcile、localhost Host/SNI/Public Origin仍为L2a `MUST`，不得因冻结证明实现而变成可选。
+3. L2a构建必须从新的root-owned `0700` detached clean Git worktree开始，固定commit和tree，拒绝tracked drift及untracked输入；不得直接以当前含用户未跟踪文件的工作树作为Docker build context。Web/Worker必须由该commit构建并回读精确image/config digest，Compose只消费digest，禁止旧`78d96c6`镜像、`latest`或浮动tag。
+4. 隔离边界继续硬性成立：独立Compose项目、host roots、Secret、网络、Volume、loopback端口和全新空PostgreSQL；严格`0001 → 0046` allowlist；不挂载生产凭据、四个受保护Volume、Docker socket，不使用host network或privileged容器，应用容器保持nonroot。Secret必须使用独立新值；宿主Secret根目录为`root:root 0700`，每个文件严格继承`operations/runtime-secret-file-policy-v1.json`，即owner uid为0、gid为固定consumer gid、mode为`0440`、regular file且`nlink=1`，不得写入日志，并只读挂载到容器。部署后仍须以只读方式核对实际初始空库、精确Migration ledger、技术角色/owner/ACL、镜像与config digest、Secret/mount、network/Volume/loopback及health；不建设通用证据平台不等于省略这些运行事实。
+5. L2a执行前必须重新通过低资源门，核对现有四服务/四保护卷，并确认现有UAT的数据库与文件域备份位于不同故障域、摘要/清单通过且已完成隔离恢复验证；同机dump或快照不得称为灾备。全新空UAT仍可按`DISPOSABLE`由固定输入重建，不为其虚构备份成熟度。另须准备只针对精确新项目的回退命令；执行后必须证明现有服务ID、health、restart/OOM及保护卷未改变。禁止任何prune或扩大清理。
+6. 人员数量不进入基础设施、线程、容量或验收硬条件。L2a只允许在新的明确授权后串行build、空库Migration、部署及上述只读运行不变量核对；账号、虚构样本、真实样本、公开访问和生产继续按L3—L5独立授权。
+7. 本决策切片只修改治理文档并运行无业务写的既有静态测试；D-187不运行新的宿主/运行面plan，D-185历史只读plan事实保留，任何execute动作均未获权或产生副作用；不运行build、Migration、deploy，不创建UAT、账号、Secret、Docker或数据库资源。
+
+### Consequences
+
+- TASK92不再等待独立writer trust root、固定launcher、CPython全量attestation或通用runtime证据平台；这些风险对本阶段按P1接受并记录，到真实样本/公开访问/生产前重新设门。基础隔离与部署后只读运行核对不在接受范围内。
+- 当前P0收敛为：固定commit/tree的精确Web/Worker镜像与config digest、resolved Compose和回退输入、继承的隔离/角色/顺序/ACL/Host-SNI不变量、上述Secret实物门、部署后只读运行核对、现有UAT异故障域备份及隔离恢复验证、新鲜资源门，以及新的明确L2a执行授权。上述任一缺失都保持L2a NO-GO。
+- D-186 pin继续保留为可审计历史事实，但不因存在而声称可信启动，也不因D-187而删除或放宽。新UAT仍未创建，系统继续`PRODUCTION NO-GO`。
+
+### Rejected alternatives
+
+- 拒绝继续建设同机内容寻址payload publisher、专用plan launcher、daemon、broker、systemd或CPython/stdlib全量attestation作为空库L2a前置条件。
+- 拒绝删除D-174—D-186证据、修改现有pin权限，或把D-187解释为生产安全降级。
+- 拒绝直接从当前可变工作树build、复用旧镜像、浮动tag、现有UAT数据库/Volume或生产凭据。
+- 拒绝因为系统人数少就取消空库隔离、精确镜像、Migration allowlist、资源门、恢复和回退底线。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

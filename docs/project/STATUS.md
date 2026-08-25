@@ -2,12 +2,17 @@
 
 最后更新时间：2026-08-25（Asia/Shanghai）
 
-## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-186仓库外manifest pin已安装回读，可信启动与runtime仍未建立）
+## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-187已简化同机空库UAT信任边界，等待精确镜像与L2a授权）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / D-186 EXTERNAL MANIFEST PIN INSTALLED AND READ BACK / TRUSTED PLAN LAUNCH + RUNTIME + EXACT IMAGE REQUIRED / PRODUCTION NO-GO | 固定manifest raw SHA已安装到仓库外宿主路径并连续两次只读回读；`execute`不可用，writer separation、受信launcher/CPython、runtime evidence和UAT均未建立 |
-| 授权范围 | PASS / ONE FIXED CREATE-ONLY HOST PIN + READBACK | 只允许固定`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`安装/核对；未授权launcher/plan、UAT目录、Secret、证书、Docker资源、数据库、build、Migration、部署、账号、HTTP/TLS探针或业务写 |
+| 当前状态 | DOING / D-187 SAME-HOST UAT TRUST BOUNDARY SIMPLIFIED / EXACT IMAGES + EXPLICIT L2A AUTHORIZATION REQUIRED / PRODUCTION NO-GO | D-174—D-186中以同机独立信任根为目标的高级attestation实现已冻结；基础隔离与部署后只读运行不变量继续强制。同机空库UAT接受root运维信任，但精确镜像/config digest、resolved Compose/回退、Secret实物门、现有UAT异故障域备份与隔离恢复验证、资源门、L2a授权和新UAT均未建立 |
+| 授权范围 | PASS / DOCS-ONLY TRUST-BOUNDARY DECISION | 只允许记录D-187并运行无业务写的静态测试；未授权launcher/plan、UAT目录、Secret、证书、Docker资源、数据库、build、Migration、部署、账号、HTTP/TLS探针或业务写 |
+| D-187比例原则 | ACCEPTED / ROOT ADMIN TRUSTED NONPRODUCTION BOUNDARY | 同一root能控制kernel、Docker、pin、launcher和Python，继续同机自证不能形成独立信任域。该风险只对空库、无真实数据、loopback-only UAT按P1接受，不适用于真实样本、公开访问或生产 |
+| D-187冻结范围 | PASS / ADVANCED ATTESTATION OPTIONAL; RUNTIME INVARIANTS MUST | 历史源码、测试、摘要及D-186宿主pin原样保留，不删除、不chmod、不继续演进；one-shot证明链、通用publisher/observer/backend和CPython全量attestation不再是空库L2a必经平台。隔离root、技术角色/凭据映射、动作顺序、Migration后ACL、Host/SNI与部署后只读运行核对仍强制，且不因冻结而声称已运行或可信 |
+| D-187剩余P0 | L2A NO-GO | 必须从新的root-owned `0700`干净detached worktree固定commit/tree，构建并回读精确Web/Worker image/config digest，冻结resolved Compose和精确回退；继续强制隔离root、技术角色/凭据映射、动作顺序、Migration后ACL及localhost Host/SNI/Public Origin；Secret须为独立新值，宿主目录`root:root 0700`，每个regular/`nlink=1`文件严格继承`runtime-secret-file-policy-v1`的owner uid 0、固定consumer gid与`0440`，不入日志且容器只读挂载；部署后须只读核对实际初始空库、Migration ledger、角色/owner/ACL、镜像/config、Secret/mount、network/Volume/loopback与health；现有UAT数据库/文件域须有异故障域备份并通过摘要/清单与隔离恢复验证，同机快照不算灾备；另须复核资源门并取得明确L2a执行授权。新空UAT按`DISPOSABLE`重建 |
+| D-187回归 | PASS / EXISTING 124 + COMPOSE DOUBLE PASS / REVIEW P0=P1=P2=0 | D-174—D-186聚合`124/124`通过；隔离Compose policy/config连续两次双PASS；`git diff --check`通过。两路最终独立复核均无P0/P1/P2。D-187未运行新的宿主/运行面plan，D-185历史只读plan保留且任何execute动作均未获权或产生副作用；未运行容器、数据库、build或Migration |
+| D-187资源/完整性 | PASS / DOCS + STATIC ONLY / NO RESIDUE | 10:54→11:07 available memory `2,115,837,952 → 2,106,703,872`B，Swap `185,061,376 → 186,945,536`B（+`1,884,160`B），根盘available `17,477,898,240 → 17,530,789,888`B，Load `0.31/0.17/0.16 → 0.69/0.42/0.31`，PSI/OOM0。四服务restart0/OOM false，Web/PostgreSQL healthy，四保护卷存在；本段`/tmp/isolated-uat-*`与新增pyc残留0 |
 | 清理执行 | PASS / 3 BOUNDED PASSES | 三次BuildKit-only命令均rc0，分别报告607.3MB、35.76MB和9.667GB；Cache`174 → 164 → 149 → 0`，active始终0 |
 | 根盘 | PASS / 16.68 GiB AVAILABLE | `10,825,478,144 → 17,909,628,928` bytes，实际增加约6.60GiB；最终比10GiB硬线高约6.68GiB |
 | 内存/Swap/Load | PASS | 最终MemAvailable `2,467,676,160`B，Swap used `179,859,456`B且60秒增长0，Load`0.24/0.28/0.26`，PSI/OOM0 |
@@ -82,8 +87,8 @@
 | 收口资源/完整性 | PASS / NO UAT RESIDUE | `2,452,017,152`B available memory、`179,843,072`B Swap、`17,893,322,752`B根盘、Load`0.19/0.17/0.12`、OOM0；6/75/277/6、Cache0，四服务restart0/OOM false且保护卷完整 |
 | 生产配置/运行面 | PASS / UNCHANGED | 生产Compose与政策未改；未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源 |
 | 本段资源/完整性 | PASS / STATIC ONLY | 起点约2.3GiB/171MiB/17GiB/Load`0.21/0.20/0.18`；收口`2,445,348,864`B available、`179,769,344`B Swap、`17,871,294,464`B磁盘、Load`0.03/0.11/0.15`、PSI/OOM0。6/75/277/6、Cache0，四服务restart0/OOM false且保护卷保持，任务临时资源0 |
-| 仍有阻断 | TRUSTED LAUNCHER + WRITER SEPARATION + TRUSTED RUNTIME + EXACT IMAGE | 仓库外摘要文件已安装回读，但同一uid 0仍可写anchor，installer/bootstrap/CPython/stdlib未形成payload外独立闭包；host/Docker/PG/HTTP observer、runtime publisher/backend及当前源码匹配Web/Worker镜像仍缺失 |
-| 下一步 | TASK92 / SEPARATE AUTHORIZATION FOR TRUSTED LAUNCH/RUNTIME + EXACT IMAGE/L2A | 先另获授权建立anchor写者与非写runner分离、same-FD bytes执行或内容寻址只读快照及受控Python/runtime closure，再准备精确镜像和L2a执行包；`execute`继续不可用，不自动运行plan、build、deploy、Migration或创建UAT |
+| 仍有阻断 | EXACT IMAGE + RESOLVED COMPOSE/ROLLBACK + RESOURCE/RECOVERY + L2A AUTHORIZATION | 当前HEAD没有匹配Web/Worker image/config digest；新的干净build commit/tree、resolved Compose、精确回退、资源/恢复门和L2a执行授权仍缺失。D-187已把同机独立launcher/CPython attestation移出空库L2a阻断 |
+| 下一步 | TASK92 / SEPARATE AUTHORIZATION FOR CLEAN BUILD + EXACT IMAGE/L2A | 另获授权后从新的root-owned `0700`干净detached worktree固定commit/tree，串行build并回读精确Web/Worker image/config digest，冻结resolved Compose和回退输入，再提交或执行L2a空库包；不自动运行plan、build、deploy、Migration或创建UAT |
 
 ## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
 
@@ -100,7 +105,7 @@
 | 运行面完整性 | PASS / UNCHANGED | 6容器/75镜像/277 Volume/174 Build Cache不变；四ERP服务restart0/OOM false，Web/PostgreSQL healthy，TASK91残留0 |
 | 授权/非动作 | PASS / L1 ONLY | 未连接数据库，未读业务/凭据/备份/Volume正文；未创建资源、清理、build、deploy、Migration、账号或业务写 |
 | 已选路径 | SAME HOST / FAILURE DOMAIN ACCEPTED | D-173已取代此前待选状态；Compose消费者隔离已通过，producer/operator仍待适配 |
-| 后续状态 | SUPERSEDED BY TASK92 / D-186 | TASK91历史入口已由D-173—D-186继续推进；外部路径pin已安装回读，当前下一步以本文件TASK92小节的受信launcher/writer separation、精确镜像/runtime和L2a授权为准，不自动取得L2a、账号、HTTPS或L3写权限 |
+| 后续状态 | SUPERSEDED BY TASK92 / D-187 | TASK91历史入口已由D-173—D-187继续推进；高级attestation实现已冻结但基础隔离/运行不变量继续强制，当前下一步以本文件TASK92小节的干净固定commit/tree、精确镜像/config digest、resolved Compose/回退和L2a授权为准，不自动取得L2a、账号、HTTPS或L3写权限 |
 | 系统是否可试运行 | NO | 环境尚未创建，L1通过不能替代部署、Migration、账号和员工UAT |
 
 ## SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90（完成；无样本试运行准备包）

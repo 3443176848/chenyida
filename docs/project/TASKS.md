@@ -11,9 +11,11 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-185已把84份verified bytes直接生成只读plan；D-186又把launch manifest raw SHA以固定65-byte文件create-only安装到`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`并连续两次回读。`execute`不可用；该路径不是独立writer trust root，installer/bootstrap/CPython、可信launcher、runtime evidence和UAT均未建立。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-187已按小团队第一性原理只冻结D-174—D-186中以同机独立信任根为目标的高级attestation实现，接受受信root管理员及root-owned OS/Python/Docker为同机空库UAT运维信任边界；历史代码、测试和D-186 pin原样保留，基础隔离与部署后只读运行不变量继续强制。当前P0只剩这些不变量、固定commit/tree的精确镜像/config digest、resolved Compose/回退、Secret实物门、现有UAT异故障域备份与隔离恢复验证、资源门和明确L2a执行授权，新UAT未创建。
 
-2026-08-25仓库外摘要钉扎事件：项目负责人在已明确“只安装并只读核对D-185宿主外部摘要钉扎，不创建UAT、不build/deploy、不运行Migration、不接触数据库或四个保护卷”的下一步后继续确认。新增D-186、固定create-only安装器和12项专项测试；pin目录/文件root:root `0700/0400`，manifest/pin raw为`ba8e7337…a7e5`/`83bea3c…6065`，一次install与两次verify通过且identity不变。专项12/12、聚合124/124、Compose静态双门连续两次PASS，三路复核无P0/P1。外部路径不等于独立trust root；writer separation、受信launcher/Python/runtime、精确镜像和UAT仍缺失。TASK92继续`DOING`，下一步需另获可信launch/runtime及L2a授权。
+2026-08-25同机UAT信任边界简化事件：项目负责人继续要求“下一步”，且此前已明确系统少于20名内部用户、人数不得写死并要求第一性原理。新增D-187，确认同一root域内继续建设独立writer trust root、launcher、CPython/stdlib全量attestation及通用publisher/observer/backend不能形成真正独立信任域，故只冻结D-174—D-186相应高级证明实现，不再让其阻断空库L2a；隔离root、技术角色/凭据映射、动作顺序、Migration后ACL、localhost Host/SNI/Public Origin及部署后只读运行核对继续为L2a `MUST`。其余底线收敛为新的root-owned `0700`干净detached worktree、固定commit/tree、精确Web/Worker image/config digest、隔离Compose/空PG/`0001→0046`、Secret实物门、现有UAT异故障域备份与隔离恢复验证、资源/回退门和新的明确授权。既有聚合124/124与隔离Compose连续两次双门通过，多路只读评估复核范围；10:54→11:07资源保持门内且任务残留0。D-187未运行新的宿主/运行面plan，D-185历史只读plan事实保留，任何execute动作均未获权或产生副作用；未运行build/Migration/deploy，未创建UAT、账号或业务数据；TASK92继续`DOING`。
+
+2026-08-25仓库外摘要钉扎事件：项目负责人在已明确“只安装并只读核对D-185宿主外部摘要钉扎，不创建UAT、不build/deploy、不运行Migration、不接触数据库或四个保护卷”的下一步后继续确认。新增D-186、固定create-only安装器和12项专项测试；pin目录/文件root:root `0700/0400`，manifest/pin raw为`ba8e7337…a7e5`/`83bea3c…6065`，一次install与两次verify通过且identity不变。专项12/12、聚合124/124、Compose静态双门连续两次PASS，三路复核无P0/P1。外部路径不等于独立trust root；writer separation、受信launcher/Python/runtime、精确镜像和UAT当时仍缺失。该历史下一步已由D-187取代，高级attestation不再阻断空库L2a。
 
 2026-08-25 verified-byte只读计划交接事件：项目负责人继续要求“下一步”。新增D-185、bootstrap policy v2和未来外部宿主钉扎manifest；CLI只开放`verify/plan`，以2 MiB stdin/4 MiB output上限、唯一活动主线程、84成员map、8条模块边及258次/78路径固定读取，将D-184已验bytes直接交给one-shot plan编译器。专项20/20、聚合112/112、Compose静态双门连续两次PASS，三路独立复核P0/P1/P2=0。D-185当时manifest仓库副本不是外部信任根且未安装host pin；没有execute、publisher/runtime、Docker、数据库或UAT动作。随后D-186已完成固定外部路径pin安装/回读，但不改变D-185的历史边界。
 
@@ -303,7 +305,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域，已授权固定pin-only安装/回读）、Codex（已完成清理、D-177—D-185合同/闭包/同字节计划及D-186外部路径pin；继续可信launcher、精确镜像/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、D-181、D-182、D-183、D-184、D-185、D-186、低资源规则 | `DOING / D-186 EXTERNAL MANIFEST PIN INSTALLED AND READ BACK / TRUSTED PLAN LAUNCH + RUNTIME + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。固定manifest raw SHA已在仓库外宿主路径安装并双回读，`execute`不可用；writer separation、受信launcher/CPython、TLS/HTTP、publisher/backend未建立，新UAT未创建。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B、接受同一故障域并要求小团队第一性原理）、Codex（已完成清理/隔离合同，只冻结D-174—D-186高级证明实现，继续基础不变量、精确镜像与L2a输入） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174—D-187、低资源规则 | `DOING / D-187 SAME-HOST UAT TRUST BOUNDARY SIMPLIFIED / EXACT IMAGES + EXPLICIT L2A AUTHORIZATION REQUIRED / PRODUCTION NO-GO`。root运维信任只适用于同机空库非生产UAT，不是独立信任根或生产证明；历史pin/代码/测试不变，基础隔离与运行不变量继续强制。精确镜像/config digest、resolved Compose/回退、Secret实物门、现有UAT异故障域备份与隔离恢复验证、资源门和L2a授权仍缺失，新UAT未创建。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 
