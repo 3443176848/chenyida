@@ -4265,6 +4265,40 @@
 - 拒绝把同仓manifest、自hash或root-owned mode冒充payload外部known-good锚。
 - 拒绝开放`execute`、宿主安装、Docker/数据库动作，或按员工人数配置当前合同。
 
+## D-186 仓库外摘要文件只证明固定路径安装/回读，不等于独立信任根或可信启动
+
+- 日期：2026-08-25
+- 状态：Accepted（固定宿主pin已create-only安装并连续回读；受信launcher、writer separation、Python/runtime和UAT未建立）
+- 发起：项目负责人在前一步已明确“只安装并只读核对宿主外部摘要钉扎”的范围后继续要求“下一步”；Codex按单一小团队UAT和最小宿主变化执行
+
+### Context
+
+- D-185已经声明launch manifest raw SHA，但仓库内副本与payload同域，不能充当外部比较值。当前最小有用宿主事实只是把该64位摘要加换行保存到仓库树和三个生产保护根之外，并能从固定路径核对精确identity和bytes。
+- 完整launcher、systemd、journal、账号、runtime publisher或通用安装框架都不是保存65 bytes的必要条件；把它们并入本步会扩大授权和故障面。
+- `root:root 0400`也不能自动形成独立writer信任根：uid 0可绕过mode；worktree installer、`/usr/bin/python3`、loader/libpython/stdlib和动态加载环境均未获payload外独立attestation。先hash路径再按路径执行bootstrap还会留下TOCTOU。
+
+### Decision
+
+1. 唯一目标固定为`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`；它与`/etc/chenyida-erp`、`/var/lib/chenyida-erp`和`/var/backups/chenyida-erp-v2`不重叠。内容精确为manifest raw SHA `ba8e7337798cf499deea039ad14ea859f0ba27ecba88aaec7196c3c02d33a7e5\n`，文件raw SHA为`83bea3c086538c5eaea83446c5e54bbc5d8446ff69fcd0d1687baeab2bb56065`。
+2. 安装器只接受固定`install|verify`，必须以`/usr/bin/python3 -I -S -B`和root运行，不接受caller source/target/digest。写入前完整核对manifest/bootstrap/policy raw/internal链；目录链和文件以固定dir-FD、`O_NOFOLLOW`、root:root、mode/nlink/device/bounds及读后name→inode identity失败关闭。
+3. 发布仅允许同目录prepared文件、`O_EXCL`、完整write、`fchown/fchmod/fsync`、`renameat2(RENAME_NOREPLACE)`和目录`fsync`。目录固定0700、pin固定0400/regular/nlink1；已有正确pin不重写，任何异常对象或内容不覆盖。
+4. 成功状态最高只能是`EXTERNAL_MANIFEST_PIN_INSTALLED_AND_READ_BACK`。报告必须同时写明外部路径不是独立writer trust root、installer未外部attest、writer separation/可信launch未建立、Python/stdlib未attest、`execute`不可用且UAT未创建。
+5. 不实现自动crash recovery或rollback。捕获异常只清理本次精确temp；SIGKILL/断电遗留任何prepared项时，后续严格`DIRECTORY_NOT_EXACT`停止，清理或回滚必须另获精确授权。
+6. 本决策不授权运行bootstrap `plan`、创建launcher/账号/Secret/UAT/Docker/数据库资源，或build、deploy、Migration、restart、HTTP/TLS探针、业务写和生产动作。
+
+### Consequences
+
+- 一次前台安装与两次只读verify已经把固定manifest raw SHA放到仓库外确定路径；最终目录/文件为root:root 0700/0400，pin为65 bytes、单链接，目录无额外项，两次verify报告逐字一致。
+- D-186专项12/12、更新后聚合124/124及隔离Compose双门连续两次PASS；三路复核无P0/P1阻断。Prepared residue是显式失败关闭合同，不冒充完整可恢复事务。
+- TASK92继续`DOING`。下一独立切片必须把anchor写者与payload runner分离，并以同一已验FD字节执行或内容寻址只读快照关闭hash-then-path TOCTOU，同时明确Python/runtime closure；之后才处理精确镜像、runtime和L2a。
+
+### Rejected alternatives
+
+- 拒绝把pin放进D-174保护根或仓库worktree，也拒绝caller选择路径、摘要或覆盖既有错误对象。
+- 拒绝因为文件是root:root 0400就称其为独立trust root，或直接以host uid 0运行payload并保留anchor写能力。
+- 拒绝先hash bootstrap路径再重新按路径执行，也拒绝在本步顺带建设launcher、systemd、journal、daemon或通用发布平台。
+- 拒绝自动扫描/删除prepared残留、自动回滚，或因pin回读成功声称UAT已可试运行。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

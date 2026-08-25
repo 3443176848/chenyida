@@ -4,6 +4,18 @@
 
 ## 2026-08-25
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: install isolated UAT external manifest pin`
+
+- 第一性原理：为单一小团队UAT只增加一个固定create-only安装器、一个65-byte宿主摘要文件和12项专项测试；不建设launcher、systemd、journal、账号或通用发布平台，人数不进入路径、线程、容量或验收条件。
+- 固定pin：唯一目标`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`与三个保护根不重叠；内容为manifest raw SHA `ba8e7337…a7e5`加换行，文件raw SHA `83bea3c…6065`。最终目录/文件root:root `0700/0400`，文件65 bytes、nlink1、device64769/inode101991324，目录仅含`manifest.sha256`。
+- 原子/失败关闭：源manifest/bootstrap/policy raw/internal链先核对；目录逐组件dir-FD、nofollow、owner/mode/device，文件再核对regular/nlink/bounds、稳定FD及读后pathname identity。同目录prepared经O_EXCL、文件/目录fsync和`RENAME_NOREPLACE`发布；错误内容/type/mode/owner/group/hardlink/symlink/可写祖先或额外项不覆盖。
+- 实际回读：执行时installer/test raw为`033772b1…e8733`/`43807f83…063c`；一次前台install返回`CREATED_AND_VERIFIED`及报告SHA`ae0bbd55…fdcfa`，随后两次verify输出逐字一致、identity不变，报告SHA`9dc339be…65c6`。SIGKILL/断电prepared残留会严格失败且不自动删除，恢复/回滚需另授权。
+- 诚实停止线：最高状态仅`EXTERNAL_MANIFEST_PIN_INSTALLED_AND_READ_BACK`；外部路径不是独立writer trust root，installer、CPython/stdlib未外部attest，writer separation和可信launcher未建立，`execute`不可用，runtime/UAT未创建。
+- 测试/复核：D-186专项12/12，完整聚合`5+13+7+16+13+15+11+12+20+12=124/124`；隔离Compose policy/config连续两次双PASS。三路最终复核P0=0/P1=0；prepared crash边界已进入状态字段和负测。
+- 资源/完整性：10:00→10:21 available memory `2,102,263,808 → 2,101,612,544`B，Swap `182,804,480 → 184,582,144`B，根盘 `17,453,727,744 → 17,463,406,592`B，Load `0.21/0.12/0.13 → 0.25/0.28/0.27`，PSI/OOM0。四服务running/restart0/OOM false，Web/PostgreSQL healthy，四保护卷存在；fixture/pyc/prepared temp残留0。Compose `ps`对缺失当前必填环境值失败关闭，以Docker metadata核对。
+- 代码/数据：新增host-pin安装器/测试并接入聚合runner；无产品业务代码、Schema、Migration、API、页面、依赖或生产配置变化。未连接数据库、读取Volume/备份/业务正文，未创建UAT/Docker/Secret/账号，未build/deploy/Migration/restart/HTTP-TLS/业务写。
+- 文档：新增D-186并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一步需另授权可信launcher/writer separation、runtime closure、精确镜像和L2a，不自动运行plan。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: hand off verified UAT plan bytes`
 
 - 第一性原理：少于20人的单一同机UAT只需要证明“被验证的同一批bytes生成了只读plan”；不为plan创建84文件私有树、child、daemon或通用publisher，也不把工程/计划/市场等人数写入容量或验收合同。

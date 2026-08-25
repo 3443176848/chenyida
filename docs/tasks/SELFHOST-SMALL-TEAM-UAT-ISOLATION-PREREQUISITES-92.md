@@ -1,9 +1,9 @@
 # SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 新隔离UAT前置边界
 
-> 状态：`DOING / D-185 VERIFIED-BYTE READ-ONLY PLAN HANDOFF PASS / EXTERNAL HOST PIN + RUNTIME OBSERVER/BACKEND + EXACT IMAGE REQUIRED / NEW UAT NOT CREATED / PRODUCTION NO-GO`
+> 状态：`DOING / D-186 EXTERNAL MANIFEST PIN INSTALLED AND READ BACK / TRUSTED PLAN LAUNCH + RUNTIME + EXACT IMAGE REQUIRED / NEW UAT NOT CREATED / PRODUCTION NO-GO`
 > 日期：2026-08-25（Asia/Shanghai）
 > 依赖：TASK91、D-172、低资源服务器保护规则
-> 责任：项目负责人已选择当前主机同机隔离并接受同一故障域；Codex只执行仓库内静态前置，运行资源仍逐层授权
+> 责任：项目负责人已选择当前主机同机隔离并接受同一故障域；Codex已按本轮明确范围安装单一仓库外摘要文件，其他运行资源仍逐层授权
 
 ## 1. 目标
 
@@ -29,6 +29,7 @@
 - 2026-08-25，项目负责人继续要求“下一步”。本段只新增D-183独立声明源码闭包policy/纯validator和静态负测，从冻结v6重建有界依赖图；不修改v1—v6、不新增v7，不读取运行文件、build镜像、实现publisher/runtime backend或扩大为L2a。
 - 2026-08-25，项目负责人继续要求“下一步”。本段只新增D-184固定文件系统FD快照入口并从已验bytes重跑D-183；不执行one-shot、不实现publisher/runtime backend，也不扩大为L2a。
 - 2026-08-25，项目负责人再次要求“下一步”。本段只把D-184已验证bytes交给固定只读`plan`编译器并增加未来外部宿主钉扎清单；`execute`不可用，不安装宿主锚、不创建UAT，不运行Docker、数据库、Migration、build、部署、HTTP/TLS或业务写。
+- 2026-08-25，项目负责人在已明确“只安装并只读核对D-185宿主外部摘要钉扎，不创建UAT、不build/deploy、不运行Migration、不接触数据库或四个保护卷”的下一步后确认继续。本段只在固定同级路径`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`以create-only方式安装manifest raw SHA并连续两次只读回读；不安装launcher、不运行`plan/execute`，不创建账号、Secret、Docker或UAT资源。
 
 ### A. 独立UAT主机（推荐）
 
@@ -48,7 +49,7 @@
 
 - 当前HEAD没有匹配Web/Worker镜像；唯一alpha.47镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`。
 - `compose.uat-isolated.yml`已关闭容器消费者侧固定root：独立项目名、Secret、release candidate/identity、命名Volume、网络和loopback端口均有失败关闭静态合同。生产Compose未参数化、未改变。
-- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同；D-183完成冻结v6九动作的83成员有界声明source closure，D-184/D-185又从固定FD捕获83成员及D-174 control policy，并以固定内存适配器直接生成同字节只读计划。仓库内manifest不是外部信任根，尚未在宿主外部安装/钉扎；bootstrap、CPython/stdlib、TLS/HTTP、runtime publisher/observer/backend和精确镜像仍未建立。
+- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同；D-183完成冻结v6九动作的83成员有界声明source closure，D-184/D-185又从固定FD捕获83成员及D-174 control policy，并以固定内存适配器直接生成同字节只读计划。D-186已把manifest raw SHA安装到仓库外固定宿主路径并回读，但同一uid 0仍可写该路径、installer未获payload外独立attestation，也没有受信launcher或CPython/stdlib闭包；TLS/HTTP、runtime publisher/observer/backend和精确镜像仍未建立。
 - TASK92已把根盘可用恢复到约16.68 GiB、比10 GiB硬线高约6.68 GiB；磁盘停止线阻断已解除，但任何后续build仍须重新执行新鲜资源门并串行控制上界。
 - L2a、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权。
 
@@ -228,11 +229,23 @@
 - 本切片起点→09:37 CST资源/完整性：available memory `2,130,964,480 → 2,127,458,304`B，Swap used `182,296,576 → 182,812,672`B（+`516,096`B），根盘available `17,551,732,736 → 17,520,386,048`B，Load `0.05/0.07/0.15 → 0.44/0.28/0.29`，Memory PSI和kernel `oom_kill`均0。Docker保持6容器/75镜像/277 Volume/6网络；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整。`docker compose ps`因未注入必填`ERP_DEPLOYMENT_CLASS`在插值期失败关闭，故以只读Docker metadata核对；D184/D185 fixture、临时目录及本切片新增pyc残留0，既有历史pyc未清理。
 - 本段没有创建或访问UAT目录、Secret、证书、容器、网络、Volume、数据库、备份或业务数据，没有build、deploy、Migration、restart、账号、HTTP/TLS探针或回执发布。人数不进入文件数、动作数、容量或验收合同。
 
-## 18. 当前停止线与完成标准
+## 18. D-186 仓库外manifest摘要钉扎与只读回读结果
 
-磁盘、Compose消费者隔离、producer/operator请求、默认只读计划、v2顺序、D-178—D-183纯合同/声明closure、D-184 FD快照及D-185 same-verified-bytes只读计划交接已经完成；TASK92继续`DOING`。Payload外部宿主钉扎、受信Python运行时、宿主runtime publisher/observer/backend和当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
+- 第一性原理边界保持为一个65-byte固定事实，不建设通用安装平台：新增标准库-only create-only安装器及12项专项测试，唯一宿主目标为`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`。该路径是受保护`/etc/chenyida-erp`的同级路径，不与`/etc/chenyida-erp`、`/var/lib/chenyida-erp`或`/var/backups/chenyida-erp-v2`重叠；调用方不能覆盖source root、target、摘要或命令。
+- 安装前固定核对manifest/bootstrap/policy raw SHA `ba8e7337…a7e5`/`bc33d4da…e028`/`809989aa…241d`及manifest/policy内部SHA `b71662a4…672a`/`4358ef2d…fe1`。目录链逐组件dir-FD、`O_NOFOLLOW`、root:root、不可group/other写且同device；文件还必须regular、`nlink=1`、有界，FD读取前后和读后pathname→inode完整identity均一致。
+- 发布只允许目录`root:root 0700`、文件`root:root 0400`。同目录随机prepared文件经`O_EXCL|O_NOFOLLOW`创建，完整写入后`fchown/fchmod/fsync`，再以`renameat2(RENAME_NOREPLACE)`发布并`fsync`目录；既有正确pin只读幂等，任何错误内容、type、mode、owner/group、hardlink、symlink、可写祖先或额外目录项均失败且不覆盖。
+- 执行时installer/test raw SHA为`033772b17f0e0cba23a31f9d51cacd9431681f761e9796ab261511c4875e8733`/`43807f8301829413b1db24b6e010ee1c2663656a68e01ca365e762564ebe063c`。10:19 CST实际一次前台安装返回`CREATED_AND_VERIFIED`。最终pin保存manifest raw SHA加换行，文件raw SHA为`83bea3c086538c5eaea83446c5e54bbc5d8446ff69fcd0d1687baeab2bb56065`，size 65、device 64769、inode 101991324、uid/gid 0/0、mode 0400、nlink 1；目录仅含`manifest.sha256`。安装报告SHA为`ae0bbd55…fdcfa`，随后两次独立只读verify输出逐字一致、identity不变，verify报告SHA为`9dc339be…65c6`。
+- 诚实边界固定为`EXTERNAL_MANIFEST_PIN_INSTALLED_AND_READ_BACK`，同时明确`OUTSIDE_REPOSITORY_WORKTREE_NOT_INDEPENDENT_WRITER_TRUST_ROOT / WORKTREE_CODE_NOT_EXTERNALLY_ATTESTED / WRITER_SEPARATION_NOT_ESTABLISHED / TRUSTED_PLAN_LAUNCH_NOT_ESTABLISHED / PYTHON_RUNTIME_NOT_ATTESTED / UAT_NOT_CREATED`。本切片没有执行bootstrap `plan`或任何payload；uid 0仍可改写anchor，不能据此称为受信启动链。
+- Crash recovery/rollback不在本切片：若SIGKILL或断电留下精确`.manifest.sha256.prepared.*.tmp`，后续install/verify必须`DIRECTORY_NOT_EXACT`失败关闭，不得自动删除；任何精确清理或回滚都需另行授权。正常异常路径会只清理本次创建的精确temp，专项负测已固定该边界。
+- D-186专项12/12；完整聚合为控制5 + one-shot13 + runtime contracts7 + runtime receipts16 + external anchors13 + owner15 + Host/SNI11 + D-183 12 + D-185 20 + D-186 12，共124/124；隔离Compose policy/config连续两次双PASS。三路只读复核均为P0=0/P1=0；唯一讨论项是上述已显式合同化的crash prepared residue边界，没有安装阻断。
+- 10:00→10:21 CST资源/完整性：available memory `2,102,263,808 → 2,101,612,544`B，Swap used `182,804,480 → 184,582,144`B（+`1,777,664`B），根盘available `17,453,727,744 → 17,463,406,592`B，Load `0.21/0.12/0.13 → 0.25/0.28/0.27`，Memory PSI及kernel `oom_kill`均0。四常驻服务均running、restart0/OOM false，Web/PostgreSQL healthy；四保护卷存在且未读取正文。当前Compose `ps`先后因缺`ERP_DEPLOYMENT_CLASS`及运行env缺当前源码必填`ERP_RELEASE_EXPECTED_DEPLOYMENT_ID`失败关闭，故以Docker metadata核对；D186 fixture/pyc/prepared temp残留0，唯一新增宿主对象是预期pin目录和文件。
+- 本段未连接数据库、未读取业务数据/备份/Volume正文，未创建UAT、Secret、证书、容器、网络、Volume或账号，未build、deploy、Migration、restart、HTTP/TLS探针或业务写。
+
+## 19. 当前停止线与完成标准
+
+磁盘、Compose消费者隔离、producer/operator请求、默认只读计划、v2顺序、D-178—D-183纯合同/声明closure、D-184 FD快照、D-185 same-verified-bytes只读计划交接及D-186仓库外摘要文件安装/回读已经完成；TASK92继续`DOING`。独立写者信任根、受信launcher/Python运行时、宿主runtime publisher/observer/backend和当前HEAD匹配Web/Worker镜像仍缺失；不得据此运行plan、创建Secret/Volume、启动第二套数据库、build或部署。
 
 - 只完成负责人选定的一条路径，不同时建设两套方案。
-- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、v2九步依赖、D-178—D-183合同/closure、D-184 FD快照及D-185只读交接已明确。下一步必须另获授权，才可把manifest raw SHA安装/钉扎到payload外部宿主入口，并处理当前源码精确Web/Worker镜像、runtime publisher/observer/backend和L2a空库执行包；不自动创建或运行。
+- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、v2九步依赖、D-178—D-183合同/closure、D-184 FD快照、D-185只读交接及D-186仓库外pin回读已明确。下一步必须另获授权，才可建立与anchor写权限分离、同一已验FD字节执行且运行时闭包受控的固定launcher，并处理当前源码精确Web/Worker镜像、runtime publisher/observer/backend和L2a空库执行包；不自动运行plan或创建UAT。
 - 现有UAT身份、数据、四个受保护Volume和常驻服务不变。
 - TASK92完成后只允许提交L2a授权申请，不自动build、deploy或Migration。

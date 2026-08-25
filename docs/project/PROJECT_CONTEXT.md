@@ -46,7 +46,9 @@
 
 2026-08-25 TASK92 pre-import文件系统快照增量：D-184新增stage-1 policy/bootstrap，不修改冻结v1—v6、D-183或one-shot。CLI固定绝对bootstrap路径、`/usr/bin/python3 -I -S -B`和唯一site root；从`/`逐组件dir-FD打开，目录/文件必须root所有且不可group/other写，文件还必须regular、`nlink=1`、同device、有界且读取前后identity不变。D-184 policy raw/internal、D-183 policy raw/internal/closure、D-183 validator raw及83成员hash全部先匹配，才从已验validator bytes执行一次D-183完整语义校验；caller-root API只能返回TEST_ONLY/NOT_ATTESTED。当前实际快照83成员共`2,092,585` bytes；bootstrap raw和policy内部/raw为`ccb9365c…a9c5`、`c5359216…2a45`/`708c96cc…cf1a`。专项10/10、聚合102/102、Compose静态双门连续两次PASS，最终对抗复核P0/P1/P2=0。结果只为`FILESYSTEM_FD_BYTES_HASH_MATCHED_BOOTSTRAP_NOT_EXTERNALLY_ATTESTED`；stage-1不执行one-shot，prior process、bootstrap与CPython身份未attest，handoff/publisher/runtime/授权未建立。下一切片把外部内容寻址锚/原子publisher与same-verified-bytes只读handoff合并处理。
 
-2026-08-25 TASK92 verified-byte只读计划交接增量：D-185以更小边界取代“为plan建立临时文件publisher”。Bootstrap policy v2只开放固定`verify/plan`，把D-184的83成员和固定D-174 control policy组成84成员/`2,100,283` bytes；路径集合与路径+值SHA为`5cd4a2e2…03a0`/`80fafed8…843`。唯一活动主线程内的固定内存适配器按8条module/path边满足one-shot的258次/78路径读取，read-set/read-trace SHA为`0403a5e1…6969a`/`b6d158d6…025b01`，捕获后不重开原仓source/pyc、不建临时树或child；固定专项测试request生成的计划SHA为`04e12045…95ea`。Bootstrap/policy/manifest raw为`bc33d4da…e028`/`809989aa…241d`/`ba8e7337…a7e5`，manifest仓库副本只作未来payload外部宿主钉扎输入，当前未安装/验证。专项20/20、聚合112/112、Compose双门两次PASS，三路复核P0/P1/P2=0。`execute`不可用，bootstrap/CPython、runtime publisher/observer/backend、精确镜像和UAT均未建立；下一步需另获host pin/runtime/L2a授权。
+2026-08-25 TASK92 verified-byte只读计划交接增量：D-185以更小边界取代“为plan建立临时文件publisher”。Bootstrap policy v2只开放固定`verify/plan`，把D-184的83成员和固定D-174 control policy组成84成员/`2,100,283` bytes；路径集合与路径+值SHA为`5cd4a2e2…03a0`/`80fafed8…843`。唯一活动主线程内的固定内存适配器按8条module/path边满足one-shot的258次/78路径读取，read-set/read-trace SHA为`0403a5e1…6969a`/`b6d158d6…025b01`，捕获后不重开原仓source/pyc、不建临时树或child；固定专项测试request生成的计划SHA为`04e12045…95ea`。Bootstrap/policy/manifest raw为`bc33d4da…e028`/`809989aa…241d`/`ba8e7337…a7e5`；D-185时manifest仓库副本只作未来宿主钉扎输入且尚未安装，随后由紧接的D-186完成固定外部路径安装/回读。专项20/20、聚合112/112、Compose双门两次PASS，三路复核P0/P1/P2=0。`execute`不可用，bootstrap/CPython、runtime publisher/observer/backend、精确镜像和UAT均未建立。
+
+2026-08-25 TASK92仓库外摘要钉扎增量：D-186按负责人对刚刚明确pin-only范围的继续确认，只在`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`create-only安装manifest raw SHA `ba8e7337…a7e5`加换行。安装器固定source/target/CLI，先核对manifest/bootstrap/policy raw/internal链，再以dir-FD/nofollow/root:root/same-device/stable-FD+path-after identity和同目录`fsync + RENAME_NOREPLACE`发布；最终目录/文件0700/0400，pin raw `83bea3c…6065`、65 bytes、nlink1，目录仅此一项。一次install与两次verify通过，两次verify逐字一致。专项12/12、聚合124/124、Compose双门连续两次PASS，三路复核无P0/P1。状态只称`EXTERNAL_MANIFEST_PIN_INSTALLED_AND_READ_BACK`；同一uid0仍有写能力，installer/CPython/stdlib未外部attest，writer separation、受信launcher、runtime和UAT未建立。Crash prepared residue严格停止且不得自动清理。未连接数据库或操作Docker/四保护卷正文。
 
 ## 2026-08-13 投产准入基线
 
@@ -60,7 +62,7 @@
 
 2026-08-21 TASK70启动增量：TASK70已从`TODO`转为当前唯一`DOING`。三条只读审计和主智能体代码复核确认现有审计把handler实现、隔离动态证明、host activation与真实UAT回退混为一个阻断；首个仓库切片先建立版本化、失败关闭的动态证据/verifier并拆分四类状态，之后才允许在新鲜资源门和磁盘上界内执行单容器PostgreSQL 17原子切换case。任何隔离结果都不得冒充host或真实UAT证据；现有UAT数据库、四卷、备份正文、凭据和业务数据保持禁止访问。
 
-项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK91已按D-172完成新隔离UAT L1核对；TASK92已完成BuildKit-only清理、D-173—D-184隔离合同/声明闭包/FD快照和D-185 verified-byte只读plan交接。TASK92保持唯一`DOING`；下一步需另获授权后才可安装/钉扎payload外部宿主入口并处理runtime observer/backend、精确镜像及L2a，不是自动运行部署。不得自动恢复高级控制面、AI、进一步清理、build/deploy/Migration或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
+项目负责人此前授予的持续选择安全任务授权已由2026-08-23 D-166范围重置取代。TASK91已按D-172完成新隔离UAT L1核对；TASK92已完成BuildKit-only清理、D-173—D-185隔离合同/声明闭包/FD快照/verified-byte只读plan交接和D-186固定仓库外摘要文件安装/回读。TASK92保持唯一`DOING`；下一步需另获授权后才可建立anchor写者分离、same-FD bytes执行和受控Python/runtime closure，并处理精确镜像及L2a，不是自动运行plan或部署。不得自动恢复高级控制面、AI、进一步清理、build/deploy/Migration或员工UAT；真实数据、账号、备份恢复和生产动作仍须专项明确授权。
 
 TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScript门；TASK47又在源码`9a18a0f`与manifest-only直接子提交`614ef7ac`完成D-121固定Browser门。TASK48随后以运行层源码`864789c8`、严格扫描合同`13c42294`和最终bundle子提交`8952a815`闭合本机候选：Web/Worker manifest为`sha256:27868850…92288`/`sha256:e85ce236…ee77c`，固定Wolfi/Node层为非root且无npm，断网无socket扫描覆盖Web 25+63、Worker 25+60包且全部severity为0。三项都不连接或修改UAT/生产；TASK48的诊断不能替代正式supervisor provenance、18步PASS或部署授权。
 
@@ -397,7 +399,7 @@ TASK46已在源码`f3bac028`与manifest-only `3d1243e2`完成D-120发布TypeScri
 
 ## 当前路线
 
-2026-08-25 D-166—D-185已取代原持续交付路线：TASK59—TASK82既有高级控制面只保留历史，TASK70及R2—R5/AI路线冻结。TASK86完成可变人数和十大闭环基线，TASK87/88关闭日期型P0，TASK89完成现代同库合成旅程，TASK90完成无真实样本准备包，TASK91完成新隔离UAT L1核对。当前唯一`DOING`为TASK92；D-179—D-183完成纯链、localhost Host/SNI和冻结v6的83成员声明闭包，D-184以固定isolated CLI/dir-FD核对这些成员，D-185再以固定内存适配器从84份verified bytes直接生成只读plan。Manifest尚未在payload外部宿主安装/钉扎，bootstrap/CPython、runtime publisher/observer/backend与精确镜像仍缺失。UAT alpha.42/0040及全部运行服务保持不变，新UAT未创建，系统继续`PRODUCTION NO-GO`。
+2026-08-25 D-166—D-186已取代原持续交付路线：TASK59—TASK82既有高级控制面只保留历史，TASK70及R2—R5/AI路线冻结。TASK86完成可变人数和十大闭环基线，TASK87/88关闭日期型P0，TASK89完成现代同库合成旅程，TASK90完成无真实样本准备包，TASK91完成新隔离UAT L1核对。当前唯一`DOING`为TASK92；D-179—D-183完成纯链、localhost Host/SNI和冻结v6的83成员声明闭包，D-184以固定isolated CLI/dir-FD核对这些成员，D-185以固定内存适配器从84份verified bytes直接生成只读plan，D-186把manifest raw SHA安装到仓库外固定路径并双回读。该路径不是独立writer trust root，bootstrap/CPython、受信launcher、runtime publisher/observer/backend与精确镜像仍缺失。UAT alpha.42/0040及全部运行服务保持不变，新UAT未创建，系统继续`PRODUCTION NO-GO`。
 
 ## 恢复上下文检查清单
 
