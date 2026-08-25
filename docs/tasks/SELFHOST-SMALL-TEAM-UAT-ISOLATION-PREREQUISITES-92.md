@@ -1,6 +1,6 @@
 # SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 新隔离UAT前置边界
 
-> 状态：`DOING / PURE CADDY HOST-SNI INTENT CONTRACT VALID / RUNTIME NOT OBSERVED / FULL CLOSURE + PUBLISHERS + RUNTIME BACKENDS + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
+> 状态：`DOING / FROZEN V6 DECLARED ACTION SOURCE CLOSURE VALID / TRUSTED PRE-IMPORT + PUBLISHER + RUNTIME OBSERVER/BACKEND + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
 > 日期：2026-08-25（Asia/Shanghai）
 > 依赖：TASK91、D-172、低资源服务器保护规则
 > 责任：项目负责人已选择当前主机同机隔离并接受同一故障域；Codex只执行仓库内静态前置，运行资源仍逐层授权
@@ -26,6 +26,7 @@
 - 2026-08-24，项目负责人继续要求“下一步”。本段只新增D-180外部锚点纯合同、binding/plan v4和静态负测；输入仍由调用方注入且未认证，publisher/backend继续固定拒绝。本指令不授权宿主observer、目录、Secret、Docker、数据库、Migration、build、部署或运行写入。
 - 2026-08-25，项目负责人继续要求“下一步”。本段只新增D-181 owner完成日志纯合同、固定D-179/D-180重验和binding/plan v5；不实现publisher、runtime observer/backend，不创建或读取UAT目录、Secret、Docker、数据库或业务数据，也不把该指令扩张为L2a。
 - 2026-08-25，项目负责人再次要求“下一步”。本段只新增D-182 Caddy Host/SNI纯intent、evidence intent v2及binding/plan v6，并关闭隔离Compose中production-mode HTTP Origin与默认`erp.invalid`的静态矛盾；不运行HTTP/TLS探针，不创建证书或UAT，不实现publisher/runtime observer/backend，也不扩大为L2a。
+- 2026-08-25，项目负责人继续要求“下一步”。本段只新增D-183独立声明源码闭包policy/纯validator和静态负测，从冻结v6重建有界依赖图；不修改v1—v6、不新增v7，不读取运行文件、build镜像、实现publisher/runtime backend或扩大为L2a。
 
 ### A. 独立UAT主机（推荐）
 
@@ -45,7 +46,7 @@
 
 - 当前HEAD没有匹配Web/Worker镜像；唯一alpha.47镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`。
 - `compose.uat-isolated.yml`已关闭容器消费者侧固定root：独立项目名、Secret、release candidate/identity、命名Volume、网络和loopback端口均有失败关闭静态合同。生产Compose未参数化、未改变。
-- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同，并由完整v6→v5→v4计划对象、固定角色/合同/摘要与确定性投影建立intent v2桥接；但TLS信任、证书hostname、错误Host/SNI拒绝、HTTP高端口重定向和反向代理仍未运行观察。全动作传递closure、publisher及宿主runtime path尚未实现。
+- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同；D-183又完成冻结v6九动作的83成员有界声明source closure。但source仍为调用方注入且未认证，现有one-shot的部分模块导入先于D-183派生证明；TLS信任、证书hostname、错误Host/SNI拒绝、HTTP高端口重定向和反向代理仍未运行观察，trusted pre-import、publisher及宿主runtime path尚未实现。
 - TASK92已把根盘可用恢复到约16.68 GiB、比10 GiB硬线高约6.68 GiB；磁盘停止线阻断已解除，但任何后续build仍须重新执行新鲜资源门并串行控制上界。
 - L2a、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权。
 
@@ -96,7 +97,7 @@
 
 ## 7. 默认禁用one-shot计划入口结果
 
-> D-177已取代本节/D-175中的历史动作顺序；D-179加入内部回执链，D-180加入外部锚点，D-181加入owner完成接线，D-182再把当前入口升级为plan/binding v6。默认拒绝语义保持，物理顺序见第9节，内部链见第11节，外锚见第12节，owner接线见第13节，Host/SNI见第14节。
+> D-177已取代本节/D-175中的历史动作顺序；D-179加入内部回执链，D-180加入外部锚点，D-181加入owner完成接线，D-182再把当前入口升级为plan/binding v6；D-183不修改计划版本，只建立独立派生闭包。默认拒绝语义保持，物理顺序见第9节，内部链见第11节，外锚见第12节，owner接线见第13节，Host/SNI见第14节，声明source closure见第15节。
 
 - 新增`isolated-uat-one-shot.py`。同一个已验证request会确定性输出规范JSON和`plan_sha256`；默认命令只有读取、校验和输出，不导入subprocess，不创建目录，不连接Docker或数据库。
 - 九步只表达技术依赖：精确输入、私有root、独立凭据、PostgreSQL、五角色权限原语、`EMPTY → 0046`、release identity、Web/Worker和loopback就绪。项目名和root仍由request派生，未写死人员、席位、账号或并发数量。
@@ -189,11 +190,23 @@
 - 纯合同仍不证明Caddy本地CA信任、证书SAN、错误Host/SNI拒绝、HTTPS反代或HTTP高端口重定向。容器内443到宿主高端口的Location转换未观察，因此redirect状态保持`NOT_ESTABLISHED_CONTAINER_HOST_PORT_TRANSLATION_UNOBSERVED`；publisher、observer和backend继续固定未实现。
 - 本段没有创建或访问UAT目录、Secret、证书、容器、网络、Volume、数据库或业务数据，没有build、deploy、Migration、restart、账号、HTTP/TLS探针或回执发布。02:00→02:07最终门前后available memory `2,210,680,832 → 2,199,441,408`B，Swap `181,915,648 → 185,536,512`B（增长3,620,864B），根盘available `17,697,169,408 → 17,684,115,456`B，Load `1.16/0.79/0.46 → 0.44/0.57/0.48`，kernel `oom_kill=0`。Docker保持6容器/75镜像/277 Volume/6网络；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整。精确清理本任务3个`.pyc`后，任务pyc和Compose临时目录残留0。两路修复后独立只读复核均为P0=0/P1=0；其中先发现的upstream raw/closure自重签P1已修复并进入负测。
 
-## 15. 当前停止线与完成标准
+## 15. D-183 冻结v6声明源码传递闭包结果
 
-磁盘、Compose消费者隔离、producer/operator请求、默认只读计划、v2顺序、D-178纯意图、D-179内部回执链、D-180外部锚点、D-181 owner完成日志/`operator_state_root`及D-182 Host/SNI intent v2纯合同已经完成；TASK92继续`DOING`。全动作传递closure、原子publisher、宿主runtime observer/backend和当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
+- 第一性原理边界仍是单一小团队UAT：不新增通用依赖平台、daemon、队列、服务、v7计划或人员基数字段。独立`isolated-uat-action-source-closure-policy-v1.json`和纯validator只消费调用方注入的JSON/source bytes，不读仓库或运行文件，不导入被绑定模块，也不执行UAT动作。
+- Validator从固定v3—v6 raw锚点重建冻结v6的九动作目录，得到54个action source引用和21个唯一直接root；历史v1—v6 raw SHA保持`3244d550…7b3a`/`9cc4e3c1…5232`/`da69ce3a…de5c4`/`4858b8c1…34262`/`95bbf9a2…7363`/`459bb65d…f1f0`，没有用v7制造循环绑定。
+- 闭包固定为83成员：当前control的29项`SOURCE_PATHS`，再加`package.json`、Migration journal、46个SQL Migration、`runtime-secret.ts`和5个传递ESM模块。依赖模型精确核对8个Python模块及8条固定模块装载、3个TypeScript成员/2条本地import、8个ESM成员/23条本地import、Compose→Caddyfile资源边、46项journal顺序及全成员raw SHA；所有成员必须从21个root可达，代码import图必须无环。
+- 失败关闭覆盖固定策略自摘要、闭包摘要、成员hash/usage/path、重复key、非法Unicode、非有限数/超大整数、bool冒充integer、动态JS import/require/re-export、Python间接导入、生产runner进入ESM图、Migration/journal/package和Compose资源漂移。固定`EXPECTED_POLICY_SHA256`使攻击者不能同时重签policy、member hash与未单独解析的source漂移。
+- Policy内部/closure/raw SHA分别为`a85d6abbad072ce5981690f0e266b3b657beb3a707f7ca04db96d97d0bb52d11`/`19e518819ede89a2b5ad4925d0c71b27fa2b5bba41759ffb0e51e90bd7cc0fb3`/`7c2a22928c5c80dc21ee21fc8cc99693a480717b7a76f39c4f9b784663c680a8`；validator/test/聚合runner raw SHA为`f4705be0…81ad`/`5efbc604…ad8b`/`37e19d8c…ef6`。
+- 诚实边界：成功值只为`FULL_DECLARED_NINE_ACTION_TRANSITIVE_SOURCE_CLOSURE_FOR_FROZEN_V6_VALID`和`SOURCE_BYTES_CALLER_INJECTED_HASH_MATCHED_NOT_ATTESTED`。它不证明filesystem attestation、Python/Node/Compose/Docker实现、OCI内容、运行时文件读取或PostgreSQL policy JSON来源；生产privilege ESM只作reference primitive。当前one-shot会在调用该派生证明前导入固定模块，因此trusted pre-import bootstrap明确为`NOT_IMPLEMENTED`，publisher、runtime backend和执行授权也继续固定拒绝。
+- 测试/复核：D-183专项12/12，聚合控制5 + one-shot13 + runtime contracts7 + runtime receipts16 + external anchors13 + owner completion15 + Host/SNI11 + D-183 12，共92/92；隔离Compose policy/config本段连续两次双PASS。Shell语法、严格JSON、直接policy验证、冻结v1—v6摘要和`git diff --check`通过；两路最终只读复核均为P0=0/P1=0/P2=0。
+- 资源/完整性：07:33→08:02 CST，available memory `2,209,591,296 → 2,185,998,336`B，Swap used `171,536,384 → 178,974,720`B（增长`7,438,336`B；10秒采样`si/so=0/0`），根盘available `17,541,615,616 → 17,579,905,024`B，Load `0.25/0.10/0.07 → 0.80/0.53/0.31`，Memory PSI和kernel `oom_kill`均0。本段未调用Docker变更；收口只读统计为6容器/75镜像/277 Volume/6网络，四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整。`docker compose ps`因未注入必填`ERP_RELEASE_EXPECTED_DEPLOYMENT_ID`而在解析期失败关闭，故服务核对使用只读Docker metadata；任务`.pyc`和`/tmp/isolated-uat-*`残留0。
+- 本段没有产品业务代码、Schema、Migration、API、页面、依赖、员工角色或生产配置变化；没有创建或访问UAT目录、Secret、证书、容器、网络、Volume、数据库、备份或业务数据，没有build、deploy、Migration、restart、账号、HTTP/TLS探针或回执发布。
+
+## 16. 当前停止线与完成标准
+
+磁盘、Compose消费者隔离、producer/operator请求、默认只读计划、v2顺序、D-178纯意图、D-179内部回执链、D-180外部锚点、D-181 owner完成日志/`operator_state_root`、D-182 Host/SNI intent v2纯合同及D-183冻结v6有界声明source closure已经完成；TASK92继续`DOING`。受信pre-import source verification/bootstrap、原子publisher、宿主runtime observer/backend和当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
 
 - 只完成负责人选定的一条路径，不同时建设两套方案。
-- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、v2九步依赖、D-178意图、D-179内部链、D-180外锚、D-181 owner日志及D-182 Host/SNI纯合同已明确；下一独立切片只补全动作传递source closure，publisher、runtime observer/backend、精确源码/镜像输入和空库Migration执行包仍待后续。
+- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、v2九步依赖、D-178意图、D-179内部链、D-180外锚、D-181 owner日志、D-182 Host/SNI纯合同及D-183声明source closure已明确；下一独立切片只补固定trusted pre-import source verification/bootstrap，publisher、runtime observer/backend、精确源码/镜像输入和空库Migration执行包仍待后续。
 - 现有UAT身份、数据、四个受保护Volume和常驻服务不变。
 - TASK92完成后只允许提交L2a授权申请，不自动build、deploy或Migration。

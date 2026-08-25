@@ -4,6 +4,18 @@
 
 ## 2026-08-25
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: validate isolated UAT action source closure`
+
+- 第一性原理：单一小团队UAT只增加独立派生policy、一个纯validator和静态负测；不建设依赖平台、daemon、队列、服务或按工程/计划/市场“各2人”硬编码容量，也不修改冻结binding v1—v6或新增v7。
+- 声明闭包：从固定v3—v6 raw锚点重建九动作目录，固定54个action source引用、21个直接root和83个成员。成员由control 29项source、package、Migration journal、46个SQL Migration、`runtime-secret.ts`和5个传递ESM模块组成；descriptor/validator不加入payload，避免自引用摘要循环。
+- 依赖验证：精确核对8个Python模块/8条固定模块装载、3个TypeScript成员/2条本地import、8个ESM成员/23条本地import、Compose→Caddyfile资源边、46项journal顺序、成员usage/hash/path及完整可达性。JS动态import/require/re-export、Python间接导入、生产runner、异常JSON、bool/int混淆和自重签source漂移失败关闭。
+- 摘要：policy内部/closure/raw为`a85d6abbad072ce5981690f0e266b3b657beb3a707f7ca04db96d97d0bb52d11`/`19e518819ede89a2b5ad4925d0c71b27fa2b5bba41759ffb0e51e90bd7cc0fb3`/`7c2a22928c5c80dc21ee21fc8cc99693a480717b7a76f39c4f9b784663c680a8`；validator/test/runner raw为`f4705be0…81ad`/`5efbc604…ad8b`/`37e19d8c…ef6`。v1—v6 raw SHA保持不变。
+- 诚实边界：成功只证明调用方注入bytes在固定code-import/control-read/Migration数据集内闭合；不证明filesystem attestation、runtime filesystem I/O、Python/Node/Docker实现、OCI内容、publisher/backend或执行授权。当前one-shot导入固定模块早于该派生证明，trusted pre-import仍明确未实现；生产privilege ESM仅作reference primitive。
+- 测试/复核：D-183专项12/12，完整聚合`5+13+7+16+13+15+11+12=92/92`；隔离Compose policy/config连续两次双PASS。Shell语法、严格JSON、直接policy、冻结v1—v6摘要及`git diff --check`通过；两路最终独立只读复核均为P0=0/P1=0/P2=0。
+- 资源：07:33→08:02 available memory `2,209,591,296 → 2,185,998,336`B，Swap `171,536,384 → 178,974,720`B（增长7,438,336B；10秒`si/so=0/0`），根盘available `17,541,615,616 → 17,579,905,024`B，Load `0.25/0.10/0.07 → 0.80/0.53/0.31`，PSI/OOM0。收口为6容器/75镜像/277 Volume/6网络；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整，任务pyc/临时目录0。
+- 代码/数据：无产品业务代码、Schema、Migration、API、页面、依赖、员工角色或生产配置变化；未创建或访问UAT目录、Secret、证书、Docker资源、数据库、备份或业务数据，未build/deploy/Migration/restart/账号/HTTP-TLS探针/业务写。
+- 文档：新增D-183并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一独立切片只处理固定trusted pre-import source verification/bootstrap，再分别处理publisher、runtime observer/backend和精确镜像，不自动运行。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: bind isolated UAT Caddy host and SNI`
 
 - 第一性原理：不到20人的单一同机UAT只增加localhost Host/SNI纯合同和既有one-shot的声明式v6扩展；没有引入DNS、证书平台、探针服务、队列、多租户控制面或人员基数配置。

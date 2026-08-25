@@ -4163,6 +4163,39 @@
 - 拒绝仅凭Location摘要、叶证书摘要或静态配置摘要声称TLS hostname、信任链、错误SNI拒绝和反向代理运行正常。
 - 拒绝修改冻结v1—v5、给旧receipt链追加伪运行节点，或因本切片PASS而创建/启动同机UAT。
 
+## D-183 冻结v6的声明源码闭包必须独立派生，不修改历史计划或冒充受信启动门
+
+- 日期：2026-08-25
+- 状态：Accepted（仓库有界声明源码闭包；未建立filesystem attestation、trusted pre-import或运行授权）
+- 发起：项目负责人继续要求“下一步”；Codex按少于20人的单一UAT、最小静态边界和第一性原理推进D-182之后的source closure
+
+### Context
+
+- D-182已冻结binding/plan v6及Host/SNI纯合同，但v6九动作只列出直接source。一个直接source还可能通过Python动态模块装载、TypeScript/ESM import、control-plane文件读取、Migration journal或Compose bind消费其他仓库文件；不闭合这些边，就不能判断声明执行输入是否完整。
+- 把闭包描述写回v6会改变已冻结raw SHA并迫使所有上游策略重签；新增v7又只为描述派生关系扩大版本链。小团队单一UAT不需要依赖服务、图数据库、daemon或通用构建平台。
+- 纯函数可以校验调用方注入的固定bytes和依赖图，但不能证明这些bytes来自真实文件系统，也不能在模块已经导入后倒推形成可信pre-import gate。OCI镜像内容和宿主运行I/O又属于不同观察边界。
+
+### Decision
+
+1. 保持binding v1—v6原始字节不变，不新增v7。新增独立`chenyida-erp-isolated-uat-action-source-closure-policy/v1`和纯validator，固定policy内部摘要为`a85d6abbad072ce5981690f0e266b3b657beb3a707f7ca04db96d97d0bb52d11`，由执行代码常量锁定，拒绝攻击者同步重签policy和source成员。
+2. 从固定v3—v6 raw锚点机械重建当前九动作目录，闭包边界固定为54个action source引用、21个直接root和83个成员。成员包括control policy列出的29项source、`package.json`、Migration journal、46个SQL Migration、`runtime-secret.ts`和5个传递ESM模块；descriptor、validator自身及control descriptor不进入payload成员，避免自引用循环。
+3. 固定核对Python外部import与8条已声明模块装载、TypeScript 3成员/2条本地import、ESM 8成员/23条本地import、Compose→Caddyfile资源边、Migration journal/package及46项SQL顺序、成员usage/hash/path和从21个root的完整可达性。动态JS import/require/re-export、Python间接导入、未知本地边、生产runner进入闭包、畸形JSON及bool/int混淆必须失败关闭。
+4. 验证范围只命名为`FIXED_CODE_IMPORTS_CONTROL_READS_AND_MIGRATION_DATASET_ONLY`。PostgreSQL policy JSON中的source绑定暂按provenance reference处理，生产privilege ESM只作`REFERENCE_PRIMITIVES_ONLY_NOT_EXECUTABLE`；运行时文件读取、Python/Node/Compose/Docker实现、OCI内容和精确镜像继续明确排除，直到固定隔离runtime adapter call graph存在。
+5. 成功输出必须同时声明`SOURCE_BYTES_CALLER_INJECTED_HASH_MATCHED_NOT_ATTESTED`、`AUTHORIZATION_NOT_ESTABLISHED`、`NOT_PUBLISHED`和runtime未建立。`require_trusted_pre_import_bootstrap()`、`require_publisher()`及`require_runtime_backend()`继续固定失败；D-183不改变one-shot执行门或任何运行授权。
+6. 人数、岗位“先按2人”或少于20人只属于后续应用账号配置，不进入member count、动作数、资源容量或验收条件。83是当前冻结源码图的结果，不是组织或系统规模上限。
+
+### Consequences
+
+- 冻结v6九动作现在有可重复校验的完整“声明静态图”：9动作、54引用、21直接root、83成员、46项Migration和23条ESM本地边；成员或依赖扩张会失败关闭。该结论不等于可执行I/O调用图、文件系统认证或镜像供应链证明。
+- 当前one-shot在进入任何D-183派生证明前已导入部分固定模块，因此不能把本切片写成trusted pre-import enforcement。TASK92继续`DOING`；下一独立切片只定义并验证模块执行前的受信source verification/bootstrap边界，之后才分别处理原子publisher、runtime observer/backend、精确镜像和L2a申请。
+- 92项聚合Unit、Compose静态双门及两路最终复核P0/P1/P2=0只证明仓库静态合同成立。新UAT仍未创建，不能试运行。
+
+### Rejected alternatives
+
+- 拒绝修改冻结v1—v6或仅为闭包描述新增v7，也拒绝把closure policy/validator加入自身payload形成摘要循环。
+- 拒绝把npm/Python运行时、Docker/Compose实现、OCI层或任意运行文件全部塞进当前静态闭包，制造一个无法审阅的通用供应链平台。
+- 拒绝仅凭调用方注入bytes匹配就声称filesystem attestation、pre-import执行门、publisher/runtime backend已实现，或据此创建/启动同机UAT。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

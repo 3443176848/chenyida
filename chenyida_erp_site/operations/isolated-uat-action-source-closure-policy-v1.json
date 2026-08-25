@@ -1,0 +1,1075 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-isolated-uat-action-source-closure-policy/v1",
+  "policy_id": "chenyida-erp-isolated-uat-frozen-v6-action-source-closure-v1",
+  "execution_authorized": false,
+  "capability_status": {
+    "frozen_v6_action_catalog_reconstruction": "IMPLEMENTED_PURE_FIXED_RAW_ANCHORS",
+    "member_hash_validation": "IMPLEMENTED_PURE_CALLER_INJECTED_BYTES",
+    "python_fixed_module_load_validation": "IMPLEMENTED_PURE_BOUNDED",
+    "typescript_local_import_validation": "IMPLEMENTED_PURE_BOUNDED",
+    "esm_static_import_validation": "IMPLEMENTED_PURE_BOUNDED",
+    "migration_dataset_validation": "IMPLEMENTED_PURE_FIXED_46_MEMBER_SET",
+    "filesystem_attestation": "NOT_IMPLEMENTED",
+    "trusted_pre_import_bootstrap": "NOT_IMPLEMENTED",
+    "image_content_validation": "NOT_IMPLEMENTED_SEPARATE_EXACT_IMAGE_BLOCKER",
+    "publisher": "NOT_IMPLEMENTED",
+    "runtime_backend": "NOT_IMPLEMENTED",
+    "execution_authorized": false
+  },
+  "validation_output": {
+    "action_source_closure_status": "FULL_DECLARED_NINE_ACTION_TRANSITIVE_SOURCE_CLOSURE_FOR_FROZEN_V6_VALID",
+    "source_observation_status": "SOURCE_BYTES_CALLER_INJECTED_HASH_MATCHED_NOT_ATTESTED",
+    "graph_scope_status": "FIXED_CODE_IMPORTS_CONTROL_READS_AND_MIGRATION_DATASET_ONLY",
+    "authorization_status": "AUTHORIZATION_NOT_ESTABLISHED",
+    "publication_status": "NOT_PUBLISHED",
+    "runtime_enforcement_status": "NOT_IMPLEMENTED",
+    "runtime_evidence_status": "NOT_ESTABLISHED_BY_PURE_VALIDATION"
+  },
+  "boundary": {
+    "subject": "FROZEN_V6_NINE_ACTION_DECLARED_SOURCE_GRAPH",
+    "action_count": 9,
+    "action_source_reference_count": 54,
+    "direct_source_count": 21,
+    "member_count": 83,
+    "migration_count": 46,
+    "closure_descriptor_is_member": false,
+    "validator_is_member": false,
+    "control_policy_descriptor_is_member": false,
+    "pre_import_enforcement": "NOT_IMPLEMENTED_EXISTING_ONE_SHOT_IMPORTS_PRECEDE_DERIVED_PROOF",
+    "json_provenance_traversal": "NON_TRAVERSAL_REFERENCE_ONLY_PENDING_FIXED_RUNTIME_ADAPTER",
+    "resolved_compose_and_image_digests": "SEPARATELY_BOUND_INPUTS_CONTENT_NOT_OBSERVED",
+    "staffing": "APPLICATION_CONFIGURATION_NOT_INFRASTRUCTURE_CARDINALITY"
+  },
+  "binding_anchors": [
+    {
+      "schema_version": 3,
+      "path": "operations/isolated-uat-one-shot-action-bindings-v3.json",
+      "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v3",
+      "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v3",
+      "binding_sha256": "50ddd73fb4745c8fcc0b91fd7e4130e2cb3a9ef0d2f52773c64cd6112afc74bd",
+      "raw_sha256": "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4"
+    },
+    {
+      "schema_version": 4,
+      "path": "operations/isolated-uat-one-shot-action-bindings-v4.json",
+      "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v4",
+      "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v4",
+      "binding_sha256": "fb83e0f20823b632525823f3d6c012769501fff1aec9763abc64d8d10d2b050b",
+      "raw_sha256": "4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262"
+    },
+    {
+      "schema_version": 5,
+      "path": "operations/isolated-uat-one-shot-action-bindings-v5.json",
+      "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v5",
+      "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v5",
+      "binding_sha256": "349fb247d271d3c749129c151ebb0b3c7054b64f5ee0c5646ea9e1d238c49c3f",
+      "raw_sha256": "95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363"
+    },
+    {
+      "schema_version": 6,
+      "path": "operations/isolated-uat-one-shot-action-bindings-v6.json",
+      "contract": "chenyida-erp-isolated-uat-one-shot-action-bindings/v6",
+      "binding_id": "chenyida-erp-isolated-uat-fixed-actions-v6",
+      "binding_sha256": "f1a3fd38d0a49eea284caa704016d92de336e2eafb4d46a4fd23c59113266dc5",
+      "raw_sha256": "459bb65d42c71551797bf4cbf56a022700780caeb8a3d987b51bd96560d9f1f0"
+    }
+  ],
+  "action_catalog": [
+    {
+      "ordinal": 1,
+      "action": "VERIFY_EXACT_INPUTS",
+      "sources": [
+        "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "scripts/isolated-uat-control-plane-policy.py",
+        "scripts/isolated-uat-runtime-receipts.py",
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 2,
+      "action": "PREPARE_PRIVATE_NAMESPACE_ROOTS",
+      "sources": [
+        "scripts/isolated-uat-one-shot.py",
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 3,
+      "action": "PROVISION_DISTINCT_CREDENTIAL_FILES",
+      "sources": [
+        "operations/runtime-secret-file-policy-v1.json",
+        "scripts/isolated-uat-one-shot.py",
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 4,
+      "action": "START_POSTGRES_ONLY",
+      "sources": [
+        "compose.yml",
+        "compose.release.yml",
+        "compose.uat-isolated.yml",
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 5,
+      "action": "INITIALIZE_DATABASE_IDENTITY_AND_LOGIN_ROLES",
+      "sources": [
+        "operations/isolated-uat-runtime-contract-policy-v1.json",
+        "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "scripts/isolated-uat-one-shot.py",
+        "scripts/isolated-uat-runtime-contracts.py",
+        "scripts/isolated-uat-runtime-receipts.py"
+      ]
+    },
+    {
+      "ordinal": 6,
+      "action": "MIGRATE_EMPTY_DATABASE_TO_BOUND_HEAD",
+      "sources": [
+        "operations/isolated-uat-runtime-contract-policy-v1.json",
+        "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "scripts/isolated-uat-one-shot.py",
+        "scripts/isolated-uat-runtime-contracts.py",
+        "scripts/isolated-uat-runtime-receipts.py"
+      ]
+    },
+    {
+      "ordinal": 7,
+      "action": "RECONCILE_FINAL_RUNTIME_PRIVILEGES",
+      "sources": [
+        "operations/isolated-uat-runtime-contract-policy-v1.json",
+        "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "operations/postgresql-runtime-privilege-policy-v2.json",
+        "scripts/isolated-uat-runtime-contracts.py",
+        "scripts/isolated-uat-runtime-receipts.py",
+        "scripts/postgresql-runtime-privilege-journal.mjs",
+        "scripts/postgresql-runtime-privilege-operator.mjs",
+        "scripts/postgresql-runtime-privilege-reconciler.mjs",
+        "operations/isolated-uat-owner-completion-policy-v1.json",
+        "scripts/isolated-uat-owner-completion-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 8,
+      "action": "START_BOUND_RUNTIME_SERVICES",
+      "sources": [
+        "compose.yml",
+        "compose.release.yml",
+        "compose.uat-isolated.yml",
+        "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+        "scripts/isolated-uat-caddy-host-sni-contracts.py"
+      ]
+    },
+    {
+      "ordinal": 9,
+      "action": "VERIFY_AND_PUBLISH_ISOLATED_UAT_EVIDENCE",
+      "sources": [
+        "operations/isolated-uat-runtime-contract-policy-v1.json",
+        "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "scripts/isolated-uat-compose-policy.py",
+        "scripts/isolated-uat-one-shot.py",
+        "scripts/isolated-uat-runtime-contracts.py",
+        "scripts/isolated-uat-runtime-receipts.py",
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "scripts/isolated-uat-external-anchor-contracts.py",
+        "operations/isolated-uat-owner-completion-policy-v1.json",
+        "scripts/isolated-uat-owner-completion-contracts.py",
+        "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+        "scripts/isolated-uat-caddy-host-sni-contracts.py"
+      ]
+    }
+  ],
+  "source_closure": {
+    "schema_version": 1,
+    "algorithm": "FROZEN_V6_FIXED_IMPORT_AND_CONTROL_READ_CLOSURE_V1",
+    "roots": [
+      "compose.release.yml",
+      "compose.uat-isolated.yml",
+      "compose.yml",
+      "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+      "operations/isolated-uat-external-anchor-policy-v1.json",
+      "operations/isolated-uat-owner-completion-policy-v1.json",
+      "operations/isolated-uat-runtime-contract-policy-v1.json",
+      "operations/isolated-uat-runtime-receipt-policy-v1.json",
+      "operations/postgresql-runtime-privilege-policy-v2.json",
+      "operations/runtime-secret-file-policy-v1.json",
+      "scripts/isolated-uat-caddy-host-sni-contracts.py",
+      "scripts/isolated-uat-compose-policy.py",
+      "scripts/isolated-uat-control-plane-policy.py",
+      "scripts/isolated-uat-external-anchor-contracts.py",
+      "scripts/isolated-uat-one-shot.py",
+      "scripts/isolated-uat-owner-completion-contracts.py",
+      "scripts/isolated-uat-runtime-contracts.py",
+      "scripts/isolated-uat-runtime-receipts.py",
+      "scripts/postgresql-runtime-privilege-journal.mjs",
+      "scripts/postgresql-runtime-privilege-operator.mjs",
+      "scripts/postgresql-runtime-privilege-reconciler.mjs"
+    ],
+    "members": [
+      {
+        "path": ".env.uat-isolated.example",
+        "sha256": "ebf60a09217916ce1ace5732b258bde07574a8add9ae96c8b152b535a3719d4f",
+        "usage": "STATIC_CONTROL_RESOURCE"
+      },
+      {
+        "path": "app/lib/infrastructure/config.ts",
+        "sha256": "1215c91915bf1715cf5d143d87443be6664eb6413fdc3516d0d30ec30093cc34",
+        "usage": "STATIC_CONTROL_RESOURCE"
+      },
+      {
+        "path": "app/lib/infrastructure/request-origin.ts",
+        "sha256": "6745149dc8bda6447f08496535c1813c7b6367e948d11c9a190c3670c254800d",
+        "usage": "STATIC_CONTROL_RESOURCE"
+      },
+      {
+        "path": "app/lib/infrastructure/runtime-secret.ts",
+        "sha256": "b7cd589dfdedbf0141ac7037b66ac2653226d1192bb873e240f840ec395e6e7f",
+        "usage": "TRANSITIVE_TYPESCRIPT_IMPORT"
+      },
+      {
+        "path": "compose.release.yml",
+        "sha256": "ca8aefc35ed30f7d4c2af9424b3cdf5606b7b2166ef0648fbf545be52ed18661",
+        "usage": "DIRECT_ACTION_COMPOSE_RESOURCE"
+      },
+      {
+        "path": "compose.uat-isolated.yml",
+        "sha256": "abcf24c0c9e50ff41188bf4d9e089681f30417739490711081c0c2a6bba71e4b",
+        "usage": "DIRECT_ACTION_COMPOSE_RESOURCE"
+      },
+      {
+        "path": "compose.yml",
+        "sha256": "2f4b8aad65bcefb4d603825543ebd6ec09674f9e5cfef7b30e88afa5944a0bfa",
+        "usage": "DIRECT_ACTION_COMPOSE_RESOURCE"
+      },
+      {
+        "path": "deploy/Caddyfile",
+        "sha256": "9302c1191d1460dcb34ecceef841100bef97fd8800676a6ddc899cd65ddfc9e9",
+        "usage": "STATIC_CONTROL_RESOURCE"
+      },
+      {
+        "path": "drizzle-postgres/0001_selfhost_baseline.sql",
+        "sha256": "c1cd71803b0f504594a41234a82eb13ce8e6713f5d346f3e49247b4921ff1702",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0002_material_master_workflow.sql",
+        "sha256": "2d8d4facf54c950fa19d1346705aa0f549669544da1a87c2fc584c1fe8b7eb80",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0003_material_import_mapping.sql",
+        "sha256": "8ce859551198a8a5a334665f68eee503590fa5472f3a6396f44670d2110dddbf",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0004_material_import_normalization.sql",
+        "sha256": "1bb0eb9b7b3ddbe6c6058a75a04a4bbc69a088e201856f258a4c75728f64aa39",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0005_material_import_review.sql",
+        "sha256": "e4f2dc62afb8908c7d5a1a0202639809c9dd3f3be3fc09f0ad469224e46ecdcc",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0006_identity_security.sql",
+        "sha256": "6e185d01a69c4bd132c577793ae72baceaa075e5beecc738bcdf4310430d7079",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0007_master_data_bom.sql",
+        "sha256": "0e9cf9327b37673eb09483035117d15789047862f348cd5eb7098476d62fd3a6",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0008_inventory_ledger.sql",
+        "sha256": "49334afa405d03b61568559edcdffa68c232c899251181e3a27ff271aa1da80b",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0009_procurement.sql",
+        "sha256": "351b322f562e39bf0e17cf16cd6da20de6d801ff33f7692300a85c15403874d7",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0010_production.sql",
+        "sha256": "d60c4100f726d6572a9969c78cf06f64aa2f789d3a31d3be5fd58c22fa7dec35",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0011_sales.sql",
+        "sha256": "6d97c854ecd2fd47f4540c0403de097332f406c7d9f5155c2355dd44d5a57e3b",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0012_quality.sql",
+        "sha256": "64f065783769c0913af482402199b10f9224a1a81e52c30a3b8a087978bcd5bf",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0013_finance.sql",
+        "sha256": "8c52efe69d836fadf4f2841caab6dad140c51d0b78e37612cbcbac46076c45a1",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0014_migration_openings.sql",
+        "sha256": "61f65ef3d588bfbf178f3dd9ba196886fa18fb3ecca119a151f6a3bc0bc5a99b",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0015_market_project_handoff.sql",
+        "sha256": "419a80cb1ec3daad614f23b89895c9e8e3679bee40f506b0d0a811aba98a546f",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0016_project_planning_handoff.sql",
+        "sha256": "26d6e4cc609a53403b377d8550fcf5d8fd88f677178681f4cca1692544bb2076",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0017_planning_material_requirements.sql",
+        "sha256": "33cb162e5e32aeaca015a9d6e25a33f048166c7c895ebbc242819f6bbe2b6b28",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0018_procurement_sourcing.sql",
+        "sha256": "64276e1292c0696ae097a322115662b958156ba6486b1cd16752cf84b6c987c9",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0019_sourcing_purchase_fulfillment.sql",
+        "sha256": "6e517f6d2beffc74c94dcd5c5d60c9bcdc5baf9c93711a6add6cec4a08ed989a",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0020_production_handoff_reservations.sql",
+        "sha256": "1164536d51fbcf2f022c45aeab54b2b1ebc3d20cb2e4caabba9341d63fb4e182",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0021_production_reporting_completions.sql",
+        "sha256": "1cf953d98da2d3a7703f3866b852cbe10bdb37b33e1826cb78b24079fc5a11ec",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0022_production_quality_release.sql",
+        "sha256": "65b31aec91ad30ffd309796f58500a73c47a20bc12f855e010a4b4f17e808155",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0023_sales_delivery_receivable.sql",
+        "sha256": "5f07c7aebe9513e040fa0ab2f31f5cd5a51faf64fe78516794cd0fd46309221d",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0024_finance_project_settlements.sql",
+        "sha256": "cab6f7679e91589cfe2c7fdecf9750b222b9212acbbd3341301c7a67ec2e9624",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0025_production_routings.sql",
+        "sha256": "39b1212df99d392739aa20b95859f3e2789fa287e23061006a34efc342c258f9",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0026_production_operation_execution.sql",
+        "sha256": "b00e49aa4d4f8279372c5aab291ccfcbd54afc09ab284a6390a50fea9e66aca0",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0027_production_final_output_reporting.sql",
+        "sha256": "b226cc958215400c38f48c925e4b33c4e97723340aaf729d4da75322213b9c76",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0028_production_operation_quality_gates.sql",
+        "sha256": "a7a55f7c6c81b1c5a80df59a1b3f639187cc2c2ce8658087ceb392b1f2ada912",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0029_production_nonconformance_rework_handoff.sql",
+        "sha256": "6814a728f4d04e4fbceb83c7a288fa214a9ec64317b547cc6cbaebfec456b40c",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0030_production_rework_execution.sql",
+        "sha256": "37fd53b02f517023a3fc6aba22b0904a4881273b8752de2946f0c5432a2d050c",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0031_production_batch_genealogy.sql",
+        "sha256": "ac0f6a63cfdb30d42edf50741afc7c8af632f74ff6fb08398d6b6e398a637fd4",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0032_finished_goods_inventory_lots.sql",
+        "sha256": "3a2fc22ff73706d226641119135b68d042d393124c89233a63d774f76aa2d4fa",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0033_finished_goods_lot_fqc_shipment.sql",
+        "sha256": "ca01cbc6a40ebfe9c17e9c3133f8704748d12b64c21d56155313ff73ce0c3d44",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0034_supplier_receipt_lot_iqc.sql",
+        "sha256": "29b380050d7d7003df82df981aea061e7287845dde773f181caf918a49d47b2d",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0035_bom_material_governance.sql",
+        "sha256": "d64ec733bb937d8cde11d93d5370605fb7e754ffb0c93d2f9795c8d7b66c9714",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0036_project_requirement_unit_resolution.sql",
+        "sha256": "a5ad532837acb0c9704f5c885206cf2ec10c891628c7fe4ed660233468b134a0",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0037_project_planning_revision_response_lineage.sql",
+        "sha256": "139f2623a184ae3d6927c95b56569cc438deffc2a0b46c325c9f04d59471d99f",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0038_supplier_mapping_governance.sql",
+        "sha256": "2da259364151af098641795da55604dc3012b6adf92aec67038c0554e0592941",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0039_rfq_traceability.sql",
+        "sha256": "3cbf573844a9b7cb0227d3aa56d1dd40aaa48075f44d64f8c4cc1149478e3f37",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0040_warehouse_receipt_readiness.sql",
+        "sha256": "b6781c94da3f52a8f719ce57cdf13acbb4e3fe1c66f2a0480bdb6a9ff10a5a93",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0041_ai_governance_suggestion_evidence.sql",
+        "sha256": "676626b9dcb78f31643612e5662cf5c36e06259c72ff922287bb913394071bf2",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0042_material_import_fallback_safety.sql",
+        "sha256": "c0eeab63bc51f1d1dd96805b43e78c83c5ef5e0a5d5712a08a0308c95b9385bf",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0043_material_import_terminal_integrity.sql",
+        "sha256": "0fdb3d4b92d999a5dede5a36a08bd99ea054879ebb6857341e08f0f0e07852d9",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0044_identity_session_absolute_lifetime.sql",
+        "sha256": "a24df94474403c4f235933d4450626ce65b40416264393db400cef08e7fcaa7e",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0045_runtime_worker_readiness.sql",
+        "sha256": "cc4685a08d97d49717e3c65c069131be17e9fc1cddd52b429ef64202c40180fc",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/0046_runtime_lock_privilege_boundary.sql",
+        "sha256": "ad68aaa4f20d16324fcdc7b234928ac363ecb73313921970d3b4840f4db6d66b",
+        "usage": "SEALED_MIGRATION_DATASET_MEMBER"
+      },
+      {
+        "path": "drizzle-postgres/meta/_journal.json",
+        "sha256": "e5d985e28f2a7491fe37a5da7d53a5f5513c7fc45fc9ef8afde4af88d5796f4e",
+        "usage": "MIGRATION_JOURNAL_RESOURCE"
+      },
+      {
+        "path": "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+        "sha256": "c3edf759d2b342f91931c4b529f993c89cae72656a4fa951b06b9be72c30f39a",
+        "usage": "DIRECT_ACTION_POLICY_RESOURCE"
+      },
+      {
+        "path": "operations/isolated-uat-external-anchor-policy-v1.json",
+        "sha256": "92c59a9f9f800a243324c0a6e24ca8258e58483fe759cf30c2c98d53aead6ef3",
+        "usage": "DIRECT_ACTION_POLICY_RESOURCE"
+      },
+      {
+        "path": "operations/isolated-uat-one-shot-action-bindings-v3.json",
+        "sha256": "da69ce3a276ef68f9f6cece12f281ea89584930d481afef19fcf930dae8de5c4",
+        "usage": "FROZEN_ACTION_CATALOG_RESOURCE"
+      },
+      {
+        "path": "operations/isolated-uat-one-shot-action-bindings-v4.json",
+        "sha256": "4858b8c14846a69ed969f5476828631362830675399e788f705c35e1cfe34262",
+        "usage": "FROZEN_ACTION_CATALOG_RESOURCE"
+      },
+      {
+        "path": "operations/isolated-uat-one-shot-action-bindings-v5.json",
+        "sha256": "95bbf9a263818886072a29f486a53acb752687dcd4d5cd086283336dcbb77363",
+        "usage": "FROZEN_ACTION_CATALOG_RESOURCE"
+      },
+      {
+        "path": "operations/isolated-uat-one-shot-action-bindings-v6.json",
+        "sha256": "459bb65d42c71551797bf4cbf56a022700780caeb8a3d987b51bd96560d9f1f0",
+        "usage": "FROZEN_ACTION_CATALOG_RESOURCE"
+      },
+      {
+        "path": "operations/isolated-uat-owner-completion-policy-v1.json",
+        "sha256": "e86831d5669ff161fe54d29bca072c3cd52e12e946fcb30433874c5ebc525cf5",
+        "usage": "DIRECT_ACTION_POLICY_RESOURCE"
+      },
+      {
+        "path": "operations/isolated-uat-runtime-contract-policy-v1.json",
+        "sha256": "4b7f6f741ff84c4ae7a4d8ee3d3641e7a9d3dc52b62c2b00d4c9f9c0f98020cc",
+        "usage": "DIRECT_ACTION_POLICY_RESOURCE"
+      },
+      {
+        "path": "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "sha256": "1eee47ed1ed9311529153cc3e7defeb95984e075276af23a453a872c94027aac",
+        "usage": "DIRECT_ACTION_POLICY_RESOURCE"
+      },
+      {
+        "path": "operations/postgresql-runtime-privilege-policy-v2.json",
+        "sha256": "2aba8ed96202117761ba88212fb84e3d475afbf19e5447fabe2f658bbe9d8a7c",
+        "usage": "DIRECT_ACTION_POLICY_RESOURCE"
+      },
+      {
+        "path": "operations/runtime-secret-file-policy-v1.json",
+        "sha256": "8dd07c6acd6e857a0b29b14e2b6d5b60ad919cf54aac9b552ce11672eb45b7c5",
+        "usage": "DIRECT_ACTION_POLICY_RESOURCE"
+      },
+      {
+        "path": "package.json",
+        "sha256": "c158bca501375c7d7f61b7cb5e690c5a6a0e840deb6c37c641cfac734ab66304",
+        "usage": "PACKAGE_METADATA_RESOURCE"
+      },
+      {
+        "path": "scripts/backup-recovery-contract.mjs",
+        "sha256": "9fc9394e0936c31bf10d68de6fe313ea927782fd168058d8302a1d9b1efaeb83",
+        "usage": "TRANSITIVE_REFERENCE_PRIMITIVE_DEPENDENCY_NOT_EXECUTABLE"
+      },
+      {
+        "path": "scripts/isolated-uat-caddy-host-sni-contracts.py",
+        "sha256": "53283460f5c868efaed57bc977499dd69d88d43cacbd6e2e7e1178826db0a6ff",
+        "usage": "DIRECT_ACTION_PYTHON_SOURCE"
+      },
+      {
+        "path": "scripts/isolated-uat-compose-policy.py",
+        "sha256": "3299a1a8a8b07e426096ce54cc06a650af7b42260c03989bfe0b6557547361a7",
+        "usage": "DIRECT_ACTION_PYTHON_SOURCE"
+      },
+      {
+        "path": "scripts/isolated-uat-control-plane-policy.py",
+        "sha256": "2dd1edd389155046e9c658268e5def6c08c36ad6cd7efa4a2b80c3f2ead22c15",
+        "usage": "DIRECT_ACTION_PYTHON_SOURCE"
+      },
+      {
+        "path": "scripts/isolated-uat-external-anchor-contracts.py",
+        "sha256": "fc6e76d4620cbfbb447beb53f5b0b35d1f6df138a028cfb811bffbc51959be61",
+        "usage": "DIRECT_ACTION_PYTHON_SOURCE"
+      },
+      {
+        "path": "scripts/isolated-uat-one-shot.py",
+        "sha256": "5ec47d3c43668945c872e3d4f4a485499dc8730b4d6e7d1ac50692b663dea674",
+        "usage": "DIRECT_ACTION_PYTHON_SOURCE"
+      },
+      {
+        "path": "scripts/isolated-uat-owner-completion-contracts.py",
+        "sha256": "1a6d284873c50baac93ec87597356d8e04ff2086a0523b8e56961fcf7e769c17",
+        "usage": "DIRECT_ACTION_PYTHON_SOURCE"
+      },
+      {
+        "path": "scripts/isolated-uat-runtime-contracts.py",
+        "sha256": "c293e1872e6700dfb4b129450f666fba86612dc16678a613cc7b050fb8ebdc6a",
+        "usage": "DIRECT_ACTION_PYTHON_SOURCE"
+      },
+      {
+        "path": "scripts/isolated-uat-runtime-receipts.py",
+        "sha256": "c19d4599abf2b7063a4d82476b651ae0013303f181bcca1b8c45f5d94148e79d",
+        "usage": "DIRECT_ACTION_PYTHON_SOURCE"
+      },
+      {
+        "path": "scripts/postgresql-cluster-recovery-contract.mjs",
+        "sha256": "d11ba513f43d69d3bc4918dbd523d32973904bf98beec585de084cc2bdea3cfa",
+        "usage": "TRANSITIVE_REFERENCE_PRIMITIVE_DEPENDENCY_NOT_EXECUTABLE"
+      },
+      {
+        "path": "scripts/postgresql-runtime-privilege-catalog.mjs",
+        "sha256": "0752e8eadacf796b06b24f602b0feb61e8302f797a6237572ea1d48b7debda2e",
+        "usage": "TRANSITIVE_REFERENCE_PRIMITIVE_DEPENDENCY_NOT_EXECUTABLE"
+      },
+      {
+        "path": "scripts/postgresql-runtime-privilege-journal.mjs",
+        "sha256": "16d8a311181874f4e6ed49c2251581df0777f038f7d3b10e7a4e7a88f6ef1bfc",
+        "usage": "DIRECT_ACTION_REFERENCE_PRIMITIVE_NOT_EXECUTABLE"
+      },
+      {
+        "path": "scripts/postgresql-runtime-privilege-operator.mjs",
+        "sha256": "13a896aee3c0c36d6c120eb2d9c46b2e514fc9c15f8e7a2becad06e3b84d0dc5",
+        "usage": "DIRECT_ACTION_REFERENCE_PRIMITIVE_NOT_EXECUTABLE"
+      },
+      {
+        "path": "scripts/postgresql-runtime-privilege-policy.mjs",
+        "sha256": "dae1dacef46b81110a5937c268ce117a9ff7e271e8a3ddff900a175e7a9f476a",
+        "usage": "TRANSITIVE_REFERENCE_PRIMITIVE_DEPENDENCY_NOT_EXECUTABLE"
+      },
+      {
+        "path": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+        "sha256": "22ddda1cf7f77899cbb58f2e6e5ac75f81ea7629d8a4abbf05b07021efc0a6b9",
+        "usage": "DIRECT_ACTION_REFERENCE_PRIMITIVE_NOT_EXECUTABLE"
+      },
+      {
+        "path": "scripts/postgresql-runtime-privilege-source.mjs",
+        "sha256": "d275d548029c930d1fa33beed058723dc5b40b3af67d601393745e790a935b39",
+        "usage": "TRANSITIVE_REFERENCE_PRIMITIVE_DEPENDENCY_NOT_EXECUTABLE"
+      }
+    ],
+    "dependency_model": {
+      "control_source_binding_paths": [
+        ".env.uat-isolated.example",
+        "app/lib/infrastructure/config.ts",
+        "app/lib/infrastructure/request-origin.ts",
+        "compose.release.yml",
+        "compose.uat-isolated.yml",
+        "compose.yml",
+        "deploy/Caddyfile",
+        "operations/isolated-uat-caddy-host-sni-policy-v1.json",
+        "operations/isolated-uat-external-anchor-policy-v1.json",
+        "operations/isolated-uat-one-shot-action-bindings-v3.json",
+        "operations/isolated-uat-one-shot-action-bindings-v4.json",
+        "operations/isolated-uat-one-shot-action-bindings-v5.json",
+        "operations/isolated-uat-one-shot-action-bindings-v6.json",
+        "operations/isolated-uat-owner-completion-policy-v1.json",
+        "operations/isolated-uat-runtime-contract-policy-v1.json",
+        "operations/isolated-uat-runtime-receipt-policy-v1.json",
+        "operations/postgresql-runtime-privilege-policy-v2.json",
+        "operations/runtime-secret-file-policy-v1.json",
+        "scripts/isolated-uat-caddy-host-sni-contracts.py",
+        "scripts/isolated-uat-compose-policy.py",
+        "scripts/isolated-uat-control-plane-policy.py",
+        "scripts/isolated-uat-external-anchor-contracts.py",
+        "scripts/isolated-uat-owner-completion-contracts.py",
+        "scripts/isolated-uat-one-shot.py",
+        "scripts/isolated-uat-runtime-contracts.py",
+        "scripts/isolated-uat-runtime-receipts.py",
+        "scripts/postgresql-runtime-privilege-journal.mjs",
+        "scripts/postgresql-runtime-privilege-operator.mjs",
+        "scripts/postgresql-runtime-privilege-reconciler.mjs"
+      ],
+      "control_source_state_paths": [
+        "package.json",
+        "drizzle-postgres/meta/_journal.json",
+        "drizzle-postgres/0001_selfhost_baseline.sql",
+        "drizzle-postgres/0002_material_master_workflow.sql",
+        "drizzle-postgres/0003_material_import_mapping.sql",
+        "drizzle-postgres/0004_material_import_normalization.sql",
+        "drizzle-postgres/0005_material_import_review.sql",
+        "drizzle-postgres/0006_identity_security.sql",
+        "drizzle-postgres/0007_master_data_bom.sql",
+        "drizzle-postgres/0008_inventory_ledger.sql",
+        "drizzle-postgres/0009_procurement.sql",
+        "drizzle-postgres/0010_production.sql",
+        "drizzle-postgres/0011_sales.sql",
+        "drizzle-postgres/0012_quality.sql",
+        "drizzle-postgres/0013_finance.sql",
+        "drizzle-postgres/0014_migration_openings.sql",
+        "drizzle-postgres/0015_market_project_handoff.sql",
+        "drizzle-postgres/0016_project_planning_handoff.sql",
+        "drizzle-postgres/0017_planning_material_requirements.sql",
+        "drizzle-postgres/0018_procurement_sourcing.sql",
+        "drizzle-postgres/0019_sourcing_purchase_fulfillment.sql",
+        "drizzle-postgres/0020_production_handoff_reservations.sql",
+        "drizzle-postgres/0021_production_reporting_completions.sql",
+        "drizzle-postgres/0022_production_quality_release.sql",
+        "drizzle-postgres/0023_sales_delivery_receivable.sql",
+        "drizzle-postgres/0024_finance_project_settlements.sql",
+        "drizzle-postgres/0025_production_routings.sql",
+        "drizzle-postgres/0026_production_operation_execution.sql",
+        "drizzle-postgres/0027_production_final_output_reporting.sql",
+        "drizzle-postgres/0028_production_operation_quality_gates.sql",
+        "drizzle-postgres/0029_production_nonconformance_rework_handoff.sql",
+        "drizzle-postgres/0030_production_rework_execution.sql",
+        "drizzle-postgres/0031_production_batch_genealogy.sql",
+        "drizzle-postgres/0032_finished_goods_inventory_lots.sql",
+        "drizzle-postgres/0033_finished_goods_lot_fqc_shipment.sql",
+        "drizzle-postgres/0034_supplier_receipt_lot_iqc.sql",
+        "drizzle-postgres/0035_bom_material_governance.sql",
+        "drizzle-postgres/0036_project_requirement_unit_resolution.sql",
+        "drizzle-postgres/0037_project_planning_revision_response_lineage.sql",
+        "drizzle-postgres/0038_supplier_mapping_governance.sql",
+        "drizzle-postgres/0039_rfq_traceability.sql",
+        "drizzle-postgres/0040_warehouse_receipt_readiness.sql",
+        "drizzle-postgres/0041_ai_governance_suggestion_evidence.sql",
+        "drizzle-postgres/0042_material_import_fallback_safety.sql",
+        "drizzle-postgres/0043_material_import_terminal_integrity.sql",
+        "drizzle-postgres/0044_identity_session_absolute_lifetime.sql",
+        "drizzle-postgres/0045_runtime_worker_readiness.sql",
+        "drizzle-postgres/0046_runtime_lock_privilege_boundary.sql"
+      ],
+      "python_external_imports": [
+        {
+          "source": "scripts/isolated-uat-caddy-host-sni-contracts.py",
+          "imports": [
+            "ast",
+            "hashlib",
+            "json",
+            "re",
+            "typing"
+          ]
+        },
+        {
+          "source": "scripts/isolated-uat-compose-policy.py",
+          "imports": [
+            "argparse",
+            "json",
+            "pathlib",
+            "re",
+            "sys",
+            "typing"
+          ]
+        },
+        {
+          "source": "scripts/isolated-uat-control-plane-policy.py",
+          "imports": [
+            "argparse",
+            "hashlib",
+            "json",
+            "pathlib",
+            "re",
+            "sys",
+            "typing"
+          ]
+        },
+        {
+          "source": "scripts/isolated-uat-external-anchor-contracts.py",
+          "imports": [
+            "datetime",
+            "hashlib",
+            "json",
+            "pathlib",
+            "re",
+            "typing",
+            "unicodedata"
+          ]
+        },
+        {
+          "source": "scripts/isolated-uat-one-shot.py",
+          "imports": [
+            "argparse",
+            "hashlib",
+            "importlib",
+            "json",
+            "pathlib",
+            "sys",
+            "typing"
+          ]
+        },
+        {
+          "source": "scripts/isolated-uat-owner-completion-contracts.py",
+          "imports": [
+            "copy",
+            "datetime",
+            "hashlib",
+            "importlib",
+            "json",
+            "pathlib",
+            "re",
+            "typing",
+            "unicodedata"
+          ]
+        },
+        {
+          "source": "scripts/isolated-uat-runtime-contracts.py",
+          "imports": [
+            "ast",
+            "hashlib",
+            "json",
+            "re",
+            "typing"
+          ]
+        },
+        {
+          "source": "scripts/isolated-uat-runtime-receipts.py",
+          "imports": [
+            "ast",
+            "datetime",
+            "hashlib",
+            "json",
+            "re",
+            "typing",
+            "unicodedata"
+          ]
+        }
+      ],
+      "python_fixed_module_loads": [
+        {
+          "source": "scripts/isolated-uat-one-shot.py",
+          "target": "scripts/isolated-uat-caddy-host-sni-contracts.py"
+        },
+        {
+          "source": "scripts/isolated-uat-one-shot.py",
+          "target": "scripts/isolated-uat-control-plane-policy.py"
+        },
+        {
+          "source": "scripts/isolated-uat-one-shot.py",
+          "target": "scripts/isolated-uat-external-anchor-contracts.py"
+        },
+        {
+          "source": "scripts/isolated-uat-one-shot.py",
+          "target": "scripts/isolated-uat-owner-completion-contracts.py"
+        },
+        {
+          "source": "scripts/isolated-uat-one-shot.py",
+          "target": "scripts/isolated-uat-runtime-contracts.py"
+        },
+        {
+          "source": "scripts/isolated-uat-one-shot.py",
+          "target": "scripts/isolated-uat-runtime-receipts.py"
+        },
+        {
+          "source": "scripts/isolated-uat-owner-completion-contracts.py",
+          "target": "scripts/isolated-uat-external-anchor-contracts.py"
+        },
+        {
+          "source": "scripts/isolated-uat-owner-completion-contracts.py",
+          "target": "scripts/isolated-uat-runtime-receipts.py"
+        }
+      ],
+      "typescript_external_imports": [
+        {
+          "source": "app/lib/infrastructure/config.ts",
+          "imports": [
+            "node:path"
+          ]
+        },
+        {
+          "source": "app/lib/infrastructure/request-origin.ts",
+          "imports": []
+        },
+        {
+          "source": "app/lib/infrastructure/runtime-secret.ts",
+          "imports": [
+            "node:fs",
+            "node:path",
+            "node:util"
+          ]
+        }
+      ],
+      "typescript_local_imports": [
+        {
+          "source": "app/lib/infrastructure/config.ts",
+          "target": "app/lib/infrastructure/request-origin.ts"
+        },
+        {
+          "source": "app/lib/infrastructure/config.ts",
+          "target": "app/lib/infrastructure/runtime-secret.ts"
+        }
+      ],
+      "esm_external_imports": [
+        {
+          "source": "scripts/backup-recovery-contract.mjs",
+          "imports": [
+            "node:child_process",
+            "node:crypto",
+            "node:fs",
+            "node:fs/promises",
+            "node:path",
+            "node:url"
+          ]
+        },
+        {
+          "source": "scripts/postgresql-cluster-recovery-contract.mjs",
+          "imports": [
+            "node:crypto",
+            "node:fs",
+            "node:fs/promises",
+            "node:os",
+            "node:path"
+          ]
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-catalog.mjs",
+          "imports": [
+            "node:crypto",
+            "node:fs",
+            "node:fs/promises",
+            "node:path",
+            "node:url"
+          ]
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-journal.mjs",
+          "imports": [
+            "node:crypto",
+            "node:fs",
+            "node:fs/promises",
+            "node:path"
+          ]
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-operator.mjs",
+          "imports": [
+            "node:crypto",
+            "node:fs",
+            "node:fs/promises",
+            "node:os",
+            "node:path",
+            "node:url"
+          ]
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-policy.mjs",
+          "imports": [
+            "node:crypto",
+            "node:fs",
+            "node:fs/promises",
+            "node:path",
+            "node:url"
+          ]
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+          "imports": [
+            "node:crypto",
+            "node:fs",
+            "node:fs/promises",
+            "node:path",
+            "node:url"
+          ]
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-source.mjs",
+          "imports": [
+            "node:crypto",
+            "node:fs/promises",
+            "node:path",
+            "node:url"
+          ]
+        }
+      ],
+      "esm_local_imports": [
+        {
+          "source": "scripts/postgresql-cluster-recovery-contract.mjs",
+          "target": "scripts/backup-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-catalog.mjs",
+          "target": "scripts/backup-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-catalog.mjs",
+          "target": "scripts/postgresql-cluster-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-catalog.mjs",
+          "target": "scripts/postgresql-runtime-privilege-source.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-journal.mjs",
+          "target": "scripts/backup-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-journal.mjs",
+          "target": "scripts/postgresql-cluster-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-journal.mjs",
+          "target": "scripts/postgresql-runtime-privilege-operator.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-journal.mjs",
+          "target": "scripts/postgresql-runtime-privilege-reconciler.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-operator.mjs",
+          "target": "scripts/backup-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-operator.mjs",
+          "target": "scripts/postgresql-cluster-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-operator.mjs",
+          "target": "scripts/postgresql-runtime-privilege-catalog.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-operator.mjs",
+          "target": "scripts/postgresql-runtime-privilege-policy.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-operator.mjs",
+          "target": "scripts/postgresql-runtime-privilege-reconciler.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-operator.mjs",
+          "target": "scripts/postgresql-runtime-privilege-source.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-policy.mjs",
+          "target": "scripts/backup-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-policy.mjs",
+          "target": "scripts/postgresql-cluster-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-policy.mjs",
+          "target": "scripts/postgresql-runtime-privilege-catalog.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-policy.mjs",
+          "target": "scripts/postgresql-runtime-privilege-source.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+          "target": "scripts/backup-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+          "target": "scripts/postgresql-cluster-recovery-contract.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+          "target": "scripts/postgresql-runtime-privilege-catalog.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+          "target": "scripts/postgresql-runtime-privilege-policy.mjs"
+        },
+        {
+          "source": "scripts/postgresql-runtime-privilege-reconciler.mjs",
+          "target": "scripts/postgresql-runtime-privilege-source.mjs"
+        }
+      ],
+      "compose_bind_resources": [
+        {
+          "source": "compose.yml",
+          "target": "deploy/Caddyfile"
+        }
+      ],
+      "non_traversal_provenance": {
+        "source": "operations/postgresql-runtime-privilege-policy-v2.json",
+        "classification": "REFERENCE_SEMANTICS_ONLY_NOT_EXECUTABLE",
+        "rule": "JSON_SOURCE_BINDING_IS_PROVENANCE_NOT_A_DECLARED_RUNTIME_DEPENDENCY",
+        "expansion_status": "DEFERRED_UNTIL_FIXED_ISOLATED_UAT_RUNTIME_ADAPTER_CALL_GRAPH"
+      }
+    },
+    "external_boundary": {
+      "python_runtime": "EXCLUDED_NOT_PINNED_OR_ATTESTED",
+      "node_runtime": "EXCLUDED_NOT_PINNED_OR_ATTESTED",
+      "compose_and_docker_implementation": "EXCLUDED_NOT_PINNED_OR_ATTESTED",
+      "oci_image_contents": "EXCLUDED_SEPARATE_EXACT_IMAGE_BLOCKER",
+      "runtime_filesystem_reads": "EXCLUDED_UNTIL_FIXED_ADAPTER_CALL_GRAPH",
+      "postgresql_policy_json_provenance": "NON_TRAVERSAL_REFERENCE_ONLY",
+      "production_runner": "FORBIDDEN_AS_ISOLATED_UAT_ACTION_ENTRYPOINT",
+      "production_supervisor": "FORBIDDEN_AS_ISOLATED_UAT_ACTION_ENTRYPOINT"
+    },
+    "validation_scope": "CALLER_INJECTED_RAW_BYTES_FIXED_GRAPH_NOT_FILESYSTEM_ATTESTATION_NOT_TRUSTED_PRE_IMPORT_ENFORCEMENT",
+    "source_closure_sha256": "19e518819ede89a2b5ad4925d0c71b27fa2b5bba41759ffb0e51e90bd7cc0fb3"
+  },
+  "policy_sha256": "a85d6abbad072ce5981690f0e266b3b657beb3a707f7ca04db96d97d0bb52d11"
+}
