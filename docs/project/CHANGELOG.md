@@ -4,6 +4,18 @@
 
 ## 2026-08-25
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: hand off verified UAT plan bytes`
+
+- 第一性原理：少于20人的单一同机UAT只需要证明“被验证的同一批bytes生成了只读plan”；不为plan创建84文件私有树、child、daemon或通用publisher，也不把工程/计划/市场等人数写入容量或验收合同。
+- 固定交接：Bootstrap policy v2只开放`verify/plan`，请求/输出上限为2/4 MiB。D-184的83成员加固定D-174 control policy形成84成员、`2,100,283` bytes；路径集合/路径+值SHA为`5cd4a2e2…03a0`/`80fafed8…843`。
+- 内存适配器：只在唯一活动主线程内按固定顺序提供8条`(module_name, path)`边；计划编译器固定读取258次/78个唯一路径，read-set/read-trace SHA为`0403a5e1…6969a`/`b6d158d6…025b01`。捕获后不重开原仓source/pyc，所有临时全局适配器在成功/异常路径恢复。
+- 摘要与外部输入：Bootstrap/policy/manifest raw为`bc33d4da…e028`/`809989aa…241d`/`ba8e7337…a7e5`，policy/manifest内部为`4358ef2d…fe1`/`b71662a4…672a`；固定专项测试request生成的原计划SHA为`04e12045…95ea`，其他合法request按其内容生成各自摘要。Manifest仓库副本明确不是外部trust root，只作为未来宿主钉扎输入，当前未安装或验证。
+- 诚实停止线：输出只称`VERIFIED_SOURCE_BYTES_DELIVERED_TO_FIXED_READ_ONLY_PLAN_COMPILER / ONE_SHOT_PLAN_GENERATED_NO_UAT_ACTION_EXECUTED`。`execute`不可用；bootstrap/CPython/stdlib、runtime publisher/observer/backend、精确镜像、授权和UAT均未建立。
+- 测试/复核：D-185专项20/20，完整聚合`5+13+7+16+13+15+11+12+20=112/112`；隔离Compose policy/config连续两次双PASS。三路最终只读复核P0=0/P1=0/P2=0，覆盖捕获后原路径替换、未消费成员篡改、source set/value替换、错误请求恢复、后台线程、execute/额外参数和临时残留。
+- 资源/完整性：起点→09:37 available memory `2,130,964,480 → 2,127,458,304`B，Swap `182,296,576 → 182,812,672`B，根盘 `17,551,732,736 → 17,520,386,048`B，Load `0.05/0.07/0.15 → 0.44/0.28/0.29`，PSI/OOM0。Docker保持6容器/75镜像/277 Volume/6网络；四服务restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整。本切片fixture/临时目录/新增pyc为0；Compose `ps`缺必填`ERP_DEPLOYMENT_CLASS`时按设计失败关闭，服务状态改用只读Docker metadata核对。
+- 代码/数据：只修改pre-import bootstrap和专项测试，新增policy v2与launch manifest；无产品业务代码、Schema、Migration、API、页面、依赖、员工角色或生产配置变化。未创建/访问UAT目录、Secret、证书、Docker资源、数据库、备份或业务数据，未build/deploy/Migration/restart/账号/HTTP-TLS探针/业务写。
+- 文档：新增D-185并同步MASTER、TASKS、PROJECT_CONTEXT、当前任务、STATUS和CHANGELOG。TASK92继续`DOING`；下一步需另获payload外部宿主钉扎、精确镜像/runtime和L2a授权，不自动运行。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: verify isolated UAT source snapshot`
 
 - 第一性原理：单一小团队UAT只增加一个stage-1 policy、标准库-only verifier和专项负测；不修改冻结v1—v6、D-183或one-shot，不新增v7、daemon、队列、服务、临时payload publisher或按职能人数硬编码容量。

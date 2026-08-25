@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "contract": "chenyida-erp-isolated-uat-pre-import-launch-manifest/v1",
+  "manifest_id": "chenyida-erp-isolated-uat-verified-plan-launch-v1",
+  "execution_authorized": false,
+  "activation_status": "CONTENT_ADDRESS_INPUT_READY_NOT_INSTALLED_OR_HOST_PINNED",
+  "external_pin_contract": {
+    "required_anchor": "MANIFEST_RAW_SHA256_STORED_OUTSIDE_PAYLOAD_AND_REPOSITORY_WORKTREE",
+    "repository_copy_trust_status": "NOT_AN_EXTERNAL_TRUST_ROOT",
+    "host_installation_requires_separate_authorization": true
+  },
+  "bootstrap": {
+    "path": "scripts/isolated-uat-pre-import-bootstrap.py",
+    "raw_sha256": "bc33d4da3a32cb4e894a897261afb2ab528fd8327becc975eb243f725b79e028"
+  },
+  "bootstrap_policy": {
+    "path": "operations/isolated-uat-pre-import-bootstrap-policy-v2.json",
+    "raw_sha256": "809989aa82bf993471f7fd50bf61601e62d30af81a94fb1a74ae3bcf6d41241d",
+    "policy_sha256": "4358ef2d41df39c6483171794d1e0a889db064f91c341045c8372263fd216fe1"
+  },
+  "launch_contract": {
+    "python_executable": "/usr/bin/python3",
+    "required_flags": [
+      "-I",
+      "-S",
+      "-B"
+    ],
+    "bootstrap_path": "ABSOLUTE_CONTENT_MATCHED_PATH_FROM_EXTERNAL_LAUNCHER",
+    "allowed_commands": [
+      "verify",
+      "plan"
+    ],
+    "plan_request_source": "BOUNDED_STDIN_ONLY",
+    "plan_request_max_bytes": 2097152,
+    "plan_output_max_bytes": 4194304,
+    "execute_command": "UNAVAILABLE",
+    "caller_selected_source_root": "FORBIDDEN",
+    "caller_selected_policy": "FORBIDDEN"
+  },
+  "trust_boundary": {
+    "bootstrap_identity": "ATTESTABLE_BY_FUTURE_EXTERNAL_RAW_SHA256_PIN_NOT_CURRENTLY_ATTESTED",
+    "python_runtime_and_stdlib_identity": "NOT_ATTESTED",
+    "prior_process_execution": "NOT_ATTESTED",
+    "runtime_publisher": "NOT_IMPLEMENTED",
+    "runtime_evidence": "NOT_ESTABLISHED",
+    "uat_environment": "NOT_CREATED"
+  },
+  "manifest_sha256": "b71662a429a9180df3cd30f1824b0bc7ebb4b25d078d2cae1ae3595bf903672a"
+}

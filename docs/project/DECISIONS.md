@@ -4231,6 +4231,40 @@
 - 拒绝在本切片临时复制83成员并启动child；这会同时跨入publisher/handoff及异常清理范围，应与下一外部锚原子设计。
 - 拒绝新增v7、通用dependency daemon、容器供应链平台或按员工人数配置源码边界。
 
+## D-185 只读计划直接消费已验证内存字节，不为plan建设文件系统publisher
+
+- 日期：2026-08-25
+- 状态：Accepted（same-verified-bytes只读计划交接已实现；外部宿主钉扎、runtime publisher/backend与执行授权未建立）
+- 发起：项目负责人再次要求“下一步”；Codex按少于20人的单一UAT和第一性原理继续收窄D-184 handoff边界
+
+### Context
+
+- D-184已经从固定文件系统边界取得并验证83个成员，但没有把同一批bytes交给one-shot；只验证路径后再由one-shot重开文件仍有TOCTOU。生成当前只读计划还固定读取D-174 control policy，因此真正的交接输入是84成员而不是83成员。
+- 为只读plan复制84文件到私有临时树再启动child，会新增临时目录、pyc、signal、异常清理、残留与独立publisher语义。该复杂度只在未来真正需要runtime filesystem执行时才可能合理，当前没有这个需求。
+- 仓库内的manifest可以声明未来外部入口应钉住哪些摘要，但它与payload同属一个信任域，不能自称外部trust root。
+
+### Decision
+
+1. Bootstrap policy升级为v2；可信CLI仍固定`/usr/bin/python3 -I -S -B`、绝对bootstrap派生site root，只开放`verify`和`plan`。Plan请求只从stdin读取且上限2 MiB，输出上限4 MiB；`execute`、额外参数、caller root/policy均不可用。
+2. Plan在D-184的83成员之后，以相同FD规则捕获固定D-174 control policy；84成员总计`2,100,283` bytes，精确路径集合与路径+值SHA分别为`5cd4a2e2a6696a3c79e24d6893374d732fcba08dbe93ba1a328ca7ccb60203a0`和`80fafed8f27377fac43b038327bfdc16984260bb4cd077bae04872c4fd088843`。
+3. 固定内存适配器只允许唯一活动主线程，并按精确顺序提供8条`(module_name, path)`装载边；临时替换的import/path读取入口必须在`finally`全部恢复。计划编译阶段固定读取258次、78个唯一路径，read-set/read-trace SHA为`0403a5e1…6969a`/`b6d158d6…025b01`，每次都只能从已验证map返回。
+4. 成功输出只称`VERIFIED_SOURCE_BYTES_DELIVERED_TO_FIXED_READ_ONLY_PLAN_COMPILER`及`ONE_SHOT_PLAN_GENERATED_NO_UAT_ACTION_EXECUTED`，保留原始只读plan并计算其摘要；不建立授权、runtime evidence、publisher回执或UAT状态。
+5. 新增launch manifest，绑定bootstrap raw `bc33d4da…e028`和policy v2 raw/internal `809989aa…241d`/`4358ef2d…fe1`。Manifest raw/internal为`ba8e7337…a7e5`/`b71662a4…672a`，只作为未来payload外部宿主钉扎的输入；本轮不安装、不激活，也不attest CPython/stdlib。
+6. 本切片不创建临时执行树、child、daemon、队列、Docker对象、数据库或UAT，不提供execute或runtime publisher。人数不进入文件数、动作数、线程、容量或验收条件。
+
+### Consequences
+
+- D-184的verified filesystem bytes现在可以在同一进程中直接生成只读计划，捕获后不重开仓库source/pyc；D-184原先预想的“plan也需要原子文件publisher”被更小的内存交接边界取代。
+- 这仍不是受信运行入口：manifest尚未在payload外部安装/钉扎，bootstrap、CPython/stdlib、direct one-shot、runtime publisher/observer/backend和当前源码精确镜像都未建立信任；新UAT未创建，不能试运行。
+- D-185专项20/20、更新后聚合112/112、隔离Compose静态双门连续两次PASS；三路独立最终复核均为P0=0/P1=0/P2=0。TASK92继续`DOING`，下一步必须另获宿主安装/钉扎及精确镜像/runtime/L2a授权。
+
+### Rejected alternatives
+
+- 拒绝为只读plan创建84文件临时树和child；收益不足以覆盖publisher、pyc、signal和残留边界。
+- 拒绝通用import loader、常驻daemon或可由caller选择模块/path/policy的执行器。
+- 拒绝把同仓manifest、自hash或root-owned mode冒充payload外部known-good锚。
+- 拒绝开放`execute`、宿主安装、Docker/数据库动作，或按员工人数配置当前合同。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-184 stage-1已把D-183的83成员从caller-injected证明推进到实际文件系统FD快照：固定isolated Python、唯一site root、逐组件非跟随打开、owner/mode/type/nlink/device/读取前后identity及全部摘要，并只从已验bytes执行D-183 validator。它仍明确`BOOTSTRAP IDENTITY NOT ATTESTED / PAYLOAD NOT EXECUTED BY THIS BOOTSTRAP / HANDOFF NOT IMPLEMENTED / NOT PUBLISHED`；v1—v6、D-183和one-shot字节保持不变，授权与runtime evidence未建立。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-185已把D-184捕获的83成员与固定D-174 control policy组成84份verified bytes，并通过固定内存适配器直接生成只读plan；捕获后不重开仓库source/pyc，不创建文件publisher或child。`execute`不可用，launch manifest尚未在payload外部宿主安装/钉扎；bootstrap/CPython、runtime evidence和UAT均未建立。
+
+2026-08-25 verified-byte只读计划交接事件：项目负责人继续要求“下一步”。新增D-185、bootstrap policy v2和未来外部宿主钉扎manifest；CLI只开放`verify/plan`，以2 MiB stdin/4 MiB output上限、唯一活动主线程、84成员map、8条模块边及258次/78路径固定读取，将D-184已验bytes直接交给one-shot plan编译器。专项20/20、聚合112/112、Compose静态双门连续两次PASS，三路独立复核P0/P1/P2=0。Manifest仓库副本不是外部信任根，未安装host pin；没有execute、publisher/runtime、Docker、数据库或UAT动作。TASK92继续`DOING`，下一步需另获外部宿主钉扎、精确镜像/runtime和L2a授权。
 
 2026-08-25 pre-import文件系统快照事件：项目负责人继续要求“下一步”。新增D-184、stage-1 bootstrap policy、标准库-only FD verifier和10项专项测试。Trusted CLI固定`/usr/bin/python3 -I -S -B`并从bootstrap绝对路径派生site root，不接受caller root；从`/`逐组件dir-FD打开，拒绝symlink、双前导斜杠、可写目录/文件、wrong owner、hardlink、FIFO、跨device、超限和读中identity变化。先固定核对D-184 policy、D-183 policy/validator和全部83成员hash，再从同一validator bytes执行完整D-183校验；策略/成员自重签及顶层payload sentinel均在执行前失败。聚合102/102、Compose静态双门连续两次PASS，最终对抗复核P0/P1/P2=0。Stage-1不执行one-shot且handoff固定失败；新UAT未创建。TASK92继续`DOING`，下一独立切片合并外部内容寻址bootstrap锚/原子publisher与same-verified-bytes只读handoff。
 
@@ -299,7 +301,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、D-177—D-183合同/闭包及D-184 stage-1文件系统快照；继续外部锚+same-byte handoff、runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、D-181、D-182、D-183、D-184、低资源规则 | `DOING / D-184 FILESYSTEM SOURCE SNAPSHOT VERIFIED / BOOTSTRAP TRUST ROOT + PAYLOAD HANDOFF NOT ESTABLISHED / RUNTIME + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。83成员已从固定site root以FD实际读取且匹配，D-183 validator只从已验bytes执行；bootstrap/CPython未外部attest，stage-1不执行one-shot，TLS/HTTP未观察，publisher/backend未实现，新UAT未创建。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B并接受同一故障域）、Codex（已完成清理、D-177—D-184合同/闭包/FD快照及D-185 same-byte只读交接；继续外部宿主钉扎、精确镜像/runtime path） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174、D-175、D-176（历史v1）、D-177、D-178、D-179、D-180、D-181、D-182、D-183、D-184、D-185、低资源规则 | `DOING / D-185 VERIFIED-BYTE READ-ONLY PLAN HANDOFF PASS / EXTERNAL HOST PIN + RUNTIME + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`。84成员从固定FD捕获后由内存适配器直接生成只读plan，`execute`不可用；manifest未在payload外部安装/钉扎，bootstrap/CPython、TLS/HTTP、publisher/backend未建立，新UAT未创建。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

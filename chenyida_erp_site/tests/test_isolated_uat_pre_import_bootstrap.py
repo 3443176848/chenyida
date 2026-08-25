@@ -7,18 +7,24 @@ import ast
 from contextlib import contextmanager
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
 
 SITE_ROOT = Path(__file__).resolve().parent.parent
 BOOTSTRAP_PATH = SITE_ROOT / "scripts/isolated-uat-pre-import-bootstrap.py"
+MANIFEST_PATH = (
+    SITE_ROOT / "operations/isolated-uat-pre-import-launch-manifest-v1.json"
+)
 
 
 def load_module(name: str, path: Path):
@@ -45,6 +51,57 @@ def member_paths() -> list[str]:
     return [item["path"] for item in policy["source_closure"]["members"]]
 
 
+def valid_request() -> dict:
+    policy = json.loads((SITE_ROOT / BOOTSTRAP.CONTROL_POLICY_PATH).read_bytes())
+    project = "chenyida-erp-uat-pre-import-test"
+    return {
+        "schema_version": 1,
+        "contract": "chenyida-erp-isolated-uat-control-plane-request/v1",
+        "request_id": "uat-pre-import-request-001",
+        "policy_sha256": policy["policy_sha256"],
+        "project": project,
+        "roots": {
+            key: value.format(project=project)
+            for key, value in policy["namespace"]["roots"].items()
+        },
+        "source": {
+            "package_version": policy["release"]["package_version"],
+            "git_commit": "a" * 40,
+            "git_tree": "b" * 40,
+            "migration_current_head": policy["database"]["current_head"],
+            "migration_target_head": policy["database"]["target_head"],
+            "migration_allowlist_sha256": policy["database"][
+                "migration_allowlist_sha256"
+            ],
+            "resolved_compose_sha256": "c" * 64,
+        },
+        "images": {
+            "web": {
+                "image_reference": f"example.invalid/erp-web@sha256:{'d' * 64}",
+                "config_digest": f"sha256:{'e' * 64}",
+            },
+            "worker": {
+                "image_reference": f"example.invalid/erp-worker@sha256:{'f' * 64}",
+                "config_digest": f"sha256:{'1' * 64}",
+            },
+        },
+        "ports": {
+            "host_ip": "127.0.0.1",
+            "web": 33001,
+            "caddy_http": 33080,
+            "caddy_https": 33443,
+        },
+        "runtime_actions_authorized": [],
+        "request_only": True,
+    }
+
+
+def request_raw() -> bytes:
+    return (json.dumps(
+        valid_request(), ensure_ascii=False, separators=(",", ":"),
+    ) + "\n").encode("utf-8")
+
+
 @contextmanager
 def isolated_fixture():
     with tempfile.TemporaryDirectory(
@@ -56,6 +113,7 @@ def isolated_fixture():
             BOOTSTRAP.POLICY_PATH,
             BOOTSTRAP.D183_POLICY_PATH,
             BOOTSTRAP.D183_VALIDATOR_PATH,
+            BOOTSTRAP.CONTROL_POLICY_PATH,
             *member_paths(),
         ]
         for relative in dict.fromkeys(paths):
@@ -85,7 +143,8 @@ class IsolatedUatPreImportBootstrapTest(unittest.TestCase):
             "TEST_ONLY_CALLER_SUPPLIED_SOURCE_ROOT_AND_RUNTIME_NOT_ATTESTED",
         )
         self.assertEqual(
-            first["execution_handoff_status"], "NOT_IMPLEMENTED_FAIL_CLOSED",
+            first["execution_handoff_status"],
+            "FIXED_READ_ONLY_PLAN_COMMAND_DECLARED_NOT_VALIDATED_BY_VERIFY",
         )
         self.assertEqual(
             first["trust_root_status"],
@@ -161,7 +220,11 @@ class IsolatedUatPreImportBootstrapTest(unittest.TestCase):
                 imports.add(node.module.split(".")[0])
         self.assertEqual(
             imports,
-            {"__future__", "hashlib", "json", "os", "re", "stat", "sys", "typing"},
+            {
+                "__future__", "hashlib", "importlib", "io", "json", "os",
+                "pathlib", "re", "stat", "sys", "typing",
+                "threading",
+            },
         )
         top_level_calls: list[str] = []
         for statement in tree.body:
@@ -179,16 +242,19 @@ class IsolatedUatPreImportBootstrapTest(unittest.TestCase):
             sorted(top_level_calls),
             ["SystemExit", "main", "re.compile", "re.compile"],
         )
-        for forbidden in (
-            "spec_from_file_location", "exec_module", "subprocess", "Path.read_bytes",
-        ):
-            self.assertNotIn(forbidden, source)
-        validator_function = next(
-            node for node in tree.body
-            if isinstance(node, ast.FunctionDef)
-            and node.name == "_run_verified_d183_validator"
-        )
-        validator_nodes = set(ast.walk(validator_function))
+        self.assertNotIn("subprocess", source)
+        execution_functions = [
+            node for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name in {
+                "_run_verified_d183_validator",
+                "exec_module",
+                "_run_verified_one_shot_plan",
+            }
+        ]
+        execution_nodes = set()
+        for function in execution_functions:
+            execution_nodes.update(ast.walk(function))
         compile_or_exec = [
             node for node in ast.walk(tree)
             if isinstance(node, ast.Call)
@@ -196,9 +262,10 @@ class IsolatedUatPreImportBootstrapTest(unittest.TestCase):
             and node.func.id in {"compile", "exec"}
         ]
         self.assertEqual(
-            sorted(node.func.id for node in compile_or_exec), ["compile", "exec"],
+            sorted(node.func.id for node in compile_or_exec),
+            ["compile", "compile", "compile", "exec", "exec", "exec"],
         )
-        self.assertTrue(all(node in validator_nodes for node in compile_or_exec))
+        self.assertTrue(all(node in execution_nodes for node in compile_or_exec))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
@@ -212,6 +279,76 @@ class IsolatedUatPreImportBootstrapTest(unittest.TestCase):
                     or node.func.attr == "fork" or node.func.attr.startswith("exec")
                     or node.func.attr.startswith("spawn")
                 )
+
+    def test_fixed_payload_filesystem_surface_is_fully_adapted(self) -> None:
+        payload_paths = [
+            BOOTSTRAP.ONE_SHOT_PATH,
+            "scripts/isolated-uat-control-plane-policy.py",
+            "scripts/isolated-uat-runtime-contracts.py",
+            "scripts/isolated-uat-runtime-receipts.py",
+            "scripts/isolated-uat-external-anchor-contracts.py",
+            "scripts/isolated-uat-owner-completion-contracts.py",
+            "scripts/isolated-uat-caddy-host-sni-contracts.py",
+        ]
+        adapted = {
+            "resolve", "read_bytes", "read_text", "is_file", "is_symlink", "glob",
+        }
+        forbidden = {
+            "open", "write_bytes", "write_text", "iterdir", "rglob", "stat",
+            "lstat", "exists", "unlink", "rename", "mkdir", "touch",
+            "chmod", "symlink_to", "hardlink_to",
+        }
+        observed: set[str] = set()
+        for relative in payload_paths:
+            source = (SITE_ROOT / relative).read_text(encoding="utf-8")
+            tree = ast.parse(source)
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                if isinstance(node.func, ast.Name):
+                    self.assertNotIn(node.func.id, {"open", "eval", "__import__"})
+                if isinstance(node.func, ast.Attribute):
+                    self.assertNotIn(node.func.attr, forbidden)
+                    if node.func.attr in adapted:
+                        observed.add(node.func.attr)
+        self.assertEqual(observed, adapted)
+
+    def test_launch_manifest_is_content_address_input_not_trust_claim(self) -> None:
+        raw = MANIFEST_PATH.read_bytes()
+        manifest = json.loads(raw)
+        body = {
+            key: item for key, item in manifest.items()
+            if key != "manifest_sha256"
+        }
+        self.assertEqual(manifest["manifest_sha256"], canonical_sha256(body))
+        self.assertEqual(
+            manifest["activation_status"],
+            "CONTENT_ADDRESS_INPUT_READY_NOT_INSTALLED_OR_HOST_PINNED",
+        )
+        self.assertEqual(
+            manifest["external_pin_contract"]["repository_copy_trust_status"],
+            "NOT_AN_EXTERNAL_TRUST_ROOT",
+        )
+        self.assertFalse(manifest["execution_authorized"])
+        self.assertEqual(
+            manifest["bootstrap"]["raw_sha256"],
+            hashlib.sha256(BOOTSTRAP_PATH.read_bytes()).hexdigest(),
+        )
+        policy_path = SITE_ROOT / manifest["bootstrap_policy"]["path"]
+        policy_raw = policy_path.read_bytes()
+        policy = json.loads(policy_raw)
+        self.assertEqual(
+            manifest["bootstrap_policy"]["raw_sha256"],
+            hashlib.sha256(policy_raw).hexdigest(),
+        )
+        self.assertEqual(
+            manifest["bootstrap_policy"]["policy_sha256"],
+            policy["policy_sha256"],
+        )
+        self.assertNotIn(
+            "operations/isolated-uat-pre-import-launch-manifest-v1.json",
+            member_paths(),
+        )
 
     def test_validator_and_payload_tamper_cannot_execute_sentinels(self) -> None:
         with isolated_fixture() as root:
@@ -399,10 +536,220 @@ class IsolatedUatPreImportBootstrapTest(unittest.TestCase):
             after = len(list(Path("/proc/self/fd").iterdir()))
             self.assertEqual(after, before)
 
+    def test_plan_cli_is_deterministic_and_matches_direct_read_only_plan(self) -> None:
+        command = [
+            "/usr/bin/python3", "-I", "-S", "-B", str(BOOTSTRAP_PATH), "plan",
+        ]
+        raw = request_raw()
+        first = subprocess.run(
+            command, input=raw, check=False, capture_output=True, cwd="/",
+        )
+        second = subprocess.run(
+            command, input=raw, check=False, capture_output=True, cwd="/",
+        )
+        self.assertEqual(first.returncode, 0, first.stderr.decode())
+        self.assertEqual(first.stdout, second.stdout)
+        self.assertEqual(first.stderr, b"")
+        envelope = json.loads(first.stdout)
+        with tempfile.TemporaryDirectory(
+            dir=SITE_ROOT.parent, prefix=".d185-empty-pycache-",
+        ) as cache_root:
+            direct = subprocess.run(
+                [
+                    "/usr/bin/python3", "-I", "-S", "-B", "-X",
+                    f"pycache_prefix={cache_root}",
+                    str(SITE_ROOT / BOOTSTRAP.ONE_SHOT_PATH), "plan", "--policy",
+                    str(SITE_ROOT / BOOTSTRAP.CONTROL_POLICY_PATH),
+                ],
+                input=raw,
+                check=False,
+                capture_output=True,
+                cwd="/",
+            )
+        self.assertEqual(direct.returncode, 0, direct.stderr.decode())
+        self.assertEqual(envelope["plan"], json.loads(direct.stdout))
+        self.assertEqual(envelope["plan_sha256"], envelope["plan"]["plan_sha256"])
+        self.assertEqual(envelope["mode"], "READ_ONLY_PLAN")
+        self.assertFalse(envelope["execution_authorized"])
+        self.assertEqual(envelope["handoff_member_count"], 84)
+        self.assertEqual(
+            envelope["handoff_paths_sha256"],
+            BOOTSTRAP.EXPECTED_HANDOFF_PATHS_SHA256,
+        )
+        self.assertEqual(
+            envelope["handoff_source_map_sha256"],
+            BOOTSTRAP.EXPECTED_HANDOFF_SOURCE_MAP_SHA256,
+        )
+        self.assertEqual(envelope["verified_module_load_count"], 8)
+        self.assertEqual(envelope["verified_repository_read_count"], 258)
+        self.assertEqual(envelope["verified_repository_unique_read_count"], 78)
+        self.assertEqual(
+            envelope["verified_repository_read_set_sha256"],
+            BOOTSTRAP.EXPECTED_PLAN_READ_SET_SHA256,
+        )
+        self.assertEqual(
+            envelope["verified_repository_read_trace_sha256"],
+            BOOTSTRAP.EXPECTED_PLAN_READ_TRACE_SHA256,
+        )
+        self.assertEqual(
+            envelope["handoff_status"],
+            "VERIFIED_SOURCE_BYTES_DELIVERED_TO_FIXED_READ_ONLY_PLAN_COMPILER",
+        )
+        self.assertEqual(envelope["execution_command_status"], "UNAVAILABLE")
+        self.assertEqual(envelope["publisher_status"], (
+            "NO_FILESYSTEM_PUBLISHER_USED_RUNTIME_PUBLISHER_NOT_IMPLEMENTED"
+        ))
+        self.assertEqual(envelope["external_anchor_status"], (
+            "CONTENT_ADDRESS_MANIFEST_DECLARED_NOT_VERIFIED_OR_HOST_PINNED"
+        ))
+        self.assertEqual(envelope["uat_status"], "NOT_CREATED")
+        body = {
+            key: item for key, item in envelope.items()
+            if key != "handoff_sha256"
+        }
+        self.assertEqual(envelope["handoff_sha256"], canonical_sha256(body))
+
+    def test_plan_uses_captured_bytes_after_origin_files_change(self) -> None:
+        with isolated_fixture() as root:
+            def change_origin_after_capture() -> None:
+                moved = root.parent / "captured-origin-removed"
+                root.rename(moved)
+                root.mkdir(mode=0o700)
+
+            envelope = BOOTSTRAP.plan_site_root_for_tests(
+                str(root),
+                request_raw(),
+                after_capture=change_origin_after_capture,
+            )
+        self.assertEqual(envelope["mode"], "READ_ONLY_PLAN")
+        self.assertEqual(
+            envelope["payload_execution_status"],
+            "ONE_SHOT_PLAN_GENERATED_NO_UAT_ACTION_EXECUTED",
+        )
+
+    def test_source_map_substitution_fails_before_adapter(self) -> None:
+        with isolated_fixture() as root:
+            _, sources, _ = BOOTSTRAP._capture_site_root(
+                str(root),
+                "TEST_ONLY",
+                include_plan_policy=True,
+            )
+        original_spec = importlib.util.spec_from_file_location
+        original_read_bytes = Path.read_bytes
+        original_glob = Path.glob
+        substituted = dict(sources)
+        del substituted["scripts/isolated-uat-runtime-contracts.py"]
+        substituted["unused.txt"] = b"unused"
+        mutated = dict(sources)
+        mutated["app/lib/infrastructure/runtime-secret.ts"] += b"\n"
+        for candidate in (substituted, mutated):
+            with self.assertRaisesRegex(
+                BOOTSTRAP.BootstrapError,
+                "ISOLATED_UAT_PRE_IMPORT_PLAN_INPUT_INVALID",
+            ):
+                BOOTSTRAP._run_verified_one_shot_plan(candidate, request_raw())
+        self.assertIs(importlib.util.spec_from_file_location, original_spec)
+        self.assertIs(Path.read_bytes, original_read_bytes)
+        self.assertIs(Path.glob, original_glob)
+
+    def test_rejected_request_restores_global_adapters(self) -> None:
+        with isolated_fixture() as root:
+            _, sources, _ = BOOTSTRAP._capture_site_root(
+                str(root),
+                "TEST_ONLY",
+                include_plan_policy=True,
+            )
+        original_spec = importlib.util.spec_from_file_location
+        original_read_bytes = Path.read_bytes
+        original_glob = Path.glob
+        with self.assertRaisesRegex(
+            BOOTSTRAP.BootstrapError,
+            "ISOLATED_UAT_PRE_IMPORT_PLAN_COMPILER_REJECTED",
+        ):
+            BOOTSTRAP._run_verified_one_shot_plan(sources, b"{}\n")
+        self.assertIs(importlib.util.spec_from_file_location, original_spec)
+        self.assertIs(Path.read_bytes, original_read_bytes)
+        self.assertIs(Path.glob, original_glob)
+
+    def test_plan_adapter_rejects_a_multithreaded_process_before_patching(self) -> None:
+        with isolated_fixture() as root:
+            _, sources, _ = BOOTSTRAP._capture_site_root(
+                str(root),
+                "TEST_ONLY",
+                include_plan_policy=True,
+            )
+        started = threading.Event()
+        stop = threading.Event()
+
+        def wait_for_stop() -> None:
+            started.set()
+            stop.wait(timeout=5)
+
+        worker = threading.Thread(target=wait_for_stop)
+        worker.start()
+        try:
+            self.assertTrue(started.wait(timeout=1))
+            original_spec = importlib.util.spec_from_file_location
+            original_read_bytes = Path.read_bytes
+            with self.assertRaisesRegex(
+                BOOTSTRAP.BootstrapError,
+                "ISOLATED_UAT_PRE_IMPORT_PLAN_PROCESS_NOT_SINGLE_THREADED",
+            ):
+                BOOTSTRAP._run_verified_one_shot_plan(sources, request_raw())
+            self.assertIs(importlib.util.spec_from_file_location, original_spec)
+            self.assertIs(Path.read_bytes, original_read_bytes)
+        finally:
+            stop.set()
+            worker.join(timeout=2)
+        self.assertFalse(worker.is_alive())
+
+    def test_control_policy_tamper_stops_before_one_shot_compiler(self) -> None:
+        with isolated_fixture() as root:
+            policy = root / BOOTSTRAP.CONTROL_POLICY_PATH
+            policy.write_bytes(policy.read_bytes() + b"\n")
+            with mock.patch.object(
+                BOOTSTRAP, "_run_verified_one_shot_plan",
+            ) as compiler, self.assertRaisesRegex(
+                BOOTSTRAP.BootstrapError,
+                "ISOLATED_UAT_PRE_IMPORT_CONTROL_POLICY_RAW_DIGEST_MISMATCH",
+            ):
+                BOOTSTRAP.plan_site_root_for_tests(str(root), request_raw())
+            compiler.assert_not_called()
+
+    def test_execute_and_extra_arguments_fail_before_plan_capture(self) -> None:
+        for arguments in (["execute"], ["plan", "--policy", "bad"], []):
+            with self.subTest(arguments=arguments), mock.patch.object(
+                BOOTSTRAP, "_require_runtime",
+            ), mock.patch.object(
+                BOOTSTRAP, "_plan_site_root",
+            ) as planner, mock.patch.object(
+                sys, "stderr", io.StringIO(),
+            ), mock.patch.object(sys, "stdout", io.StringIO()):
+                self.assertEqual(BOOTSTRAP.main(arguments), 1)
+                planner.assert_not_called()
+
+    def test_invalid_request_produces_no_partial_plan(self) -> None:
+        result = subprocess.run(
+            [
+                "/usr/bin/python3", "-I", "-S", "-B",
+                str(BOOTSTRAP_PATH), "plan",
+            ],
+            input=b"{}\n",
+            check=False,
+            capture_output=True,
+            cwd="/",
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, b"")
+        self.assertEqual(
+            result.stderr,
+            b"ISOLATED_UAT_PRE_IMPORT_PLAN_COMPILER_REJECTED\n",
+        )
+
     def test_execution_handoff_remains_explicitly_unimplemented(self) -> None:
         with self.assertRaisesRegex(
             BOOTSTRAP.BootstrapError,
-            "ISOLATED_UAT_PRE_IMPORT_EXECUTION_HANDOFF_NOT_IMPLEMENTED",
+            "ISOLATED_UAT_PRE_IMPORT_RUNTIME_EXECUTION_HANDOFF_NOT_IMPLEMENTED",
         ):
             BOOTSTRAP.require_execution_handoff()
 

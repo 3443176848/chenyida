@@ -2,12 +2,12 @@
 
 最后更新时间：2026-08-25（Asia/Shanghai）
 
-## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-184 stage-1文件系统源码快照已验证，外部信任锚与payload handoff仍未建立）
+## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-185同字节只读计划交接已通过，外部宿主钉扎与runtime仍未建立）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / D-184 FILESYSTEM SOURCE SNAPSHOT VERIFIED / BOOTSTRAP TRUST ROOT + PAYLOAD HANDOFF NOT ESTABLISHED / RUNTIME + EXACT IMAGE REQUIRED / PRODUCTION NO-GO | 83成员已从固定site root以FD实际读取并匹配；D-183 validator只从已验bytes执行。Stage-1不执行one-shot，bootstrap/CPython未外部attest，publisher/backend仍失败关闭 |
-| 授权范围 | PASS / REPOSITORY STAGE-1 VERIFY ONLY | 本段只新增pre-import snapshot policy/verifier、10项专项负测和静态runner接线；不修改冻结v1—v6/D-183/one-shot，不授权UAT目录、Secret、证书、Docker资源、数据库、build、Migration、部署、账号、HTTP/TLS探针或业务写 |
+| 当前状态 | DOING / D-185 VERIFIED-BYTE READ-ONLY PLAN HANDOFF PASS / EXTERNAL HOST PIN + RUNTIME + EXACT IMAGE REQUIRED / PRODUCTION NO-GO | 84成员从固定FD捕获后由内存适配器直接生成只读plan；`execute`不可用。Manifest未外部钉扎，bootstrap/CPython、runtime evidence和UAT均未建立 |
+| 授权范围 | PASS / REPOSITORY READ-ONLY PLAN HANDOFF ONLY | 本段只新增bootstrap policy v2、固定内存适配器、未来外部钉扎manifest及专项负测；不修改冻结v1—v6/D-183/one-shot，不授权宿主安装、UAT目录、Secret、证书、Docker资源、数据库、build、Migration、部署、账号、HTTP/TLS探针或业务写 |
 | 清理执行 | PASS / 3 BOUNDED PASSES | 三次BuildKit-only命令均rc0，分别报告607.3MB、35.76MB和9.667GB；Cache`174 → 164 → 149 → 0`，active始终0 |
 | 根盘 | PASS / 16.68 GiB AVAILABLE | `10,825,478,144 → 17,909,628,928` bytes，实际增加约6.60GiB；最终比10GiB硬线高约6.68GiB |
 | 内存/Swap/Load | PASS | 最终MemAvailable `2,467,676,160`B，Swap used `179,859,456`B且60秒增长0，Load`0.24/0.28/0.26`，PSI/OOM0 |
@@ -28,7 +28,7 @@
 | D-180 namespace/credential边界 | PASS / FAIL-CLOSED | 祖先从`/`完整列举且root所有/不可group或other写；directory/regular-file类型、非symlink、mount point/root/source、`device+inode`物理唯一性均精确核对，受保护mount、双前导斜杠、`..`组件和跨mount-ID别名失败关闭；Secret正文和内容摘要不进入合同 |
 | D-180 PostgreSQL身份边界 | PASS / COMPLETE DECLARED SET | 固定manifest/config digest、唯一内部backend network、network mode、`published_ports=[]`、两个项目Volume、只读bootstrap Secret bind和三项tmpfs；额外网络/端口/bind、生产Volume或Secret挂载漂移失败关闭 |
 | D-180摘要与binding | PASS / V4 ACTIVE / V3 INTERNAL BASE | External policy内部/raw/closure SHA为`66afa1ee…9a6b`/`92c59a9f…6ef3`/`4452221d…aff4`，module/one-shot/control internal/raw分别为`fc6e76d4…be61`/`8cd1a345…b7f7`/`9a09a3f1…d6c8`/`45bdf961…b83c`；v4 body/raw为`fb83e0f2…b050b`/`4858b8c1…34262`，v1—v3 raw字节不变 |
-| D-180后续边界 | SUPERSEDED BY D-181—D-184 | D-181已join外锚/内部链/owner日志，D-182补Host/SNI intent，D-183补声明source graph，D-184以stage-1 FD实际观察83成员；bootstrap/CPython外部锚、payload handoff、atomic publisher及host/Docker/PostgreSQL/HTTP observer/backend仍未实现 |
+| D-180后续边界 | SUPERSEDED BY D-181—D-185 | D-181已join外锚/内部链/owner日志，D-182补Host/SNI intent，D-183补声明source graph，D-184以FD观察83成员，D-185直接完成verified-byte只读plan交接；payload外部host pin、bootstrap/CPython attestation及host/Docker/PostgreSQL/HTTP runtime仍未实现 |
 | D-181 owner policy | PASS / PURE CONTRACT / 15 UNIT | 固定重跑D-180 plan/external anchors与D-179完整receipt chain，再验证owner log、六阶段journal、空recovery authorization、`COMPLETED/VERIFIED`终态和`operator_state_root`准备/完成身份连续性 |
 | D-181摘要与binding | PASS / V5 ACTIVE / V4 EXTERNAL BASE | v5 body/raw为`349fb247…9c3f`/`95bbf9a2…7363`；owner policy内部/raw/closure为`47d70021…87d0`/`e86831d5…5cf5`/`4238653e…055b`，module/one-shot/control internal/raw为`1a6d2848…9c17`/`0ce8417f…d198`/`a62a9664…2681`/`013d50d6…549b`；v1—v4 raw字节不变 |
 | D-181失败关闭边界 | PASS / UPSTREAM REVALIDATED | External policy必须等于固定raw；双plan摘要显式路由，action 9参数/束组/pipeline闭合。自签validation envelope、v99 observation、privilege policy、source usage、plan/root/terminal及跨链时间漂移均失败关闭 |
@@ -55,6 +55,10 @@
 | D-184摘要/边界 | PASS / BOOTSTRAP NOT EXTERNALLY ATTESTED / HANDOFF CLOSED | Bootstrap raw为`ccb9365c…a9c5`，policy内部/raw为`c5359216…2a45`/`708c96cc…cf1a`；输出固定`NOT_EXECUTED_BY_THIS_BOOTSTRAP / PRIOR_PROCESS NOT ATTESTED / HANDOFF NOT IMPLEMENTED / NOT PUBLISHED`。Bootstrap raw只作下一外部锚输入；CPython/stdlib、direct one-shot和payload handoff未建立信任 |
 | D-184验证/复核 | PASS / 10 UNIT / AGGREGATE 102 / P0=P1=P2=0 | 专项10/10；聚合`5+13+7+16+13+15+11+12+10=102/102`；隔离Compose policy/config连续两次双PASS。Symlink、双斜杠、可写/owner/type/hardlink/FIFO、self-resign、sentinel、读中变化、FD泄漏及危险AST旁路均失败关闭；最终三路复核无P0/P1/P2 |
 | D-184资源/完整性 | PASS / STATIC ONLY / NO TASK RESIDUE | 08:24→08:46 available memory `2,147,934,208 → 2,125,922,304`B，Swap `180,957,184 → 182,300,672`B（+1,343,488B），根盘 `17,484,529,664 → 17,505,542,144`B，Load `0.46/0.22/0.25 → 0.36/0.34/0.29`，PSI/OOM0。Docker保持6/75/277/6，四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整；fixture/pycache/精确临时报告残留0 |
+| D-185 verified-byte交接 | PASS / 84 MEMBERS / 2,100,283 BYTES / READ-ONLY PLAN | 83个D-183成员加固定D-174 policy；路径集合/路径+值SHA为`5cd4a2e2…03a0`/`80fafed8…843`。唯一活动主线程内按8条module/path边提供258次/78路径读取，read-set/read-trace为`0403a5e1…6969a`/`b6d158d6…025b01`；捕获后不重开原仓source/pyc |
+| D-185摘要/信任边界 | PASS / MANIFEST DECLARED / NOT HOST PINNED | Bootstrap/policy/manifest raw为`bc33d4da…e028`/`809989aa…241d`/`ba8e7337…a7e5`，policy/manifest内部为`4358ef2d…fe1`/`b71662a4…672a`；固定专项测试request的计划SHA为`04e12045…95ea`。仓库manifest不是外部trust root，bootstrap/CPython/stdlib未attest，runtime publisher/backend未实现 |
+| D-185验证/复核 | PASS / 20 UNIT / AGGREGATE 112 / P0=P1=P2=0 | 专项20/20；聚合`5+13+7+16+13+15+11+12+20=112/112`；隔离Compose policy/config连续两次双PASS。原路径替换、未消费成员、source set/value、错误请求恢复、后台线程、execute/额外参数及残留负测失败关闭；三路复核无P0/P1/P2 |
+| D-185资源/完整性 | PASS / STATIC ONLY / NO TASK RESIDUE | 起点→09:37 available memory `2,130,964,480 → 2,127,458,304`B，Swap `182,296,576 → 182,812,672`B（+516,096B），根盘 `17,551,732,736 → 17,520,386,048`B，Load `0.05/0.07/0.15 → 0.44/0.28/0.29`，PSI/OOM0。Docker保持6/75/277/6；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整。Compose `ps`因缺`ERP_DEPLOYMENT_CLASS`失败关闭并改用Docker metadata；D184/D185 fixture/临时目录/新增pyc为0，历史pyc未清理 |
 | D-181静态验证 | PASS / 5 + 13 + 7 + 16 + 13 + 15 = 69 UNIT / COMPOSE DOUBLE PASS | 控制合同5/5、one-shot 13/13、runtime contracts 7/7、runtime receipts 16/16、external anchors 13/13、owner completion 15/15；聚合runner与隔离Compose policy/config双PASS |
 | D-181独立复核 | PASS / 2 REVIEWERS / P0=0 / P1=0 | 两路最终稳定树只读复核均无P0/P1；此前双plan、输入闭包、上游伪造、摘要命名、跨链时间、external policy与source usage自签缝均修复进入负测 |
 | D-181资源/完整性 | PASS / STATIC ONLY / NO TASK RESIDUE | 00:52→01:00收口门：available memory `2,262,908,928 → 2,247,430,144`B，Swap保持`180,166,656`B且10秒`si/so=0/0`，根盘 `17,742,811,136 → 17,757,143,040`B，Load `0.14/0.20/0.20 → 0.53/0.38/0.27`，PSI/OOM0。Docker保持6/75/277/6、Build Cache 0；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整；Compose `ps`在未注入`ERP_DEPLOYMENT_CLASS`时严格拒绝插值，改用只读Docker metadata核对；任务`.pyc`/Compose临时目录残留0 |
@@ -74,8 +78,8 @@
 | 收口资源/完整性 | PASS / NO UAT RESIDUE | `2,452,017,152`B available memory、`179,843,072`B Swap、`17,893,322,752`B根盘、Load`0.19/0.17/0.12`、OOM0；6/75/277/6、Cache0，四服务restart0/OOM false且保护卷完整 |
 | 生产配置/运行面 | PASS / UNCHANGED | 生产Compose与政策未改；未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源 |
 | 本段资源/完整性 | PASS / STATIC ONLY | 起点约2.3GiB/171MiB/17GiB/Load`0.21/0.20/0.18`；收口`2,445,348,864`B available、`179,769,344`B Swap、`17,871,294,464`B磁盘、Load`0.03/0.11/0.15`、PSI/OOM0。6/75/277/6、Cache0，四服务restart0/OOM false且保护卷保持，任务临时资源0 |
-| 仍有阻断 | EXTERNAL BOOTSTRAP TRUST ROOT + SAME-BYTE HANDOFF + RUNTIME OBSERVER/BACKEND + EXACT IMAGE | Stage-1已观察文件系统，但bootstrap/CPython没有payload外部known-good锚，one-shot未从verified bytes接续；host/Docker/PG/HTTP运行观察、publisher、专用backend及当前源码匹配Web/Worker镜像缺失 |
-| 下一步 | TASK92 / EXTERNAL CONTENT-ADDRESSED ANCHOR + SAME-VERIFIED-BYTES READ-ONLY HANDOFF | 下一独立切片把bootstrap外部锚/原子publisher与只读payload handoff合并设计；仍不开放execute，不自动build、deploy、Migration或创建UAT |
+| 仍有阻断 | EXTERNAL HOST PIN + TRUSTED PYTHON + RUNTIME OBSERVER/BACKEND + EXACT IMAGE | Same-verified-bytes只读plan已完成，但manifest尚未在payload外部宿主安装/钉扎；bootstrap/CPython、host/Docker/PG/HTTP运行观察、runtime publisher/backend及当前源码匹配Web/Worker镜像缺失 |
+| 下一步 | TASK92 / SEPARATE AUTHORIZATION FOR EXTERNAL HOST PIN + EXACT IMAGE/RUNTIME/L2A | 先取得明确授权，再安装/核对外部manifest pin并准备精确镜像和runtime执行包；`execute`继续不可用，不自动build、deploy、Migration或创建UAT |
 
 ## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
 
@@ -92,7 +96,7 @@
 | 运行面完整性 | PASS / UNCHANGED | 6容器/75镜像/277 Volume/174 Build Cache不变；四ERP服务restart0/OOM false，Web/PostgreSQL healthy，TASK91残留0 |
 | 授权/非动作 | PASS / L1 ONLY | 未连接数据库，未读业务/凭据/备份/Volume正文；未创建资源、清理、build、deploy、Migration、账号或业务写 |
 | 已选路径 | SAME HOST / FAILURE DOMAIN ACCEPTED | D-173已取代此前待选状态；Compose消费者隔离已通过，producer/operator仍待适配 |
-| 后续状态 | SUPERSEDED BY TASK92 / D-184 | TASK91历史入口已由D-173—D-184继续推进；当前下一步以本文件TASK92小节的外部bootstrap锚+same-byte handoff为准，不自动取得L2a、账号、HTTPS或L3写权限 |
+| 后续状态 | SUPERSEDED BY TASK92 / D-185 | TASK91历史入口已由D-173—D-185继续推进；当前下一步以本文件TASK92小节的外部host pin、精确镜像/runtime和L2a授权为准，不自动取得L2a、账号、HTTPS或L3写权限 |
 | 系统是否可试运行 | NO | 环境尚未创建，L1通过不能替代部署、Migration、账号和员工UAT |
 
 ## SELFHOST-SMALL-TEAM-REAL-SAMPLE-UAT-PLAN-90（完成；无样本试运行准备包）

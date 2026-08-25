@@ -1,0 +1,117 @@
+{
+  "schema_version": 2,
+  "contract": "chenyida-erp-isolated-uat-pre-import-bootstrap-policy/v2",
+  "policy_id": "chenyida-erp-isolated-uat-frozen-v6-verified-plan-handoff-v2",
+  "execution_authorized": false,
+  "launch_contract": {
+    "python_executable": "/usr/bin/python3",
+    "required_flags": [
+      "-I",
+      "-S",
+      "-B"
+    ],
+    "commands": [
+      "verify",
+      "plan"
+    ],
+    "plan_request_source": "BOUNDED_STDIN_ONLY",
+    "plan_request_max_bytes": 2097152,
+    "plan_output_max_bytes": 4194304,
+    "optimization_level": 0,
+    "site_root_source": "BOOTSTRAP_ABSOLUTE_PATH_PARENT_PARENT_ONLY",
+    "caller_selected_source_root": "FORBIDDEN",
+    "caller_selected_policy": "FORBIDDEN",
+    "execute_command": "UNAVAILABLE"
+  },
+  "filesystem_contract": {
+    "reader": "DIRECTORY_FD_COMPONENT_WALK_OPENAT_V1",
+    "directory_rules": [
+      "O_DIRECTORY",
+      "O_NOFOLLOW",
+      "O_CLOEXEC",
+      "ROOT_OWNED",
+      "NOT_GROUP_OR_OTHER_WRITABLE",
+      "SAME_DEVICE_AS_FILESYSTEM_ROOT"
+    ],
+    "file_rules": [
+      "O_NOFOLLOW",
+      "O_CLOEXEC",
+      "O_NONBLOCK",
+      "REGULAR_FILE",
+      "ROOT_OWNED",
+      "NOT_GROUP_OR_OTHER_WRITABLE",
+      "LINK_COUNT_ONE",
+      "SAME_DEVICE_AS_SOURCE_ROOT",
+      "BOUNDED_READ",
+      "IDENTITY_STABLE_BEFORE_AND_AFTER_READ"
+    ],
+    "single_file_max_bytes": 4194304,
+    "total_declared_member_max_bytes": 33554432
+  },
+  "anchors": {
+    "declared_source_policy": {
+      "path": "operations/isolated-uat-action-source-closure-policy-v1.json",
+      "raw_sha256": "7c2a22928c5c80dc21ee21fc8cc99693a480717b7a76f39c4f9b784663c680a8",
+      "policy_sha256": "a85d6abbad072ce5981690f0e266b3b657beb3a707f7ca04db96d97d0bb52d11",
+      "source_closure_sha256": "19e518819ede89a2b5ad4925d0c71b27fa2b5bba41759ffb0e51e90bd7cc0fb3"
+    },
+    "declared_source_validator": {
+      "path": "scripts/isolated-uat-action-source-closure-contracts.py",
+      "raw_sha256": "f4705be0c588947c0f7a968dde153df80b235ee65da760096bf29d7d64e481ad"
+    },
+    "control_policy": {
+      "path": "operations/isolated-uat-control-plane-policy-v1.json",
+      "raw_sha256": "a4809ee36160804ee5a11a36f8432437aa4c2e516aeb68e261f2d962b0df67f0",
+      "policy_sha256": "b9fabb5ec573ae98eaec044470b6ca28f0647e49980d557fc0e055d5e8fade8e"
+    }
+  },
+  "snapshot_contract": {
+    "declared_member_count": 83,
+    "plan_handoff_member_count": 84,
+    "plan_handoff_paths_sha256": "5cd4a2e2a6696a3c79e24d6893374d732fcba08dbe93ba1a328ca7ccb60203a0",
+    "plan_handoff_source_map_sha256": "80fafed8f27377fac43b038327bfdc16984260bb4cd077bae04872c4fd088843",
+    "declared_member_source": "FIXED_D183_POLICY_AFTER_RAW_DIGEST_MATCH",
+    "control_policy_source": "FIXED_RAW_AND_INTERNAL_DIGEST_MATCH",
+    "member_bytes_source": "SINGLE_FILESYSTEM_DIRECTORY_FD_CAPTURE",
+    "validator_execution": "COMPILE_EXEC_FROM_VERIFIED_VALIDATOR_BYTES_ONLY",
+    "plan_compiler_execution": "COMPILE_EXEC_FROM_CAPTURED_ONE_SHOT_BYTES_ONLY",
+    "repository_reads_during_plan_compiler_after_capture": "FIXED_IN_MEMORY_ADAPTER_ONLY",
+    "python_module_edges": 8,
+    "adapter_threading": "SINGLE_ACTIVE_MAIN_THREAD_REQUIRED",
+    "plan_repository_read_count": 258,
+    "plan_repository_unique_read_count": 78,
+    "plan_repository_read_set_sha256": "0403a5e1004973b3390b68ae769a3925d7a1b87d8235cf34ca8a777bb8b6969a",
+    "plan_repository_read_trace_sha256": "b6d158d61345208e859e525edd91e2ee369d0ab4e0dd9fdf7b1b5eb357025b01",
+    "filesystem_snapshot_publisher": "NOT_USED",
+    "runtime_publisher": "NOT_IMPLEMENTED",
+    "execution_handoff": "IN_MEMORY_FIXED_READ_ONLY_PLAN_ADAPTER"
+  },
+  "external_anchor_contract": {
+    "content_address_manifest": "operations/isolated-uat-pre-import-launch-manifest-v1.json",
+    "manifest_purpose": "INPUT_FOR_FUTURE_PAYLOAD_EXTERNAL_HOST_PIN",
+    "host_installation": "NOT_PERFORMED",
+    "bootstrap_identity": "NOT_EXTERNALLY_ATTESTED",
+    "python_runtime_and_stdlib_identity": "NOT_ATTESTED"
+  },
+  "capability_status": {
+    "filesystem_source_snapshot": "IMPLEMENTED_BOUNDED_FD_READ",
+    "pre_action_payload_module_order": "IMPLEMENTED_D183_VALIDATOR_FROM_VERIFIED_BYTES_ONLY",
+    "verified_byte_plan_handoff": "IMPLEMENTED_FIXED_IN_MEMORY_ADAPTER",
+    "execute_command": "UNAVAILABLE",
+    "runtime_publisher": "NOT_IMPLEMENTED",
+    "runtime_observer_backend": "NOT_IMPLEMENTED",
+    "uat_environment": "NOT_CREATED",
+    "execution_authorized": false
+  },
+  "validation_output": {
+    "handoff_status": "VERIFIED_SOURCE_BYTES_DELIVERED_TO_FIXED_READ_ONLY_PLAN_COMPILER",
+    "payload_execution_status": "ONE_SHOT_PLAN_GENERATED_NO_UAT_ACTION_EXECUTED",
+    "authorization_status": "AUTHORIZATION_NOT_ESTABLISHED",
+    "trust_root_status": "BOOTSTRAP_IDENTITY_NOT_EXTERNALLY_ATTESTED",
+    "external_anchor_status": "CONTENT_ADDRESS_MANIFEST_DECLARED_NOT_VERIFIED_OR_HOST_PINNED",
+    "publisher_status": "NO_FILESYSTEM_PUBLISHER_USED_RUNTIME_PUBLISHER_NOT_IMPLEMENTED",
+    "runtime_evidence_status": "NOT_ESTABLISHED",
+    "uat_status": "NOT_CREATED"
+  },
+  "policy_sha256": "4358ef2d41df39c6483171794d1e0a889db064f91c341045c8372263fd216fe1"
+}

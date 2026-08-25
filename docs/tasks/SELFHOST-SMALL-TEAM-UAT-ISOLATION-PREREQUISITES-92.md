@@ -1,6 +1,6 @@
 # SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 新隔离UAT前置边界
 
-> 状态：`DOING / FROZEN V6 DECLARED ACTION SOURCE CLOSURE VALID / TRUSTED PRE-IMPORT + PUBLISHER + RUNTIME OBSERVER/BACKEND + EXACT IMAGE REQUIRED / PRODUCTION NO-GO`
+> 状态：`DOING / D-185 VERIFIED-BYTE READ-ONLY PLAN HANDOFF PASS / EXTERNAL HOST PIN + RUNTIME OBSERVER/BACKEND + EXACT IMAGE REQUIRED / NEW UAT NOT CREATED / PRODUCTION NO-GO`
 > 日期：2026-08-25（Asia/Shanghai）
 > 依赖：TASK91、D-172、低资源服务器保护规则
 > 责任：项目负责人已选择当前主机同机隔离并接受同一故障域；Codex只执行仓库内静态前置，运行资源仍逐层授权
@@ -27,6 +27,8 @@
 - 2026-08-25，项目负责人继续要求“下一步”。本段只新增D-181 owner完成日志纯合同、固定D-179/D-180重验和binding/plan v5；不实现publisher、runtime observer/backend，不创建或读取UAT目录、Secret、Docker、数据库或业务数据，也不把该指令扩张为L2a。
 - 2026-08-25，项目负责人再次要求“下一步”。本段只新增D-182 Caddy Host/SNI纯intent、evidence intent v2及binding/plan v6，并关闭隔离Compose中production-mode HTTP Origin与默认`erp.invalid`的静态矛盾；不运行HTTP/TLS探针，不创建证书或UAT，不实现publisher/runtime observer/backend，也不扩大为L2a。
 - 2026-08-25，项目负责人继续要求“下一步”。本段只新增D-183独立声明源码闭包policy/纯validator和静态负测，从冻结v6重建有界依赖图；不修改v1—v6、不新增v7，不读取运行文件、build镜像、实现publisher/runtime backend或扩大为L2a。
+- 2026-08-25，项目负责人继续要求“下一步”。本段只新增D-184固定文件系统FD快照入口并从已验bytes重跑D-183；不执行one-shot、不实现publisher/runtime backend，也不扩大为L2a。
+- 2026-08-25，项目负责人再次要求“下一步”。本段只把D-184已验证bytes交给固定只读`plan`编译器并增加未来外部宿主钉扎清单；`execute`不可用，不安装宿主锚、不创建UAT，不运行Docker、数据库、Migration、build、部署、HTTP/TLS或业务写。
 
 ### A. 独立UAT主机（推荐）
 
@@ -46,7 +48,7 @@
 
 - 当前HEAD没有匹配Web/Worker镜像；唯一alpha.47镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`。
 - `compose.uat-isolated.yml`已关闭容器消费者侧固定root：独立项目名、Secret、release candidate/identity、命名Volume、网络和loopback端口均有失败关闭静态合同。生产Compose未参数化、未改变。
-- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同；D-183又完成冻结v6九动作的83成员有界声明source closure。但source仍为调用方注入且未认证，现有one-shot的部分模块导入先于D-183派生证明；TLS信任、证书hostname、错误Host/SNI拒绝、HTTP高端口重定向和反向代理仍未运行观察，trusted pre-import、publisher及宿主runtime path尚未实现。
+- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同；D-183完成冻结v6九动作的83成员有界声明source closure，D-184/D-185又从固定FD捕获83成员及D-174 control policy，并以固定内存适配器直接生成同字节只读计划。仓库内manifest不是外部信任根，尚未在宿主外部安装/钉扎；bootstrap、CPython/stdlib、TLS/HTTP、runtime publisher/observer/backend和精确镜像仍未建立。
 - TASK92已把根盘可用恢复到约16.68 GiB、比10 GiB硬线高约6.68 GiB；磁盘停止线阻断已解除，但任何后续build仍须重新执行新鲜资源门并串行控制上界。
 - L2a、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权。
 
@@ -214,11 +216,23 @@
 - 08:24→08:46 CST资源/完整性：available memory `2,147,934,208 → 2,125,922,304`B，Swap used `180,957,184 → 182,300,672`B（增长`1,343,488`B），根盘available `17,484,529,664 → 17,505,542,144`B，Load `0.46/0.22/0.25 → 0.36/0.34/0.29`，Memory PSI及kernel `oom_kill`均0。Docker保持6容器/75镜像/277 Volume/6网络；四服务ID与D-183后基线一致、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整。任务fixture、task pycache及精确`/tmp/d184-bootstrap-report.json`残留0。
 - 本段没有创建或访问UAT目录、Secret、证书、容器、网络、Volume、数据库、备份或业务数据，没有build、deploy、Migration、restart、账号、HTTP/TLS探针或回执发布。测试仅在`/opt/erp`安全父目录串行创建并自动清理小型fixture；运行bootstrap本身为只读，未生成payload执行树。
 
-## 17. 当前停止线与完成标准
+## 17. D-185 已验证字节到只读计划的直接交接结果
 
-磁盘、Compose消费者隔离、producer/operator请求、默认只读计划、v2顺序、D-178—D-183纯合同/声明closure及D-184 stage-1文件系统快照已经完成；TASK92继续`DOING`。Bootstrap外部身份、same-verified-bytes payload handoff/原子publisher、宿主runtime observer/backend和当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
+- 第一性原理边界继续按少于20人的单一同机UAT收敛：只读计划需要的是“验证过的输入字节被同一次编译消费”，不需要把84个文件复制成私有树、启动子进程或建设通用publisher。冻结binding v1—v6、D-183、one-shot和产品业务代码均未修改。
+- Bootstrap CLI现在只接受`verify`或`plan`，仍固定绝对入口、`/usr/bin/python3 -I -S -B`和bootstrap派生site root；请求仅从有界stdin读取，输入上限2 MiB、输出上限4 MiB。`execute`、额外参数、caller-selected root/policy均在捕获前失败关闭。
+- `plan`先按D-184规则一次性FD捕获D-183的83成员，再捕获固定D-174 control policy，形成84成员、合计`2,100,283` bytes。路径集合SHA为`5cd4a2e2a6696a3c79e24d6893374d732fcba08dbe93ba1a328ca7ccb60203a0`，路径+内容映射SHA为`80fafed8f27377fac43b038327bfdc16984260bb4cd077bae04872c4fd088843`；D-174 raw/internal继续为`a4809ee3…67f0`/`b9fabb5e…ade8e`。
+- 固定内存适配器只在“当前线程是唯一活动主线程”时临时接管精确的module/path读取，并在`finally`恢复全部全局适配器。它按固定顺序提供8条`(module_name, path)`装载边；计划编译器的仓库读取轨迹精确为258次/78个唯一路径，集合/顺序SHA为`0403a5e1…6969a`/`b6d158d6…025b01`，每次读取都命中已验证map。捕获后不重开原仓source/pyc，不创建文件系统publisher或子进程。
+- 输出是只读薄封套：`VERIFIED_SOURCE_BYTES_DELIVERED_TO_FIXED_READ_ONLY_PLAN_COMPILER / ONE_SHOT_PLAN_GENERATED_NO_UAT_ACTION_EXECUTED`，内含原计划及按request内容计算的`plan_sha256`；固定专项测试request得到`04e12045…95ea`。授权、runtime evidence和UAT状态仍为`NOT_ESTABLISHED / NOT_CREATED`，runtime publisher/observer/backend仍未实现。
+- 新增launch manifest只把bootstrap raw `bc33d4da…e028`与policy v2 raw/internal `809989aa…241d`/`4358ef2d…fe1`绑定；manifest raw/internal为`ba8e7337…a7e5`/`b71662a4…672a`。仓库副本明确不是payload外部信任根，未在宿主安装或钉扎；bootstrap、CPython/stdlib和direct one-shot入口仍未attest。
+- D-185专项20/20；完整聚合为控制5 + one-shot13 + runtime contracts7 + runtime receipts16 + external anchors13 + owner15 + Host/SNI11 + D-183 12 + D-185 20，共112/112；隔离Compose policy/config连续两次双PASS。三路独立只读复核均为P0=0/P1=0/P2=0，覆盖捕获后原路径替换、未消费成员篡改、source set/value替换、错误请求恢复、后台线程、execute/额外参数及临时残留。
+- 本切片起点→09:37 CST资源/完整性：available memory `2,130,964,480 → 2,127,458,304`B，Swap used `182,296,576 → 182,812,672`B（+`516,096`B），根盘available `17,551,732,736 → 17,520,386,048`B，Load `0.05/0.07/0.15 → 0.44/0.28/0.29`，Memory PSI和kernel `oom_kill`均0。Docker保持6容器/75镜像/277 Volume/6网络；四服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四保护卷完整。`docker compose ps`因未注入必填`ERP_DEPLOYMENT_CLASS`在插值期失败关闭，故以只读Docker metadata核对；D184/D185 fixture、临时目录及本切片新增pyc残留0，既有历史pyc未清理。
+- 本段没有创建或访问UAT目录、Secret、证书、容器、网络、Volume、数据库、备份或业务数据，没有build、deploy、Migration、restart、账号、HTTP/TLS探针或回执发布。人数不进入文件数、动作数、容量或验收合同。
+
+## 18. 当前停止线与完成标准
+
+磁盘、Compose消费者隔离、producer/operator请求、默认只读计划、v2顺序、D-178—D-183纯合同/声明closure、D-184 FD快照及D-185 same-verified-bytes只读计划交接已经完成；TASK92继续`DOING`。Payload外部宿主钉扎、受信Python运行时、宿主runtime publisher/observer/backend和当前HEAD匹配Web/Worker镜像仍缺失；不得据此创建Secret/Volume、启动第二套数据库、build或部署。
 
 - 只完成负责人选定的一条路径，不同时建设两套方案。
-- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、v2九步依赖、D-178—D-183合同/closure及D-184 FD快照已明确；下一独立切片合并payload外部内容寻址bootstrap锚/原子publisher与same-verified-bytes只读handoff，runtime observer/backend、精确源码/镜像输入和空库Migration执行包仍待后续。
+- 目标环境消费者和控制请求边界、资源上界、Secret/角色映射、v2九步依赖、D-178—D-183合同/closure、D-184 FD快照及D-185只读交接已明确。下一步必须另获授权，才可把manifest raw SHA安装/钉扎到payload外部宿主入口，并处理当前源码精确Web/Worker镜像、runtime publisher/observer/backend和L2a空库执行包；不自动创建或运行。
 - 现有UAT身份、数据、四个受保护Volume和常驻服务不变。
 - TASK92完成后只允许提交L2a授权申请，不自动build、deploy或Migration。
