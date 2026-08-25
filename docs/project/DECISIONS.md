@@ -4334,6 +4334,41 @@
 - 拒绝直接从当前可变工作树build、复用旧镜像、浮动tag、现有UAT数据库/Volume或生产凭据。
 - 拒绝因为系统人数少就取消空库隔离、精确镜像、Migration allowlist、资源门、恢复和回退底线。
 
+## D-188 L2a构建准备只冻结精确本机候选，缺失Migration接线时不得部署
+
+- 日期：2026-08-25
+- 状态：Accepted（精确本机候选与静态Compose已冻结；L2a部署继续NO-GO）
+- 发起：项目负责人明确指令`确认授权L2a构建准备`
+
+### Context
+
+- D-187已将同机高级attestation平台移出空库UAT阻断，但仍要求从干净固定commit/tree构建精确镜像、冻结resolved Compose和回退输入。当前主工作树含负责人未跟踪文件，不能直接作为Docker build context。
+- `compose.uat-isolated.yml`可以静态隔离项目、Volume、网络、bind和loopback端口，但现有`migrate`运行时还要求ELIGIBLE release manifest、动态数据库身份及受控Migration grant。静态validator只检查digest形状，没有机械绑定服务镜像、runtime config digest与刚构建候选的等值关系。
+- 本轮授权措辞只覆盖“构建准备”，不包含Secret、数据库、Migration、部署、备份读取、恢复或生产动作。
+
+### Decision
+
+1. 以root-owned `0700`新detached worktree固定commit `74fbeeebe95432e5f17e3313b1d14b273a91f7b9`和tree `db1edef51e21e69bd7571ef0f765e602c940fec9`，串行构建Web后构建Worker。候选必须绑定alpha.47、46项Migration和固定allowlist，并在临时loopback registry中回读manifest/config digest；构建后registry和临时容器必须移除。
+2. 接受的精确本机候选为：Web manifest/config `sha256:42b4154088b4cad04ee27cb7c30b30e4db89f60d4d6706e8cdb638e6dfe40ffd` / `sha256:d4da6cba1dc85fb1a1498db2e8c5209056ca4a57f53e6833864c1653ae2c8dd3`，Worker `sha256:861d71ae3c69a5a0aa8f9afcde0a1b56d8b96ad7a962bb1bc10b7f5a9d974b9b` / `sha256:bd34dfd26e6d72e4ec5ba64233d6e04d0c6d8343d8f820dd80be5f3b4ec227c1`。构建回执SHA-256为`172cf8601bdf917653e6e353676fd03f81c8ef7264629748f2d3d1ba4df20f82`。这些引用只在当前Engine可用，不是外部恢复锚点；未来启动必须先精确inspect并使用`--pull never`。
+3. 把三份Compose、Caddyfile、Secret policy、validator、非Secret render env、实际profile服务清单和规范化resolved JSON冻结在root-only仓库外目录。Resolved Compose SHA-256固定为`f9ec23b4c8851c6cb27e6c3b276f230978fa496f1a6efb9e3047815db8568e99`；除既有隔离policy外，必须机械验证Web/Worker/migrate/admin镜像、runtime image/config、版本/commit、安全选项和无build/Docker socket/host network/privileged完全等值。完整静态审计使用`--profile '*'`；未来运行只允许`uat-edge`，不得启用`tools/admin`。
+4. 冻结配置必须诚实保持未授权：deployment operation/authorization为`not-uat-promotion`，system identifier、database OID、release manifest SHA、Migration confirm及production migration开关为空。不得把静态PASS、构建回执或D-187 root信任假设解释为deploy-ready。
+5. 新UAT无前代，第一阶段回退只允许对精确项目执行`down --remove-orphans`，不带`--volumes`、`--rmi`或prune；失败卷保留取证。删除精确新卷需要后续独立授权，并必须先核对项目label和四个保护卷排除清单。
+6. 部署前必须新增最小root运维执行接线：PostgreSQL-only启动、技术登录角色bootstrap、ELIGIBLE manifest与固定Migration execution grant挂载/环境映射、`EMPTY → 0046`和Migration后ACL reconcile。不得使用test mode、生产runner或绕过当前Migration守卫。Secret实物、现有UAT异故障域备份与隔离恢复、动态数据库身份、新鲜资源门和明确部署授权继续独立失败关闭。
+7. 本决策允许构建器创建任务专用临时registry/provenance容器并要求收口清零；除此之外不创建Secret、证书、UAT运行容器、项目网络、命名Volume、数据库、账号或业务数据，不运行Migration、`compose up/down`、备份/恢复、HTTP/TLS探针、部署或生产动作。人员估算不进入镜像、服务、端口、容量或验收条件。
+
+### Consequences
+
+- TASK92现在拥有可审计的精确本机Web/Worker候选、静态resolved Compose和第一阶段回退输入；“缺精确镜像”阻断已关闭。
+- TASK92仍为`DOING / L2A DEPLOYMENT NO-GO`。下一独立切片是最小root运维执行包，不是直接启动UAT；包完成后还需Secret、恢复、动态数据库与新的部署授权。
+- 两路只读复核中，候选构建P0/P1/P2为0；Compose静态冻结通过，但Migration grant、角色bootstrap和最终ACL接线被登记为部署前P0，不以文档或测试标记绕过。
+
+### Rejected alternatives
+
+- 拒绝直接从含未跟踪文件的主工作树构建、复用旧镜像、浮动tag或临时registry端口作为异机恢复锚点。
+- 拒绝只依赖现有Compose validator的digest格式检查，而不验证服务镜像与runtime config对候选的精确等值。
+- 拒绝因为构建成功就运行`docker compose up`、创建空PG或Secret；也拒绝以test mode、空grant或生产控制面绕过Migration守卫。
+- 拒绝在回退命令中加入Volume/image删除或任何prune，或把新UAT回退错误描述为回到某个不存在的前代镜像。
+
 ## 待确认业务决策
 
 完整清单位于 `docs/material-master/business-decisions.md`。`B01` 已通过 D-006 确认，`B03` 已通过 D-011 确认；数据责任人、多角色审核节点、其他生命周期细则和首期迁移范围仍需人工确认。未确认项不得写入生产业务规则，任何生产迁移或部署仍需单独授权。

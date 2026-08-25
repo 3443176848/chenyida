@@ -1,9 +1,9 @@
 # SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 新隔离UAT前置边界
 
-> 状态：`DOING / D-187 SAME-HOST UAT TRUST BOUNDARY SIMPLIFIED / EXACT IMAGES + EXPLICIT L2A AUTHORIZATION REQUIRED / NEW UAT NOT CREATED / PRODUCTION NO-GO`
+> 状态：`DOING / D-188 L2A BUILD PREPARATION COMPLETE / DEPLOYMENT PACKAGE INCOMPLETE / NEW UAT NOT CREATED / PRODUCTION NO-GO`
 > 日期：2026-08-25（Asia/Shanghai）
 > 依赖：TASK91、D-172、低资源服务器保护规则
-> 责任：项目负责人已选择当前主机同机隔离并接受同一故障域；Codex已按本轮明确范围安装单一仓库外摘要文件，其他运行资源仍逐层授权
+> 责任：项目负责人已选择当前主机同机隔离并接受同一故障域，且已明确授权L2a构建准备；Codex已构建并冻结精确本机候选，但未获得部署、Migration、Secret、数据库或账号授权
 
 ## 1. 目标
 
@@ -31,6 +31,7 @@
 - 2026-08-25，项目负责人再次要求“下一步”。本段只把D-184已验证bytes交给固定只读`plan`编译器并增加未来外部宿主钉扎清单；`execute`不可用，不安装宿主锚、不创建UAT，不运行Docker、数据库、Migration、build、部署、HTTP/TLS或业务写。
 - 2026-08-25，项目负责人在已明确“只安装并只读核对D-185宿主外部摘要钉扎，不创建UAT、不build/deploy、不运行Migration、不接触数据库或四个保护卷”的下一步后确认继续。本段只在固定同级路径`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`以create-only方式安装manifest raw SHA并连续两次只读回读；不安装launcher、不运行`plan/execute`，不创建账号、Secret、Docker或UAT资源。
 - 2026-08-25，项目负责人继续要求“下一步”，并已多次明确系统少于20名内部用户、应从第一性原理避免复杂化。本段只在仓库文档中接受“受信root管理员 + root-owned宿主OS/Python/Docker”为同机、空库、无真实数据UAT的运维信任边界，冻结D-174—D-186中以同机独立信任根为目标的高级attestation实现，不再把独立writer trust root、CPython/stdlib全量attestation、通用publisher/observer/backend作为L2a阻断；隔离root、技术角色/凭据映射、动作顺序、Migration后ACL、Host/SNI及部署后只读运行核对继续强制。历史文件、测试和宿主pin全部保留且不改；本指令不授权`plan`、build、Migration、deploy、创建UAT、账号或业务写。
+- 2026-08-25，项目负责人明确指令：`确认授权L2a构建准备`。D-188授权边界只包括从新的root-owned干净detached worktree构建精确Web/Worker本机候选、回读manifest/config digest、冻结静态resolved Compose和无数据回退输入、运行无业务写测试及记录证据；构建器所需的任务专用临时registry/provenance容器属于本范围并须收口清零。不包括创建Secret、证书、PostgreSQL、UAT运行容器、项目网络、命名Volume、账号或业务数据，也不包括Migration、`docker compose up/down`、现有UAT备份读取、恢复、部署或生产动作。
 
 ### A. 独立UAT主机（推荐）
 
@@ -48,11 +49,11 @@
 
 ## 3. 已知阻断
 
-- 当前HEAD没有匹配Web/Worker镜像；唯一alpha.47镜像绑定旧提交`78d96c6198ab4b7255572186ea580c463b5eeba3`。
+- D-188已从固定commit/tree构建匹配alpha.47的Web/Worker本机候选并回读manifest/config digest；旧`78d96c6198ab4b7255572186ea580c463b5eeba3`镜像仍不得复用。候选只存在于本机Docker Engine，临时loopback registry已移除，尚无外部镜像恢复锚点。
 - `compose.uat-isolated.yml`已关闭容器消费者侧固定root：独立项目名、Secret、release candidate/identity、命名Volume、网络和loopback端口均有失败关闭静态合同。生产Compose未参数化、未改变。
-- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同；D-183完成冻结v6九动作的83成员有界声明source closure，D-184/D-185又从固定FD捕获83成员及D-174 control policy，并以固定内存适配器直接生成同字节只读计划。D-186已把manifest raw SHA安装到仓库外固定宿主路径并回读。D-187确认同一宿主root本就控制kernel、Docker、pin和Python，继续建设同机自证不能形成独立信任根；因此只把高级证明实现保留为历史/可选强化证据，不再阻断空库L2a。隔离root、技术角色/凭据映射、动作顺序、Migration后ACL、localhost Host/SNI/Public Origin及部署后只读运行核对继续强制；其余阻断为匹配固定Git commit/tree的精确Web/Worker镜像、resolved Compose/回退输入、Secret、备份恢复、资源门，以及新的明确L2a执行授权。
-- TASK92已把根盘可用恢复到约16.68 GiB、比10 GiB硬线高约6.68 GiB；磁盘停止线阻断已解除，但任何后续build仍须重新执行新鲜资源门并串行控制上界。
-- L2a、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权。
+- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同；D-183—D-187历史/简化边界保持。D-188又冻结精确镜像、静态resolved Compose和第一阶段回退输入。当前新的P0是：Compose尚未挂载`/run/chenyida-erp-promotion/migration-execution-grant.json`或传入对应`ERP_UAT_PROMOTION_MIGRATION_*`，技术角色bootstrap与Migration后ACL reconcile也没有最小root运维执行接线；因此现有Compose不能直接执行空库L2a。另仍缺独立Secret实物、ELIGIBLE release manifest及动态数据库身份/grant、现有UAT异故障域备份与隔离恢复验证、新鲜资源门和新的明确部署授权。
+- TASK92清理阶段曾把根盘恢复到约16.68 GiB；D-188构建后当前available为`14,907,346,944`B（约13.88GiB），仍高于10GiB停止线。Build Cache现为46项/2.431GB、active 0；不得自动再次清理，任何后续重任务仍须新鲜资源门并串行控制上界。
+- L2a部署/Migration、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权；D-188的构建准备完成不等于可以`up`或试运行。
 
 ## 4. BuildKit清理结果
 
@@ -254,11 +255,42 @@
 - 既有准备链聚合`124/124`通过，隔离Compose policy/config连续两次双PASS，`git diff --check`通过。多路独立只读评估促成冻结范围、恢复门和Secret模式收紧，最终两路均为P0/P1/P2=0；本段没有新增测试代码或降低既有断言。
 - 10:54→11:07 CST资源/完整性：available memory `2,115,837,952 → 2,106,703,872`B，Swap used `185,061,376 → 186,945,536`B（+`1,884,160`B），根盘available `17,477,898,240 → 17,530,789,888`B，Load `0.31/0.17/0.16 → 0.69/0.42/0.31`；Memory PSI和kernel `oom_kill`均0。四服务restart0/OOM false，Web/PostgreSQL healthy，四保护卷存在；`/tmp/isolated-uat-*`和本段新增pyc残留0。
 
-## 20. 当前停止线与完成标准
+## 20. D-188 L2a构建准备结果
 
-磁盘、Compose消费者隔离、D-174—D-186历史准备证据及D-187比例适当的同机UAT信任边界已经明确；TASK92继续`DOING`。独立writer trust root、CPython全量attestation和通用runtime证据平台已由D-187移出空库L2a阻断，基础隔离与运行不变量仍强制。当前仍缺匹配固定commit/tree的精确Web/Worker镜像、resolved Compose/回退输入、Secret实物门、现有UAT异故障域备份与隔离恢复验证、新鲜资源门和明确L2a执行授权；不得据此运行新的宿主/运行面plan、创建Secret/Volume、启动第二套数据库、build或部署。
+- 授权与边界：项目负责人明确授权`L2a构建准备`。本段执行了精确本机构建、摘要回读、静态Compose冻结和无业务写测试；构建器所需的任务专用临时registry/provenance容器已在收口清零。没有连接数据库、读取业务/备份/Volume正文，没有创建Secret、证书、UAT运行容器、项目网络、命名Volume或账号，没有运行Migration、`compose up/down`、HTTP/TLS探针、部署或生产动作。
+- 固定源码：新建root-owned `0700` detached worktree，精确绑定commit `74fbeeebe95432e5f17e3313b1d14b273a91f7b9`、tree `db1edef51e21e69bd7571ef0f765e602c940fec9`、version `0.1.0-alpha.47`、46项Migration/head `0046_runtime_lock_privilege_boundary.sql`及allowlist `8bb2b2d662df03e397d49c4ed5d11f1af1a9406ecbaff37aee8fc0d2d7388eed`。Git archive为`73,031,680` bytes、SHA-256 `580627abeb381fe23c1a297f736e32f699d9356eba6db76c1c1f8d2e77fab095`；构建后worktree保持tracked/index/untracked全clean，并在收口时精确移除。
+- 精确候选：Web manifest/config为`sha256:42b4154088b4cad04ee27cb7c30b30e4db89f60d4d6706e8cdb638e6dfe40ffd` / `sha256:d4da6cba1dc85fb1a1498db2e8c5209056ca4a57f53e6833864c1653ae2c8dd3`；Worker为`sha256:861d71ae3c69a5a0aa8f9afcde0a1b56d8b96ad7a962bb1bc10b7f5a9d974b9b` / `sha256:bd34dfd26e6d72e4ec5ba64233d6e04d0c6d8343d8f820dd80be5f3b4ec227c1`。两者均为`linux/amd64`、`65532:65532`，baked/OCI version和revision精确，Web/Worker CMD分别正确。root:root `0440`构建回执位于`/var/lib/chenyida-erp-uat-isolated/release-candidate/task92-d188-74fbeee.build-provenance.json`，SHA-256为`172cf8601bdf917653e6e353676fd03f81c8ef7264629748f2d3d1ba4df20f82`，状态为`LOCAL_LOOPBACK_DIGEST_VERIFIED`。
+- 供应链边界：依赖阶段使用公共npm lockfile integrity和固定Wolfi APK包，应用build阶段断网；临时loopback registry、producer容器和`/tmp/chenyida-erp-release-candidate-build.*`均已清零。候选只有本机Engine身份，不是可异机恢复的registry锚点，也没有可复现构建attestation；部署前必须重新精确inspect并强制`--pull never`。
+- 冻结Compose：root-only父链`/var/lib/chenyida-erp-uat-isolated/build-preparation/task92-d188-74fbeee`保存三份Compose、Caddyfile、Secret policy、静态validator、非Secret `render.env`、`active-services.txt`、规范化`resolved-compose.json`及摘要清单，文件均root:root `0440`（validator `0550`）。`render.env` SHA-256为`87cbe38868a0364db697e81afe76d4ce6a655e16ccf72280a84520a3d8873a62`，resolved Compose SHA-256为`f9ec23b4c8851c6cb27e6c3b276f230978fa496f1a6efb9e3047815db8568e99`，输入清单SHA-256为`42d0f896db90f135a40f309eecc7f205bd9e4d40fbf877915946a3e65e8f9ece`。两次clean-env规范化渲染逐字一致，冻结env-file复渲染也一致。
+- 静态等值门：`ISOLATED_UAT_COMPOSE_POLICY_PASS`与`D188_RESOLVED_COMPOSE_EQUIVALENCE_PASS`通过。项目固定`chenyida-erp-uat-isolated`，端口`33001/33080/33443`当前无监听碰撞；Web精确使用Web候选，worker/migrate/admin精确使用Worker候选，runtime image/config环境值与回读值相等；PostgreSQL/Caddy也使用固定digest。所有服务无`build`、Docker socket、host network或privileged，应用UID非root，read-only/cap-drop/no-new-privileges保持。完整审计渲染包含六服务；未来运行profile只允许`uat-edge`，实际启用集合固定为`postgres/migrate/web/worker/caddy`，不得启用`tools/admin`。
+- 明确未授权态：冻结配置将`EMPTY → 0046`及数据库marker写为预期值，但保留system identifier、database OID、release manifest SHA、Migration confirm及production migration开关为空，Web/Worker deployment operation/authorization标签固定`not-uat-promotion`。这使制品可审计但不可冒充deploy-ready。
+- 精确第一阶段回退输入：新UAT无前代镜像，回退语义是“回到未运行状态”。只有另获回退授权后，才可使用同一冻结输入执行以下命令；命令刻意不带`--volumes`、`--rmi`或任何prune，以保留失败取证：
+
+  ```sh
+  env -i PATH=/usr/bin:/bin LC_ALL=C LANG=C TZ=UTC \
+    COMPOSE_PARALLEL_LIMIT=1 COMPOSE_DISABLE_ENV_FILE=1 \
+    docker compose \
+      --env-file /var/lib/chenyida-erp-uat-isolated/build-preparation/task92-d188-74fbeee/render.env \
+      --project-name chenyida-erp-uat-isolated \
+      --project-directory /var/lib/chenyida-erp-uat-isolated/build-preparation/task92-d188-74fbeee \
+      --profile uat-edge \
+      -f /var/lib/chenyida-erp-uat-isolated/build-preparation/task92-d188-74fbeee/compose.yml \
+      -f /var/lib/chenyida-erp-uat-isolated/build-preparation/task92-d188-74fbeee/compose.release.yml \
+      -f /var/lib/chenyida-erp-uat-isolated/build-preparation/task92-d188-74fbeee/compose.uat-isolated.yml \
+      down --remove-orphans
+  ```
+
+  只有在按项目label复核精确7个新卷且再次取得删除授权后，才可另行恢复到“卷也不存在”；四个保护卷和现有项目永远不在该命令范围内。
+- 发现的部署P0：当前`migrate`服务需要ELIGIBLE release manifest、动态PostgreSQL system identifier/OID/marker、受控Migration grant及授权摘要，但Compose没有挂载固定grant路径，也未传递相应UAT promotion Migration变量；技术登录角色初始化和Migration后ACL reconcile也没有最小root执行包。因此禁止直接`docker compose up`，也禁止切到test mode、复用生产runner或绕过守卫。下一独立切片应只实现并测试这份最小root运维接线；仍不部署。
+- 测试：候选构建器完成Web→Worker串行build和loopback digest回读；隔离Compose policy/config runner通过；受控`/opt/erp`源码根上的准备链聚合`124/124`通过。首次从`/var/tmp` detached worktree运行时，前92项通过，pre-import的20项因共享可写`/var/tmp`祖先按设计出现8 failure/6 error并停止；未放宽断言，改从相同commit/tree的安全`/opt/erp`根重跑后全绿。
+- 资源/完整性：11:56→12:12 CST，MemAvailable `2,163,392,512 → 2,112,208,896`B，Swap used `190,021,632 → 327,303,168`B（增加`137,281,536`B，低于256MiB停止线），根盘available `17,355,300,864 → 14,991,380,480`B，Load `0.38/0.40/0.33 → 0.44/0.57/0.56`，Memory PSI及kernel `oom_kill`均0。Docker为6容器、77镜像、277 Volume、6网络，正好新增2个候选镜像；Build Cache为46项/2.431GB、active 0。`docker compose ps`只读复核四服务running；四个常驻服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四个保护卷完整；构建专用临时registry/provenance容器、worktree、监听端口和临时目录残留0。
+- 两路独立只读复核：构建回执/镜像复核P0=P1=P2=0；Compose复核确认静态冻结可闭合，但上述Migration/角色/ACL接线是部署前P0。新UAT仍未创建，现有alpha.42/0040 UAT及生产运行面未改变。
+
+## 21. 当前停止线与完成标准
+
+磁盘、Compose消费者隔离、D-174—D-186历史准备证据、D-187比例适当的信任边界及D-188精确本机候选/静态Compose/第一阶段回退输入已经明确；TASK92继续`DOING`。当前仍缺最小root运维执行包（PostgreSQL-only启动、技术角色bootstrap、ELIGIBLE manifest与Migration grant接线、`0001→0046`、Migration后ACL reconcile）、独立Secret实物门、动态数据库身份、现有UAT异故障域备份与隔离恢复验证、部署前新鲜资源门和新的明确部署授权。不得据此创建Secret/Volume、启动第二套数据库、运行Migration或部署。
 
 - 只完成负责人选定的一条路径，不同时建设两套方案。
-- 目标环境消费者边界、资源上界、Secret/角色映射、空库Migration范围、部署后只读运行核对及D-174—D-186历史证据已明确。下一步必须另获明确授权，才可从新的干净固定commit/tree串行build精确Web/Worker镜像、冻结resolved Compose/回退输入，并提交或执行L2a空库包；不自动运行plan、build或创建UAT。
+- 目标环境消费者边界、资源上界、Secret/角色映射、空库Migration范围、部署后只读运行核对、精确镜像和静态Compose/回退输入已明确。下一步是另行实现并测试最小root运维执行包；即使该包完成，也必须再取得部署授权并补齐Secret、异故障域恢复和动态数据库门，才可执行L2a。
 - 现有UAT身份、数据、四个受保护Volume和常驻服务不变。
-- TASK92完成后只允许提交L2a授权申请，不自动build、deploy或Migration。
+- TASK92完成前不自动deploy或Migration；D-188构建准备授权已消费完毕，不能复用为后续启动授权。

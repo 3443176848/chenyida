@@ -2,12 +2,19 @@
 
 最后更新时间：2026-08-25（Asia/Shanghai）
 
-## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-187已简化同机空库UAT信任边界，等待精确镜像与L2a授权）
+## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-188构建准备已完成，部署包仍不完整）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / D-187 SAME-HOST UAT TRUST BOUNDARY SIMPLIFIED / EXACT IMAGES + EXPLICIT L2A AUTHORIZATION REQUIRED / PRODUCTION NO-GO | D-174—D-186中以同机独立信任根为目标的高级attestation实现已冻结；基础隔离与部署后只读运行不变量继续强制。同机空库UAT接受root运维信任，但精确镜像/config digest、resolved Compose/回退、Secret实物门、现有UAT异故障域备份与隔离恢复验证、资源门、L2a授权和新UAT均未建立 |
-| 授权范围 | PASS / DOCS-ONLY TRUST-BOUNDARY DECISION | 只允许记录D-187并运行无业务写的静态测试；未授权launcher/plan、UAT目录、Secret、证书、Docker资源、数据库、build、Migration、部署、账号、HTTP/TLS探针或业务写 |
+| 当前状态 | DOING / D-188 L2A BUILD PREPARATION COMPLETE / DEPLOYMENT PACKAGE INCOMPLETE / PRODUCTION NO-GO | 精确本机Web/Worker候选、config digest、root-only静态resolved Compose及第一阶段回退输入已冻结。Migration grant/manifest、技术角色bootstrap和最终ACL执行接线仍缺；Secret、数据库、恢复、部署授权及新UAT均未建立 |
+| 授权范围 | PASS / L2A BUILD PREPARATION ONLY | 项目负责人明确指令`确认授权L2a构建准备`；只允许精确构建、摘要回读、静态Compose/回退冻结和无业务写测试，包含构建器所需且收口清零的任务专用临时registry/provenance容器。未授权Secret、证书、数据库、UAT运行容器、项目网络/命名Volume、Migration、up/down、备份/恢复、部署、账号、HTTP/TLS或业务写 |
+| D-188固定源码 | PASS / CLEAN DETACHED COMMIT+TREE | root-owned `0700` worktree固定`74fbeeebe95432e5f17e3313b1d14b273a91f7b9`/`db1edef51e21e69bd7571ef0f765e602c940fec9`、alpha.47、46/head0046和allowlist`8bb2b2d6…8eed`；archive `73,031,680`B、SHA`580627ab…095`，构建后clean并在收口精确移除 |
+| D-188精确镜像 | PASS / LOCAL ENGINE ONLY | Web manifest/config=`42b41540…40ffd`/`d4da6cba…c8dd3`；Worker=`861d71ae…74b9b`/`bd34dfd2…227c1`。平台、nonroot用户、CMD、OCI/baked version/revision全部匹配；provenance root:root 0440、SHA`172cf860…20f82`。临时registry已移除，无外部镜像恢复锚点 |
+| D-188静态Compose | PASS / POLICY + EXACT CANDIDATE EQUALITY | root-only冻结目录保存三Compose/Caddy/Secret policy/validator/render env/active services/resolved JSON；resolved SHA=`f9ec23b4…68e99`，render env=`87cbe388…3a62`，输入清单=`42d0f896…9ece`。双render及env-file复渲染一致；Web/Worker/migrate/admin image/config等值、无build/socket/host network/privileged通过 |
+| D-188运行profile/回退 | FROZEN / NOT EXECUTED | 完整审计包含六服务；实际只允许`uat-edge`的postgres/migrate/web/worker/caddy，禁止`tools/admin`。新UAT无前代；第一阶段回退仅为精确项目`down --remove-orphans`，不删Volume/image且未执行，任何Volume删除另行授权 |
+| D-188部署阻断 | L2A DEPLOYMENT NO-GO | `migrate`缺固定Migration grant挂载和`ERP_UAT_PROMOTION_MIGRATION_*`接线，技术角色bootstrap与Migration后ACL reconcile缺最小root执行包；system ID/OID、ELIGIBLE manifest/grant、Secret、异故障域恢复、资源门及新的部署授权仍缺。禁止直接up、test-mode或绕过守卫 |
+| D-188测试/复核 | PASS / 124 + COMPOSE / BUILD REVIEW P0=P1=P2=0 | 构建及loopback digest回读通过；Compose policy/config和候选等值门通过；安全`/opt/erp`根聚合124/124。`/var/tmp` worktree首跑的pre-import失败是共享可写祖先按设计拒绝，未降断言。构建复核无P0/P1/P2；Compose复核把运行接线列为部署P0 |
+| D-188资源/完整性 | PASS / ABOVE STOP LINES / NO TEMP RESIDUE | 11:56→12:12 MemAvailable`2,163,392,512→2,112,208,896`B，Swap`190,021,632→327,303,168`B（+137,281,536B，低于256MiB停止线），根盘`17,355,300,864→14,991,380,480`B，Load`0.38/0.40/0.33→0.44/0.57/0.56`，PSI/OOM0。6容器/77镜像/277卷/6网络，新增恰为两候选；Cache46/2.431GB active0。`docker compose ps`复核四服务running，四服务/四保护卷不变，构建专用临时容器、worktree、监听端口和目录残留0 |
 | D-187比例原则 | ACCEPTED / ROOT ADMIN TRUSTED NONPRODUCTION BOUNDARY | 同一root能控制kernel、Docker、pin、launcher和Python，继续同机自证不能形成独立信任域。该风险只对空库、无真实数据、loopback-only UAT按P1接受，不适用于真实样本、公开访问或生产 |
 | D-187冻结范围 | PASS / ADVANCED ATTESTATION OPTIONAL; RUNTIME INVARIANTS MUST | 历史源码、测试、摘要及D-186宿主pin原样保留，不删除、不chmod、不继续演进；one-shot证明链、通用publisher/observer/backend和CPython全量attestation不再是空库L2a必经平台。隔离root、技术角色/凭据映射、动作顺序、Migration后ACL、Host/SNI与部署后只读运行核对仍强制，且不因冻结而声称已运行或可信 |
 | D-187剩余P0 | L2A NO-GO | 必须从新的root-owned `0700`干净detached worktree固定commit/tree，构建并回读精确Web/Worker image/config digest，冻结resolved Compose和精确回退；继续强制隔离root、技术角色/凭据映射、动作顺序、Migration后ACL及localhost Host/SNI/Public Origin；Secret须为独立新值，宿主目录`root:root 0700`，每个regular/`nlink=1`文件严格继承`runtime-secret-file-policy-v1`的owner uid 0、固定consumer gid与`0440`，不入日志且容器只读挂载；部署后须只读核对实际初始空库、Migration ledger、角色/owner/ACL、镜像/config、Secret/mount、network/Volume/loopback与health；现有UAT数据库/文件域须有异故障域备份并通过摘要/清单与隔离恢复验证，同机快照不算灾备；另须复核资源门并取得明确L2a执行授权。新空UAT按`DISPOSABLE`重建 |
@@ -87,8 +94,8 @@
 | 收口资源/完整性 | PASS / NO UAT RESIDUE | `2,452,017,152`B available memory、`179,843,072`B Swap、`17,893,322,752`B根盘、Load`0.19/0.17/0.12`、OOM0；6/75/277/6、Cache0，四服务restart0/OOM false且保护卷完整 |
 | 生产配置/运行面 | PASS / UNCHANGED | 生产Compose与政策未改；未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源 |
 | 本段资源/完整性 | PASS / STATIC ONLY | 起点约2.3GiB/171MiB/17GiB/Load`0.21/0.20/0.18`；收口`2,445,348,864`B available、`179,769,344`B Swap、`17,871,294,464`B磁盘、Load`0.03/0.11/0.15`、PSI/OOM0。6/75/277/6、Cache0，四服务restart0/OOM false且保护卷保持，任务临时资源0 |
-| 仍有阻断 | EXACT IMAGE + RESOLVED COMPOSE/ROLLBACK + RESOURCE/RECOVERY + L2A AUTHORIZATION | 当前HEAD没有匹配Web/Worker image/config digest；新的干净build commit/tree、resolved Compose、精确回退、资源/恢复门和L2a执行授权仍缺失。D-187已把同机独立launcher/CPython attestation移出空库L2a阻断 |
-| 下一步 | TASK92 / SEPARATE AUTHORIZATION FOR CLEAN BUILD + EXACT IMAGE/L2A | 另获授权后从新的root-owned `0700`干净detached worktree固定commit/tree，串行build并回读精确Web/Worker image/config digest，冻结resolved Compose和回退输入，再提交或执行L2a空库包；不自动运行plan、build、deploy、Migration或创建UAT |
+| 仍有阻断 | ROOT OPS MIGRATION PACKAGE + SECRET + DYNAMIC DB/RECOVERY + DEPLOY AUTH | 精确镜像与静态Compose/回退已完成；仍缺PostgreSQL-only/技术角色/Migration grant/manifest/最终ACL最小执行包、独立Secret、动态数据库身份、现有UAT异故障域恢复、部署前资源门和新的明确部署授权 |
+| 下一步 | TASK92 / IMPLEMENT MINIMAL ROOT OPS PACKAGE, NO DEPLOY | 下一独立切片只实现并测试上述最小root运维执行包；不创建Secret或数据库，不运行Migration/deploy。执行包完成后仍需恢复/动态门和新的部署授权 |
 
 ## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
 

@@ -4,6 +4,18 @@
 
 ## 2026-08-25
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: freeze isolated UAT build candidate`
+
+- 授权：项目负责人明确指令`确认授权L2a构建准备`。范围仅为精确本机构建、摘要回读、静态Compose/回退冻结和无业务写测试；构建器所需的任务专用临时registry/provenance容器属于该准备范围并在结束时清零。不授权创建Secret、数据库、UAT运行容器、项目网络或命名Volume，也不授权Migration、up/down、备份/恢复、部署、账号或业务写。
+- 固定源码/构建：root-owned `0700` detached clean worktree固定commit `74fbeeebe95432e5f17e3313b1d14b273a91f7b9`/tree `db1edef51e21e69bd7571ef0f765e602c940fec9`、alpha.47、46/head0046和allowlist`8bb2b2d6…8eed`；Web→Worker串行构建及loopback digest回读完成。Archive `73,031,680`B、SHA`580627ab…095`；worktree收口精确移除。
+- 候选：Web manifest/config为`42b41540…40ffd`/`d4da6cba…c8dd3`，Worker为`861d71ae…74b9b`/`bd34dfd2…227c1`；linux/amd64、`65532:65532`、CMD、OCI/baked version/revision均匹配。root:root 0440 provenance SHA为`172cf860…20f82`。临时registry/producer已清零；候选仅在当前Engine存在，无外部恢复锚点或可复现构建attestation。
+- 静态Compose：root-only冻结三份Compose、Caddy、Secret policy、validator、非Secret render env、active services和规范化resolved JSON。Resolved/render env/input-list SHA分别为`f9ec23b4…68e99`/`87cbe388…3a62`/`42d0f896…9ece`；双clean-env及env-file复渲染一致。隔离policy和候选等值门通过；实际profile只允许`uat-edge`的五服务，`tools/admin`不启动。
+- 回退：新UAT无前代，第一阶段回退输入只允许精确项目`down --remove-orphans`，不带`--volumes`、`--rmi`或prune，且本轮未执行。任何精确新卷删除仍需独立授权并排除四个保护卷。
+- 诚实停止线：冻结配置保留`not-uat-promotion`、空system ID/OID/manifest SHA/Migration confirm。审计确认Compose尚未挂载Migration grant或传入对应UAT promotion变量，技术角色bootstrap及Migration后ACL reconcile也缺最小root执行接线；禁止直接up、test mode或绕过守卫。Secret、动态数据库/ELIGIBLE manifest、现有UAT异故障域恢复和部署授权继续缺失。
+- 测试/复核：构建器与loopback回读通过；Compose policy/config与D188候选等值门通过；安全`/opt/erp`源码根聚合`124/124`通过。首次从`/var/tmp` worktree运行时，前92项通过，pre-import 20项因共享可写祖先按设计出现8 failure/6 error；未降断言，使用相同commit/tree的安全根重跑全绿。构建独立复核P0=P1=P2=0；Compose复核把运行接线登记为部署P0。
+- 资源/完整性：11:56→12:12 MemAvailable`2,163,392,512→2,112,208,896`B，Swap`190,021,632→327,303,168`B（+137,281,536B，低于256MiB停止线），根盘`17,355,300,864→14,991,380,480`B，Load`0.38/0.40/0.33→0.44/0.57/0.56`，PSI/OOM0。Docker为6容器/77镜像/277 Volume/6网络，正好新增两候选；Build Cache46项/2.431GB active0。`docker compose ps`只读复核四服务running，四服务ID/restart/OOM及四保护卷不变，Web/PostgreSQL healthy，构建专用临时registry/provenance容器、worktree、监听端口和目录残留0。
+- 代码/数据：产品代码、Schema、Migration、Compose源码和生产配置均未改变；只同步MASTER、TASKS、PROJECT_CONTEXT、DECISIONS、STATUS、当前任务和CHANGELOG。新UAT未创建，现有alpha.42/0040 UAT未改变，系统继续`PRODUCTION NO-GO`。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `docs: simplify isolated UAT trust boundary`
 
 - 第一性原理：同一宿主root可以同时修改kernel、Docker、pin、launcher和Python，继续建设独立writer trust root、CPython/stdlib全量attestation及通用publisher/observer/backend不能产生独立信任域。对少于20名内部用户使用的空库、无真实数据、loopback-only UAT，接受受信root管理员及root-owned OS/Python/Docker为明确运维假设；不把它写成生产级或cryptographic证明。部署后最小只读运行核对仍不可省略。
