@@ -4,6 +4,18 @@
 
 ## 2026-08-25
 
+### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: add isolated UAT root operations package`
+
+- 范围：D-188复核暴露最小运行接线P0后，项目负责人要求“下一步”。本切片仅实现仓库源码、测试和文档；已消费的D-188构建准备授权不延伸为新候选构建、Secret、数据库、Migration或部署授权。人员数量不进入项目、容器、角色、线程、容量或验收合同。
+- Root执行包：新增严格request/auth/plan/grant/result合同、create-only耐久状态、单一package manifest/digest门、标准库-only system port和失败quarantine/containment。父授权最长30分钟并在只读预检前后重验；Migration grant最长10分钟且创建时再次验证父授权余量。按D-187比例原则只在首个副作用前核对一次root祖先、`root:root 0700`包根、成员metadata和整体摘要，固定路径装载不写pyc；不建设内存`compile/exec`或第二套全包重读。
+- Compose/数据库：新增第四层`compose.uat-operations.yml`与静态policy/runner；受控入口只启动目标PostgreSQL，技术角色bootstrap后以精确`run --rm --no-deps`执行46项allowlist的`EMPTY→0046`，观察live fence/ledger，再在单一事务/advisory lock内unfence并完成最终owner/ACL reconcile。Web、Worker、Caddy和Admin不在该运行集合。
+- Secret/运行身份：六份Secret在Docker及事务关键边界以目录FD、`O_NOFOLLOW`、root owner、固定group、`0440`、regular、`nlink=1`、稳定metadata/content和唯一inode/值重验；正文不输出。Docker实际完整ID、manifest/config、user/label、安全选项、无发布端口、唯一backend网络、精确mount/tmpfs及现有四服务/四保护卷均失败关闭核对。
+- Migration入口：`migrate-postgres.ts`和release authorization增加隔离UAT grant/结果合同，Migration result时间必须落在grant窗口，完整ledger/result/grant/父授权/release manifest绑定；SQL Migration、Schema、journal和业务API未改变。
+- 候选状态：Dockerfile现在只把数据库CLI实际需要的3份operations JSON纳入Worker镜像，Migration入口和Compose也已变化；三个未使用的示例root已删除。D-188的Web/Worker manifest/config与resolved Compose `f9ec23b4…68e99`因此降级为`OBSOLETE / DO NOT START / DO NOT REUSE`。必须从D-189最终独立提交重新串行构建并生成同commit/tree的部署包，不能拼接旧候选。
+- 验证：D-189 Python专项`38/38`、Node专项`32/32`、四层Compose policy/config、release typecheck、lint、release Node阶段`77/77`及宿主Python fixed-executor`130/130`通过；受限离线Node容器的Python子阶段因禁止`/proc/self/fd`执行/chown未能运行，未降低断言。Shell/Python语法、`git diff --check`及旧D-188五个冻结文件零差异通过；比例审计与简化后独立复核P0=0/P1=0。
+- 资源/完整性：重测试前约MemAvailable 1.8GiB、Swap 351MiB/1GiB、根盘14GiB、Load约1.05；14:06 CST为`1,968,537,600`B、`388,296,704`B/1GiB、`14,833,958,912`B、Load`0.18/0.17/0.21`，Memory PSI/kernel OOM0。Docker保持6容器/77镜像/277 Volume/6网络；四服务running、restart0/OOM false，Web/PostgreSQL healthy，四保护卷存在。精确删除本任务13:20生成的一个测试pyc后，任务UAT容器、Compose临时目录和D-189 pyc残留均为0。
+- 数据/运行面：没有创建Secret、证书、数据库、Volume、网络、账号或业务数据，没有连接现有UAT数据库、运行Migration、`compose up/down`、部署、HTTP/TLS或生产动作。现有alpha.42/0040 UAT保持不变，TASK92继续`DOING / L2A DEPLOYMENT NO-GO`。
+
 ### SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 - `ops: freeze isolated UAT build candidate`
 
 - 授权：项目负责人明确指令`确认授权L2a构建准备`。范围仅为精确本机构建、摘要回读、静态Compose/回退冻结和无业务写测试；构建器所需的任务专用临时registry/provenance容器属于该准备范围并在结束时清零。不授权创建Secret、数据库、UAT运行容器、项目网络或命名Volume，也不授权Migration、up/down、备份/恢复、部署、账号或业务写。

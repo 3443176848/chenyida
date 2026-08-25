@@ -31,6 +31,7 @@ chenyida_erp_app/data/
 .env*
 !.env.example
 !.env.uat-isolated.example
+!.env.uat-operations.example
 .agents/
 .codex/
 .git.invalid-empty-backup/

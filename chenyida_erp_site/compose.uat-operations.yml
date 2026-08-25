@@ -1,0 +1,57 @@
+# Fourth-layer, same-host UAT operations overlay.  This file only wires the
+# short-lived, root-controlled migration inputs; it is not deployment or
+# migration authorization by itself.
+services:
+  migrate:
+    profiles: !override [uat-migration]
+    environment:
+      ERP_ALLOW_PRODUCTION_MIGRATION: "YES"
+      ERP_MIGRATION_DATABASE_STATE: MIGRATION_FENCED
+      ERP_RELEASE_MANIFEST_SHA256: ${ERP_RELEASE_MANIFEST_SHA256:?ERP_RELEASE_MANIFEST_SHA256 is required}
+      ERP_RELEASE_EXPECTED_MANIFEST_SHA256: ${ERP_RELEASE_MANIFEST_SHA256:?ERP_RELEASE_MANIFEST_SHA256 is required}
+      ERP_RELEASE_EXPECTED_VERSION: ${ERP_RELEASE_EXPECTED_VERSION:?ERP_RELEASE_EXPECTED_VERSION is required}
+      ERP_RELEASE_EXPECTED_GIT_COMMIT: ${ERP_RELEASE_EXPECTED_GIT_COMMIT:?ERP_RELEASE_EXPECTED_GIT_COMMIT is required}
+      ERP_MIGRATION_CONFIRM: MIGRATE_EXACT_RELEASE_MANIFEST
+      ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER: ${ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER:?ERP_MIGRATION_EXPECTED_SYSTEM_IDENTIFIER is required}
+      ERP_MIGRATION_EXPECTED_DATABASE_OID: ${ERP_MIGRATION_EXPECTED_DATABASE_OID:?ERP_MIGRATION_EXPECTED_DATABASE_OID is required}
+      ERP_MIGRATION_EXPECTED_DATABASE_MARKER: chenyida-erp-deployment/v2:UAT:${ERP_UAT_COMPOSE_PROJECT:?ERP_UAT_COMPOSE_PROJECT is required}
+      ERP_MIGRATION_EXPECTED_CURRENT_HEAD: EMPTY
+      ERP_MIGRATION_EXPECTED_TARGET_HEAD: 0046_runtime_lock_privilege_boundary.sql
+      ERP_UAT_PROMOTION_MIGRATION_GRANT_SHA256: ${ERP_UAT_PROMOTION_MIGRATION_GRANT_SHA256:?ERP_UAT_PROMOTION_MIGRATION_GRANT_SHA256 is required}
+      ERP_UAT_PROMOTION_MIGRATION_EXECUTION_AUTHORIZATION_SHA256: ${ERP_UAT_PROMOTION_MIGRATION_EXECUTION_AUTHORIZATION_SHA256:?ERP_UAT_PROMOTION_MIGRATION_EXECUTION_AUTHORIZATION_SHA256 is required}
+      ERP_ISOLATED_UAT_ROOT_OPERATIONS_PACKAGE_SHA256: ${ERP_ISOLATED_UAT_ROOT_OPERATIONS_PACKAGE_SHA256:?ERP_ISOLATED_UAT_ROOT_OPERATIONS_PACKAGE_SHA256 is required}
+    volumes: !override
+      - type: bind
+        source: ${ERP_UAT_RELEASE_CANDIDATE_ROOT:?ERP_UAT_RELEASE_CANDIDATE_ROOT is required}
+        target: /run/chenyida-erp-release-candidate
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ERP_UAT_RUNTIME_SECRET_ROOT:?ERP_UAT_RUNTIME_SECRET_ROOT is required}/migration-database-password
+        target: /run/chenyida-erp-secrets/migration-database-password
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ERP_UAT_MIGRATION_GRANT_ROOT:?ERP_UAT_MIGRATION_GRANT_ROOT is required}/migration-execution-grant.json
+        target: /run/chenyida-erp-promotion/migration-execution-grant.json
+        read_only: true
+        bind:
+          create_host_path: false
+
+  web:
+    depends_on: !override
+      postgres: { condition: service_healthy }
+
+  worker:
+    depends_on: !override
+      postgres: { condition: service_healthy }
+
+  admin:
+    depends_on: !override
+      postgres: { condition: service_healthy }
+
+  caddy:
+    depends_on: !override
+      web: { condition: service_healthy }

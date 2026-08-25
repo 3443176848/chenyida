@@ -1,9 +1,9 @@
 # SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 新隔离UAT前置边界
 
-> 状态：`DOING / D-188 L2A BUILD PREPARATION COMPLETE / DEPLOYMENT PACKAGE INCOMPLETE / NEW UAT NOT CREATED / PRODUCTION NO-GO`
+> 状态：`DOING / D-189 ROOT OPERATIONS SOURCE COMPLETE / D-188 CANDIDATES OBSOLETE / NEW BUILD AND DEPLOYMENT AUTHORIZATION PENDING / NEW UAT NOT CREATED / PRODUCTION NO-GO`
 > 日期：2026-08-25（Asia/Shanghai）
 > 依赖：TASK91、D-172、低资源服务器保护规则
-> 责任：项目负责人已选择当前主机同机隔离并接受同一故障域，且已明确授权L2a构建准备；Codex已构建并冻结精确本机候选，但未获得部署、Migration、Secret、数据库或账号授权
+> 责任：项目负责人已选择当前主机同机隔离并接受同一故障域，且已明确授权L2a构建准备；Codex已完成最小root运维执行源码及测试，但未获得新候选重建、部署、Migration、Secret、数据库或账号授权
 
 ## 1. 目标
 
@@ -32,6 +32,7 @@
 - 2026-08-25，项目负责人在已明确“只安装并只读核对D-185宿主外部摘要钉扎，不创建UAT、不build/deploy、不运行Migration、不接触数据库或四个保护卷”的下一步后确认继续。本段只在固定同级路径`/etc/chenyida-erp-isolated-uat-pre-import-v1/manifest.sha256`以create-only方式安装manifest raw SHA并连续两次只读回读；不安装launcher、不运行`plan/execute`，不创建账号、Secret、Docker或UAT资源。
 - 2026-08-25，项目负责人继续要求“下一步”，并已多次明确系统少于20名内部用户、应从第一性原理避免复杂化。本段只在仓库文档中接受“受信root管理员 + root-owned宿主OS/Python/Docker”为同机、空库、无真实数据UAT的运维信任边界，冻结D-174—D-186中以同机独立信任根为目标的高级attestation实现，不再把独立writer trust root、CPython/stdlib全量attestation、通用publisher/observer/backend作为L2a阻断；隔离root、技术角色/凭据映射、动作顺序、Migration后ACL、Host/SNI及部署后只读运行核对继续强制。历史文件、测试和宿主pin全部保留且不改；本指令不授权`plan`、build、Migration、deploy、创建UAT、账号或业务写。
 - 2026-08-25，项目负责人明确指令：`确认授权L2a构建准备`。D-188授权边界只包括从新的root-owned干净detached worktree构建精确Web/Worker本机候选、回读manifest/config digest、冻结静态resolved Compose和无数据回退输入、运行无业务写测试及记录证据；构建器所需的任务专用临时registry/provenance容器属于本范围并须收口清零。不包括创建Secret、证书、PostgreSQL、UAT运行容器、项目网络、命名Volume、账号或业务数据，也不包括Migration、`docker compose up/down`、现有UAT备份读取、恢复、部署或生产动作。
+- 2026-08-25，D-188复核暴露最小root运维执行接线缺口后，项目负责人要求“下一步”。D-189仅在仓库内实现并测试该执行源码；没有把已消费的D-188构建准备授权复用为新镜像构建、Secret落盘、PostgreSQL启动、Migration、部署或生产授权。任何新的候选构建和运行面动作仍须基于D-189最终提交另行明确授权。
 
 ### A. 独立UAT主机（推荐）
 
@@ -49,11 +50,11 @@
 
 ## 3. 已知阻断
 
-- D-188已从固定commit/tree构建匹配alpha.47的Web/Worker本机候选并回读manifest/config digest；旧`78d96c6198ab4b7255572186ea580c463b5eeba3`镜像仍不得复用。候选只存在于本机Docker Engine，临时loopback registry已移除，尚无外部镜像恢复锚点。
+- D-189修改了Worker镜像内容、Migration入口与Compose接线；因此D-188从`74fbee…`构建的Web/Worker manifest/config和resolved Compose `f9ec23b4…68e99`均已成为`OBSOLETE / DO NOT START / DO NOT REUSE`。它们只保留历史审计价值，不能与D-189源码拼接成部署包。
 - `compose.uat-isolated.yml`已关闭容器消费者侧固定root：独立项目名、Secret、release candidate/identity、命名Volume、网络和loopback端口均有失败关闭静态合同。生产Compose未参数化、未改变。
-- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同；D-183—D-187历史/简化边界保持。D-188又冻结精确镜像、静态resolved Compose和第一阶段回退输入。当前新的P0是：Compose尚未挂载`/run/chenyida-erp-promotion/migration-execution-grant.json`或传入对应`ERP_UAT_PROMOTION_MIGRATION_*`，技术角色bootstrap与Migration后ACL reconcile也没有最小root运维执行接线；因此现有Compose不能直接执行空库L2a。另仍缺独立Secret实物、ELIGIBLE release manifest及动态数据库身份/grant、现有UAT异故障域备份与隔离恢复验证、新鲜资源门和新的明确部署授权。
+- D-182已把`127.0.0.1`连接、`localhost` Host/SNI和HTTPS Public Origin收敛为纯合同；D-183—D-187历史/简化边界保持。D-189已经关闭“缺最小root运维执行源码”的仓库P0，但尚未把源码冻结成与最终commit/tree、Web/Worker manifest/config和resolved Compose完全一致的新部署包。另仍缺独立Secret实物、ELIGIBLE release manifest及动态数据库身份/grant、现有UAT异故障域备份与隔离恢复验证、新鲜资源门和新的明确部署授权。
 - TASK92清理阶段曾把根盘恢复到约16.68 GiB；D-188构建后当前available为`14,907,346,944`B（约13.88GiB），仍高于10GiB停止线。Build Cache现为46项/2.431GB、active 0；不得自动再次清理，任何后续重任务仍须新鲜资源门并串行控制上界。
-- L2a部署/Migration、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权；D-188的构建准备完成不等于可以`up`或试运行。
+- L2a部署/Migration、账号、公开HTTPS、L3虚构业务写、真实样本与生产均未授权；D-189源码完成不等于可以`up`、Migration或试运行。
 
 ## 4. BuildKit清理结果
 
@@ -281,16 +282,33 @@
   ```
 
   只有在按项目label复核精确7个新卷且再次取得删除授权后，才可另行恢复到“卷也不存在”；四个保护卷和现有项目永远不在该命令范围内。
-- 发现的部署P0：当前`migrate`服务需要ELIGIBLE release manifest、动态PostgreSQL system identifier/OID/marker、受控Migration grant及授权摘要，但Compose没有挂载固定grant路径，也未传递相应UAT promotion Migration变量；技术登录角色初始化和Migration后ACL reconcile也没有最小root执行包。因此禁止直接`docker compose up`，也禁止切到test mode、复用生产runner或绕过守卫。下一独立切片应只实现并测试这份最小root运维接线；仍不部署。
+- D-188当时发现的部署P0：`migrate`服务需要ELIGIBLE release manifest、动态PostgreSQL system identifier/OID/marker、受控Migration grant及授权摘要，但三层Compose没有挂载固定grant路径，也未传递对应UAT promotion变量；技术登录角色初始化和Migration后ACL reconcile也缺最小root执行包。该源码缺口后续已由D-189关闭，同时D-188候选被废止；D-188从未获得直接`up`、test mode、生产runner或绕过守卫的权限。
 - 测试：候选构建器完成Web→Worker串行build和loopback digest回读；隔离Compose policy/config runner通过；受控`/opt/erp`源码根上的准备链聚合`124/124`通过。首次从`/var/tmp` detached worktree运行时，前92项通过，pre-import的20项因共享可写`/var/tmp`祖先按设计出现8 failure/6 error并停止；未放宽断言，改从相同commit/tree的安全`/opt/erp`根重跑后全绿。
 - 资源/完整性：11:56→12:12 CST，MemAvailable `2,163,392,512 → 2,112,208,896`B，Swap used `190,021,632 → 327,303,168`B（增加`137,281,536`B，低于256MiB停止线），根盘available `17,355,300,864 → 14,991,380,480`B，Load `0.38/0.40/0.33 → 0.44/0.57/0.56`，Memory PSI及kernel `oom_kill`均0。Docker为6容器、77镜像、277 Volume、6网络，正好新增2个候选镜像；Build Cache为46项/2.431GB、active 0。`docker compose ps`只读复核四服务running；四个常驻服务ID不变、restart0/OOM false，Web/PostgreSQL healthy，四个保护卷完整；构建专用临时registry/provenance容器、worktree、监听端口和临时目录残留0。
 - 两路独立只读复核：构建回执/镜像复核P0=P1=P2=0；Compose复核确认静态冻结可闭合，但上述Migration/角色/ACL接线是部署前P0。新UAT仍未创建，现有alpha.42/0040 UAT及生产运行面未改变。
 
-## 21. 当前停止线与完成标准
+## 21. D-189 最小root运维执行源码结果
 
-磁盘、Compose消费者隔离、D-174—D-186历史准备证据、D-187比例适当的信任边界及D-188精确本机候选/静态Compose/第一阶段回退输入已经明确；TASK92继续`DOING`。当前仍缺最小root运维执行包（PostgreSQL-only启动、技术角色bootstrap、ELIGIBLE manifest与Migration grant接线、`0001→0046`、Migration后ACL reconcile）、独立Secret实物门、动态数据库身份、现有UAT异故障域备份与隔离恢复验证、部署前新鲜资源门和新的明确部署授权。不得据此创建Secret/Volume、启动第二套数据库、运行Migration或部署。
+- 范围与状态：本段只修改仓库源码、测试和治理文档，关闭D-188发现的最小root运维执行源码缺口。它不是已安装的root包、冻结部署包、ELIGIBLE release、Secret实物或运行授权；没有创建UAT、数据库、Volume、网络、账号或业务数据，也没有执行Migration、`compose up/down`、部署、HTTP/TLS或生产动作。
+- 最小入口：新增`isolated-uat-root-operations.py`及标准库-only system port，把一个规范请求收敛为`验证请求与授权 → 只读预检 → 消费授权 → PostgreSQL-only启动 → 技术角色bootstrap → 生成短期Migration grant → EMPTY→0046 → 最终ACL/owner收敛 → 失败收容`。项目名必须动态匹配`chenyida-erp-uat-*`，人员数量不进入项目名、容器、线程、角色、容量或验收合同。
+- 授权与耐久状态：父授权最长30分钟，初次验证和只读预检后的新时钟均须至少剩余15分钟；Migration grant最长10分钟且创建时父授权须至少剩余2分钟。授权、package、request、plan、intent、grant、result和quarantine均使用create-only耐久记录；授权过期、摘要漂移、重放或状态树身份变化在首个运行动作前失败关闭。
+- 受信package门：按D-187的`ROOT_ADMIN_TRUSTED_NONPRODUCTION_BOUNDARY`，首个副作用前一次核对root-owned不可写祖先、`root:root 0700` package root、固定成员regular/root-owned/nonwritable/`nlink=1`/无symlink及整体摘要；随后以固定路径装载system adapter且不写pyc。删除同一root域内不形成新信任边界的内存`compile/exec`和system port第二次全包重读。
+- Compose边界：新增第四层`compose.uat-operations.yml`和严格静态policy。受控阶段只允许启动目标PostgreSQL；Migration固定为profile服务的`run --rm --no-deps`精确argv，禁止启动Web、Worker、Caddy、Admin或任意服务/argv。PostgreSQL必须是空数据库并严格执行46项allowlist至head `0046_runtime_lock_privilege_boundary.sql`。
+- Secret门：六份凭据文件在任何Docker变更前、PostgreSQL启动前后和每个事务边界重新验证。目录使用固定FD与`O_NOFOLLOW`；文件必须为policy要求的root owner、固定consumer group、`0440`、regular、`nlink=1`、metadata/content读取稳定，六个inode和值均唯一，正文只进入私有快照而不进入输出、日志或回执。
+- 运行身份与保护面：Docker 29观察必须精确匹配完整container ID、image manifest/config digest、用户、label、只读/nonprivileged策略、无发布端口、唯一backend网络、精确两个Volume+一个bind及tmpfs集合；仅health=`starting`允许有界重试。现有`chenyida-erp-parallel`四服务及四保护卷在动作前后按精确metadata快照比较。
+- 失败收容：任何首个运行动作后的失败都先停止目标PostgreSQL，再回收只属于本请求且身份精确匹配的`--rm`临时容器；连续两次确认仅保留已停止的目标PostgreSQL且无helper，并再次核对四服务/四保护卷不变。不得使用prune、`--volumes`或扩大清理范围。
+- Migration/ACL边界：Migration入口新增隔离UAT allowlist授权模式，结果时间必须位于grant窗口内；执行后必须观察真实`POST_MIGRATION_FENCED`状态，并把完整ledger、result、grant、父授权和release manifest绑定。解除只读围栏在单一事务/advisory lock内再次核对数据库身份、围栏、ledger、零业务backend和零prepared transaction，随后执行最终owner/ACL reconcile并再次只读验证。
+- Release绑定：候选manifest必须精确绑定最终Git commit/tree/version、Web/Worker manifest/config digest、46项Migration/head及allowlist；Docker实际镜像身份必须与其一致。Worker镜像只复制数据库CLI需要的3份operations JSON，不再携带整个历史operations目录。D-188的`74fbee…`候选和resolved Compose `f9ec23b4…68e99`不含D-189新入口与镜像内容，现为`OBSOLETE / DO NOT START / DO NOT REUSE`。下一次构建必须从D-189最终独立提交重新生成全部候选和部署包。
+- 验证：D-189 Python专项`38/38`、Node专项`32/32`、四层Compose policy/config双门、release typecheck和lint均通过；release基线Node阶段`77/77`通过。过度收紧的离线Node测试容器因禁止`/proc/self/fd`执行/chown而无法完成其Python子阶段，未降低安全断言；同一Python fixed-executor阶段改在宿主运行并以`130/130`通过。`git diff --check`、Shell语法、Python AST解析及旧D-188五个冻结文件零差异均通过。
+- 独立复核：安全审计修复预检期间授权过期竞态和`--rm`临时容器消失竞态；比例审计又删除不增加真实信任边界的重复package自证，生产源码净减56行。简化后独立终审P0=0/P1=0。部署层仍有一个明确P0：旧D-188镜像与D-189源码不一致，必须重建而不能拼接复用。
+- 资源/完整性：重测试前约MemAvailable 1.8GiB、Swap 351MiB/1GiB、根盘14GiB可用、Load约1.05；14:06 CST收口为MemAvailable `1,968,537,600`B、Swap `388,296,704`B/1GiB、根盘available `14,833,958,912`B、Load `0.18/0.17/0.21`，Memory PSI和kernel `oom_kill`均0。Docker保持6容器/77镜像/277 Volume/6网络；四常驻服务running、restart0/OOM false，Web/PostgreSQL healthy，四保护卷存在。精确删除本任务生成的一个测试pyc后，`chenyida-erp-uat-*`容器、Compose临时目录和D-189 pyc残留0。
+
+## 22. 当前停止线与完成标准
+
+磁盘、Compose消费者隔离、D-174—D-186历史准备证据、D-187比例适当的信任边界，以及D-189最小root运维执行源码已经明确；TASK92继续`DOING`。当前仍缺从D-189最终commit/tree重新构建并冻结匹配的Web/Worker候选与四层resolved Compose、独立Secret实物门、动态数据库身份/ELIGIBLE manifest/grant、现有UAT异故障域备份与隔离恢复验证、部署前新鲜资源门和新的明确部署授权。不得据此创建Secret/Volume、启动第二套数据库、运行Migration或部署。
 
 - 只完成负责人选定的一条路径，不同时建设两套方案。
-- 目标环境消费者边界、资源上界、Secret/角色映射、空库Migration范围、部署后只读运行核对、精确镜像和静态Compose/回退输入已明确。下一步是另行实现并测试最小root运维执行包；即使该包完成，也必须再取得部署授权并补齐Secret、异故障域恢复和动态数据库门，才可执行L2a。
+- 下一步是在新的明确授权下，从D-189最终独立提交串行重建候选并生成同commit/tree的部署包；该动作仍不自动创建Secret、启动PostgreSQL、运行Migration或部署。
+- 新候选完成后，仍必须补齐Secret、异故障域恢复、动态数据库/manifest/grant和新鲜资源门，并另获L2a部署执行授权。
 - 现有UAT身份、数据、四个受保护Volume和常驻服务不变。
-- TASK92完成前不自动deploy或Migration；D-188构建准备授权已消费完毕，不能复用为后续启动授权。
+- TASK92完成前不自动deploy或Migration；D-188构建准备授权已消费完毕，不能复用为D-189后的新构建或启动授权。

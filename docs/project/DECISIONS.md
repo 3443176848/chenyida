@@ -4359,7 +4359,7 @@
 ### Consequences
 
 - TASK92现在拥有可审计的精确本机Web/Worker候选、静态resolved Compose和第一阶段回退输入；“缺精确镜像”阻断已关闭。
-- TASK92仍为`DOING / L2A DEPLOYMENT NO-GO`。下一独立切片是最小root运维执行包，不是直接启动UAT；包完成后还需Secret、恢复、动态数据库与新的部署授权。
+- TASK92仍为`DOING / L2A DEPLOYMENT NO-GO`。本决策当时的下一独立切片是最小root运维执行包，后续已由D-189完成；D-189同时使本决策候选废止。Secret、恢复、动态数据库、新候选和部署授权仍缺。
 - 两路只读复核中，候选构建P0/P1/P2为0；Compose静态冻结通过，但Migration grant、角色bootstrap和最终ACL接线被登记为部署前P0，不以文档或测试标记绕过。
 
 ### Rejected alternatives
@@ -4368,6 +4368,42 @@
 - 拒绝只依赖现有Compose validator的digest格式检查，而不验证服务镜像与runtime config对候选的精确等值。
 - 拒绝因为构建成功就运行`docker compose up`、创建空PG或Secret；也拒绝以test mode、空grant或生产控制面绕过Migration守卫。
 - 拒绝在回退命令中加入Volume/image删除或任何prune，或把新UAT回退错误描述为回到某个不存在的前代镜像。
+
+## D-189 最小root运维执行源码完成后，旧候选必须废止并从最终提交重建
+
+- 日期：2026-08-25
+- 状态：Accepted（仓库执行源码完成；尚未形成可部署候选或运行授权）
+- 发起：项目负责人在D-188明确暴露运行接线P0后要求“下一步”
+
+### Context
+
+- D-188已经证明精确镜像和静态Compose可以构建，但其Worker内容、Migration入口和三层Compose都缺PostgreSQL-only启动、技术角色bootstrap、受控grant、`EMPTY→0046`及最终ACL的最小执行接线。
+- 系统少于20名内部用户，目标只是一个空库、loopback-only、可丢弃的新隔离UAT；没有必要恢复D-174—D-186的通用证明平台，但Secret、授权、精确身份、事务边界和失败收容会直接决定是否误碰现有UAT，不能省略。
+- D-188构建准备授权已经消费完毕；新增仓库源码不自动授权基于它重建镜像，更不授权创建Secret、数据库、运行容器或执行Migration。
+
+### Decision
+
+1. 只实现一个封闭的隔离UAT root运维入口和system port，不建设daemon、broker、任务队列或人员席位模型。项目名动态限定为`chenyida-erp-uat-*`；工程、计划、市场等人数不进入基础设施或验收硬条件。
+2. 请求、父授权、release manifest和单一package manifest/digest必须完整绑定最终Git commit/tree、version、Web/Worker manifest/config digest、46项Migration/head和allowlist。按D-187受信root边界，首个副作用前只做一次root祖先、`root:root 0700`包根、固定成员metadata及整体摘要核对，随后从固定路径装载且不写pyc；不再做内存`compile/exec`或system port第二次全包重读。父授权最长30分钟，预检前后均须保有至少15分钟；Migration grant最长10分钟并在创建时再次校验父授权。
+3. 受控顺序固定为PostgreSQL-only启动、技术角色bootstrap、短期grant、严格`EMPTY→0046`、真实Migration ledger/fence观察、事务内解除只读围栏及最终ACL reconcile。Web、Worker、Caddy和Admin不属于该数据库准备入口的运行集合。
+4. 六份Secret必须在任何Docker变化前及关键动作边界以目录FD、`O_NOFOLLOW`、owner/group/mode、regular、`nlink=1`、稳定metadata/content、唯一inode和值重新核对；Secret正文不得进入输出、日志或耐久回执。
+5. Docker实际容器必须精确匹配完整ID、image manifest/config、用户、label、网络、端口、mount、tmpfs和安全选项。现有`chenyida-erp-parallel`四服务及四保护卷在前后保持精确快照；失败时先停目标PG、清理精确临时helper并连续两次确认收容状态，禁止prune或Volume删除。
+6. 授权、package、request、plan、intent、grant、result和quarantine使用create-only耐久状态。首个运行动作后的任何失败必须进入收容；授权过期、package漂移、状态树替换、运行身份漂移或数据库不空在副作用前失败关闭。
+7. D-189修改Dockerfile、Migration入口和第四层Compose；因此D-188的Web/Worker候选及resolved Compose立即降级为`OBSOLETE / DO NOT START / DO NOT REUSE`。下一候选必须从D-189最终独立提交重新串行构建，并生成同commit/tree的四层resolved Compose、ELIGIBLE manifest和部署包；不得拼接旧镜像。
+8. 本决策只授权仓库实现、测试和文档收口。新候选构建、Secret实物、现有UAT异故障域恢复、动态数据库身份、Migration、部署和生产动作均保持独立授权。
+
+### Consequences
+
+- “缺最小root运维执行源码”的仓库P0已关闭；比例审计删除不增加真实信任边界的重复package自证，并把Worker运行输入收窄为3份operations JSON。D-189专项Python`38/38`、Node`32/32`、Compose policy/config、typecheck、lint及适用release基线通过，独立最终复核P0=0/P1=0。
+- TASK92继续`DOING / L2A DEPLOYMENT NO-GO`。当前直接下一步不是启动UAT，而是在新的明确授权下从D-189最终commit/tree重建候选和部署包。
+- 新构建完成也不自动获得部署权；Secret、异故障域恢复、动态数据库/manifest/grant、新鲜资源门和明确L2a执行授权仍须全部成立。
+
+### Rejected alternatives
+
+- 拒绝为少量用户建设常驻root daemon、通用工作流平台、人员数量驱动的容器/角色拓扑或第二套生产控制面。
+- 拒绝复用D-188镜像、只替换Compose、使用浮动tag或让manifest与实际Docker config不一致。
+- 拒绝把Secret值放入env、命令行、日志、manifest或回执，或只在启动前检查一次后长期信任。
+- 拒绝在失败收容中使用project-wide `down`、Volume删除、prune或不核对完整容器身份的宽泛清理。
 
 ## 待确认业务决策
 

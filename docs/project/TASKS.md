@@ -11,7 +11,9 @@
 
 ## 当前任务
 
-当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-188已按负责人明确的`L2a构建准备`授权，从固定commit/tree构建并回读精确Web/Worker本机候选，冻结root-only resolved Compose、非Secret render env、实际profile服务清单和第一阶段回退输入；没有创建或启动新UAT。Compose审计同时确认现有`migrate`缺固定grant挂载/环境、技术角色bootstrap及Migration后ACL执行接线，故L2a部署继续NO-GO。当前P0为这份最小root运维执行包、独立Secret、动态数据库/ELIGIBLE manifest与grant、现有UAT异故障域恢复、资源门和新的明确部署授权。
+当前唯一`DOING`为`SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92`。D-189已完成并测试最小root运维执行源码，固定PostgreSQL-only、技术角色bootstrap、短期Migration grant、`EMPTY→0046`、live fence/ledger、最终ACL和失败收容；没有创建或启动新UAT。由于D-189改变Worker镜像内容、Migration入口和Compose接线，D-188候选及resolved Compose已废止，不得启动或复用。当前P0为从D-189最终commit/tree重新构建匹配候选/部署包，以及独立Secret、动态数据库/ELIGIBLE manifest与grant、现有UAT异故障域恢复、资源门和新的明确部署授权。
+
+2026-08-25最小root运维执行源码事件：D-188复核暴露运行接线P0后，项目负责人要求“下一步”。新增D-189；仓库内实现root orchestrator、标准库-only system port、数据库operation CLI/operator、Migration执行合同、第四层Compose overlay和严格policy/tests。授权在只读预检前后重验；单一受信package摘要门、create-only状态、六Secret FD/nofollow/identity检查、Docker实际manifest/config/network/mount/tmpfs、现有四服务/四保护卷快照、PostgreSQL-only、`EMPTY→0046`、live fence/ledger、事务内unfence/最终ACL和失败收容均闭合。提交前比例审计按D-187删除重复全包重读和内存`compile/exec`，改为固定路径无pyc装载，并把Worker的operations输入从整目录收窄为3份实际JSON。Python专项38/38、Node专项32/32、Compose双门、typecheck、lint及适用release基线通过，最终独立复核P0=0/P1=0。D-188候选现在为`OBSOLETE / DO NOT START / DO NOT REUSE`；未新建镜像、Secret、数据库、UAT资源或账号，未运行Migration/deploy。TASK92继续`DOING / L2A DEPLOYMENT NO-GO`，下一步须另获新构建准备授权。
 
 2026-08-25 L2a构建准备事件：项目负责人明确指令`确认授权L2a构建准备`。新增D-188；root-owned `0700`干净detached worktree固定commit `74fbeeebe95432e5f17e3313b1d14b273a91f7b9`/tree `db1edef51e21e69bd7571ef0f765e602c940fec9`，串行构建Web→Worker并完成loopback digest回读。Web manifest/config为`42b41540…40ffd`/`d4da6cba…c8dd3`，Worker为`861d71ae…74b9b`/`bd34dfd2…227c1`，构建回执SHA为`172cf860…20f82`。root-only冻结输入中的规范化resolved Compose SHA为`f9ec23b4…68e99`，两次clean-env及env-file复渲染一致；隔离policy和候选等值门通过，运行profile只允许`uat-edge`且不启用`tools/admin`。首轮从`/var/tmp` worktree运行聚合测试时，前92项通过而pre-import测试因共享可写祖先按设计失败；未降断言，改从相同commit/tree的安全`/opt/erp`根重跑后`124/124`通过。构建只新增两镜像；构建器所需的任务专用临时registry/provenance容器、worktree和目录均已清零，四服务/四保护卷不变，资源全程高于停止线。未创建Secret、数据库、UAT运行容器、项目网络、命名Volume或账号，未运行Migration、up/down、备份/恢复或部署。TASK92继续`DOING / L2A DEPLOYMENT NO-GO`。
 
@@ -307,7 +309,7 @@
 
 | 任务编号 | 任务名称 | 状态 | 负责人 | 开始时间 | 依赖任务 | 当前说明 |
 | --- | --- | --- | --- | --- | --- | --- |
-| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B、接受同一故障域并明确授权构建准备）、Codex（已完成精确候选/静态Compose冻结，继续最小Migration/角色/ACL接线） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174—D-188、低资源规则 | `DOING / D-188 L2A BUILD PREPARATION COMPLETE / DEPLOYMENT PACKAGE INCOMPLETE / PRODUCTION NO-GO`。精确Web/Worker本机候选、config digest、root-only resolved Compose和第一阶段回退输入已冻结；新UAT未创建。当前仍缺PostgreSQL-only/技术角色/Migration grant/ACL最小执行包、独立Secret、动态数据库与ELIGIBLE manifest、现有UAT异故障域恢复、资源门及新的明确部署授权。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
+| SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92 | 新隔离UAT前置边界 | DOING | 项目负责人（已选同机B、接受同一故障域；新构建与部署授权待确认）、Codex（已完成D-189最小root运维执行源码和测试） | 2026-08-24 06:37 CST | TASK91、D-172、D-173、D-174—D-189、低资源规则 | `DOING / D-189 ROOT OPERATIONS SOURCE COMPLETE / D-188 CANDIDATES OBSOLETE / NEW BUILD + DEPLOYMENT PENDING / PRODUCTION NO-GO`。新UAT未创建；旧候选不得复用。当前仍缺从D-189最终commit/tree重建匹配候选/部署包、独立Secret、动态数据库与ELIGIBLE manifest、现有UAT异故障域恢复、资源门及新的明确部署授权。见[任务文档](../tasks/SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92.md)。 |
 
 ## 待启动任务
 

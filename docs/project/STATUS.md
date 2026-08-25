@@ -2,17 +2,23 @@
 
 最后更新时间：2026-08-25（Asia/Shanghai）
 
-## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-188构建准备已完成，部署包仍不完整）
+## SELFHOST-SMALL-TEAM-UAT-ISOLATION-PREREQUISITES-92（执行中；D-189执行源码完成，D-188候选已废止）
 
 | 验证项 | 结果 | 说明 |
 | --- | --- | --- |
-| 当前状态 | DOING / D-188 L2A BUILD PREPARATION COMPLETE / DEPLOYMENT PACKAGE INCOMPLETE / PRODUCTION NO-GO | 精确本机Web/Worker候选、config digest、root-only静态resolved Compose及第一阶段回退输入已冻结。Migration grant/manifest、技术角色bootstrap和最终ACL执行接线仍缺；Secret、数据库、恢复、部署授权及新UAT均未建立 |
-| 授权范围 | PASS / L2A BUILD PREPARATION ONLY | 项目负责人明确指令`确认授权L2a构建准备`；只允许精确构建、摘要回读、静态Compose/回退冻结和无业务写测试，包含构建器所需且收口清零的任务专用临时registry/provenance容器。未授权Secret、证书、数据库、UAT运行容器、项目网络/命名Volume、Migration、up/down、备份/恢复、部署、账号、HTTP/TLS或业务写 |
-| D-188固定源码 | PASS / CLEAN DETACHED COMMIT+TREE | root-owned `0700` worktree固定`74fbeeebe95432e5f17e3313b1d14b273a91f7b9`/`db1edef51e21e69bd7571ef0f765e602c940fec9`、alpha.47、46/head0046和allowlist`8bb2b2d6…8eed`；archive `73,031,680`B、SHA`580627ab…095`，构建后clean并在收口精确移除 |
-| D-188精确镜像 | PASS / LOCAL ENGINE ONLY | Web manifest/config=`42b41540…40ffd`/`d4da6cba…c8dd3`；Worker=`861d71ae…74b9b`/`bd34dfd2…227c1`。平台、nonroot用户、CMD、OCI/baked version/revision全部匹配；provenance root:root 0440、SHA`172cf860…20f82`。临时registry已移除，无外部镜像恢复锚点 |
-| D-188静态Compose | PASS / POLICY + EXACT CANDIDATE EQUALITY | root-only冻结目录保存三Compose/Caddy/Secret policy/validator/render env/active services/resolved JSON；resolved SHA=`f9ec23b4…68e99`，render env=`87cbe388…3a62`，输入清单=`42d0f896…9ece`。双render及env-file复渲染一致；Web/Worker/migrate/admin image/config等值、无build/socket/host network/privileged通过 |
-| D-188运行profile/回退 | FROZEN / NOT EXECUTED | 完整审计包含六服务；实际只允许`uat-edge`的postgres/migrate/web/worker/caddy，禁止`tools/admin`。新UAT无前代；第一阶段回退仅为精确项目`down --remove-orphans`，不删Volume/image且未执行，任何Volume删除另行授权 |
-| D-188部署阻断 | L2A DEPLOYMENT NO-GO | `migrate`缺固定Migration grant挂载和`ERP_UAT_PROMOTION_MIGRATION_*`接线，技术角色bootstrap与Migration后ACL reconcile缺最小root执行包；system ID/OID、ELIGIBLE manifest/grant、Secret、异故障域恢复、资源门及新的部署授权仍缺。禁止直接up、test-mode或绕过守卫 |
+| 当前状态 | DOING / D-189 ROOT OPERATIONS SOURCE COMPLETE / D-188 CANDIDATES OBSOLETE / PRODUCTION NO-GO | 最小root运维执行源码与测试完成；没有与最终源码匹配的新镜像或部署包。Secret、数据库、恢复、部署授权及新UAT均未建立 |
+| 授权范围 | PASS / REPOSITORY SOURCE AND TESTS ONLY | D-188构建准备授权已消费；后续“下一步”只用于关闭其发现的仓库执行源码P0。未授权从D-189重新build，也未授权Secret、证书、数据库、UAT运行容器、网络/Volume、Migration、up/down、备份/恢复、部署、账号、HTTP/TLS或业务写 |
+| D-189最小入口 | PASS / CLOSED ROOT OPERATIONS SOURCE | 固定`授权+单一package摘要门 → PostgreSQL-only → 技术角色 → 短期grant → EMPTY→0046 → live fence/ledger → transaction unfence/final ACL → containment`；动态项目名不含人员基数，Web/Worker/Caddy/Admin不进入数据库准备运行集合 |
+| D-189授权/状态 | PASS / FRESHNESS + CREATE-ONLY / D-187 PROPORTIONAL | 父授权最长30分钟，初检和只读预检后均须至少剩15分钟；grant最长10分钟且父授权须至少剩2分钟。package/request/plan/intent/grant/result/quarantine均create-only。首个副作用前只做一次受信root package身份/摘要核对，固定路径无pyc装载；无重复全包自证 |
+| D-189 Secret/运行身份 | PASS / SIX FILES + EXACT DOCKER IDENTITY | 六Secret在Docker与事务边界按FD/nofollow/owner/group/0440/regular/nlink1/stable identity/唯一inode和值重验且正文不输出；容器完整ID、manifest/config、user/label、安全选项、network/port/mount/tmpfs及四服务/四保护卷精确失败关闭 |
+| D-189 Migration/ACL | PASS / LIVE FENCE + SINGLE TRANSACTION UNFENCE | Migration result必须在grant窗口并绑定46项ledger/result/grant/父授权/release manifest；unfence在advisory lock事务内重验cluster/OID/fence/ledger/零backend/零prepared transaction，随后最终owner/ACL只读复核 |
+| D-189测试/复核 | PASS / PY38 + NODE32 + COMPOSE + BASELINES / P0=P1=0 | 专项Python38/38、Node32/32、四层Compose双门、typecheck、lint、release Node77/77及宿主fixed-executor130/130通过；受限容器Python子阶段的`/proc/self/fd`/chown环境失败如实记录，未降断言。比例审计后生产源码净减56行；旧五个冻结文件零差异 |
+| D-189资源/完整性 | PASS / ABOVE STOP LINES / NO UAT RESIDUE | 重测试前约MemAvailable1.8GiB/Swap351MiB/根盘14GiB/Load1.05；14:06为`1,968,537,600`B/`388,296,704`B/`14,833,958,912`B/`0.18/0.17/0.21`，PSI/kernel OOM0。Docker6容器/77镜像/277卷/6网络；四服务running、restart0/OOM false，Web/PG healthy，四保护卷存在；任务容器、Compose临时目录、D-189 pyc均0 |
+| D-188固定源码 | HISTORICAL / SUPERSEDED BY D-189 | 历史worktree固定`74fbeeebe95432e5f17e3313b1d14b273a91f7b9`/`db1edef51e21e69bd7571ef0f765e602c940fec9`、alpha.47、46/head0046和allowlist`8bb2b2d6…8eed`；不包含D-189变更 |
+| D-188精确镜像 | OBSOLETE / DO NOT START / DO NOT REUSE | Web manifest/config=`42b41540…40ffd`/`d4da6cba…c8dd3`；Worker=`861d71ae…74b9b`/`bd34dfd2…227c1`。只保留历史审计价值，禁止与D-189源码或Compose拼接 |
+| D-188静态Compose | OBSOLETE / THREE-LAYER HISTORICAL INPUT | resolved SHA=`f9ec23b4…68e99`只匹配D-188三层输入，不含`compose.uat-operations.yml`；下一次必须从D-189最终提交重新渲染四层输入 |
+| D-188运行profile/回退 | HISTORICAL / NOT EXECUTED | D-188运行与回退均未执行；历史无Volume删除原则继续保留，但下一部署包必须重新生成精确命令 |
+| 当前部署阻断 | L2A DEPLOYMENT NO-GO | 缺从D-189最终commit/tree构建的Web/Worker image/config和四层resolved Compose、system ID/OID、ELIGIBLE manifest/grant、Secret、异故障域恢复、资源门及新的构建/部署授权。禁止启动旧候选、test-mode或绕过守卫 |
 | D-188测试/复核 | PASS / 124 + COMPOSE / BUILD REVIEW P0=P1=P2=0 | 构建及loopback digest回读通过；Compose policy/config和候选等值门通过；安全`/opt/erp`根聚合124/124。`/var/tmp` worktree首跑的pre-import失败是共享可写祖先按设计拒绝，未降断言。构建复核无P0/P1/P2；Compose复核把运行接线列为部署P0 |
 | D-188资源/完整性 | PASS / ABOVE STOP LINES / NO TEMP RESIDUE | 11:56→12:12 MemAvailable`2,163,392,512→2,112,208,896`B，Swap`190,021,632→327,303,168`B（+137,281,536B，低于256MiB停止线），根盘`17,355,300,864→14,991,380,480`B，Load`0.38/0.40/0.33→0.44/0.57/0.56`，PSI/OOM0。6容器/77镜像/277卷/6网络，新增恰为两候选；Cache46/2.431GB active0。`docker compose ps`复核四服务running，四服务/四保护卷不变，构建专用临时容器、worktree、监听端口和目录残留0 |
 | D-187比例原则 | ACCEPTED / ROOT ADMIN TRUSTED NONPRODUCTION BOUNDARY | 同一root能控制kernel、Docker、pin、launcher和Python，继续同机自证不能形成独立信任域。该风险只对空库、无真实数据、loopback-only UAT按P1接受，不适用于真实样本、公开访问或生产 |
@@ -94,8 +100,8 @@
 | 收口资源/完整性 | PASS / NO UAT RESIDUE | `2,452,017,152`B available memory、`179,843,072`B Swap、`17,893,322,752`B根盘、Load`0.19/0.17/0.12`、OOM0；6/75/277/6、Cache0，四服务restart0/OOM false且保护卷完整 |
 | 生产配置/运行面 | PASS / UNCHANGED | 生产Compose与政策未改；未运行system/image/container/volume prune，未restart/build/deploy/Migration、访问数据库或创建UAT资源 |
 | 本段资源/完整性 | PASS / STATIC ONLY | 起点约2.3GiB/171MiB/17GiB/Load`0.21/0.20/0.18`；收口`2,445,348,864`B available、`179,769,344`B Swap、`17,871,294,464`B磁盘、Load`0.03/0.11/0.15`、PSI/OOM0。6/75/277/6、Cache0，四服务restart0/OOM false且保护卷保持，任务临时资源0 |
-| 仍有阻断 | ROOT OPS MIGRATION PACKAGE + SECRET + DYNAMIC DB/RECOVERY + DEPLOY AUTH | 精确镜像与静态Compose/回退已完成；仍缺PostgreSQL-only/技术角色/Migration grant/manifest/最终ACL最小执行包、独立Secret、动态数据库身份、现有UAT异故障域恢复、部署前资源门和新的明确部署授权 |
-| 下一步 | TASK92 / IMPLEMENT MINIMAL ROOT OPS PACKAGE, NO DEPLOY | 下一独立切片只实现并测试上述最小root运维执行包；不创建Secret或数据库，不运行Migration/deploy。执行包完成后仍需恢复/动态门和新的部署授权 |
+| 仍有阻断 | D-189-MATCHED BUILD PACKAGE + SECRET + DYNAMIC DB/RECOVERY + DEPLOY AUTH | Root运维源码已完成，D-188镜像/Compose已废止；仍缺从D-189最终提交重建的精确候选/部署包、独立Secret、动态数据库身份/ELIGIBLE manifest/grant、现有UAT异故障域恢复、部署前资源门和新的明确部署授权 |
+| 下一步 | TASK92 / REBUILD FROM D-189 FINAL COMMIT, NO DEPLOY | 另获明确构建准备授权后，从D-189最终commit/tree串行重建Web/Worker候选和四层部署包；不创建Secret或数据库，不运行Migration/deploy。构建后仍需恢复/动态门和新的部署执行授权 |
 
 ## SELFHOST-SMALL-TEAM-UAT-ENVIRONMENT-READINESS-91（完成；新隔离UAT L1只读核对）
 

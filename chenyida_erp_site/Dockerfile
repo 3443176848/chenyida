@@ -49,9 +49,15 @@ COPY --chown=65532:65532 db ./db
 COPY --chown=root:root drizzle-postgres ./drizzle-postgres
 COPY --chown=65532:65532 release ./release
 COPY --chown=65532:65532 scripts ./scripts
+COPY --chown=root:root \
+    operations/postgresql-runtime-privilege-access-v2.json \
+    operations/postgresql-runtime-privilege-compiled-catalog-v1.json \
+    operations/postgresql-runtime-privilege-policy-v2.json \
+    ./operations/
 COPY --chown=65532:65532 seeds ./seeds
 COPY --chown=65532:65532 worker ./worker
 RUN find ./drizzle-postgres -type d -exec chmod 0555 {} + && find ./drizzle-postgres -type f -exec chmod 0444 {} +
+RUN find ./operations -type d -exec chmod 0555 {} + && find ./operations -type f -exec chmod 0444 {} +
 RUN mkdir -p /data/chenyida-erp/uploads /data/chenyida-erp/attachments /run/chenyida-erp-secrets \
     && chown -R 65532:65532 /data/chenyida-erp \
     && chown 0:0 /run/chenyida-erp-secrets && chmod 0555 /run/chenyida-erp-secrets

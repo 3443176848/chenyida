@@ -15,6 +15,11 @@ import {
 } from "./release-manifest-contract.mjs";
 import { CONTROLLED_MIGRATION_SEARCH_PATH } from "./postgresql-session-profile.ts";
 import {
+  ISOLATED_UAT_MIGRATION_GRANT_CONTRACT,
+  canonicalIsolatedUatMigrationExecutionJson,
+  validateIsolatedUatMigrationGrant,
+} from "./isolated-uat-migration-execution-contract.mjs";
+import {
   canonicalMigrationExecutionJson,
   validateUatPromotionMigrationGrant,
 } from "./uat-promotion-migration-execution-contract.mjs";
@@ -29,6 +34,9 @@ const OID = /^\d{1,10}$/;
 const MIGRATION_EXECUTION_GRANT_FILE = "/run/chenyida-erp-promotion/migration-execution-grant.json";
 const MAX_GRANT_BYTES = 512 * 1024;
 
+export type MigrationExecutionGrant = ReturnType<typeof validateUatPromotionMigrationGrant>
+  | ReturnType<typeof validateIsolatedUatMigrationGrant>;
+
 export type MigrationRuntimeConfig = {
   environment: string;
   deploymentClass: string;
@@ -37,7 +45,7 @@ export type MigrationRuntimeConfig = {
 export type ReleaseAuthorization = {
   manifest: Awaited<ReturnType<typeof loadReleaseManifest>>;
   expectedCurrentHead: string;
-  grant: ReturnType<typeof validateUatPromotionMigrationGrant> | null;
+  grant: MigrationExecutionGrant | null;
   target: {
     deploymentClass: "UAT" | "PRODUCTION";
     deploymentId: string;
@@ -86,7 +94,7 @@ function sameFileIdentity(left: Stats, right: Stats): boolean {
     && left.mtimeMs === right.mtimeMs && left.ctimeMs === right.ctimeMs;
 }
 
-async function loadMigrationExecutionGrant(file: string, expectedSha256: string) {
+async function loadMigrationExecutionGrant(file: string, expectedGrantSha256: string) {
   let handle;
   try { handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW); }
   catch { reject("MIGRATION_EXECUTION_GRANT_INVALID"); }
@@ -98,11 +106,21 @@ async function loadMigrationExecutionGrant(file: string, expectedSha256: string)
     }
     const raw = await handle.readFile();
     const after = await handle.stat();
-    if (!sameFileIdentity(before, after) || sha256(raw) !== expectedSha256) reject("MIGRATION_EXECUTION_GRANT_INVALID");
-    let grant;
-    try { grant = validateUatPromotionMigrationGrant(parseStrictJson(raw.toString("utf8"), MAX_GRANT_BYTES)); }
+    if (!sameFileIdentity(before, after)) reject("MIGRATION_EXECUTION_GRANT_INVALID");
+    let grant: MigrationExecutionGrant;
+    try {
+      const parsed = parseStrictJson(raw.toString("utf8"), MAX_GRANT_BYTES);
+      grant = parsed?.contract === ISOLATED_UAT_MIGRATION_GRANT_CONTRACT
+        ? validateIsolatedUatMigrationGrant(parsed)
+        : validateUatPromotionMigrationGrant(parsed);
+    }
     catch { reject("MIGRATION_EXECUTION_GRANT_INVALID"); }
-    if (raw.toString("utf8") !== canonicalMigrationExecutionJson(grant)) reject("MIGRATION_EXECUTION_GRANT_INVALID");
+    const canonical = grant.contract === ISOLATED_UAT_MIGRATION_GRANT_CONTRACT
+      ? canonicalIsolatedUatMigrationExecutionJson(grant)
+      : canonicalMigrationExecutionJson(grant);
+    if (raw.toString("utf8") !== canonical || grant.grant_sha256 !== expectedGrantSha256) {
+      reject("MIGRATION_EXECUTION_GRANT_INVALID");
+    }
     const now = Date.now();
     if (now < Date.parse(grant.created_at) - 5 * 1000 || now >= Date.parse(grant.expires_at)) {
       reject("MIGRATION_EXECUTION_GRANT_EXPIRED");
@@ -127,7 +145,7 @@ export async function loadReleaseAuthorization(
   if (!controlled) return null;
   if (config.environment !== "production") reject("MIGRATION_CONTROLLED_ENVIRONMENT_REQUIRED");
   // Legacy variables may select and validate evidence, but never authorize SQL; runMigrationWorkflow
-  // remains fail-closed unless the checkpoint-8 Supervisor execution adapter supplies a fenced grant.
+  // remains fail-closed unless a controlled execution adapter supplies a fenced grant.
   if (process.env.ERP_ALLOW_PRODUCTION_MIGRATION !== "YES") reject("MIGRATION_EXPLICIT_PRODUCTION_PERMISSION_REQUIRED");
   if (process.env.ERP_MIGRATION_CONFIRM !== "MIGRATE_EXACT_RELEASE_MANIFEST") reject("MIGRATION_EXACT_CONFIRMATION_REQUIRED");
   const manifestFile = process.env.ERP_RELEASE_MANIFEST_FILE || "";
@@ -180,11 +198,21 @@ export async function loadReleaseAuthorization(
     "ERP_UAT_PROMOTION_MIGRATION_EXECUTION_AUTHORIZATION_SHA256", SHA256,
     "MIGRATION_EXECUTION_AUTHORIZATION_SHA256_INVALID",
   );
-  const supervisorBundleSha256 = required(
-    "ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256", SHA256, "MIGRATION_SUPERVISOR_BUNDLE_SHA256_INVALID",
-  );
-  if (grant.execution_authorization_sha256 !== executionAuthorizationSha256
-    || grant.supervisor_bundle_sha256 !== supervisorBundleSha256
+  let adapterBindingValid: boolean;
+  if (grant.contract === ISOLATED_UAT_MIGRATION_GRANT_CONTRACT) {
+    const rootOperationsPackageSha256 = required(
+      "ERP_ISOLATED_UAT_ROOT_OPERATIONS_PACKAGE_SHA256", SHA256,
+      "MIGRATION_ROOT_OPERATIONS_PACKAGE_SHA256_INVALID",
+    );
+    adapterBindingValid = grant.root_operations_package_sha256 === rootOperationsPackageSha256;
+  } else {
+    const supervisorBundleSha256 = required(
+      "ERP_RELEASE_EXPECTED_SUPERVISOR_BUNDLE_SHA256", SHA256, "MIGRATION_SUPERVISOR_BUNDLE_SHA256_INVALID",
+    );
+    adapterBindingValid = grant.supervisor_bundle_sha256 === supervisorBundleSha256;
+  }
+  if (!adapterBindingValid
+    || grant.execution_authorization_sha256 !== executionAuthorizationSha256
     || grant.release_manifest_sha256 !== manifestSha256
     || grant.worker_image !== manifest.images.worker.image_reference
     || grant.migration_manifest_sha256 !== manifest.migrations.allowlist_sha256
@@ -364,7 +392,13 @@ export async function readAppliedMigrations(client: MigrationQueryClient): Promi
   return (await readMigrationHistory(client)).rows;
 }
 
-async function assertNoUntrackedEmptyTargetState(client: MigrationQueryClient): Promise<void> {
+async function assertNoUntrackedEmptyTargetState(
+  client: MigrationQueryClient,
+  databaseState: "RELEASED" | "MIGRATION_FENCED",
+): Promise<void> {
+  const databaseSettingPredicate = databaseState === "MIGRATION_FENCED"
+    ? "and not (s.setrole=0 and s.setconfig=ARRAY['default_transaction_read_only=on']::text[])"
+    : "";
   const result = await client.query<{ present: boolean }>(`
     select exists (
       select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace
@@ -418,7 +452,9 @@ async function assertNoUntrackedEmptyTargetState(client: MigrationQueryClient): 
       union all
       select 1 from pg_catalog.pg_language l where l.lanname not in ('c','internal','plpgsql','sql')
       union all
-      select 1 from pg_catalog.pg_db_role_setting s where s.setdatabase=(select d.oid from pg_catalog.pg_database d where d.datname=pg_catalog.current_database())
+      select 1 from pg_catalog.pg_db_role_setting s
+       where s.setdatabase=(select d.oid from pg_catalog.pg_database d where d.datname=pg_catalog.current_database())
+         ${databaseSettingPredicate}
     ) as present
   `);
   if (result.rows.length !== 1) reject("MIGRATION_EMPTY_TARGET_PROBE_FAILED");
@@ -435,7 +471,7 @@ export async function assertReleaseDatabasePreflight(
   let rows: Array<{ version: string; checksum: string }> = [];
   if (authorization.expectedCurrentHead === "EMPTY") {
     if (present) reject("MIGRATION_EMPTY_TARGET_HISTORY_PRESENT");
-    await assertNoUntrackedEmptyTargetState(client);
+    await assertNoUntrackedEmptyTargetState(client, databaseState);
   } else if (present) rows = await readPresentMigrationHistory(client);
   validateAppliedMigrationRows(rows, authorization.manifest.migrations.entries, authorization.expectedCurrentHead);
 }

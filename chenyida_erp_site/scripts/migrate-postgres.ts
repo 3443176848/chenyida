@@ -30,6 +30,11 @@ import {
 } from "./release-migration-authorization.ts";
 import { CONTROLLED_MIGRATION_SEARCH_PATH } from "./postgresql-session-profile.ts";
 import {
+  ISOLATED_UAT_MIGRATION_GRANT_CONTRACT,
+  IsolatedUatMigrationExecutionError,
+  createIsolatedUatMigrationEngineResult,
+} from "./isolated-uat-migration-execution-contract.mjs";
+import {
   canonicalMigrationExecutionJson,
   createUatPromotionMigrationEngineResult,
   migrationExecutionSha256,
@@ -44,6 +49,8 @@ type MigrationLifecycleClient = Pick<PoolClient, "query" | "release">;
 type MigrationPool = Readonly<{ connect(): Promise<PoolClient> }>;
 type MigrationSourceFile = Readonly<{ filename: string; sha256: string; sql: string; bytes: number }>;
 type ControlledReleaseAuthorization = ReleaseAuthorization & { grant: NonNullable<ReleaseAuthorization["grant"]> };
+export type ControlledMigrationEngineResult = ReturnType<typeof createUatPromotionMigrationEngineResult>
+  | ReturnType<typeof createIsolatedUatMigrationEngineResult>;
 
 export type MigrationWorkflowInput = Readonly<{
   config: Pick<RuntimeConfig, "environment" | "deploymentClass">;
@@ -150,6 +157,15 @@ export function assertMigrationGrantDeadline(
 
 const migrationGrantBudget = assertMigrationGrantDeadline;
 
+export function createControlledMigrationEngineResult(
+  grant: ControlledReleaseAuthorization["grant"],
+  input: Parameters<typeof createUatPromotionMigrationEngineResult>[0],
+): ControlledMigrationEngineResult {
+  return grant.contract === ISOLATED_UAT_MIGRATION_GRANT_CONTRACT
+    ? createIsolatedUatMigrationEngineResult(input)
+    : createUatPromotionMigrationEngineResult(input);
+}
+
 async function configureMigrationDeadline(client: MigrationTransactionClient,
                                           grant: ControlledReleaseAuthorization["grant"], local: boolean): Promise<void> {
   const budget = migrationGrantBudget(grant);
@@ -251,7 +267,7 @@ export async function closeMigrationRuntime(
   if (strict && cleanupFailed) reject("MIGRATION_RUNTIME_CLOSE_FAILED");
 }
 
-export async function runMigrationWorkflow(input: MigrationWorkflowInput): Promise<ReturnType<typeof createUatPromotionMigrationEngineResult> | null> {
+export async function runMigrationWorkflow(input: MigrationWorkflowInput): Promise<ControlledMigrationEngineResult | null> {
   const { config } = input;
   assertControlledSecretsAbsent(config.deploymentClass);
   assertControlledRuntimeServiceKind(config.deploymentClass, "MIGRATION");
@@ -271,7 +287,7 @@ export async function runMigrationWorkflow(input: MigrationWorkflowInput): Promi
   let client: PoolClient | undefined;
   let locked = false;
   let primaryFailure: unknown;
-  let result: ReturnType<typeof createUatPromotionMigrationEngineResult> | null = null;
+  let result: ControlledMigrationEngineResult | null = null;
   try {
     client = await pool.connect();
     if (authorization.kind === "RELEASE") {
@@ -311,7 +327,9 @@ export async function runMigrationWorkflow(input: MigrationWorkflowInput): Promi
     const fileResults: Array<{ filename: string; sha256: string; outcome: "ALREADY_APPLIED" | "APPLIED" }> = [];
     const currentIndex = authorization.kind === "RELEASE"
       ? authorization.value.expectedCurrentHead === "EMPTY" ? -1
-        : authorization.value.manifest.migrations.entries.findIndex((entry) => entry.filename === authorization.value.expectedCurrentHead)
+        : authorization.value.manifest.migrations.entries.findIndex(
+          (entry: { filename: string }) => entry.filename === authorization.value.expectedCurrentHead,
+        )
       : -1;
     if (authorization.kind === "RELEASE" && authorization.value.expectedCurrentHead !== "EMPTY" && currentIndex < 0) {
       reject("MIGRATION_EXPECTED_CURRENT_HEAD_NOT_APPROVED");
@@ -369,7 +387,7 @@ export async function runMigrationWorkflow(input: MigrationWorkflowInput): Promi
       validateAppliedMigrationRows(applied, authorization.value.manifest.migrations.entries, authorization.value.manifest.migrations.head);
       migrationGrantBudget(authorization.value.grant);
       const completedAt = new Date().toISOString();
-      result = createUatPromotionMigrationEngineResult({
+      result = createControlledMigrationEngineResult(authorization.value.grant, {
         promotion_id: authorization.value.grant.promotion_id,
         migration_operation_id: authorization.value.grant.migration_operation_id,
         execution_authorization_sha256: authorization.value.grant.execution_authorization_sha256,
@@ -402,7 +420,7 @@ export async function runMigrationWorkflow(input: MigrationWorkflowInput): Promi
   return result;
 }
 
-export async function runMigrations(): Promise<ReturnType<typeof createUatPromotionMigrationEngineResult> | null> {
+export async function runMigrations(): Promise<ControlledMigrationEngineResult | null> {
   const config = runtimeConfig();
   return runMigrationWorkflow({
     config,
@@ -414,7 +432,8 @@ export async function runMigrations(): Promise<ReturnType<typeof createUatPromot
 
 export function safeMigrationErrorCode(error: unknown): string {
   if (error instanceof MigrationGuardError || error instanceof ReleaseManifestError
-    || error instanceof UatPromotionMigrationExecutionError) return error.code;
+    || error instanceof UatPromotionMigrationExecutionError
+    || error instanceof IsolatedUatMigrationExecutionError) return error.code;
   const candidate = error && typeof error === "object" && "code" in error ? String(error.code || "") : "";
   const known: Readonly<Record<string, string>> = Object.freeze({
     "08000": "MIGRATION_DATABASE_CONNECTION_ERROR",

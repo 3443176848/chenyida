@@ -20,6 +20,73 @@ test("migration authorization stays bundle-local and independent of application 
 
 test("EMPTY authorization rejects a pre-created history before reading an attacker-owned table",async()=>{const authorization={expectedCurrentHead:"EMPTY",manifest:{migrations:{entries:[]}},target:{databaseName:"fixture_test",systemIdentifier:"1234567890123456789",databaseOid:"16384",marker:"chenyida-erp-deployment/v2:UAT:fixture-uat",migrationRole:"fixture_migrator"}};const client={async query(text){if(text.includes("pg_control_system"))return{rows:[{database_name:"fixture_test",system_identifier:"1234567890123456789",database_oid:"16384",marker:"chenyida-erp-deployment/v2:UAT:fixture-uat",current_role_name:"fixture_migrator",session_role_name:"fixture_migrator",database_owner_matches:true,role_login:true,role_superuser:false,role_create_role:false,role_create_database:false,role_replication:false,role_bypass_rls:false,role_pg_monitor:false,role_memberships_absent:true,role_settings_absent:true,role_inherit:false,role_connection_limit:1,role_valid_until_absent:true,database_settings_absent:true,search_path_exact:true,public_schema_owner_valid:true,public_schema_create_acl_valid:true}]};if(text.includes("to_regclass"))return{rows:[{present:true}]};throw new Error("history table must not be inspected or read");}};await assert.rejects(assertReleaseDatabasePreflight(client,authorization),error=>error.code==="MIGRATION_EMPTY_TARGET_HISTORY_PRESENT");});
 
+test("fenced EMPTY preflight allows only the exact database-wide read-only setting", async () => {
+  const authorization = {
+    expectedCurrentHead: "EMPTY",
+    manifest: { migrations: { entries: [{ ordinal: 1, filename: "0001_fixture.sql", sha256: "a".repeat(64) }] } },
+    target: {
+      databaseName: "chenyida_erp",
+      systemIdentifier: "1234567890123456789",
+      databaseOid: "16384",
+      marker: "chenyida-erp-deployment/v2:UAT:chenyida-erp-uat-fenced",
+      migrationRole: "chenyida_erp_owner",
+    },
+  };
+  const identity = {
+    database_name: authorization.target.databaseName,
+    system_identifier: authorization.target.systemIdentifier,
+    database_oid: authorization.target.databaseOid,
+    marker: authorization.target.marker,
+    current_role_name: authorization.target.migrationRole,
+    session_role_name: authorization.target.migrationRole,
+    database_owner_matches: true,
+    role_login: true,
+    role_superuser: false,
+    role_create_role: false,
+    role_create_database: false,
+    role_replication: false,
+    role_bypass_rls: false,
+    role_pg_monitor: false,
+    role_memberships_absent: true,
+    role_settings_absent: true,
+    role_inherit: false,
+    role_connection_limit: 1,
+    role_valid_until_absent: true,
+    database_settings_absent: false,
+    database_read_only_fence_valid: true,
+    search_path_exact: true,
+    public_schema_owner_valid: true,
+    public_schema_create_acl_valid: true,
+  };
+  let emptyProbe = "";
+  const client = {
+    async query(text) {
+      if (text.includes("pg_control_system")) return { rows: [identity] };
+      if (text.includes("to_regclass")) return { rows: [{ present: false }] };
+      emptyProbe = text;
+      return { rows: [{ present: false }] };
+    },
+  };
+  await assertReleaseDatabasePreflight(client, authorization, "MIGRATION_FENCED");
+  assert.match(emptyProbe, /not \(s\.setrole=0 and s\.setconfig=ARRAY\['default_transaction_read_only=on'\]::text\[\]\)/);
+  await assert.rejects(
+    assertReleaseDatabasePreflight(client, authorization, "RELEASED"),
+    (error) => error.code === "MIGRATION_DATABASE_SETTINGS_INVALID",
+  );
+
+  const drifted = {
+    async query(text) {
+      if (text.includes("pg_control_system")) return { rows: [identity] };
+      if (text.includes("to_regclass")) return { rows: [{ present: false }] };
+      return { rows: [{ present: true }] };
+    },
+  };
+  await assert.rejects(
+    assertReleaseDatabasePreflight(drifted, authorization, "MIGRATION_FENCED"),
+    (error) => error.code === "MIGRATION_EMPTY_TARGET_HAS_UNTRACKED_OBJECTS",
+  );
+});
+
 test("migration allowlist is contiguous, ordered, checksummed and rejects unsafe directory entries",async()=>{const f=await migrationFixture();try{assert.deepEqual(f.entries.map((entry)=>entry.filename),["0001_first.sql","0002_second.sql"]);await writeFile(path.join(f.directory,"0004_gap.sql"),"select 1;\n");await assert.rejects(buildMigrationAllowlist(f.directory),error=>error.code==="MIGRATION_FILENAME_SEQUENCE_INVALID");await rm(path.join(f.directory,"0004_gap.sql"));await symlink(path.join(f.directory,"0001_first.sql"),path.join(f.directory,"0003_link.sql"));await assert.rejects(buildMigrationAllowlist(f.directory),error=>["MIGRATION_FILENAME_SEQUENCE_INVALID","MIGRATION_FILE_INVALID"].includes(error.code));}finally{await rm(f.root,{recursive:true,force:true});}});
 
 test("applied migration history must be an exact allowlist prefix at the operator-declared head",async()=>{const f=await migrationFixture();try{const rows=f.entries.map(({filename:version,sha256:checksum})=>({version,checksum}));assert.equal(validateAppliedMigrationRows([],f.entries,"EMPTY"),"EMPTY");assert.equal(validateAppliedMigrationRows(rows.slice(0,1),f.entries,"0001_first.sql"),"0001_first.sql");assert.equal(validateAppliedMigrationRows(rows,f.entries,"0002_second.sql"),"0002_second.sql");assert.throws(()=>validateAppliedMigrationRows([{version:f.entries[0].filename,checksum:"e".repeat(64)}],f.entries,"0001_first.sql"),error=>error.code==="APPLIED_MIGRATION_CHECKSUM_MISMATCH");assert.throws(()=>validateAppliedMigrationRows([{version:f.entries[1].filename,checksum:f.entries[1].sha256}],f.entries,"0002_second.sql"),error=>error.code==="APPLIED_MIGRATION_NOT_ALLOWLIST_PREFIX");assert.throws(()=>validateAppliedMigrationRows(rows.slice(0,1),f.entries,"EMPTY"),error=>error.code==="MIGRATION_CURRENT_HEAD_MISMATCH");}finally{await rm(f.root,{recursive:true,force:true});}});
